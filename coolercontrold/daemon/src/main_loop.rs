@@ -66,6 +66,7 @@ pub async fn run(
         align_loop_timing_with_clock().await;
         // The sub-second position is set on interval creation:
         let mut loop_interval = time::interval(Duration::from_secs_f64(poll_rate));
+        let mut sleep_prepared = false;
         while run_token.is_cancelled().not() {
             loop_interval.tick().await;
             lcd_update_trigger.tick();
@@ -81,6 +82,7 @@ pub async fn run(
                 fire_snapshots_and_processes(&repos, &engine, &mut lcd_update_trigger, &status_handle, scope).await;
                 alert_controller.process_alerts();
             } else if sleep_listener.is_resuming() {
+                sleep_prepared = false;
                 wake_from_sleep(
                     &config,
                     &engine,
@@ -89,6 +91,12 @@ pub async fn run(
                 )
                 .await?;
             } else {
+                if sleep_prepared.not() {
+                    for repo in repos.iter() {
+                        repo.prepare_for_sleep().await;
+                    }
+                    sleep_prepared = true;
+                }
                 debug!("Skipping polling loop operations while system is entering/leaving sleep mode.");
             }
         }
