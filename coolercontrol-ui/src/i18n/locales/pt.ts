@@ -1134,6 +1134,9 @@ export default {
             disableDevice: 'Desativar dispositivo liquidctl',
             disableInfo:
                 'Desativar o driver liquidctl desativará este dispositivo. Um novo dispositivo baseado em HWMon aparecerá na parte inferior do menu de dispositivos. Você pode reativar o dispositivo liquidctl a qualquer momento no menu de configurações.',
+            commandDelay: 'Atraso de comando',
+            commandDelayDesc:
+                'Atraso em milissegundos entre comandos enviados a este dispositivo.\nIsso pode ajudar com dispositivos que têm problemas de comunicação\nquando vários comandos são enviados em rápida sucessão.',
         },
     },
     auth: {

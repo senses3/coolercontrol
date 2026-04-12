@@ -1058,6 +1058,9 @@ export default {
             disableDevice: '停用 liquidctl 裝置',
             disableInfo:
                 '停用 liquidctl 驅動程式將停用此裝置。一個新的基於 HWMon 的裝置將出現在裝置選單底部。您可以隨時從設定選單重新啟用 liquidctl 裝置。',
+            commandDelay: '命令延遲',
+            commandDelayDesc:
+                '傳送到此裝置的命令之間的延遲（毫秒）。\n當多個命令快速連續傳送時，\n這可以幫助解決裝置通訊問題。',
         },
     },
     auth: {
