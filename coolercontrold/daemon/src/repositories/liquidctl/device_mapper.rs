@@ -29,6 +29,7 @@ use crate::repositories::liquidctl::supported_devices::control_hub::ControlHubSu
 use crate::repositories::liquidctl::supported_devices::coolit::CoolitSupport;
 use crate::repositories::liquidctl::supported_devices::corsair_hid_psu::CorsairHidPsuSupport;
 use crate::repositories::liquidctl::supported_devices::device_support::{DeviceSupport, StatusMap};
+use crate::repositories::liquidctl::supported_devices::ga2_lcd::Ga2LcdSupport;
 use crate::repositories::liquidctl::supported_devices::h1v2::H1V2Support;
 use crate::repositories::liquidctl::supported_devices::hydro_690_lc::Hydro690LcSupport;
 use crate::repositories::liquidctl::supported_devices::hydro_platinum::HydroPlatinumSupport;
@@ -62,6 +63,7 @@ impl DeviceMapper {
             Box::new(ControlHubSupport::new()),
             Box::new(CoolitSupport::new()),
             Box::new(CorsairHidPsuSupport::new()),
+            Box::new(Ga2LcdSupport::new()),
             Box::new(H1V2Support::new()),
             Box::new(Hydro690LcSupport::new()),
             Box::new(HydroPlatinumSupport::new()),
@@ -120,5 +122,16 @@ impl DeviceMapper {
             .get(driver_type)
             .expect("Device Support should already have been verified")
             .extract_info(device_response)
+    }
+
+    pub fn liquidctl_color_channel_name<'a>(
+        &self,
+        driver_type: &BaseDriver,
+        channel_name: &'a str,
+    ) -> &'a str {
+        self.supported_devices
+            .get(driver_type)
+            .expect("Device Support should already have been verified")
+            .liquidctl_color_channel_name(channel_name)
     }
 }

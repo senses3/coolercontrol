@@ -25,6 +25,7 @@ pub mod control_hub;
 pub mod coolit;
 pub mod corsair_hid_psu;
 pub mod device_support;
+pub mod ga2_lcd;
 pub mod h1v2;
 pub mod hydro_690_lc;
 pub mod hydro_platinum;
