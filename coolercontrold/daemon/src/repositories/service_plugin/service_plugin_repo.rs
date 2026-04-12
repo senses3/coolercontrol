@@ -653,29 +653,31 @@ impl ServicePluginRepo {
         let Ok((mut channel_statuses, mut temp_statuses)) =
             service.client.status(&device_uid).await
         else {
-            let mut missing_lock = self.failsafe_statuses.borrow_mut();
-            let msd = missing_lock
-                .get_mut(&device_uid)
-                .expect("Missing Status data should exist for existing Devices");
-            msd.count += 1;
-            if msd.count > MISSING_STATUS_THRESHOLD {
-                if msd.logged.not() {
-                    error!(
-                        "There is a significant issue with retrieving status data for \
-                                    device: {device_uid}, from service: {}. Setting critical values \
-                                    for this device.",
-                        service.id
-                    );
-                    msd.logged = true;
+            {
+                let mut missing_lock = self.failsafe_statuses.borrow_mut();
+                let msd = missing_lock
+                    .get_mut(&device_uid)
+                    .expect("Missing Status data should exist for existing Devices");
+                msd.count += 1;
+                if msd.count > MISSING_STATUS_THRESHOLD {
+                    if msd.logged.not() {
+                        error!(
+                            "There is a significant issue with retrieving status data for \
+                                        device: {device_uid}, from service: {}. Setting critical values \
+                                        for this device.",
+                            service.id
+                        );
+                        msd.logged = true;
+                    }
+                    // insert ALL failsafe channels
+                    let preload_data = PreloadData {
+                        channels: msd.channel_failsafes.clone(),
+                        temps: msd.temp_failsafes.clone(),
+                    };
+                    self.preloaded_statuses
+                        .borrow_mut()
+                        .insert(device_uid, preload_data);
                 }
-                // insert ALL failsafe channels
-                let preload_data = PreloadData {
-                    channels: msd.channel_failsafes.clone(),
-                    temps: msd.temp_failsafes.clone(),
-                };
-                self.preloaded_statuses
-                    .borrow_mut()
-                    .insert(device_uid, preload_data);
             }
             apply_device_command_delay(delay).await;
             return;
