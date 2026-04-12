@@ -1406,15 +1406,12 @@ impl Config {
                 Item::None
             };
         let delay_millis_clamped = cc_device_settings.extensions.delay_millis.min(250);
-        device_settings_table["extensions"]["delay_millis"] =
-            if delay_millis_clamped > 0 {
-                has_device_extension_setting = true;
-                Item::Value(Value::Integer(Formatted::new(
-                    delay_millis_clamped.into(),
-                )))
-            } else {
-                Item::None
-            };
+        device_settings_table["extensions"]["delay_millis"] = if delay_millis_clamped > 0 {
+            has_device_extension_setting = true;
+            Item::Value(Value::Integer(Formatted::new(delay_millis_clamped.into())))
+        } else {
+            Item::None
+        };
         if has_device_extension_setting.not() {
             device_settings_table["extensions"] = Item::None;
         }
