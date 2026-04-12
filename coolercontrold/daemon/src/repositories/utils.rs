@@ -300,6 +300,15 @@ pub fn find_xauthority_path() -> Option<String> {
     None
 }
 
+/// Enforces a minimum delay after a device command completes.
+/// Called at the end of each `apply_setting_*` method to guarantee the
+/// configured minimum time gap before the next command can start.
+pub async fn apply_device_command_delay(delay_millis: u16) {
+    if delay_millis > 0 {
+        tokio::time::sleep(Duration::from_millis(u64::from(delay_millis))).await;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::repositories::utils::limit_output_length;

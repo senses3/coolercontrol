@@ -1274,10 +1274,11 @@ impl Config {
                 }
                 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
                 if let Some(value) = device_ext_table.get("delay_millis") {
-                    extensions.delay_millis = value
+                    extensions.delay_millis = (value
                         .as_integer()
                         .with_context(|| "delay_millis should be an integer value")?
-                        as u16;
+                        as u16)
+                        .min(250);
                 }
             }
             // deprecated(3.0.0). We convert this to the new model for backwards compatibility:
@@ -1404,11 +1405,12 @@ impl Config {
             } else {
                 Item::None
             };
+        let delay_millis_clamped = cc_device_settings.extensions.delay_millis.min(250);
         device_settings_table["extensions"]["delay_millis"] =
-            if cc_device_settings.extensions.delay_millis > 0 {
+            if delay_millis_clamped > 0 {
                 has_device_extension_setting = true;
                 Item::Value(Value::Integer(Formatted::new(
-                    cc_device_settings.extensions.delay_millis.into(),
+                    delay_millis_clamped.into(),
                 )))
             } else {
                 Item::None
