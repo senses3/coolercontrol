@@ -27,6 +27,7 @@ use crate::repositories::hwmon::apple_mac_smc::AppleMacSMC;
 use crate::repositories::hwmon::devices::{DEVICE_NAMES_APPLE, HWMON_DEVICE_NAME_BLACKLIST};
 use crate::repositories::hwmon::{auto_curve, devices, drivetemp, fans, power, temps, thinkpad};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
+use crate::repositories::utils::apply_device_command_delay;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -178,6 +179,9 @@ pub struct HwmonRepo {
 
     /// Liquidctl driver `HWMon` paths, to be used to filter out duplicate `HWMon` devices
     lc_hwmon_paths: Vec<PathBuf>,
+
+    /// Cached per-device command delay in milliseconds. Loaded at startup from config.
+    device_delays: HashMap<DeviceUID, u16>,
 }
 
 impl HwmonRepo {
@@ -195,22 +199,43 @@ impl HwmonRepo {
                 // blocking is fine during initialization:
                 .filter_map(|loc| cc_fs::canonicalize(loc).ok())
                 .collect(),
+            device_delays: HashMap::new(),
         }
+    }
+
+    fn load_device_delays(&mut self) {
+        for uid in self.devices.keys() {
+            let delay_millis = self
+                .config
+                .get_cc_settings_for_device(uid)
+                .ok()
+                .flatten()
+                .map_or(0, |s| s.extensions.delay_millis);
+            if delay_millis > 0 {
+                self.device_delays.insert(uid.clone(), delay_millis);
+            }
+        }
+    }
+
+    fn device_delay(&self, device_uid: &UID) -> u16 {
+        self.device_delays.get(device_uid).copied().unwrap_or(0)
     }
 
     /// Checks if the path matches a liquidctl device path.
     ///
-    /// By default, `CoolerControl` will hide `HWMon` devices that are already detected by liquidctl.
-    /// Liquidctl offers more features, like RGB & LCD control, that `HWMon` drivers don't.
+    /// By default, `CoolerControl` will hide `HWMon` devices that are already detected
+    /// by liquidctl. Liquidctl offers more features, like RGB & LCD control, that `HWMon`
+    /// drivers don't.
     ///
-    /// Liquidctl uses `HWMon` in their backend for many of their supported devices. This allows us
-    /// to verify which one of the liquidctl devices have an exact path match to a `HWMon` device
-    /// we've detected. The canonicalized path resolves the `HWMon` path to a very specific location
-    /// in the system and device model, so false positives are near impossible.
+    /// Liquidctl uses `HWMon` in their backend for many of their supported devices. This
+    /// allows us to verify which one of the liquidctl devices have an exact path match to
+    /// a `HWMon` device we've detected. The canonicalized path resolves the `HWMon` path
+    /// to a very specific location in the system and device model, so false positives are
+    /// near impossible.
     ///
-    /// Additionally, liquidctl gives us a hidraw based `HWMon` path, and we use a `HWMon` class
-    /// based path. Both of these paths are canonicalized to the same "real" path, negating any
-    /// initial subsystem differences.
+    /// Additionally, liquidctl gives us a hidraw based `HWMon` path, and we use a `HWMon`
+    /// class based path. Both of these paths are canonicalized to the same "real" path,
+    /// negating any initial subsystem differences.
     fn path_matches_liquidctl_device(&self, base_path: &Path) -> bool {
         cc_fs::canonicalize(base_path).is_ok_and(|dev_path| self.lc_hwmon_paths.contains(&dev_path))
     }
@@ -613,6 +638,7 @@ impl Repository for HwmonRepo {
         hwmon_drivers.sort_by(|d1, d2| d1.name.cmp(&d2.name));
 
         self.map_into_our_device_model(hwmon_drivers).await?;
+        self.load_device_delays();
 
         let mut init_devices = HashMap::new();
         for (uid, (device, hwmon_info)) in &self.devices {
@@ -663,8 +689,9 @@ impl Repository for HwmonRepo {
     async fn preload_statuses(self: Rc<Self>) {
         let start_update = Instant::now();
         moro_local::async_scope!(|scope| {
-            for (device_lock, driver) in self.devices.values() {
+            for (uid, (device_lock, driver)) in &self.devices {
                 let type_index = device_lock.borrow().type_index;
+                let delay = self.device_delay(uid);
                 let self = Rc::clone(&self);
                 scope.spawn(async move {
                     tokio::select! {
@@ -674,6 +701,7 @@ impl Repository for HwmonRepo {
                         },
                         Ok(device_permit) = self.device_permits.get(&type_index).unwrap().acquire() => {
                             self.preload_device_statuses(type_index, driver).await;
+                            apply_device_command_delay(delay).await;
                             drop(device_permit);
                         },
                     }
@@ -746,14 +774,16 @@ impl Repository for HwmonRepo {
         let _device_permit = self
             .get_permit_with_write_timeout(type_index, &hwmon_driver.name, channel_name)
             .await?;
-        if hwmon_driver.apple_smc.detected {
+        let result = if hwmon_driver.apple_smc.detected {
             hwmon_driver
                 .apple_smc
                 .set_to_auto_control(channel_info.number)
                 .await
         } else {
             fans::set_pwm_enable_to_default_or_auto(&hwmon_driver.path, channel_info).await
-        }
+        };
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_manual_control(
@@ -766,7 +796,7 @@ impl Repository for HwmonRepo {
         let _device_permit = self
             .get_permit_with_write_timeout(type_index, &hwmon_driver.name, channel_name)
             .await?;
-        if hwmon_driver.apple_smc.detected {
+        let result = if hwmon_driver.apple_smc.detected {
             hwmon_driver
                 .apple_smc
                 .set_to_manual_control(channel_info.number)
@@ -784,7 +814,9 @@ impl Repository for HwmonRepo {
                     hwmon_driver.name
                 )
             })
-        }
+        };
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_speed_fixed(
@@ -804,7 +836,7 @@ impl Repository for HwmonRepo {
         debug!(
             "Applying HWMON device: {device_uid} channel: {channel_name}; Fixed Speed: {speed_fixed}"
         );
-        if hwmon_driver.name == devices::DEVICE_NAME_THINK_PAD {
+        let result = if hwmon_driver.name == devices::DEVICE_NAME_THINK_PAD {
             thinkpad::apply_speed_fixed(&self.config, hwmon_driver, channel_info, speed_fixed).await
         } else if hwmon_driver.apple_smc.detected {
             hwmon_driver
@@ -820,7 +852,9 @@ impl Repository for HwmonRepo {
                         hwmon_driver.name
                     )
                 })
-        }
+        };
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_speed_profile(
@@ -860,7 +894,7 @@ impl Repository for HwmonRepo {
         debug!(
             "Applying HWMON device: {device_uid} channel: {channel_name}; Speed Profile: {speed_profile:?}"
         );
-        auto_curve::apply_curve(
+        let result = auto_curve::apply_curve(
             &hwmon_driver.path,
             fan_channel_info,
             speed_profile,
@@ -873,7 +907,9 @@ impl Repository for HwmonRepo {
                 "Error on {}:{channel_name} for speed profile {speed_profile:?} - {err}",
                 hwmon_driver.name
             )
-        })
+        });
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_lighting(

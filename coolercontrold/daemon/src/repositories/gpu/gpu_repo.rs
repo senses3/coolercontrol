@@ -35,6 +35,7 @@ use crate::device::{DeviceType, UID};
 use crate::repositories::gpu::amd::{GpuAMD, TEMP_FOR_FAN_CURVE};
 use crate::repositories::gpu::nvidia::{GpuNVidia, StatusNvidiaDeviceSMI};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
+use crate::repositories::utils::apply_device_command_delay;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use crate::ENV_NVML;
 
@@ -54,24 +55,47 @@ pub enum GpuType {
 
 /// A Repository for GPU devices
 pub struct GpuRepo {
+    config: Rc<Config>,
     devices: HashMap<UID, DeviceLock>,
     gpu_type_count: HashMap<GpuType, u8>,
     gpus_nvidia: GpuNVidia,
     nvml_active: bool,
     gpus_amd: GpuAMD,
     force_nvidia_cli: bool,
+    /// Cached per-device command delay in milliseconds. Loaded at startup from config.
+    device_delays: HashMap<UID, u16>,
 }
 
 impl GpuRepo {
     pub fn new(config: Rc<Config>, nvidia_cli: bool) -> Self {
         Self {
             gpus_nvidia: GpuNVidia::new(Rc::clone(&config)),
-            gpus_amd: GpuAMD::new(config),
+            gpus_amd: GpuAMD::new(Rc::clone(&config)),
+            config,
             devices: HashMap::new(),
             gpu_type_count: HashMap::new(),
             nvml_active: false,
             force_nvidia_cli: nvidia_cli,
+            device_delays: HashMap::new(),
         }
+    }
+
+    fn load_device_delays(&mut self) {
+        for uid in self.devices.keys() {
+            let delay_millis = self
+                .config
+                .get_cc_settings_for_device(uid)
+                .ok()
+                .flatten()
+                .map_or(0, |s| s.extensions.delay_millis);
+            if delay_millis > 0 {
+                self.device_delays.insert(uid.clone(), delay_millis);
+            }
+        }
+    }
+
+    fn device_delay(&self, device_uid: &UID) -> u16 {
+        self.device_delays.get(device_uid).copied().unwrap_or(0)
     }
 
     #[allow(clippy::cast_possible_truncation)]
@@ -110,12 +134,14 @@ impl GpuRepo {
         for (uid, amd_driver) in &self.gpus_amd.amd_driver_infos {
             if let Some(device_lock) = self.devices.get(uid) {
                 let type_index = device_lock.borrow().type_index;
+                let delay = self.device_delay(uid);
                 scope.spawn(async move {
                     let statuses = self.gpus_amd.get_amd_status(amd_driver).await;
                     self.gpus_amd
                         .amd_preloaded_statuses
                         .borrow_mut()
                         .insert(type_index, statuses);
+                    apply_device_command_delay(delay).await;
                 });
             }
         }
@@ -125,6 +151,7 @@ impl GpuRepo {
         for (uid, nv_info) in &self.gpus_nvidia.nvidia_device_infos {
             if let Some(device_lock) = self.devices.get(uid) {
                 let type_index = device_lock.borrow().type_index;
+                let delay = self.device_delay(uid);
                 scope.spawn(async move {
                     let nvml_status = self.gpus_nvidia.request_nvml_status(nv_info);
                     self.gpus_nvidia
@@ -138,6 +165,7 @@ impl GpuRepo {
                                 ..Default::default()
                             },
                         );
+                    apply_device_command_delay(delay).await;
                 });
             }
         }
@@ -161,6 +189,7 @@ impl GpuRepo {
                         error!("GPU Index not found in Nvidia status response");
                     }
                 }
+                apply_device_command_delay(self.device_delay(uid)).await;
             }
         });
     }
@@ -222,6 +251,7 @@ impl Repository for GpuRepo {
             "Time taken to initialize all GPU devices: {:?}",
             start_initialization.elapsed()
         );
+        self.load_device_delays();
         debug!("GPU Repository initialized");
         Ok(())
     }
@@ -268,7 +298,7 @@ impl Repository for GpuRepo {
             "Applying GPU device: {device_uid} channel: {channel_name}; Resetting to Automatic fan control"
         );
         let is_amd = self.gpus_amd.amd_driver_infos.contains_key(device_uid);
-        if is_amd {
+        let result = if is_amd {
             self.gpus_amd
                 .reset_amd_to_default(device_uid, channel_name)
                 .await
@@ -276,7 +306,9 @@ impl Repository for GpuRepo {
             self.gpus_nvidia
                 .reset_device(device_uid, channel_name)
                 .await
-        }
+        };
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     /// Applying manual control is handled internally for GPU devices.
@@ -301,7 +333,7 @@ impl Repository for GpuRepo {
             return Err(anyhow!("Invalid fixed_speed: {speed_fixed}"));
         }
         let is_amd = self.gpus_amd.amd_driver_infos.contains_key(device_uid);
-        if is_amd {
+        let result = if is_amd {
             self.gpus_amd
                 .set_amd_duty(device_uid, channel_name, speed_fixed)
                 .await
@@ -309,7 +341,9 @@ impl Repository for GpuRepo {
             self.gpus_nvidia
                 .set_fan_duty(device_uid, channel_name, speed_fixed)
                 .await
-        }
+        };
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_speed_profile(
@@ -345,9 +379,12 @@ impl Repository for GpuRepo {
         debug!(
             "Applying GPU device: {device_uid} channel: {channel_name}; Speed Profile: {speed_profile:?}"
         );
-        self.gpus_amd
+        let result = self
+            .gpus_amd
             .set_amd_fan_curve(device_uid, speed_profile)
-            .await
+            .await;
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_lighting(

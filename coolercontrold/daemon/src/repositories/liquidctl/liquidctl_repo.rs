@@ -39,6 +39,7 @@ use crate::repositories::liquidctl::liqctld_service;
 use crate::repositories::liquidctl::supported_devices::device_support;
 use crate::repositories::liquidctl::supported_devices::device_support::StatusMap;
 use crate::repositories::repository::{DeviceList, DeviceLock, InitError, Repository};
+use crate::repositories::utils::apply_device_command_delay;
 use crate::setting::{LcdModeName, LcdSettings, LightingSettings, TempSource};
 use crate::Device;
 use anyhow::{anyhow, Context, Result};
@@ -67,6 +68,8 @@ pub struct LiquidctlRepo {
     preloaded_statuses: RefCell<HashMap<u8, LCStatus>>,
     failsafe_statuses: RefCell<HashMap<TypeIndex, FailsafeStatusData>>,
     disabled_channels: RefCell<HashMap<UID, Vec<ChannelName>>>,
+    /// Cached per-device command delay in milliseconds. Loaded at startup from config.
+    device_delays: HashMap<UID, u16>,
 }
 
 impl LiquidctlRepo {
@@ -134,7 +137,26 @@ impl LiquidctlRepo {
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: RefCell::new(HashMap::new()),
+            device_delays: HashMap::new(),
         })
+    }
+
+    fn load_device_delays(&mut self) {
+        for uid in self.devices.keys() {
+            let delay_millis = self
+                .config
+                .get_cc_settings_for_device(uid)
+                .ok()
+                .flatten()
+                .map_or(0, |s| s.extensions.delay_millis);
+            if delay_millis > 0 {
+                self.device_delays.insert(uid.clone(), delay_millis);
+            }
+        }
+    }
+
+    fn device_delay(&self, device_uid: &UID) -> u16 {
+        self.device_delays.get(device_uid).copied().unwrap_or(0)
     }
 
     pub async fn get_devices(&mut self) -> Result<()> {
@@ -457,8 +479,13 @@ impl LiquidctlRepo {
 
     async fn call_reinitialize_concurrently(&self) {
         let mut futures = vec![];
-        for device in self.devices.values() {
-            futures.push(self.call_reinitialize_per_device(device));
+        for (uid, device) in &self.devices {
+            let delay = self.device_delay(uid);
+            futures.push(async move {
+                let result = self.call_reinitialize_per_device(device).await;
+                apply_device_command_delay(delay).await;
+                result
+            });
         }
         let results: Vec<Result<()>> = join_all(futures).await;
         for result in results {
@@ -934,6 +961,7 @@ impl Repository for LiquidctlRepo {
             "Time taken to initialize all LIQUIDCTL devices: {:?}",
             start_initialization.elapsed()
         );
+        self.load_device_delays();
         debug!("LIQUIDCTL Repository initialized");
         Ok(())
     }
@@ -945,8 +973,9 @@ impl Repository for LiquidctlRepo {
     async fn preload_statuses(self: Rc<Self>) {
         let start_update = Instant::now();
         moro_local::async_scope!(|scope| {
-            for device_lock in self.devices.values() {
+            for (uid, device_lock) in &self.devices {
                 let device_id = device_lock.borrow().type_index;
+                let delay = self.device_delay(uid);
                 let self = Rc::clone(&self);
                 scope.spawn(async move {
                     match self.call_status(&device_id).await {
@@ -975,6 +1004,7 @@ impl Repository for LiquidctlRepo {
                             }
                         }
                     }
+                    apply_device_command_delay(delay).await;
                 });
             }
         })
@@ -1026,7 +1056,7 @@ impl Repository for LiquidctlRepo {
     /// All internal `CoolerControl` processes for this device channel are reset though.
     async fn apply_setting_reset(&self, device_uid: &UID, channel_name: &str) -> Result<()> {
         let cached_device_data = self.cache_device_data(device_uid)?;
-        if cached_device_data.driver_type == BaseDriver::CorsairHidPsu {
+        let result = if cached_device_data.driver_type == BaseDriver::CorsairHidPsu {
             // The only device so far that can be reset to hardware control
             self.liqctld_client
                 .initialize_device(&cached_device_data.type_index, None)
@@ -1050,7 +1080,9 @@ impl Repository for LiquidctlRepo {
                 })
         } else {
             Ok(())
-        }
+        };
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     /// liquidctl drivers handle this themselves, so we don't need to do anything.
@@ -1072,14 +1104,17 @@ impl Repository for LiquidctlRepo {
         debug!(
             "Applying LiquidCtl device: {device_uid} channel: {channel_name}; Fixed Speed: {speed_fixed}"
         );
-        self.set_fixed_speed(&cached_device_data, channel_name, speed_fixed)
+        let result = self
+            .set_fixed_speed(&cached_device_data, channel_name, speed_fixed)
             .await
             .map_err(|err| {
                 anyhow!(
                     "Error on {}:{channel_name} for duty {speed_fixed} - {err}",
                     cached_device_data.driver_type
                 )
-            })
+            });
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_speed_profile(
@@ -1093,13 +1128,16 @@ impl Repository for LiquidctlRepo {
             "Applying LiquidCtl device: {device_uid} channel: {channel_name}; Speed Profile: {speed_profile:?}"
         );
         let cached_device_data = self.cache_device_data(device_uid)?;
-        self.set_speed_profile(
-            &cached_device_data,
-            channel_name,
-            temp_source,
-            speed_profile,
-        )
-        .await
+        let result = self
+            .set_speed_profile(
+                &cached_device_data,
+                channel_name,
+                temp_source,
+                speed_profile,
+            )
+            .await;
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_lighting(
@@ -1112,8 +1150,11 @@ impl Repository for LiquidctlRepo {
             "Applying LiquidCtl device: {device_uid} channel: {channel_name}; Lighting: {lighting:?}"
         );
         let cached_device_data = self.cache_device_data(device_uid)?;
-        self.set_color(&cached_device_data, channel_name, lighting)
-            .await
+        let result = self
+            .set_color(&cached_device_data, channel_name, lighting)
+            .await;
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_lcd(
@@ -1124,8 +1165,11 @@ impl Repository for LiquidctlRepo {
     ) -> Result<()> {
         debug!("Applying LiquidCtl device: {device_uid} channel: {channel_name}; LCD: {lcd:?}");
         let cached_device_data = self.cache_device_data(device_uid)?;
-        self.set_screen(&cached_device_data, channel_name, lcd)
-            .await
+        let result = self
+            .set_screen(&cached_device_data, channel_name, lcd)
+            .await;
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_pwm_mode(&self, _: &UID, _: &str, _: u8) -> Result<()> {
