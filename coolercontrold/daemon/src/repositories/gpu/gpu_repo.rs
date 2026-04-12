@@ -20,15 +20,17 @@ use std::collections::HashMap;
 use std::env;
 use std::ops::Not;
 use std::rc::Rc;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use moro_local::Scope;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
-use tokio::time::Instant;
+use tokio::sync::{Semaphore, SemaphorePermit};
+use tokio::time::{sleep, Instant};
 
 use crate::config::Config;
 use crate::device::{DeviceType, UID};
@@ -45,6 +47,10 @@ pub const GPU_LOAD_NAME: &str = "GPU Load";
 pub const GPU_POWER_NAME: &str = "GPU Power";
 pub const COMMAND_TIMEOUT_DEFAULT: Duration = Duration::from_millis(800);
 pub const COMMAND_TIMEOUT_FIRST_TRY: Duration = Duration::from_secs(5);
+
+static DEVICE_READ_PERMIT_TIMEOUT: LazyLock<Duration> =
+    LazyLock::new(|| Duration::from_millis(350));
+static DEVICE_WRITE_PERMIT_TIMEOUT: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(8));
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Display, EnumString, Serialize, Deserialize)]
@@ -64,6 +70,10 @@ pub struct GpuRepo {
     force_nvidia_cli: bool,
     /// Cached per-device command delay in milliseconds. Loaded at startup from config.
     device_delays: HashMap<UID, u16>,
+    /// Permits for each AMD GPU device. AMD GPUs use hwmon/sysfs under the hood,
+    /// so they need the same serialization as hwmon devices to prevent concurrent
+    /// reads/writes to the same sysfs files.
+    device_permits: HashMap<UID, Semaphore>,
 }
 
 impl GpuRepo {
@@ -77,6 +87,7 @@ impl GpuRepo {
             nvml_active: false,
             force_nvidia_cli: nvidia_cli,
             device_delays: HashMap::new(),
+            device_permits: HashMap::new(),
         }
     }
 
@@ -96,6 +107,28 @@ impl GpuRepo {
 
     fn device_delay(&self, device_uid: &UID) -> u16 {
         self.device_delays.get(device_uid).copied().unwrap_or(0)
+    }
+
+    fn is_amd_device(&self, device_uid: &UID) -> bool {
+        self.gpus_amd.amd_driver_infos.contains_key(device_uid)
+    }
+
+    async fn get_amd_permit_with_write_timeout(
+        &self,
+        device_uid: &UID,
+        channel_name: &str,
+    ) -> Result<SemaphorePermit<'_>> {
+        let Some(semaphore) = self.device_permits.get(device_uid) else {
+            return Err(anyhow!("No device permit found for AMD GPU: {device_uid}"));
+        };
+        tokio::select! {
+            () = sleep(*DEVICE_WRITE_PERMIT_TIMEOUT) => Err(anyhow!(
+                "TIMEOUT AMD GPU device: {device_uid} channel: {channel_name}; waiting to apply \
+                setting. There will be significant issues handling this device due to extreme lag."
+            )),
+            device_permit = semaphore.acquire() =>
+                device_permit.map_err(|e| anyhow!(e)),
+        }
     }
 
     #[allow(clippy::cast_possible_truncation)]
@@ -136,12 +169,26 @@ impl GpuRepo {
                 let type_index = device_lock.borrow().type_index;
                 let delay = self.device_delay(uid);
                 scope.spawn(async move {
-                    let statuses = self.gpus_amd.get_amd_status(amd_driver).await;
-                    self.gpus_amd
-                        .amd_preloaded_statuses
-                        .borrow_mut()
-                        .insert(type_index, statuses);
-                    apply_device_command_delay(delay).await;
+                    let Some(device_semaphore) = self.device_permits.get(uid) else {
+                        return;
+                    };
+                    tokio::select! {
+                        () = sleep(*DEVICE_READ_PERMIT_TIMEOUT) => {
+                            warn!(
+                                "TIMEOUT waiting for AMD GPU device permit: {uid}. \
+                                Skipping status preload for this cycle."
+                            );
+                        },
+                        Ok(device_permit) = device_semaphore.acquire() => {
+                            let statuses = self.gpus_amd.get_amd_status(amd_driver).await;
+                            self.gpus_amd
+                                .amd_preloaded_statuses
+                                .borrow_mut()
+                                .insert(type_index, statuses);
+                            apply_device_command_delay(delay).await;
+                            drop(device_permit);
+                        },
+                    }
                 });
             }
         }
@@ -206,6 +253,10 @@ impl Repository for GpuRepo {
         let start_initialization = Instant::now();
         self.detect_gpu_types().await;
         let amd_devices = self.gpus_amd.initialize_amd_devices().await?;
+        for uid in amd_devices.keys() {
+            self.device_permits
+                .insert(uid.clone(), Semaphore::const_new(1));
+        }
         self.devices.extend(amd_devices);
         let has_nvidia_devices = self.gpu_type_count.get(&GpuType::Nvidia).unwrap_or(&0) > &0;
         if has_nvidia_devices {
@@ -287,7 +338,21 @@ impl Repository for GpuRepo {
     }
 
     async fn shutdown(&self) -> Result<()> {
-        self.gpus_amd.reset_devices().await;
+        for (uid, device_lock) in &self.gpus_amd.amd_devices {
+            let channel_names: Vec<String> =
+                device_lock.borrow().info.channels.keys().cloned().collect();
+            for channel_name in &channel_names {
+                if let Ok(_device_permit) = self
+                    .get_amd_permit_with_write_timeout(uid, channel_name)
+                    .await
+                {
+                    self.gpus_amd
+                        .reset_amd_to_default(uid, channel_name)
+                        .await
+                        .ok();
+                }
+            }
+        }
         self.gpus_nvidia.reset_devices().await;
         info!("GPU Repository shutdown");
         Ok(())
@@ -297,8 +362,10 @@ impl Repository for GpuRepo {
         debug!(
             "Applying GPU device: {device_uid} channel: {channel_name}; Resetting to Automatic fan control"
         );
-        let is_amd = self.gpus_amd.amd_driver_infos.contains_key(device_uid);
-        let result = if is_amd {
+        let result = if self.is_amd_device(device_uid) {
+            let _device_permit = self
+                .get_amd_permit_with_write_timeout(device_uid, channel_name)
+                .await?;
             self.gpus_amd
                 .reset_amd_to_default(device_uid, channel_name)
                 .await
@@ -332,8 +399,10 @@ impl Repository for GpuRepo {
         if speed_fixed > 100 {
             return Err(anyhow!("Invalid fixed_speed: {speed_fixed}"));
         }
-        let is_amd = self.gpus_amd.amd_driver_infos.contains_key(device_uid);
-        let result = if is_amd {
+        let result = if self.is_amd_device(device_uid) {
+            let _device_permit = self
+                .get_amd_permit_with_write_timeout(device_uid, channel_name)
+                .await?;
             self.gpus_amd
                 .set_amd_duty(device_uid, channel_name, speed_fixed)
                 .await
@@ -379,6 +448,9 @@ impl Repository for GpuRepo {
         debug!(
             "Applying GPU device: {device_uid} channel: {channel_name}; Speed Profile: {speed_profile:?}"
         );
+        let _device_permit = self
+            .get_amd_permit_with_write_timeout(device_uid, channel_name)
+            .await?;
         let result = self
             .gpus_amd
             .set_amd_fan_curve(device_uid, speed_profile)

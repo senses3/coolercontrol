@@ -59,7 +59,7 @@ type CurveTemp = u8;
 
 pub struct GpuAMD {
     config: Rc<Config>,
-    amd_devices: HashMap<UID, DeviceLock>,
+    pub amd_devices: HashMap<UID, DeviceLock>,
     pub amd_driver_infos: HashMap<UID, Rc<AMDDriverInfo>>,
     pub amd_preloaded_statuses: RefCell<HashMap<TypeIndex, (Vec<ChannelStatus>, Vec<TempStatus>)>>,
 }
@@ -589,22 +589,6 @@ impl GpuAMD {
                     amd_driver.hwmon.name
                 );
                 device_lock.borrow_mut().set_status(status);
-            }
-        }
-    }
-
-    pub async fn reset_devices(&self) {
-        for (uid, device_lock) in &self.amd_devices {
-            // clone here to avoid holding the lock
-            let channel_names = device_lock
-                .borrow()
-                .info
-                .channels
-                .keys()
-                .cloned()
-                .collect::<Vec<_>>();
-            for channel_name in &channel_names {
-                self.reset_amd_to_default(uid, channel_name).await.ok();
             }
         }
     }
