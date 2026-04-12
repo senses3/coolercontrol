@@ -90,6 +90,7 @@ enum DeviceMessage {
         device_uid: DeviceUID,
         channel_name: ChannelName,
         lcd_settings: LcdSettings,
+        log_success: bool,
         respond_to: oneshot::Sender<Result<()>>,
     },
     DeviceSettingLighting {
@@ -294,11 +295,12 @@ impl ApiActor<DeviceMessage> for DeviceActor {
                 device_uid,
                 channel_name,
                 lcd_settings,
+                log_success,
                 respond_to,
             } => {
                 let result = async {
                     self.engine
-                        .set_lcd(&device_uid, &channel_name, &lcd_settings, true)
+                        .set_lcd(&device_uid, &channel_name, &lcd_settings, log_success)
                         .await?;
                     let config_setting = Setting {
                         channel_name,
@@ -609,12 +611,14 @@ impl DeviceHandle {
         device_uid: DeviceUID,
         channel_name: ChannelName,
         lcd_settings: LcdSettings,
+        log_success: bool,
     ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = DeviceMessage::DeviceSettingLCD {
             device_uid,
             channel_name,
             lcd_settings,
+            log_success,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
