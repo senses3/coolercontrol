@@ -340,8 +340,9 @@ impl HwmonRepo {
                 ..Default::default()
             };
             let type_index = (index + 1) as u8;
-            let mut channel_statuses = fans::extract_fan_statuses(&driver).await;
-            channel_statuses.extend(power::extract_power_status(&driver).await);
+            let (mut channel_statuses, _) = fans::extract_fan_statuses(&driver).await;
+            let (power_statuses, _) = power::extract_power_status(&driver).await;
+            channel_statuses.extend(power_statuses);
             let (temp_statuses, _) = temps::extract_temp_statuses(&driver).await;
             let (channel_failsafes, temp_failsafes) =
                 failsafe::create_failsafe_data(&channel_statuses, &temp_statuses);
@@ -415,19 +416,20 @@ impl HwmonRepo {
     /// Reads channel and temp statuses for one device and stores them
     /// in the preloaded map. Tracks read failures for failsafe logic.
     async fn preload_device_statuses(&self, type_index: TypeIndex, driver: &Rc<HwmonDriverInfo>) {
-        let mut channel_statuses = if driver.apple_smc.detected {
+        let (mut channel_statuses, any_fan_failure) = if driver.apple_smc.detected {
             driver.apple_smc.extract_fan_statuses(driver).await
         } else {
             fans::extract_fan_statuses(driver).await
         };
-        channel_statuses.extend(power::extract_power_status(driver).await);
+        let (power_statuses, any_power_failure) = power::extract_power_status(driver).await;
+        channel_statuses.extend(power_statuses);
         let (temp_statuses, any_temp_failure) =
             if drivetemp::is_suspended(driver.block_dev_path.as_ref()).await {
                 (drivetemp::default_suspended_temps(driver), false)
             } else {
                 temps::extract_temp_statuses(driver).await
             };
-        if any_temp_failure {
+        if any_fan_failure || any_power_failure || any_temp_failure {
             self.handle_device_read_failure(type_index, &driver.name);
         } else {
             self.handle_device_read_success(type_index);

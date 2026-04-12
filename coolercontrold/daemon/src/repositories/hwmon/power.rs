@@ -105,25 +105,31 @@ async fn insert_power_metrics(
 }
 
 /// Extract the power status
-pub async fn extract_power_status(driver: &HwmonDriverInfo) -> Vec<ChannelStatus> {
+pub async fn extract_power_status(driver: &HwmonDriverInfo) -> (Vec<ChannelStatus>, bool) {
     let mut powers = vec![];
+    let mut any_failure = false;
     for channel in &driver.channels {
         if channel.hwmon_type != HwmonChannelType::Power {
             continue;
         }
         // In the Power case, channel.name is the real name of the sysfs file.
-        let watts = cc_fs::read_sysfs(driver.path.join(&channel.name))
+        let result = cc_fs::read_sysfs(driver.path.join(&channel.name))
             .await
             .and_then(check_parsing_64)
-            .map(convert_micro_watts_to_watts)
-            .unwrap_or_default();
+            .map(convert_micro_watts_to_watts);
+        let watts = if let Ok(w) = result {
+            w
+        } else {
+            any_failure = true;
+            Watts::default()
+        };
         powers.push(ChannelStatus {
             name: channel.name.clone(),
             watts: Some(watts),
             ..Default::default()
         });
     }
-    powers
+    (powers, any_failure)
 }
 
 /// Check if the power channel is usable
@@ -419,10 +425,11 @@ mod tests {
             };
 
             // when:
-            let power_result = extract_power_status(&driver_info).await;
+            let (power_result, any_failure) = extract_power_status(&driver_info).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure.not());
             assert_eq!(1, power_result.len());
             assert_eq!(Some(36.), power_result[0].watts);
         });
@@ -452,10 +459,11 @@ mod tests {
             };
 
             // when:
-            let power_result = extract_power_status(&driver_info).await;
+            let (power_result, any_failure) = extract_power_status(&driver_info).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure.not());
             assert_eq!(1, power_result.len());
             assert_eq!(Some(6.123_456), power_result[0].watts);
         });
@@ -474,20 +482,23 @@ mod tests {
             };
 
             // when:
-            let power_result = extract_power_status(&driver_info).await;
+            let (power_result, any_failure) = extract_power_status(&driver_info).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure.not());
             assert_eq!(0, power_result.len());
         });
     }
 
     #[test]
     #[serial]
-    fn extract_status_reading_problem_returns_zero() {
+    fn extract_status_reading_problem_returns_zero_and_signals_failure() {
+        // Verifies that when the sysfs file is missing, the power value
+        // defaults to zero and the failure indicator is set.
         cc_fs::test_runtime(async {
             let ctx = setup().await;
-            // given:
+            // given: power channel exists but sysfs file does not.
             let test_base_path = &ctx.test_base_path;
             let driver_info = HwmonDriverInfo {
                 path: test_base_path.to_owned(),
@@ -500,12 +511,15 @@ mod tests {
             };
 
             // when:
-            let power_result = extract_power_status(&driver_info).await;
+            let (power_result, any_failure) = extract_power_status(&driver_info).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure);
             assert_eq!(1, power_result.len());
             assert_eq!(Some(0.), power_result[0].watts);
         });
     }
+
+    use std::ops::Not;
 }

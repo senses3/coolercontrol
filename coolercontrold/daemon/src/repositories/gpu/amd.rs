@@ -534,10 +534,11 @@ impl GpuAMD {
         &self,
         amd_driver: &AMDDriverInfo,
     ) -> (Vec<ChannelStatus>, Vec<TempStatus>) {
-        let mut status_channels = fans::extract_fan_statuses(&amd_driver.hwmon).await;
+        let (mut status_channels, _) = fans::extract_fan_statuses(&amd_driver.hwmon).await;
         status_channels.extend(Self::extract_load_status(amd_driver).await);
         status_channels.extend(freqs::extract_freq_statuses(&amd_driver.hwmon).await);
-        status_channels.extend(power::extract_power_status(&amd_driver.hwmon).await);
+        let (power_statuses, _) = power::extract_power_status(&amd_driver.hwmon).await;
+        status_channels.extend(power_statuses);
         let (extracted_temps, _) = temps::extract_temp_statuses(&amd_driver.hwmon).await;
         let temps = extracted_temps
             .iter()
