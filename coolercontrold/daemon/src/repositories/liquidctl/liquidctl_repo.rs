@@ -900,10 +900,11 @@ impl LiquidctlRepo {
             let recent_status = device.status_current().unwrap();
             let (channel_failsafes, temp_failsafes) =
                 failsafe::create_failsafe_data(&recent_status.channels, &recent_status.temps);
-            self.failsafe_statuses.borrow_mut().insert(
-                device.type_index,
-                FailsafeStatusData::new(channel_failsafes, temp_failsafes),
-            );
+            if let Some(fsd) = FailsafeStatusData::new(channel_failsafes, temp_failsafes) {
+                self.failsafe_statuses
+                    .borrow_mut()
+                    .insert(device.type_index, fsd);
+            }
             drop(device);
             device_lock
                 .borrow_mut()
