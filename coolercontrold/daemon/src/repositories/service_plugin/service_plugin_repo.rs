@@ -615,10 +615,11 @@ impl ServicePluginRepo {
 
         let (channel_failsafes, temp_failsafes) =
             failsafe::create_failsafe_data(&channel_statuses, &temp_statuses);
-        failsafe_statuses.borrow_mut().insert(
-            device_uid.clone(),
-            FailsafeStatusData::new(channel_failsafes, temp_failsafes),
-        );
+        if let Some(fsd) = FailsafeStatusData::new(channel_failsafes, temp_failsafes) {
+            failsafe_statuses
+                .borrow_mut()
+                .insert(device_uid.clone(), fsd);
+        }
         let preload_data = PreloadData {
             channels: channel_statuses
                 .iter()
@@ -655,28 +656,24 @@ impl ServicePluginRepo {
         else {
             {
                 let mut missing_lock = self.failsafe_statuses.borrow_mut();
-                let msd = missing_lock
-                    .get_mut(&device_uid)
-                    .expect("Missing Status data should exist for existing Devices");
-                msd.count += 1;
-                if msd.count > MISSING_STATUS_THRESHOLD {
-                    if msd.logged.not() {
-                        error!(
-                            "There is a significant issue with retrieving status data for \
-                                        device: {device_uid}, from service: {}. Setting critical values \
-                                        for this device.",
-                            service.id
-                        );
-                        msd.logged = true;
+                if let Some(msd) = missing_lock.get_mut(&device_uid) {
+                    if msd.record_failure() {
+                        if msd.log_once() {
+                            error!(
+                                "Significant issue retrieving status for \
+                                 device: {device_uid}, from service: {}. \
+                                 Setting failsafe values.",
+                                service.id
+                            );
+                        }
+                        let preload_data = PreloadData {
+                            channels: msd.channel_failsafes.clone(),
+                            temps: msd.temp_failsafes.clone(),
+                        };
+                        self.preloaded_statuses
+                            .borrow_mut()
+                            .insert(device_uid, preload_data);
                     }
-                    // insert ALL failsafe channels
-                    let preload_data = PreloadData {
-                        channels: msd.channel_failsafes.clone(),
-                        temps: msd.temp_failsafes.clone(),
-                    };
-                    self.preloaded_statuses
-                        .borrow_mut()
-                        .insert(device_uid, preload_data);
                 }
             }
             apply_device_command_delay(delay).await;
@@ -689,45 +686,43 @@ impl ServicePluginRepo {
             .retain(|s| Self::retain_enabled_channels(&s.name, disabled_channels_for_device));
         {
             let mut missing_lock = self.failsafe_statuses.borrow_mut();
-            let msd = missing_lock
-                .get_mut(&device_uid)
-                .expect("Missing Status data should exist for existing Devices");
-            let mut has_missing_statuses = false;
-            for (f_name, f_status) in &msd.channel_failsafes {
-                if channel_statuses.iter().all(|status| &status.name != f_name) {
-                    if has_missing_statuses.not() {
-                        has_missing_statuses = true;
-                        msd.count += 1;
-                    }
-                    if msd.count > MISSING_STATUS_THRESHOLD {
-                        channel_statuses.push(f_status.clone());
-                    }
-                }
-            }
-            for (f_name, f_status) in &msd.temp_failsafes {
-                if temp_statuses.iter().all(|status| &status.name != f_name) {
-                    if has_missing_statuses.not() {
-                        has_missing_statuses = true;
-                        msd.count += 1;
-                    }
-                    if msd.count > MISSING_STATUS_THRESHOLD {
-                        temp_statuses.push(f_status.clone());
+            if let Some(msd) = missing_lock.get_mut(&device_uid) {
+                let mut has_missing_statuses = false;
+                for (f_name, f_status) in &msd.channel_failsafes {
+                    if channel_statuses.iter().all(|status| &status.name != f_name) {
+                        if has_missing_statuses.not() {
+                            has_missing_statuses = true;
+                            msd.count += 1;
+                        }
+                        if msd.count > MISSING_STATUS_THRESHOLD {
+                            channel_statuses.push(f_status.clone());
+                        }
                     }
                 }
-            }
-            if has_missing_statuses {
-                if msd.count > MISSING_STATUS_THRESHOLD && msd.logged.not() {
-                    error!(
-                        "There is a significant issue with retrieving status data for \
-                                    device: {device_uid}, from service: {}. Setting critical values \
-                                    for this device.",
-                        service.id
-                    );
-                    msd.logged = true;
+                for (f_name, f_status) in &msd.temp_failsafes {
+                    if temp_statuses.iter().all(|status| &status.name != f_name) {
+                        if has_missing_statuses.not() {
+                            has_missing_statuses = true;
+                            msd.count += 1;
+                        }
+                        if msd.count > MISSING_STATUS_THRESHOLD {
+                            temp_statuses.push(f_status.clone());
+                        }
+                    }
                 }
-            } else if msd.count > 0 {
-                // reset count on expected response
-                msd.count = 0;
+                if has_missing_statuses {
+                    if msd.count > MISSING_STATUS_THRESHOLD && msd.logged.not() {
+                        error!(
+                            "Significant issue retrieving status for \
+                             device: {device_uid}, from service: {}. \
+                             Setting failsafe values.",
+                            service.id
+                        );
+                        msd.logged = true;
+                    }
+                } else if msd.count > 0 {
+                    msd.count = 0;
+                }
             }
         }
         let preload_data = PreloadData {

@@ -346,10 +346,9 @@ impl HwmonRepo {
             let (temp_statuses, _) = temps::extract_temp_statuses(&driver).await;
             let (channel_failsafes, temp_failsafes) =
                 failsafe::create_failsafe_data(&channel_statuses, &temp_statuses);
-            self.failsafe_statuses.borrow_mut().insert(
-                type_index,
-                FailsafeStatusData::new(channel_failsafes, temp_failsafes),
-            );
+            if let Some(fsd) = FailsafeStatusData::new(channel_failsafes, temp_failsafes) {
+                self.failsafe_statuses.borrow_mut().insert(type_index, fsd);
+            }
             self.preloaded_statuses.borrow_mut().insert(
                 type_index,
                 (channel_statuses.clone(), temp_statuses.clone()),
@@ -445,8 +444,7 @@ impl HwmonRepo {
     fn handle_device_read_failure(&self, type_index: TypeIndex, driver_name: &str) {
         let mut fsd_map = self.failsafe_statuses.borrow_mut();
         let Some(fsd) = fsd_map.get_mut(&type_index) else {
-            // Failsafe data must exist for every initialized device.
-            debug_assert!(false, "Missing failsafe data for device index {type_index}");
+            // No failsafe data when the device had no channels or temps at init.
             return;
         };
         if fsd.record_failure() {

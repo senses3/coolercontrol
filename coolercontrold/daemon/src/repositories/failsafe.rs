@@ -17,7 +17,6 @@
  */
 
 use std::collections::HashMap;
-use std::ops::Not;
 
 use crate::device::{ChannelName, ChannelStatus, Mhz, Status, Temp, TempStatus, Watts, RPM};
 
@@ -55,19 +54,21 @@ const MAX_FAILURE_COUNT: usize = MISSING_STATUS_THRESHOLD + 1;
 const _: () = assert!(MAX_FAILURE_COUNT > MISSING_STATUS_THRESHOLD);
 
 impl FailsafeStatusData {
+    /// Returns `None` when both maps are empty, meaning the device
+    /// has no status data to protect (e.g. read paths not yet available).
     pub fn new(
         channel_failsafes: HashMap<ChannelName, ChannelStatus>,
         temp_failsafes: HashMap<ChannelName, TempStatus>,
-    ) -> Self {
-        // At least one failsafe entry is required. A device may have
-        // only temps (pure sensor) or only channels (fan-only controller).
-        assert!(channel_failsafes.is_empty().not() || temp_failsafes.is_empty().not());
-        Self {
+    ) -> Option<Self> {
+        if channel_failsafes.is_empty() && temp_failsafes.is_empty() {
+            return None;
+        }
+        Some(Self {
             count: 0,
             logged: false,
             channel_failsafes,
             temp_failsafes,
-        }
+        })
     }
 
     /// Records a missing status reading. Returns whether the threshold
@@ -226,10 +227,17 @@ mod tests {
     // --- FailsafeStatusData lifecycle ---
 
     #[test]
+    fn new_returns_none_when_both_maps_empty() {
+        // A device with no channels and no temps has nothing to protect.
+        let result = FailsafeStatusData::new(HashMap::new(), HashMap::new());
+        assert!(result.is_none());
+    }
+
+    #[test]
     fn new_starts_at_zero_count() {
         // A freshly created tracker must have no failures recorded.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let fsd = FailsafeStatusData::new(ch, te);
+        let fsd = FailsafeStatusData::new(ch, te).unwrap();
         assert_eq!(fsd.count, 0);
         assert!(fsd.logged.not());
         assert!(fsd.threshold_exceeded().not());
@@ -239,7 +247,7 @@ mod tests {
     fn record_failure_increments_count() {
         // Each failure must increment the counter by exactly one.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         for i in 1..=MISSING_STATUS_THRESHOLD {
             let exceeded = fsd.record_failure();
             assert_eq!(fsd.count, i);
@@ -255,7 +263,7 @@ mod tests {
     fn record_success_resets_count() {
         // A successful reading must reset the failure counter.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         for _ in 0..5 {
             fsd.record_failure();
         }
@@ -269,7 +277,7 @@ mod tests {
     fn record_success_noop_at_zero() {
         // Resetting at zero must not underflow or cause issues.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         fsd.record_success();
         assert_eq!(fsd.count, 0);
     }
@@ -278,7 +286,7 @@ mod tests {
     fn log_once_returns_true_only_first_time() {
         // The first log_once call must return true, subsequent false.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         assert!(fsd.log_once());
         assert!(fsd.log_once().not());
         assert!(fsd.log_once().not());
@@ -288,7 +296,7 @@ mod tests {
     fn build_failsafe_status_contains_all_entries() {
         // The built status must include all failsafe channels and temps.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let fsd = FailsafeStatusData::new(ch, te);
+        let fsd = FailsafeStatusData::new(ch, te).unwrap();
         let status = fsd.build_failsafe_status();
         assert_eq!(status.channels.len(), 2);
         assert_eq!(status.temps.len(), 1);
@@ -301,7 +309,7 @@ mod tests {
         // At exactly MISSING_STATUS_THRESHOLD failures, the threshold
         // must NOT be exceeded (it requires strictly greater than).
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         for _ in 0..MISSING_STATUS_THRESHOLD {
             fsd.record_failure();
         }
@@ -313,7 +321,7 @@ mod tests {
     fn threshold_exceeded_one_past_boundary() {
         // One failure past the threshold must activate failsafe.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         for _ in 0..=MISSING_STATUS_THRESHOLD {
             fsd.record_failure();
         }
@@ -326,7 +334,7 @@ mod tests {
         // The counter must not grow beyond MAX_FAILURE_COUNT to
         // prevent theoretical overflow from unbounded increment.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let mut fsd = FailsafeStatusData::new(ch, te);
+        let mut fsd = FailsafeStatusData::new(ch, te).unwrap();
         for _ in 0..1000 {
             fsd.record_failure();
         }
@@ -339,7 +347,7 @@ mod tests {
         // The built status must contain the actual failsafe constant
         // values, not the original device readings.
         let (ch, te) = create_failsafe_data(&sample_channels(), &sample_temps());
-        let fsd = FailsafeStatusData::new(ch, te);
+        let fsd = FailsafeStatusData::new(ch, te).unwrap();
         let status = fsd.build_failsafe_status();
         for temp in &status.temps {
             assert!((temp.temp - MISSING_TEMP_FAILSAFE).abs() < f64::EPSILON);
