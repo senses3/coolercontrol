@@ -92,11 +92,18 @@ pub async fn device_setting_profile_modify(
 
 pub async fn device_setting_lcd_modify(
     Path(path): Path<DeviceChannelPath>,
+    Query(lcd_update_query): Query<LcdImageUpdateQuery>,
     State(AppState { device_handle, .. }): State<AppState>,
     Json(lcd_settings): Json<LcdSettings>,
 ) -> Result<(), CCError> {
+    let log_success = lcd_update_query.log.unwrap_or(true);
     device_handle
-        .device_setting_lcd(path.device_uid, path.channel_name, lcd_settings)
+        .device_setting_lcd(
+            path.device_uid,
+            path.channel_name,
+            lcd_settings,
+            log_success,
+        )
         .await
         .map_err(handle_error)
 }
