@@ -175,8 +175,9 @@ async fn caps_to_hwmon_fans(
 /// as they were correctly detected on startup.
 /// This function calls all fan channels and data points sequentially. See the `concurrently`
 /// version of this function for concurrent execution.
-pub async fn extract_fan_statuses(driver: &HwmonDriverInfo) -> Vec<ChannelStatus> {
+pub async fn extract_fan_statuses(driver: &HwmonDriverInfo) -> (Vec<ChannelStatus>, bool) {
     let mut fans = vec![];
+    let mut any_failure = false;
     for channel in &driver.channels {
         if channel.hwmon_type != HwmonChannelType::Fan {
             continue;
@@ -203,6 +204,11 @@ pub async fn extract_fan_statuses(driver: &HwmonDriverInfo) -> Vec<ChannelStatus
         } else {
             None
         };
+        if (channel.caps.has_pwm() && fan_duty.is_none())
+            || (channel.caps.has_rpm() && fan_rpm.is_none())
+        {
+            any_failure = true;
+        }
         fans.push(ChannelStatus {
             name: channel.name.clone(),
             rpm: fan_rpm,
@@ -210,7 +216,7 @@ pub async fn extract_fan_statuses(driver: &HwmonDriverInfo) -> Vec<ChannelStatus
             ..Default::default()
         });
     }
-    fans
+    (fans, any_failure)
 }
 
 #[allow(dead_code)]
@@ -1248,6 +1254,162 @@ mod tests {
             // then: parse error + manual mode = no fallback
             teardown(&ctx).await;
             assert_eq!(result, None);
+        });
+    }
+
+    // --- extract_fan_statuses: failure indicator ---
+
+    fn make_driver(base_path: &Path, channels: Vec<HwmonChannelInfo>) -> HwmonDriverInfo {
+        HwmonDriverInfo {
+            name: "test_driver".to_string(),
+            path: base_path.to_path_buf(),
+            model: None,
+            u_id: String::new(),
+            channels,
+            block_dev_path: None,
+            apple_smc: crate::repositories::hwmon::apple_mac_smc::AppleMacSMC::default(),
+        }
+    }
+
+    fn fan_channel(number: u8, caps: HwmonChannelCapabilities) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number,
+            pwm_enable_default: None,
+            name: format!("fan{number}"),
+            label: None,
+            caps,
+            auto_curve: AutoCurveInfo::None,
+            pwm_path: None,
+            rpm_path: None,
+            temp_path: None,
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn extract_fan_statuses_no_failure_when_all_reads_succeed() {
+        // Verifies that when all fan channels read successfully, the failure
+        // indicator is false and values are populated.
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            // given: pwm1 and fan1_input exist with valid values.
+            cc_fs::write(ctx.test_base_path.join("pwm1"), b"128".to_vec())
+                .await
+                .unwrap();
+            cc_fs::write(ctx.test_base_path.join("fan1_input"), b"1200".to_vec())
+                .await
+                .unwrap();
+            let caps = HwmonChannelCapabilities::PWM | HwmonChannelCapabilities::RPM;
+            let driver = make_driver(&ctx.test_base_path, vec![fan_channel(1, caps)]);
+
+            // when:
+            let (statuses, any_failure) = extract_fan_statuses(&driver).await;
+
+            // then:
+            teardown(&ctx).await;
+            assert!(any_failure.not());
+            assert_eq!(statuses.len(), 1);
+            assert!(statuses[0].duty.is_some());
+            assert!(statuses[0].rpm.is_some());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn extract_fan_statuses_failure_when_pwm_missing() {
+        // Verifies that a channel with PWM capability but no pwm file
+        // triggers a failure.
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            // given: fan1_input exists, but no pwm1.
+            cc_fs::write(ctx.test_base_path.join("fan1_input"), b"1200".to_vec())
+                .await
+                .unwrap();
+            let caps = HwmonChannelCapabilities::PWM | HwmonChannelCapabilities::RPM;
+            let driver = make_driver(&ctx.test_base_path, vec![fan_channel(1, caps)]);
+
+            // when:
+            let (statuses, any_failure) = extract_fan_statuses(&driver).await;
+
+            // then:
+            teardown(&ctx).await;
+            assert!(any_failure);
+            assert_eq!(statuses.len(), 1);
+            assert!(statuses[0].duty.is_none());
+            assert!(statuses[0].rpm.is_some());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn extract_fan_statuses_failure_when_rpm_missing() {
+        // Verifies that a channel with RPM capability but no fan_input file
+        // triggers a failure.
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            // given: pwm1 exists, but no fan1_input.
+            cc_fs::write(ctx.test_base_path.join("pwm1"), b"128".to_vec())
+                .await
+                .unwrap();
+            let caps = HwmonChannelCapabilities::PWM | HwmonChannelCapabilities::RPM;
+            let driver = make_driver(&ctx.test_base_path, vec![fan_channel(1, caps)]);
+
+            // when:
+            let (statuses, any_failure) = extract_fan_statuses(&driver).await;
+
+            // then:
+            teardown(&ctx).await;
+            assert!(any_failure);
+            assert_eq!(statuses.len(), 1);
+            assert!(statuses[0].duty.is_some());
+            assert!(statuses[0].rpm.is_none());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn extract_fan_statuses_no_failure_for_rpm_only_channel_without_pwm_cap() {
+        // Verifies that a channel without PWM capability does not trigger
+        // a failure when pwm returns None (that is expected).
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            // given: fan1_input exists, no pwm1, and channel only has RPM cap.
+            cc_fs::write(ctx.test_base_path.join("fan1_input"), b"900".to_vec())
+                .await
+                .unwrap();
+            let caps = HwmonChannelCapabilities::RPM;
+            let driver = make_driver(&ctx.test_base_path, vec![fan_channel(1, caps)]);
+
+            // when:
+            let (statuses, any_failure) = extract_fan_statuses(&driver).await;
+
+            // then:
+            teardown(&ctx).await;
+            assert!(any_failure.not());
+            assert_eq!(statuses.len(), 1);
+            assert!(statuses[0].duty.is_none());
+            assert!(statuses[0].rpm.is_some());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn extract_fan_statuses_no_failure_when_no_fan_channels() {
+        // Verifies that an empty channel list produces no statuses
+        // and no failure.
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            // given: driver with no channels.
+            let driver = make_driver(&ctx.test_base_path, vec![]);
+
+            // when:
+            let (statuses, any_failure) = extract_fan_statuses(&driver).await;
+
+            // then:
+            teardown(&ctx).await;
+            assert!(any_failure.not());
+            assert!(statuses.is_empty());
         });
     }
 }

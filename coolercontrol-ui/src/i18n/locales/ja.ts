@@ -1100,6 +1100,9 @@ export default {
             disableDevice: 'liquidctlデバイスを無効化',
             disableInfo:
                 'liquidctlドライバーを無効にすると、このデバイスが無効になります。新しいHWMonベースのデバイスがデバイスメニューの下部に表示されます。設定メニューからいつでもliquidctlデバイスを再度有効にできます。',
+            commandDelay: 'コマンド遅延',
+            commandDelayDesc:
+                'このデバイスに送信されるコマンド間の遅延（ミリ秒）。\n複数のコマンドが連続して送信される際に\n通信の問題があるデバイスに役立ちます。',
         },
     },
     auth: {

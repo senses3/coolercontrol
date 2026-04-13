@@ -1114,6 +1114,9 @@ export default {
             disableDevice: 'liquidctl-Gerät deaktivieren',
             disableInfo:
                 'Das Deaktivieren des liquidctl-Treibers deaktiviert dieses Gerät. Ein neues HWMon-basiertes Gerät wird unten im Gerätemenü angezeigt. Sie können das liquidctl-Gerät jederzeit über das Einstellungsmenü wieder aktivieren.',
+            commandDelay: 'Befehlsverzögerung',
+            commandDelayDesc:
+                'Verzögerung in Millisekunden zwischen Befehlen, die an dieses Gerät gesendet werden.\nDies kann bei Geräten helfen, die Kommunikationsprobleme haben,\nwenn mehrere Befehle schnell hintereinander gesendet werden.',
         },
     },
     auth: {

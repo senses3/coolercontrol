@@ -322,8 +322,12 @@ impl AppleMacSMC {
         Ok(fans)
     }
 
-    pub async fn extract_fan_statuses(&self, driver: &Rc<HwmonDriverInfo>) -> Vec<ChannelStatus> {
+    pub async fn extract_fan_statuses(
+        &self,
+        driver: &Rc<HwmonDriverInfo>,
+    ) -> (Vec<ChannelStatus>, bool) {
         let mut fans = vec![];
+        let mut any_failure = false;
         for channel in &driver.channels {
             if channel.hwmon_type != HwmonChannelType::Fan {
                 continue;
@@ -345,6 +349,11 @@ impl AppleMacSMC {
             } else {
                 None
             };
+            if (channel.caps.is_apple_smc() && fan_duty.is_none())
+                || (channel.caps.has_rpm() && fan_rpm.is_none())
+            {
+                any_failure = true;
+            }
             fans.push(ChannelStatus {
                 name: channel.name.clone(),
                 rpm: fan_rpm,
@@ -352,7 +361,7 @@ impl AppleMacSMC {
                 ..Default::default()
             });
         }
-        fans
+        (fans, any_failure)
     }
     pub async fn set_to_auto_control(&self, channel_number: u8) -> Result<()> {
         let fan_min_default = self
@@ -1263,10 +1272,11 @@ mod tests {
             });
 
             // when:
-            let statuses = apple_smc.extract_fan_statuses(&driver).await;
+            let (statuses, any_failure) = apple_smc.extract_fan_statuses(&driver).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure.not());
             assert_eq!(statuses.len(), 2);
             assert_eq!(statuses[0].name, "fan1");
             assert_eq!(statuses[0].rpm, Some(2500));
@@ -1841,10 +1851,11 @@ mod tests {
             });
 
             // when:
-            let statuses = apple_smc.extract_fan_statuses(&driver).await;
+            let (statuses, any_failure) = apple_smc.extract_fan_statuses(&driver).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure.not());
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].name, "fan1");
         });
@@ -1889,10 +1900,11 @@ mod tests {
             });
 
             // when:
-            let statuses = apple_smc.extract_fan_statuses(&driver).await;
+            let (statuses, any_failure) = apple_smc.extract_fan_statuses(&driver).await;
 
             // then:
             teardown(&ctx).await;
+            assert!(any_failure.not());
             assert_eq!(statuses.len(), 1);
             assert_eq!(statuses[0].name, "fan1");
             assert_eq!(statuses[0].rpm, Some(2500));

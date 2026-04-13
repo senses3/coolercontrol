@@ -1076,6 +1076,9 @@ export default {
             disableDevice: 'liquidctl 장치 비활성화',
             disableInfo:
                 'liquidctl 드라이버를 비활성화하면 이 장치가 비활성화됩니다. 장치 메뉴 하단에 HWMon 기반의 새로운 장치가 나타납니다. 설정 메뉴에서 언제든지 liquidctl 장치를 다시 활성화할 수 있습니다.',
+            commandDelay: '명령 지연',
+            commandDelayDesc:
+                '이 장치로 전송되는 명령 사이의 지연 시간(밀리초).\n여러 명령이 빠르게 연속으로 전송될 때\n통신 문제가 있는 장치에 도움이 될 수 있습니다.',
         },
     },
     auth: {

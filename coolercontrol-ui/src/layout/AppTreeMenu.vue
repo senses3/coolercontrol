@@ -625,10 +625,7 @@ const devicesTreeArray = (): any[] => {
             continue // has its own dedicated menu above
         }
         const deviceSettings = settingsStore.allUIDeviceSettings.get(device.uid)!
-        // is liquidctl device and also has hwmon driver
-        const hasApplicableDeviceExtensions =
-            device.type === DeviceType.LIQUIDCTL &&
-            device.info?.driver_info.locations.find((loc) => loc.includes('hwmon')) != null
+        const hasApplicableDeviceExtensions = device.type !== DeviceType.CPU
         const deviceItem = {
             id: device.uid,
             label: deviceSettings.name,

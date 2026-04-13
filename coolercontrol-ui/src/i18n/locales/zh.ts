@@ -1059,6 +1059,9 @@ export default {
             disableDevice: '禁用 liquidctl 设备',
             disableInfo:
                 '禁用 liquidctl 驱动程序将禁用此设备。一个新的基于 HWMon 的设备将出现在设备菜单底部。您可以随时从设置菜单重新启用 liquidctl 设备。',
+            commandDelay: '命令延迟',
+            commandDelayDesc:
+                '发送到此设备的命令之间的延迟（毫秒）。\n当多个命令快速连续发送时，\n这可以帮助解决设备通信问题。',
         },
     },
     auth: {

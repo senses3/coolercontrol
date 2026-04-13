@@ -1111,6 +1111,9 @@ export default {
             disableDevice: 'Désactiver le périphérique liquidctl',
             disableInfo:
                 'La désactivation du pilote liquidctl désactivera ce périphérique. Un nouveau périphérique basé sur HWMon apparaîtra en bas du menu des périphériques. Vous pouvez réactiver le périphérique liquidctl à tout moment depuis le menu des paramètres.',
+            commandDelay: 'Délai de commande',
+            commandDelayDesc:
+                'Délai en millisecondes entre les commandes envoyées à ce périphérique.\nCela peut aider les périphériques qui ont des problèmes de communication\nlorsque plusieurs commandes sont envoyées en succession rapide.',
         },
     },
     auth: {

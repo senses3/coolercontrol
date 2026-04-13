@@ -23,6 +23,7 @@ import { mdiCogs, mdiInformationSlabCircleOutline } from '@mdi/js'
 import { DeviceType, UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
 import Popover from 'primevue/popover'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -49,23 +50,24 @@ const { t } = useI18n()
 
 const popRef = ref()
 
+let isLiquidctl = false
 let hasHwmonDriver = false
 const useHwmon = ref(false)
 
 for (const device of deviceStore.allDevices()) {
-    if (
-        device.uid === props.deviceUID &&
-        device.type == DeviceType.LIQUIDCTL &&
-        device.info != null
-    ) {
-        hasHwmonDriver =
-            device.info?.driver_info.locations.find((loc) => loc.includes('hwmon')) != null
+    if (device.uid === props.deviceUID && device.info != null) {
+        isLiquidctl = device.type === DeviceType.LIQUIDCTL
+        if (isLiquidctl) {
+            hasHwmonDriver =
+                device.info?.driver_info.locations.find((loc) => loc.includes('hwmon')) != null
+        }
         break
     }
 }
 // extensions should always be present as well as the device's settings.
 const deviceExtensions = settingsStore.ccDeviceSettings.get(props.deviceUID)?.extensions!
 const directAccess = ref(deviceExtensions.direct_access)
+const delayMillis = ref(deviceExtensions.delay_millis)
 
 const toggleDirectAccess = _.debounce(() => {
     if (directAccess.value == deviceExtensions.direct_access) return // no change
@@ -163,6 +165,49 @@ const toggleUseHwmon = _.debounce(() => {
     })
 }, 1000)
 
+const updateDelayMillis = _.debounce(() => {
+    if (delayMillis.value == null || delayMillis.value == deviceExtensions.delay_millis) return
+    confirm.require({
+        header: t('layout.settings.restartHeader'),
+        message: t('layout.settings.applySettingAndRestart'),
+        icon: 'pi pi-exclamation-triangle',
+        defaultFocus: 'accept',
+        acceptLabel: t('common.yes'),
+        rejectLabel: t('common.no'),
+        accept: async () => {
+            const ccSetting: CoolerControlDeviceSettingsDTO = settingsStore.ccDeviceSettings.get(
+                props.deviceUID,
+            )!
+            ccSetting.extensions.delay_millis = delayMillis.value ?? 0
+            const successful = await deviceStore.daemonClient.saveCCDeviceSettings(
+                ccSetting.uid,
+                ccSetting,
+            )
+            await deviceStore.sleep(50)
+            if (successful) {
+                toast.add({
+                    severity: 'success',
+                    summary: t('layout.settings.success'),
+                    detail: t('layout.settings.successDetail'),
+                    life: 6000,
+                })
+                await deviceStore.daemonClient.shutdownDaemon()
+                await deviceStore.waitAndReload()
+            } else {
+                toast.add({
+                    severity: 'error',
+                    summary: t('common.error'),
+                    detail: t('layout.settings.devices.unknownError'),
+                    life: 4000,
+                })
+            }
+        },
+        reject: () => {
+            delayMillis.value = deviceExtensions.delay_millis
+        },
+    })
+}, 3000)
+
 const popoverOpen = (event: any): void => {
     popRef.value.toggle(event)
 }
@@ -201,7 +246,7 @@ const popoverClose = (): void => {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
+                    <tr v-if="isLiquidctl">
                         <td class="w-64 text-end pl-4">
                             <div class="flex flex-row leading-none items-center">
                                 <div
@@ -228,7 +273,7 @@ const popoverClose = (): void => {
                             />
                         </td>
                     </tr>
-                    <tr>
+                    <tr v-if="isLiquidctl">
                         <td class="w-64 text-end pl-4">
                             <div class="flex flex-row leading-none items-center">
                                 <div
@@ -253,6 +298,45 @@ const popoverClose = (): void => {
                                 :disabled="!hasHwmonDriver"
                                 @change="toggleUseHwmon"
                             />
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="w-64 text-end pl-4">
+                            <div class="flex flex-row leading-none items-center">
+                                <div
+                                    v-tooltip.bottom="
+                                        t('components.deviceExtensionSettings.commandDelayDesc')
+                                    "
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        class="mr-2"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="deviceStore.getREMSize(1.25)"
+                                    />
+                                </div>
+                                {{ t('components.deviceExtensionSettings.commandDelay') }}
+                            </div>
+                        </td>
+                        <td class="w-24 px-2 text-center">
+                            <InputNumber
+                                v-model="delayMillis"
+                                show-buttons
+                                :min="0"
+                                :max="250"
+                                :step="10"
+                                suffix=" ms"
+                                button-layout="horizontal"
+                                :input-style="{ width: '4.5rem' }"
+                                @update:model-value="updateDelayMillis"
+                            >
+                                <template #incrementicon>
+                                    <span class="pi pi-plus" />
+                                </template>
+                                <template #decrementicon>
+                                    <span class="pi pi-minus" />
+                                </template>
+                            </InputNumber>
                         </td>
                     </tr>
                 </tbody>

@@ -35,6 +35,7 @@ use crate::repositories::service_plugin::service_management::{
     delete_plugin_user, ServiceId, ServiceIdExt,
 };
 use crate::repositories::service_plugin::service_manifest::{ServiceManifest, ServiceType};
+use crate::repositories::utils::apply_device_command_delay;
 use crate::setting::{CCDeviceSettings, LcdSettings, LightingSettings, TempSource};
 use crate::{cc_fs, ENV_CC_LOG};
 use anyhow::{anyhow, Context, Result};
@@ -75,6 +76,8 @@ pub struct ServicePluginRepo {
     preloaded_statuses: RefCell<HashMap<DeviceUID, PreloadData>>,
     failsafe_statuses: RefCell<HashMap<DeviceUID, FailsafeStatusData>>,
     disabled_channels: HashMap<DeviceUID, HashSet<String>>,
+    /// Cached per-device command delay in milliseconds. Loaded at startup from config.
+    device_delays: HashMap<DeviceUID, u16>,
 }
 
 #[derive(Debug)]
@@ -100,7 +103,26 @@ impl ServicePluginRepo {
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: HashMap::new(),
+            device_delays: HashMap::new(),
         })
+    }
+
+    fn load_device_delays(&mut self) {
+        for uid in self.devices.keys() {
+            let delay_millis = self
+                .config
+                .get_cc_settings_for_device(uid)
+                .ok()
+                .flatten()
+                .map_or(0, |s| s.extensions.delay_millis);
+            if delay_millis > 0 {
+                self.device_delays.insert(uid.clone(), delay_millis);
+            }
+        }
+    }
+
+    fn device_delay(&self, device_uid: &UID) -> u16 {
+        self.device_delays.get(device_uid).copied().unwrap_or(0)
     }
 
     async fn find_service_manifests() -> HashMap<ServiceId, ServiceManifest> {
@@ -541,6 +563,9 @@ impl ServicePluginRepo {
         cc_device_setting: Option<CCDeviceSettings>,
         poll_rate: f64,
     ) {
+        let delay = cc_device_setting
+            .as_ref()
+            .map_or(0, |s| s.extensions.delay_millis);
         if let Err(err) = service.client.initialize_device(device_uid).await {
             error!(
                 "Error initializing device {device_uid} from Service {}. Skipping. - {err}",
@@ -549,6 +574,7 @@ impl ServicePluginRepo {
             devices_to_remove.borrow_mut().push(device_uid.clone());
             return;
         }
+        apply_device_command_delay(delay).await;
         let Ok((mut channel_statuses, mut temp_statuses)) = service.client.status(device_uid).await
         else {
             error!(
@@ -558,6 +584,7 @@ impl ServicePluginRepo {
             devices_to_remove.borrow_mut().push(device_uid.clone());
             return;
         };
+        apply_device_command_delay(delay).await;
         if device.borrow().info.channels.is_empty()
             && channel_statuses.is_empty()
             && temp_statuses.is_empty()
@@ -622,33 +649,37 @@ impl ServicePluginRepo {
         device_uid: DeviceUID,
         service: &Rc<DeviceServiceConnection>,
     ) {
+        let delay = self.device_delay(&device_uid);
         let Ok((mut channel_statuses, mut temp_statuses)) =
             service.client.status(&device_uid).await
         else {
-            let mut missing_lock = self.failsafe_statuses.borrow_mut();
-            let msd = missing_lock
-                .get_mut(&device_uid)
-                .expect("Missing Status data should exist for existing Devices");
-            msd.count += 1;
-            if msd.count > MISSING_STATUS_THRESHOLD {
-                if msd.logged.not() {
-                    error!(
-                        "There is a significant issue with retrieving status data for \
-                                    device: {device_uid}, from service: {}. Setting critical values \
-                                    for this device.",
-                        service.id
-                    );
-                    msd.logged = true;
+            {
+                let mut missing_lock = self.failsafe_statuses.borrow_mut();
+                let msd = missing_lock
+                    .get_mut(&device_uid)
+                    .expect("Missing Status data should exist for existing Devices");
+                msd.count += 1;
+                if msd.count > MISSING_STATUS_THRESHOLD {
+                    if msd.logged.not() {
+                        error!(
+                            "There is a significant issue with retrieving status data for \
+                                        device: {device_uid}, from service: {}. Setting critical values \
+                                        for this device.",
+                            service.id
+                        );
+                        msd.logged = true;
+                    }
+                    // insert ALL failsafe channels
+                    let preload_data = PreloadData {
+                        channels: msd.channel_failsafes.clone(),
+                        temps: msd.temp_failsafes.clone(),
+                    };
+                    self.preloaded_statuses
+                        .borrow_mut()
+                        .insert(device_uid, preload_data);
                 }
-                // insert ALL failsafe channels
-                let preload_data = PreloadData {
-                    channels: msd.channel_failsafes.clone(),
-                    temps: msd.temp_failsafes.clone(),
-                };
-                self.preloaded_statuses
-                    .borrow_mut()
-                    .insert(device_uid, preload_data);
             }
+            apply_device_command_delay(delay).await;
             return;
         };
         let disabled_channels_for_device = self.disabled_channels.get(&device_uid);
@@ -712,6 +743,7 @@ impl ServicePluginRepo {
         self.preloaded_statuses
             .borrow_mut()
             .insert(device_uid, preload_data);
+        apply_device_command_delay(delay).await;
     }
 
     fn retain_enabled_channels(
@@ -871,6 +903,7 @@ impl Repository for ServicePluginRepo {
             "Time taken to initialize Service Plugin devices: {:?}",
             start_initialization.elapsed()
         );
+        self.load_device_delays();
         debug!("Service Plugin Repository initialized");
         Ok(())
     }
@@ -955,11 +988,13 @@ impl Repository for ServicePluginRepo {
             Resetting to Original fan control mode",
             device_service.id,
         );
-        device_service
+        let result = device_service
             .client
             .reset_channel(device_uid, channel_name)
             .await
-            .map_err(|status| anyhow!("Error resetting device channel: {status}"))
+            .map_err(|status| anyhow!("Error resetting device channel: {status}"));
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_manual_control(
@@ -989,11 +1024,15 @@ impl Repository for ServicePluginRepo {
                 ));
             }
         }
-        device_service
+        let result = device_service
             .client
             .enable_manual_fan_control(device_uid, channel_name)
             .await
-            .map_err(|status| anyhow!("Error enabling manual control for device channel: {status}"))
+            .map_err(|status| {
+                anyhow!("Error enabling manual control for device channel: {status}")
+            });
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_speed_fixed(
@@ -1030,11 +1069,13 @@ impl Repository for ServicePluginRepo {
         debug!(
             "Applying Service Plugin device: {device_uid} channel: {channel_name}; Fixed Speed: {speed_fixed}"
         );
-        device_service
+        let result = device_service
             .client
             .fixed_duty(device_uid, channel_name, speed_fixed)
             .await
-            .map_err(|status| anyhow!("Error applying fixed speed for device channel: {status}"))
+            .map_err(|status| anyhow!("Error applying fixed speed for device channel: {status}"));
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_speed_profile(
@@ -1094,11 +1135,13 @@ impl Repository for ServicePluginRepo {
         debug!(
             "Applying Service Plugin device: {device_uid} channel: {channel_name}; Speed Profile: {speed_profile:?}"
         );
-        device_service
+        let result = device_service
             .client
             .speed_profile(device_uid, channel_name, temp_source, speed_profile)
             .await
-            .map_err(|status| anyhow!("Error applying speed profile for device channel: {status}"))
+            .map_err(|status| anyhow!("Error applying speed profile for device channel: {status}"));
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_lighting(
@@ -1127,13 +1170,15 @@ impl Repository for ServicePluginRepo {
         debug!(
             "Applying Service Plugin device: {device_uid} channel: {channel_name}; Lighting: {lighting:?}"
         );
-        device_service
+        let result = device_service
             .client
             .lighting(device_uid, channel_name, lighting)
             .await
             .map_err(|status| {
                 anyhow!("Error applying lighting settings for device channel: {status}")
-            })
+            });
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_lcd(
@@ -1162,13 +1207,15 @@ impl Repository for ServicePluginRepo {
         debug!(
             "Applying Service Plugin device: {device_uid} channel: {channel_name}; LCD: {lcd:?}"
         );
-        device_service
+        let result = device_service
             .client
             .lcd(device_uid, channel_name, lcd)
             .await
             .map_err(|status| {
                 anyhow!("Error applying lighting settings for device channel: {status}")
-            })
+            });
+        apply_device_command_delay(self.device_delay(device_uid)).await;
+        result
     }
 
     async fn apply_setting_pwm_mode(
@@ -1185,6 +1232,7 @@ impl Repository for ServicePluginRepo {
     async fn reinitialize_devices(&self) {
         moro_local::async_scope!(|device_init_scope| {
             for (device_uid, (_device_lock, service)) in &self.devices {
+                let delay = self.device_delay(device_uid);
                 device_init_scope.spawn(async move {
                     if let Err(err) = service.client.initialize_device(device_uid).await {
                         warn!(
@@ -1192,6 +1240,7 @@ impl Repository for ServicePluginRepo {
                             service.id
                         );
                     }
+                    apply_device_command_delay(delay).await;
                 });
             }
         })
