@@ -140,9 +140,13 @@ impl MixProfileCommander {
                             .insert(member_profile.uid.clone(), None);
                     }
                 }
+                ProfileType::Fixed => {
+                    // Fixed profiles produce a constant duty stored in NormalizedMixProfile.
+                    // No graph commander scheduling needed.
+                }
                 _ => {
                     return Err(anyhow!(
-                        "Only Graph and Mix Profiles are supported as Mix members"
+                        "Only Graph, Fixed, and Mix Profiles are supported as Mix members"
                     ));
                 }
             }
@@ -258,6 +262,15 @@ impl MixProfileCommander {
         let mut member_values = Vec::with_capacity(mix_profile.member_profile_uids.len());
         let mut members_have_no_output = true;
         for member_profile_uid in &mix_profile.member_profile_uids {
+            // Fixed members have a constant duty - no cache lookup needed.
+            if let Some(fixed_duty) = mix_profile
+                .member_fixed_profile_duties
+                .get(member_profile_uid)
+            {
+                members_have_no_output = false;
+                member_values.push(fixed_duty);
+                continue;
+            }
             // Look up the member's output from the appropriate cache
             let output = if mix_profile
                 .member_mix_profile_uids
@@ -446,6 +459,11 @@ impl MixProfileCommander {
                 .filter(|p| p.p_type == ProfileType::Mix)
                 .map(|p| p.uid.clone())
                 .collect(),
+            member_fixed_profile_duties: member_profiles
+                .iter()
+                .filter(|p| p.p_type == ProfileType::Fixed)
+                .filter_map(|p| p.speed_fixed.map(|duty| (p.uid.clone(), duty)))
+                .collect(),
             member_profile_uids: member_profiles.iter().map(|p| p.uid.clone()).collect(),
         }
     }
@@ -458,6 +476,8 @@ pub struct NormalizedMixProfile {
     member_profile_uids: Vec<ProfileUID>,
     /// Subset of `member_profile_uids` that are Mix-type profiles (children).
     member_mix_profile_uids: Vec<ProfileUID>,
+    /// Fixed-duty members: constant duty values keyed by profile UID.
+    member_fixed_profile_duties: HashMap<ProfileUID, Duty>,
 }
 
 impl Default for NormalizedMixProfile {
@@ -467,6 +487,7 @@ impl Default for NormalizedMixProfile {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: Vec::new(),
             member_mix_profile_uids: Vec::new(),
+            member_fixed_profile_duties: HashMap::new(),
         }
     }
 }
@@ -588,6 +609,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_a".to_string(), Some(40u8)),
@@ -611,6 +633,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Avg,
             member_profile_uids: vec!["graph_c".to_string(), "child_mix".to_string()],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_c".to_string(), Some(80u8))]);
         let mix_duties = HashMap::from([("child_mix".to_string(), Some(60u8))]);
@@ -636,6 +659,7 @@ mod tests {
                 "child_mix".to_string(),
             ],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_1".to_string(), Some(50u8)),
@@ -660,6 +684,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "child_mix".to_string()],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_a".to_string(), Some(25u8))]);
         let mix_duties = HashMap::from([("child_mix".to_string(), Some(75u8))]);
@@ -681,6 +706,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Diff,
             member_profile_uids: vec!["child_mix".to_string(), "graph_a".to_string()],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_a".to_string(), Some(30u8))]);
         let mix_duties = HashMap::from([("child_mix".to_string(), Some(80u8))]);
@@ -702,6 +728,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties =
             HashMap::from([("graph_a".to_string(), None), ("graph_b".to_string(), None)]);
@@ -724,6 +751,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_missing".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_a".to_string(), Some(50u8))]);
         let last_applied = HashMap::new();
@@ -744,6 +772,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_a".to_string(), Some(70u8)),
@@ -768,6 +797,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_a".to_string(), Some(70u8)),
@@ -811,6 +841,7 @@ mod tests {
                 mix_function: ProfileMixFunctionType::Max,
                 member_profile_uids: vec!["g1".to_string()],
                 member_mix_profile_uids: vec![],
+                member_fixed_profile_duties: HashMap::new(),
             },
             vec![mix_channel("dev1", "fan1")],
         )]);
@@ -834,6 +865,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Max,
                     member_profile_uids: vec!["g1".to_string(), "g2".to_string()],
                     member_mix_profile_uids: vec![],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 // child_mix has both its own channel and the parent's channel
                 vec![mix_channel("dev1", "fan1"), mix_channel("dev2", "fan2")],
@@ -844,6 +876,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Avg,
                     member_profile_uids: vec!["child_mix".to_string(), "g3".to_string()],
                     member_mix_profile_uids: vec!["child_mix".to_string()],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 vec![mix_channel("dev2", "fan2")],
             ),
@@ -876,6 +909,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Max,
                     member_profile_uids: vec!["g1".to_string()],
                     member_mix_profile_uids: vec![],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 vec![mix_channel("dev2", "fan2")],
             ),
@@ -885,6 +919,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Avg,
                     member_profile_uids: vec!["child_mix".to_string(), "g2".to_string()],
                     member_mix_profile_uids: vec!["child_mix".to_string()],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 vec![mix_channel("dev2", "fan2")],
             ),
@@ -910,6 +945,7 @@ mod tests {
                 mix_function: ProfileMixFunctionType::Max,
                 member_profile_uids: vec!["g1".to_string()],
                 member_mix_profile_uids: vec![],
+                member_fixed_profile_duties: HashMap::new(),
             },
             vec![mix_channel("dev1", "fan1")],
         )]);
@@ -927,6 +963,7 @@ mod tests {
                 mix_function: ProfileMixFunctionType::Max,
                 member_profile_uids: vec!["g1".to_string()],
                 member_mix_profile_uids: vec![],
+                member_fixed_profile_duties: HashMap::new(),
             },
             vec![DeviceChannelProfileSetting::Overlay {
                 device_uid: "dev1".to_string(),
@@ -936,5 +973,121 @@ mod tests {
         let output_cache = HashMap::from([("mix_a".to_string(), Some(80u8))]);
         let result = MixProfileCommander::collect_duties_from_scheduled(&scheduled, &output_cache);
         assert!(result.is_empty());
+    }
+
+    // -- Fixed member profile tests --
+
+    /// Verify Fixed member duties are used directly without cache lookup.
+    #[test]
+    fn fixed_member_produces_constant_duty() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Max,
+            member_profile_uids: vec!["fixed_a".to_string(), "graph_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 45u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(70u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(70)); // Max of 45, 70
+    }
+
+    /// Verify Mix with only Fixed members always produces output.
+    #[test]
+    fn all_fixed_members_always_produce_output() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Avg,
+            member_profile_uids: vec!["fixed_a".to_string(), "fixed_b".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([
+                ("fixed_a".to_string(), 30u8),
+                ("fixed_b".to_string(), 50u8),
+            ]),
+        };
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &HashMap::new(),
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(40)); // Avg of 30, 50
+    }
+
+    /// Verify Fixed members work with Diff function (subtraction order matters).
+    #[test]
+    fn fixed_member_diff_function() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Diff,
+            member_profile_uids: vec!["graph_a".to_string(), "fixed_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 20u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(80u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(60)); // Diff: 80 - 20 = 60
+    }
+
+    /// Verify Fixed members combined with Graph and Mix members.
+    #[test]
+    fn fixed_graph_and_mix_members_combined() {
+        let parent = NormalizedMixProfile {
+            profile_uid: "parent".to_string(),
+            mix_function: ProfileMixFunctionType::Min,
+            member_profile_uids: vec![
+                "fixed_a".to_string(),
+                "graph_a".to_string(),
+                "child_mix".to_string(),
+            ],
+            member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 25u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(50u8))]);
+        let mix_duties = HashMap::from([("child_mix".to_string(), Some(40u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &parent,
+            &graph_duties,
+            &mix_duties,
+            &last_applied,
+        );
+        assert_eq!(result, Some(25)); // Min of 25, 50, 40
+    }
+
+    /// Verify Fixed members keep Mix producing output even when Graph members have no output.
+    #[test]
+    fn fixed_member_provides_output_when_graph_has_none() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Max,
+            member_profile_uids: vec!["fixed_a".to_string(), "graph_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 60u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), None)]);
+        let last_applied = HashMap::from([("graph_a".to_string(), 30u8)]);
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        // Fixed=60 has output, so members_have_no_output=false.
+        // Graph has None, so it uses last_applied=30 as fallback.
+        assert_eq!(result, Some(60)); // Max of 60, 30
     }
 }

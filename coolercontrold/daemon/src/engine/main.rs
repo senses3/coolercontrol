@@ -318,16 +318,21 @@ impl Engine {
                 let sub_members = self
                     .get_ordered_member_profiles(&member.member_profile_uids)
                     .await?;
-                // Single-level enforcement: sub-members must all be Graph
-                if sub_members.iter().any(|p| p.p_type != ProfileType::Graph) {
+                // Single-level enforcement: sub-members must all be Graph or Fixed
+                if sub_members
+                    .iter()
+                    .any(|p| p.p_type != ProfileType::Graph && p.p_type != ProfileType::Fixed)
+                {
                     return Err(anyhow!(
-                        "Mix member '{}' contains non-Graph sub-members (multi-level nesting not allowed)",
+                        "Mix member '{}' contains non-Graph/Fixed sub-members \
+                         (multi-level nesting not allowed)",
                         member.name
                     ));
                 }
-                // Validate sub-member functions exist
+                // Validate sub-member functions exist (Graph profiles only)
                 if sub_members
                     .iter()
+                    .filter(|p| p.p_type == ProfileType::Graph)
                     .any(|p| all_function_uids.contains(&p.function_uid).not())
                 {
                     return Err(anyhow!(

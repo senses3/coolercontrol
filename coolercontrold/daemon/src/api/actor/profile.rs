@@ -76,38 +76,40 @@ impl ProfileActor {
         }
     }
 
+    fn verify_graph_profile(&self, profile: &Profile) -> Result<()> {
+        let _ = self.config.get_function(&profile.function_uid)?;
+        let Some(temp_source) = profile.temp_source.as_ref() else {
+            return Err(CCError::UserError {
+                msg: "Temp Source not present in Profile".to_string(),
+            }
+            .into());
+        };
+        let Some(device_lock) = self.all_devices.get(&temp_source.device_uid) else {
+            return Err(CCError::UserError {
+                msg: format!("No Device found with given UID: {}", temp_source.device_uid),
+            }
+            .into());
+        };
+        let temp_exists = device_lock
+            .borrow()
+            .info
+            .temps
+            .contains_key(&temp_source.temp_name);
+        if temp_exists.not() {
+            return Err(CCError::UserError {
+                msg: format!(
+                    "Device with given UID: {} doesn't have a temp name: {}",
+                    temp_source.device_uid, temp_source.temp_name
+                ),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     async fn verify_profile_internals(&self, profile: &Profile) -> Result<()> {
         if profile.p_type == ProfileType::Graph {
-            // verify function exists
-            let _ = self.config.get_function(&profile.function_uid)?;
-            // verify temp_source exists
-            let Some(temp_source) = profile.temp_source.as_ref() else {
-                return Err(CCError::UserError {
-                    msg: "Temp Source not present in Profile".to_string(),
-                }
-                .into());
-            };
-            let Some(temp_source_device_lock) = self.all_devices.get(&temp_source.device_uid)
-            else {
-                return Err(CCError::UserError {
-                    msg: format!("No Device found with given UID: {}", temp_source.device_uid),
-                }
-                .into());
-            };
-            let temp_exists = temp_source_device_lock
-                .borrow()
-                .info
-                .temps
-                .contains_key(&temp_source.temp_name);
-            if temp_exists.not() {
-                return Err(CCError::UserError {
-                    msg: format!(
-                        "Device with given UID: {} doesn't have a temp name: {}",
-                        temp_source.device_uid, temp_source.temp_name
-                    ),
-                }
-                .into());
-            }
+            self.verify_graph_profile(profile)?;
         } else if profile.p_type == ProfileType::Mix {
             let all_profiles = self.config.get_profiles().await?;
             for member_uid in &profile.member_profile_uids {
@@ -118,11 +120,11 @@ impl ProfileActor {
                     }
                     .into());
                 };
-                // Verify members are Graph or Mix only
-                if member.p_type != ProfileType::Graph && member.p_type != ProfileType::Mix {
+                // Verify members are Graph, Fixed, or Mix only
+                if matches!(member.p_type, ProfileType::Default | ProfileType::Overlay) {
                     return Err(CCError::UserError {
                         msg: format!(
-                            "Mix member '{}' must be a Graph or Mix profile",
+                            "Mix member '{}' must be a Graph, Fixed, or Mix profile",
                             member.name
                         ),
                     }
