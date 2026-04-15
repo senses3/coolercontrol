@@ -289,6 +289,16 @@ impl Repository for GpuRepo {
                                 vec![d.1.info.driver_info.version.clone().unwrap_or_default()],
                             ),
                             ("locations", d.1.info.driver_info.locations.clone()),
+                            ("channels", {
+                                let mut ch: Vec<_> = d.1.info.channels.keys().cloned().collect();
+                                ch.sort();
+                                ch
+                            }),
+                            ("temps", {
+                                let mut t: Vec<_> = d.1.info.temps.keys().cloned().collect();
+                                t.sort();
+                                t
+                            }),
                         ]),
                     )
                 })
