@@ -989,9 +989,29 @@ impl Engine {
     /// This function finds out if the give Profile UID is in use, and if so, updates
     /// the settings for those devices.
     pub async fn profile_updated(&self, profile_uid: &ProfileUID) {
-        let affected_mix_profiles = self
+        let mut affected_mix_profiles = self
             .get_profiles_affected_by(profile_uid, ProfileType::Mix)
             .await;
+        // Also find parent Mix profiles that contain an affected child Mix.
+        // Single-level nesting means one extra pass suffices.
+        if affected_mix_profiles.is_empty().not() {
+            let child_mix_uids: Vec<ProfileUID> =
+                affected_mix_profiles.iter().map(|p| p.uid.clone()).collect();
+            let parent_mixes: Vec<Profile> = self
+                .config
+                .get_profiles()
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|p| {
+                    p.p_type == ProfileType::Mix
+                        && p.member_profile_uids
+                            .iter()
+                            .any(|uid| child_mix_uids.contains(uid))
+                })
+                .collect();
+            affected_mix_profiles.extend(parent_mixes);
+        }
         let affected_overlay_profiles = self
             .get_profiles_affected_by(profile_uid, ProfileType::Overlay)
             .await;
