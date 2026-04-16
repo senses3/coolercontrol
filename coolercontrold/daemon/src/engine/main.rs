@@ -995,8 +995,10 @@ impl Engine {
         // Also find parent Mix profiles that contain an affected child Mix.
         // Single-level nesting means one extra pass suffices.
         if affected_mix_profiles.is_empty().not() {
-            let child_mix_uids: Vec<ProfileUID> =
-                affected_mix_profiles.iter().map(|p| p.uid.clone()).collect();
+            let child_mix_uids: Vec<ProfileUID> = affected_mix_profiles
+                .iter()
+                .map(|p| p.uid.clone())
+                .collect();
             let parent_mixes: Vec<Profile> = self
                 .config
                 .get_profiles()
