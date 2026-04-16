@@ -120,7 +120,7 @@ const calculatedDutyLineData: [LineData, LineData] = [{ value: [] }, { value: []
 const getTempLineColor = (profileIndex: number): string => {
     const profile = graphProfiles[profileIndex]
     if (profile.temp_source == null) {
-        return colors.themeColors.accent
+        return colors.themeColors.yellow
     }
     return (
         settingsStore.allUIDeviceSettings
