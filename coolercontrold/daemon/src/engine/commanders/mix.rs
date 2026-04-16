@@ -116,11 +116,15 @@ impl MixProfileCommander {
                         .schedule_setting(device_channel.clone(), &member_profile)?;
                 }
                 ProfileType::Mix => {
-                    // Schedule the child Mix's own Graph sub-members via graph_commander
+                    // Schedule the child Mix's Graph sub-members via graph_commander.
+                    // Fixed sub-members are skipped here; their constant duties are
+                    // stored directly in the child's NormalizedMixProfile.
                     if let Some(sub_profiles) = member_sub_profiles.get(&member_profile.uid) {
                         for sub_profile in sub_profiles {
-                            self.graph_commander
-                                .schedule_setting(device_channel.clone(), sub_profile)?;
+                            if sub_profile.p_type == ProfileType::Graph {
+                                self.graph_commander
+                                    .schedule_setting(device_channel.clone(), sub_profile)?;
+                            }
                         }
                     }
                     // Add the child Mix itself to scheduled_settings with its own
@@ -1113,6 +1117,30 @@ mod tests {
             &last_applied,
         );
         assert_eq!(result, Some(25)); // Min of 25, 50, 40
+    }
+
+    /// Verify a child Mix with Fixed sub-members processes correctly.
+    /// Reproduces the scenario where a Fixed profile is a member of a child Mix
+    /// (nested Mix). The child's Fixed member duty should come from its
+    /// NormalizedMixProfile, not from a graph cache lookup.
+    #[test]
+    fn child_mix_with_fixed_sub_member() {
+        let child = NormalizedMixProfile {
+            profile_uid: "child_mix".to_string(),
+            mix_function: ProfileMixFunctionType::Max,
+            member_profile_uids: vec!["graph_a".to_string(), "fixed_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 55u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(40u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &child,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(55)); // Max of 40, 55
     }
 
     /// Verify Fixed members keep Mix producing output even when Graph members have no output.
