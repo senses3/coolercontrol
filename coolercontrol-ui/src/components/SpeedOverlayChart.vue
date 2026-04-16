@@ -369,12 +369,10 @@ for (let i = 0; i < memberProfiles.value.length; i++) {
                     shadowColor: colors.themeColors.bg_one,
                     shadowBlur: 10,
                 },
-                data: [
-                    {
-                        coord: [getTemp(i), 95],
-                        value: getTemp(i),
-                    },
-                ],
+                data:
+                    memberProfiles.value[i].p_type === ProfileType.Fixed
+                        ? []
+                        : [{ coord: [getTemp(i), 95], value: getTemp(i) }],
             },
             z: 10,
             silent: true,
@@ -498,11 +496,18 @@ option.series.push({
 })
 
 const setGraphData = (profileIndex: number) => {
+    const profile = memberProfiles.value[profileIndex]
+    if (profile.p_type === ProfileType.Fixed) {
+        graphLineData[profileIndex].length = 0
+        const duty = profile.speed_fixed ?? 0
+        graphLineData[profileIndex].push({ value: [axisXTempMin, duty] })
+        graphLineData[profileIndex].push({ value: [axisXTempMax, duty] })
+        return
+    }
     const temp = getTemp(profileIndex)
     tempLineData[profileIndex][0].value = [temp, dutyMin]
     tempLineData[profileIndex][1].value = [temp, dutyMax]
     graphLineData[profileIndex].length = 0
-    const profile = memberProfiles.value[profileIndex]
     if (profile.speed_profile.length > 1) {
         const firstPoint = profile.speed_profile[0]
         if (firstPoint[0] > axisXTempMin) {
@@ -523,6 +528,15 @@ for (let i = 0; i < memberProfiles.value.length; i++) {
 const setGraphOffsetData = (profileIndex: number) => {
     graphOffsetLineData[profileIndex].length = 0
     const profile = memberProfiles.value[profileIndex]
+    if (profile.p_type === ProfileType.Fixed) {
+        if (props.profile.offset_profile != null && props.profile.offset_profile.length > 0) {
+            const duty = profile.speed_fixed ?? 0
+            const offsetDuty = calcDutyFromBaseProfileDuty(duty)
+            graphOffsetLineData[profileIndex].push({ value: [axisXTempMin, offsetDuty] })
+            graphOffsetLineData[profileIndex].push({ value: [axisXTempMax, offsetDuty] })
+        }
+        return
+    }
     if (
         profile.speed_profile.length > 1 &&
         props.profile.offset_profile != null &&
@@ -596,6 +610,7 @@ watch(rawStore.currentDeviceStatus, () => {
         ],
     })
     for (let i = 0; i < memberProfiles.value.length; i++) {
+        if (memberProfiles.value[i].p_type === ProfileType.Fixed) continue
         const temp = getTemp(i)
         tempLineData[i][0].value = [temp, dutyMin]
         tempLineData[i][1].value = [temp, dutyMax]

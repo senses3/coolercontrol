@@ -288,12 +288,18 @@ const calculateDuty = (): number => {
             for (const subUid of member.member_profile_uids) {
                 const subProfile = settingsStore.profiles.find((p) => p.uid === subUid)
                 if (subProfile == null) continue
-                const temp = getTempForProfile(subProfile)
-                childDuties.push(interpolate_profile(subProfile.speed_profile, temp))
+                if (subProfile.p_type === ProfileType.Fixed) {
+                    childDuties.push(subProfile.speed_fixed ?? 0)
+                } else {
+                    const temp = getTempForProfile(subProfile)
+                    childDuties.push(interpolate_profile(subProfile.speed_profile, temp))
+                }
             }
             if (childDuties.length > 0) {
                 allDuties.push(applyMixFunction(childDuties, member.mix_function_type))
             }
+        } else if (member.p_type === ProfileType.Fixed) {
+            allDuties.push(member.speed_fixed ?? 0)
         } else {
             const temp = getTempForProfile(member)
             allDuties.push(interpolate_profile(member.speed_profile, temp))
@@ -373,12 +379,10 @@ for (let i = 0; i < graphProfiles.length; i++) {
                     shadowColor: colors.themeColors.bg_one,
                     shadowBlur: 10,
                 },
-                data: [
-                    {
-                        coord: [getTemp(i), 95],
-                        value: getTemp(i),
-                    },
-                ],
+                data:
+                    graphProfiles[i].p_type === ProfileType.Fixed
+                        ? []
+                        : [{ coord: [getTemp(i), 95], value: getTemp(i) }],
             },
             z: 10,
             silent: true,
@@ -474,11 +478,18 @@ option.series.push({
 })
 
 const setGraphData = (profileIndex: number) => {
+    const profile = graphProfiles[profileIndex]
+    if (profile.p_type === ProfileType.Fixed) {
+        graphLineData[profileIndex].length = 0
+        const duty = profile.speed_fixed ?? 0
+        graphLineData[profileIndex].push({ value: [axisXTempMin, duty] })
+        graphLineData[profileIndex].push({ value: [axisXTempMax, duty] })
+        return
+    }
     const temp = getTemp(profileIndex)
     tempLineData[profileIndex][0].value = [temp, dutyMin]
     tempLineData[profileIndex][1].value = [temp, dutyMax]
     graphLineData[profileIndex].length = 0
-    const profile = graphProfiles[profileIndex]
     if (profile.speed_profile.length > 1) {
         const firstPoint = profile.speed_profile[0]
         if (firstPoint[0] > axisXTempMin) {
@@ -523,6 +534,7 @@ watch(rawStore.currentDeviceStatus, () => {
         ],
     })
     for (let i = 0; i < graphProfiles.length; i++) {
+        if (graphProfiles[i].p_type === ProfileType.Fixed) continue
         const temp = getTemp(i)
         tempLineData[i][0].value = [temp, dutyMin]
         tempLineData[i][1].value = [temp, dutyMax]
