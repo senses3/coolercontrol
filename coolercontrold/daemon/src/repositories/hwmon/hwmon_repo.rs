@@ -961,6 +961,39 @@ impl Repository for HwmonRepo {
         // fans::set_pwm_mode(&hwmon_driver.path, channel_info, Some(pwm_mode)).await
     }
 
+    async fn prepare_for_sleep(&self) {
+        for (device_uid, (_device_lock, hwmon_driver)) in &self.devices {
+            if hwmon_driver.name != devices::DEVICE_NAME_THINK_PAD {
+                continue;
+            }
+            for channel_info in &hwmon_driver.channels {
+                if channel_info.hwmon_type != HwmonChannelType::Fan {
+                    continue;
+                }
+                if channel_info.caps.is_fan_controllable().not() {
+                    continue;
+                }
+                info!(
+                    "Setting ThinkPad device: {device_uid} channel: {} to auto mode for sleep",
+                    channel_info.name
+                );
+                if let Err(err) = fans::set_pwm_enable(
+                    fans::PWM_ENABLE_AUTO_VALUE,
+                    &hwmon_driver.path,
+                    channel_info,
+                )
+                .await
+                {
+                    warn!(
+                        "Failed to set auto mode for ThinkPad device: {device_uid} \
+                         channel: {} before sleep: {err}",
+                        channel_info.name
+                    );
+                }
+            }
+        }
+    }
+
     async fn reinitialize_devices(&self) {
         error!("Reinitializing Devices is not supported for this Repository");
     }

@@ -97,7 +97,10 @@ pub trait Repository {
         pwm_mode: u8,
     ) -> Result<()>;
 
-    /// This is helpful/necessary after waking from sleep
+    /// Prepare devices for system sleep by resetting to safe defaults.
+    async fn prepare_for_sleep(&self) {}
+
+    /// This is helpful/necessary after waking from sleep.
     async fn reinitialize_devices(&self);
 }
 
