@@ -29,12 +29,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::device::{ChannelName, DeviceUID, Duty, UID};
 use crate::engine::commanders::graph::GraphProfileCommander;
+use crate::engine::commanders::OutputDedupState;
 use crate::engine::DeviceChannelProfileSetting;
 use crate::setting::{Profile, ProfileMixFunctionType, ProfileType, ProfileUID};
 
 type MixProfile = Profile;
 
-/// A Commander for Mix Profile Processing
+/// A Commander for Mix Profile Processing.
 /// This has its own `GraphProfile` Commander for processing each member profile. It handles
 /// scheduling, caching, as well as processing of the `MixProfileFunction`.
 pub struct MixProfileCommander {
@@ -45,6 +46,7 @@ pub struct MixProfileCommander {
     /// The last calculated Option<Duty> for each Mix Profile.
     /// This allows other Profiles to use the output of a Mix Profile.
     pub process_output_cache: RefCell<HashMap<ProfileUID, Option<Duty>>>,
+    output_dedup: RefCell<HashMap<ProfileUID, OutputDedupState>>,
 }
 
 impl MixProfileCommander {
@@ -54,6 +56,7 @@ impl MixProfileCommander {
             scheduled_settings: RefCell::new(HashMap::new()),
             all_last_applied_duties: RefCell::new(HashMap::new()),
             process_output_cache: RefCell::new(HashMap::new()),
+            output_dedup: RefCell::new(HashMap::new()),
         }
     }
 
@@ -92,6 +95,9 @@ impl MixProfileCommander {
             self.process_output_cache
                 .borrow_mut()
                 .insert(mix_profile.uid.clone(), None);
+            self.output_dedup
+                .borrow_mut()
+                .insert(mix_profile.uid.clone(), OutputDedupState::new());
         }
         Ok(())
     }
@@ -176,6 +182,9 @@ impl MixProfileCommander {
             if device_channels.is_empty() {
                 mix_profiles_to_remove.push(Rc::clone(mix_profile));
                 self.process_output_cache
+                    .borrow_mut()
+                    .remove(&mix_profile.profile_uid);
+                self.output_dedup
                     .borrow_mut()
                     .remove(&mix_profile.profile_uid);
             }
@@ -360,11 +369,32 @@ impl MixProfileCommander {
     }
 
     /// Collects the duties to apply for all scheduled Mix Profiles from the output cache.
+    /// Duties that haven't changed since the last application are suppressed unless the
+    /// safety latch counter has been reached.
     fn collect_duties_to_apply(&self) -> HashMap<DeviceUID, Vec<(ChannelName, Duty)>> {
-        Self::collect_duties_from_scheduled(
-            &self.scheduled_settings.borrow(),
-            &self.process_output_cache.borrow(),
-        )
+        let output_cache = self.process_output_cache.borrow();
+        let mut dedup_lock = self.output_dedup.borrow_mut();
+        // Build a filtered cache with only the profiles that should apply this tick.
+        let filtered_cache: HashMap<ProfileUID, Option<Duty>> = output_cache
+            .iter()
+            .map(|(uid, duty_opt)| {
+                let effective = match duty_opt {
+                    Some(duty) => {
+                        let apply = dedup_lock
+                            .get_mut(uid)
+                            .is_none_or(|state| state.should_apply(*duty));
+                        if apply {
+                            Some(*duty)
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                };
+                (uid.clone(), effective)
+            })
+            .collect();
+        Self::collect_duties_from_scheduled(&self.scheduled_settings.borrow(), &filtered_cache)
     }
 
     /// For child Mix profiles (those referenced by a parent's `member_mix_profile_uids`),
@@ -510,12 +540,15 @@ impl Hash for NormalizedMixProfile {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
-    use std::rc::Rc;
-
-    use crate::engine::commanders::mix::{MixProfileCommander, NormalizedMixProfile};
+    use crate::engine::commanders::mix::{
+        MixProfileCommander, NormalizedMixProfile, OutputDedupState,
+    };
+    use crate::engine::commanders::DEFAULT_SAFETY_LATCH_COUNT;
     use crate::engine::DeviceChannelProfileSetting;
     use crate::setting::ProfileMixFunctionType;
+    use std::collections::{HashMap, HashSet};
+    use std::ops::Not;
+    use std::rc::Rc;
 
     #[test]
     fn apply_mix_function_test_min() {
@@ -1089,5 +1122,65 @@ mod tests {
         // Fixed=60 has output, so members_have_no_output=false.
         // Graph has None, so it uses last_applied=30 as fallback.
         assert_eq!(result, Some(60)); // Max of 60, 30
+    }
+
+    // -- OutputDedupState tests --
+
+    /// Verify first call always applies (counter starts at latch count).
+    #[test]
+    fn dedup_first_call_always_applies() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50));
+    }
+
+    /// Verify identical duty is suppressed on the next tick.
+    #[test]
+    fn dedup_suppresses_identical_duty() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50)); // first: apply
+        assert!(state.should_apply(50).not()); // same: suppress
+        assert!(state.should_apply(50).not()); // same: suppress
+    }
+
+    /// Verify a changed duty is applied immediately and resets the counter.
+    #[test]
+    fn dedup_allows_changed_duty() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50));
+        assert!(state.should_apply(50).not());
+        assert!(state.should_apply(60)); // changed: apply immediately
+        assert!(state.should_apply(60).not()); // same again: suppress
+    }
+
+    /// Verify the safety latch fires after DEFAULT_SAFETY_LATCH_COUNT suppressed ticks.
+    #[test]
+    fn dedup_safety_latch_reapplies() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50)); // tick 0: first apply, counter resets to 0
+                                         // Ticks 1..=30: all suppressed (counter goes 0->1, 1->2, ..., 29->30)
+        for _ in 0..DEFAULT_SAFETY_LATCH_COUNT {
+            assert!(state.should_apply(50).not());
+        }
+        // Tick 31: counter is 30 == DEFAULT_SAFETY_LATCH_COUNT, safety latch fires
+        assert!(state.should_apply(50));
+        // Tick 32: suppressed again
+        assert!(state.should_apply(50).not());
+    }
+
+    /// Verify counter resets when duty changes mid-suppression.
+    #[test]
+    fn dedup_resets_on_duty_change() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50));
+        for _ in 0..10 {
+            assert!(state.should_apply(50).not());
+        }
+        // Change duty: apply immediately, counter resets to 0.
+        assert!(state.should_apply(70));
+        // Now need another full DEFAULT_SAFETY_LATCH_COUNT suppressed ticks before latch fires.
+        for _ in 0..DEFAULT_SAFETY_LATCH_COUNT {
+            assert!(state.should_apply(70).not());
+        }
+        assert!(state.should_apply(70)); // safety latch
     }
 }
