@@ -211,7 +211,8 @@ impl MixProfileCommander {
         let scheduled = self.scheduled_settings.borrow();
 
         // Pass 1: Process children (Mix profiles with no Mix sub-members)
-        let mut pass1_results: HashMap<ProfileUID, Option<Duty>> = HashMap::new();
+        let mut pass1_results: HashMap<ProfileUID, Option<Duty>> =
+            HashMap::with_capacity(scheduled.len());
         for mix_profile in scheduled.keys() {
             if mix_profile.member_mix_profile_uids.is_empty().not() {
                 continue; // Skip parents in pass 1
@@ -237,7 +238,8 @@ impl MixProfileCommander {
 
         // Pass 2: Process parents (Mix profiles with Mix sub-members)
         let mix_duties = self.process_output_cache.borrow();
-        let mut pass2_results: HashMap<ProfileUID, Option<Duty>> = HashMap::new();
+        let mut pass2_results: HashMap<ProfileUID, Option<Duty>> =
+            HashMap::with_capacity(scheduled.len());
         for mix_profile in scheduled.keys() {
             if mix_profile.member_mix_profile_uids.is_empty() {
                 continue; // Skip children in pass 2
@@ -268,7 +270,7 @@ impl MixProfileCommander {
         mix_duties: &HashMap<ProfileUID, Option<Duty>>,
         last_applied_duties: &HashMap<ProfileUID, Duty>,
     ) -> Option<Duty> {
-        let mut member_values = Vec::with_capacity(mix_profile.member_profile_uids.len());
+        let mut member_duties = Vec::with_capacity(mix_profile.member_profile_uids.len());
         let mut members_have_no_output = true;
         for member_profile_uid in &mix_profile.member_profile_uids {
             // Fixed members have a constant duty - no cache lookup needed.
@@ -277,7 +279,7 @@ impl MixProfileCommander {
                 .get(member_profile_uid)
             {
                 members_have_no_output = false;
-                member_values.push(fixed_duty);
+                member_duties.push(fixed_duty);
                 continue;
             }
             // Look up the member's output from the appropriate cache
@@ -313,13 +315,13 @@ impl MixProfileCommander {
                 };
                 last_duty
             };
-            member_values.push(duty_value_for_calculation);
+            member_duties.push(duty_value_for_calculation);
         }
         if members_have_no_output {
             return None;
         }
         Some(Self::apply_mix_function(
-            &member_values,
+            &member_duties,
             mix_profile.mix_function,
         ))
     }
@@ -374,7 +376,8 @@ impl MixProfileCommander {
     fn collect_duties_to_apply(&self) -> HashMap<DeviceUID, Vec<(ChannelName, Duty)>> {
         let output_cache = self.process_output_cache.borrow();
         let mut dedup_lock = self.output_dedup.borrow_mut();
-        // Build a filtered cache with only the profiles that should apply this tick.
+        // Build a filtered view with only the profiles that should apply this tick.
+        // Size is bounded by the number of scheduled profiles.
         let filtered_cache: HashMap<ProfileUID, Option<Duty>> = output_cache
             .iter()
             .map(|(uid, duty_opt)| {
@@ -450,26 +453,28 @@ impl MixProfileCommander {
         output_to_apply
     }
 
-    /// This function expects a non-empty `member_values` vector
+    /// Applies the mix function to the collected member duties.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn apply_mix_function(member_values: &[&Duty], mix_function: ProfileMixFunctionType) -> Duty {
-        // Since the member functions manage their own thresholds and the safety latch should
-        //  kick off about the same time for all of them, we don't check thresholds here.
+    fn apply_mix_function(member_duties: &[&Duty], mix_function: ProfileMixFunctionType) -> Duty {
+        debug_assert!(
+            member_duties.is_empty().not(),
+            "apply_mix_function called with empty member duties"
+        );
         match mix_function {
-            ProfileMixFunctionType::Min => **member_values.iter().min().unwrap(),
-            ProfileMixFunctionType::Max => **member_values.iter().max().unwrap(),
-            ProfileMixFunctionType::Avg => member_values
+            ProfileMixFunctionType::Min => **member_duties.iter().min().unwrap(),
+            ProfileMixFunctionType::Max => **member_duties.iter().max().unwrap(),
+            ProfileMixFunctionType::Avg => member_duties
                 .iter()
                 .map(|d| **d as usize)
                 .sum::<usize>()
-                .div(member_values.len()) as Duty,
-            ProfileMixFunctionType::Diff => member_values
+                .div(member_duties.len()) as Duty,
+            ProfileMixFunctionType::Diff => member_duties
                 .iter()
                 .map(|d| **d as isize)
                 .reduce(Sub::sub)
                 .unwrap_or_default()
                 .clamp(0, 100) as Duty,
-            ProfileMixFunctionType::Sum => member_values
+            ProfileMixFunctionType::Sum => member_duties
                 .iter()
                 .map(|d| **d as usize)
                 .sum::<usize>()
@@ -481,8 +486,17 @@ impl MixProfileCommander {
         profile: &Profile,
         member_profiles: &[Profile],
     ) -> NormalizedMixProfile {
+        debug_assert!(
+            profile.mix_function_type.is_some(),
+            "mix_function_type must be validated before normalization"
+        );
+        debug_assert!(
+            member_profiles.is_empty().not(),
+            "member_profiles must be validated before normalization"
+        );
         NormalizedMixProfile {
             profile_uid: profile.uid.clone(),
+            // Validated in schedule_setting before reaching here.
             mix_function: profile.mix_function_type.unwrap(),
             member_mix_profile_uids: member_profiles
                 .iter()
@@ -552,85 +566,85 @@ mod tests {
 
     #[test]
     fn apply_mix_function_test_min() {
-        let member_values = vec![&20, &21, &22, &23, &24];
+        let member_duties = vec![&20, &21, &22, &23, &24];
         let mix_function = ProfileMixFunctionType::Min;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 20);
     }
 
     #[test]
     fn apply_mix_function_test_max() {
-        let member_values = vec![&0, &1, &2, &3, &4];
+        let member_duties = vec![&0, &1, &2, &3, &4];
         let mix_function = ProfileMixFunctionType::Max;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 4);
     }
 
     #[test]
     fn apply_mix_function_test_avg() {
-        let member_values = vec![&0, &1, &2, &3, &4];
+        let member_duties = vec![&0, &1, &2, &3, &4];
         let mix_function = ProfileMixFunctionType::Avg;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 2);
     }
 
     #[test]
     fn apply_mix_function_test_avg_large() {
-        let member_values = vec![&120, &121, &122, &123, &124];
+        let member_duties = vec![&120, &121, &122, &123, &124];
         let mix_function = ProfileMixFunctionType::Avg;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 122);
     }
 
     #[test]
     fn apply_mix_function_test_diff() {
-        let member_values = vec![&50, &20];
+        let member_duties = vec![&50, &20];
         let mix_function = ProfileMixFunctionType::Diff;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 30);
     }
 
     #[test]
     fn apply_mix_function_test_diff_neg() {
-        let member_values = vec![&20, &50];
+        let member_duties = vec![&20, &50];
         let mix_function = ProfileMixFunctionType::Diff;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 0);
     }
 
     #[test]
     fn apply_mix_function_test_sum() {
         // Sum of two values within range.
-        let member_values = vec![&30, &40];
+        let member_duties = vec![&30, &40];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 70);
     }
 
     #[test]
     fn apply_mix_function_test_sum_clamped_at_max() {
         // Sum exceeds 100% — must clamp to 100.
-        let member_values = vec![&70, &60];
+        let member_duties = vec![&70, &60];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 100);
     }
 
     #[test]
     fn apply_mix_function_test_sum_three_members() {
         // Sum of three values, exact total in range.
-        let member_values = vec![&20, &30, &25];
+        let member_duties = vec![&20, &30, &25];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 75);
     }
 
     #[test]
     fn apply_mix_function_test_sum_at_boundary() {
         // Sum exactly at 100% — no clamping needed.
-        let member_values = vec![&50, &50];
+        let member_duties = vec![&50, &50];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 100);
     }
 

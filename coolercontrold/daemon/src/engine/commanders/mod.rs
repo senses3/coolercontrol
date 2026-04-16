@@ -46,6 +46,7 @@ impl OutputDedupState {
 
     /// Returns `true` when the duty should be written to hardware.
     pub fn should_apply(&mut self, duty: Duty) -> bool {
+        debug_assert!(duty <= 100, "duty must be in 0..=100 range");
         if self.last_applied_duty == Some(duty) {
             if self.no_change_counter >= DEFAULT_SAFETY_LATCH_COUNT {
                 // Safety latch: allow write through, reset counter.
