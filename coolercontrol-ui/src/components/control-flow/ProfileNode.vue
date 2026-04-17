@@ -32,10 +32,12 @@ import {
     mdiChartLine,
     mdiInformationSlabCircleOutline,
     mdiSwapHorizontal,
+    mdiTuneVerticalVariant,
 } from '@mdi/js'
 import TempSourceSwitchPopover from './TempSourceSwitchPopover.vue'
 import FunctionSwitchPopover from './FunctionSwitchPopover.vue'
 import MemberProfileSwitchPopover from './MemberProfileSwitchPopover.vue'
+import FixedSpeedSwitchPopover from './FixedSpeedSwitchPopover.vue'
 
 const props = defineProps<NodeProps<ProfileNodeData>>()
 const { t } = useI18n()
@@ -47,6 +49,7 @@ const onConnectionChanged = inject<() => void>('onProfileSwitched', () => {})
 const tempSourcePopoverRef = ref<InstanceType<typeof TempSourceSwitchPopover>>()
 const functionPopoverRef = ref<InstanceType<typeof FunctionSwitchPopover>>()
 const memberPopoverRef = ref<InstanceType<typeof MemberProfileSwitchPopover>>()
+const fixedSpeedPopoverRef = ref<InstanceType<typeof FixedSpeedSwitchPopover>>()
 
 const showSwapButtons = computed(() => flowViewMode === 'detail' && !props.data.isDefault)
 
@@ -63,6 +66,11 @@ function onSwapFunction(event: Event) {
 function onSwapMembers(event: Event) {
     event.stopPropagation()
     memberPopoverRef.value?.toggle(event)
+}
+
+function onAdjustFixedSpeed(event: Event) {
+    event.stopPropagation()
+    fixedSpeedPopoverRef.value?.toggle(event)
 }
 
 function onClickProfile() {
@@ -145,6 +153,19 @@ const typeBadgeClass: Record<string, string> = {
                 <svg-icon
                     type="mdi"
                     :path="mdiSwapHorizontal"
+                    class="size-5 text-text-color transition-colors hover:text-accent"
+                />
+            </div>
+            <!-- Adjust button: fixed speed -->
+            <div
+                v-if="showSwapButtons && data.profileType === ProfileType.Fixed"
+                v-tooltip.top="t('views.controls.adjustFixedSpeed')"
+                class="flex size-8 items-center justify-center rounded-md transition-all hover:bg-accent/15"
+                @click="onAdjustFixedSpeed($event)"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiTuneVerticalVariant"
                     class="size-5 text-text-color transition-colors hover:text-accent"
                 />
             </div>
@@ -233,6 +254,13 @@ const typeBadgeClass: Record<string, string> = {
             :profile-u-i-d="data.profileUID"
             :profile-type="data.profileType"
             :current-member-u-i-ds="data.memberProfileUIDs"
+            @changed="onConnectionChanged"
+        />
+        <FixedSpeedSwitchPopover
+            v-if="showSwapButtons && data.profileType === ProfileType.Fixed"
+            ref="fixedSpeedPopoverRef"
+            :profile-u-i-d="data.profileUID"
+            :current-speed-fixed="data.speedFixed ?? 0"
             @changed="onConnectionChanged"
         />
     </div>

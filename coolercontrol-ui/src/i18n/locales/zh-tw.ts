@@ -794,6 +794,7 @@ export default {
             switchFunction: '切換函數',
             switchMembers: '切換成員設定檔',
             switchBaseProfile: '切換基礎設定檔',
+            adjustFixedSpeed: '調整固定速度',
             editSources: '編輯來源',
         },
         devices: {

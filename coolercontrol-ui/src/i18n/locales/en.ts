@@ -663,6 +663,7 @@ export default {
             switchFunction: 'Switch Function',
             switchMembers: 'Switch Member Profiles',
             switchBaseProfile: 'Switch Base Profile',
+            adjustFixedSpeed: 'Adjust Fixed Speed',
             editSources: 'Edit Sources',
         },
         modes: {

@@ -666,6 +666,7 @@ export default {
             switchFunction: 'Сменить функцию',
             switchMembers: 'Сменить профили-участники',
             switchBaseProfile: 'Сменить базовый профиль',
+            adjustFixedSpeed: 'Настроить фиксированную скорость',
             editSources: 'Редактировать источники',
         },
         modes: {

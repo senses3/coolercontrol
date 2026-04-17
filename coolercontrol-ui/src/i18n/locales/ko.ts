@@ -655,6 +655,7 @@ export default {
             switchFunction: '함수 전환',
             switchMembers: '멤버 프로필 전환',
             switchBaseProfile: '기본 프로필 전환',
+            adjustFixedSpeed: '고정 속도 조정',
             editSources: '소스 편집',
         },
         modes: {

@@ -709,6 +709,7 @@ export default {
             switchFunction: '関数を切り替え',
             switchMembers: 'メンバープロファイルを切り替え',
             switchBaseProfile: 'ベースプロファイルを切り替え',
+            adjustFixedSpeed: '固定速度を調整',
             editSources: 'ソースを編集',
         },
         modes: {

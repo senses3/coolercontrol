@@ -668,6 +668,7 @@ export default {
             switchFunction: 'Cambiar función',
             switchMembers: 'Cambiar perfiles miembros',
             switchBaseProfile: 'Cambiar perfil base',
+            adjustFixedSpeed: 'Ajustar velocidad fija',
             editSources: 'Editar fuentes',
         },
         modes: {
