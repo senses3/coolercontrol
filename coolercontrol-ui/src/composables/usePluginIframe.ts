@@ -243,6 +243,21 @@ export function usePluginIframe(
                 postToIframe('status', status)
                 break
             }
+            case 'pluginFetch': {
+                const { requestId, path, options } = event.data
+                if (typeof requestId !== 'string' || typeof path !== 'string') break
+                const url = `/plugins/${pluginId}/data${path}`
+                fetch(url, { credentials: 'include', ...options })
+                    .then((r) => (r.ok ? r.json() : null))
+                    .catch(() => null)
+                    .then((body) => {
+                        iframeRef.value?.contentWindow?.postMessage(
+                            { type: 'pluginFetchResponse', requestId, body },
+                            nullOriginTarget,
+                        )
+                    })
+                break
+            }
         }
     }
 

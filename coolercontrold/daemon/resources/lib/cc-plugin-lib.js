@@ -132,6 +132,10 @@ const _processMessages = (messageEvent) => {
         case 'pluginRestarted':
             _pluginRestarted = messageEvent.data.body
             break
+        case 'pluginFetchResponse':
+            // Handled by pluginFetch's own per-request listener.
+            // Return early to avoid a spurious _decreaseMessageCount() call.
+            return
         default:
             console.log('Unknown message type', messageEvent)
     }
@@ -259,6 +263,33 @@ const getStatus = async (force = false) => {
     window.parent.postMessage({ type: 'status' }, document.location.origin)
     await waitTillAllMessagesReceived()
     return _status
+}
+
+/* Fetch data from this plugin's proxy endpoint. The path is relative to the plugin data root.
+   e.g. pluginFetch('/snapshot') proxies GET /plugins/{plugin_id}/data/snapshot via the daemon.
+   Returns the parsed JSON body, or null on error.
+   Note: the request is made by the parent window (which has credentials), not the sandboxed iframe. */
+const pluginFetch = async (path, options = {}) => {
+    const requestId = `${_messageCount}_${Date.now()}_${Math.random()}`
+    return new Promise((resolve) => {
+        const handler = (messageEvent) => {
+            if (
+                !messageEvent.isTrusted ||
+                messageEvent.origin !== document.location.origin ||
+                messageEvent.data?.type !== 'pluginFetchResponse' ||
+                messageEvent.data?.requestId !== requestId
+            ) {
+                return
+            }
+            window.removeEventListener('message', handler)
+            resolve(messageEvent.data.body)
+        }
+        window.addEventListener('message', handler)
+        window.parent.postMessage(
+            { type: 'pluginFetch', requestId, path, options },
+            document.location.origin,
+        )
+    })
 }
 
 // Plugin Running Functions

@@ -73,6 +73,10 @@ enum PluginMessage {
         plugin_id: String,
         respond_to: oneshot::Sender<Result<()>>,
     },
+    GetProxyPort {
+        plugin_id: String,
+        respond_to: oneshot::Sender<Result<Option<u16>>>,
+    },
 }
 impl PluginActor {
     pub fn new(
@@ -193,6 +197,13 @@ impl ApiActor<PluginMessage> for PluginActor {
                 let result = self.plugin_controller.enable_plugin(&plugin_id).await;
                 let _ = respond_to.send(result);
             }
+            PluginMessage::GetProxyPort {
+                plugin_id,
+                respond_to,
+            } => {
+                let result = self.plugin_controller.get_proxy_port(&plugin_id);
+                let _ = respond_to.send(result);
+            }
         }
     }
 }
@@ -305,6 +316,16 @@ impl PluginHandle {
     pub async fn enable_plugin(&self, plugin_id: String) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = PluginMessage::EnablePlugin {
+            plugin_id,
+            respond_to: tx,
+        };
+        let _ = self.sender.send(msg).await;
+        rx.await?
+    }
+
+    pub async fn get_proxy_port(&self, plugin_id: String) -> Result<Option<u16>> {
+        let (tx, rx) = oneshot::channel();
+        let msg = PluginMessage::GetProxyPort {
             plugin_id,
             respond_to: tx,
         };

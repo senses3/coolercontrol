@@ -19,11 +19,18 @@
 use crate::api::{handle_error, AppState, CCError};
 use crate::repositories::service_plugin::service_management::manager::ServiceStatus;
 use aide::axum::IntoApiResponse;
+use axum::body::Body;
 use axum::extract::{Path, Request, State};
+use axum::http::StatusCode;
+use axum::response::Response;
 use axum::Json;
+use http_body_util::{BodyExt, Full};
+use hyper::client::conn::http1;
+use hyper_util::rt::TokioIo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tokio::net::TcpStream;
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
 use tower_serve_static::include_file;
@@ -195,6 +202,93 @@ fn invalid_file_path() -> CCError {
     }
 }
 
+/// Reverse-proxy a request to a plugin's local HTTP server.
+/// Maps `/plugins/{plugin_id}/data/{*data_path}` → `http://127.0.0.1:{port}/{data_path}`.
+/// The plugin must declare `[proxy] enabled = true` and `port = N` in its manifest.
+pub async fn proxy_plugin_data(
+    Path(path): Path<PluginDataPath>,
+    State(AppState { plugin_handle, .. }): State<AppState>,
+    request: Request,
+) -> Result<Response, CCError> {
+    let port = plugin_handle
+        .get_proxy_port(path.plugin_id.clone())
+        .await
+        .map_err(handle_error)?
+        .ok_or_else(|| CCError::NotFound {
+            msg: format!("Plugin '{}' has no proxy configured", path.plugin_id),
+        })?;
+
+    // Build the upstream path, preserving query string from the original request.
+    let upstream_path = {
+        let query = request
+            .uri()
+            .query()
+            .map(|q| format!("?{q}"))
+            .unwrap_or_default();
+        format!("/{}{}", path.data_path, query)
+    };
+
+    let method = request.method().clone();
+    let body_bytes = request
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| CCError::InternalError { msg: e.to_string() })?
+        .to_bytes();
+
+    // Connect to the plugin's loopback HTTP server.
+    let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
+        .await
+        .map_err(|e| CCError::InternalError {
+            msg: format!("Cannot connect to plugin proxy on port {port}: {e}"),
+        })?;
+    let io = TokioIo::new(stream);
+    let (mut sender, conn) = http1::handshake(io)
+        .await
+        .map_err(|e| CCError::InternalError { msg: e.to_string() })?;
+    // Drive the connection in the background.
+    // Uses tokio::spawn (not spawn_local) because axum handlers run outside a LocalSet.
+    tokio::spawn(async move {
+        let _ = conn.await;
+    });
+
+    let upstream_req = hyper::Request::builder()
+        .method(method)
+        .uri(&upstream_path)
+        .header("host", format!("127.0.0.1:{port}"))
+        .body(Full::new(body_bytes))
+        .map_err(|e| CCError::InternalError { msg: e.to_string() })?;
+
+    let upstream_resp =
+        sender
+            .send_request(upstream_req)
+            .await
+            .map_err(|e| CCError::InternalError {
+                msg: format!("Plugin proxy request failed: {e}"),
+            })?;
+
+    let status = upstream_resp.status();
+    let headers = upstream_resp.headers().clone();
+    let body_bytes = upstream_resp
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| CCError::InternalError { msg: e.to_string() })?
+        .to_bytes();
+
+    let mut response = Response::builder()
+        .status(status)
+        .body(Body::from(body_bytes))
+        .unwrap_or_else(|_| {
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::empty())
+                .unwrap()
+        });
+    *response.headers_mut() = headers;
+    Ok(response)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PluginPath {
     pub plugin_id: String,
@@ -204,6 +298,12 @@ pub struct PluginPath {
 pub struct PluginUiPath {
     pub plugin_id: String,
     pub file_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct PluginDataPath {
+    pub plugin_id: String,
+    pub data_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

@@ -35,6 +35,7 @@ pub struct ServiceManifest {
     pub envs: Vec<(String, String)>, // if needed (set log level, etc.) "ENV1=value1 ENV2=value2"
     pub address: ConnectionType,     // required for all device service plugins
     pub privileged: bool,            // for device service plugins (false by default)
+    pub proxy: Option<ProxyConfig>,  // for integration plugins that expose a local HTTP API
     pub path: PathBuf,               // This plugin's folder path
 }
 
@@ -111,6 +112,20 @@ impl ServiceManifest {
             .get("privileged")
             .and_then(toml_edit::Item::as_bool)
             .unwrap_or(false);
+        let proxy = document
+            .get("proxy")
+            .and_then(toml_edit::Item::as_table)
+            .and_then(|table| {
+                let enabled = table.get("enabled")?.as_bool()?;
+                if !enabled {
+                    return None;
+                }
+                let port = table.get("port")?.as_integer()?;
+                if port < 1024 || port > 65535 {
+                    return None;
+                }
+                Some(ProxyConfig { port: port as u16 })
+            });
         Ok(Self {
             id,
             service_type,
@@ -122,6 +137,7 @@ impl ServiceManifest {
             envs,
             address,
             privileged,
+            proxy,
             path,
         })
     }
@@ -153,6 +169,13 @@ impl ServiceManifest {
     pub fn is_managed(&self) -> bool {
         self.executable.is_some()
     }
+}
+
+/// Configuration for an integration plugin's local HTTP proxy.
+#[derive(Debug, Clone)]
+pub struct ProxyConfig {
+    /// The loopback port the plugin's HTTP server listens on.
+    pub port: u16,
 }
 
 #[derive(Debug, PartialEq, Clone, EnumString, Display)]
