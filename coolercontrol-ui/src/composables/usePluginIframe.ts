@@ -24,7 +24,6 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
-import { ThemeMode } from '@/models/UISettings.ts'
 
 export type PluginIframeMode = 'modal' | 'full_page'
 
@@ -118,18 +117,19 @@ export function usePluginIframe(
                 postToIframe('style', mainStyleLinkEl())
                 break
             case 'customStyle': {
-                const customStyle =
-                    settingsStore.themeMode === ThemeMode.CUSTOM
-                        ? {
-                              '--colors-accent': settingsStore.customTheme.accent,
-                              '--colors-bg-one': settingsStore.customTheme.bgOne,
-                              '--colors-bg-two': settingsStore.customTheme.bgTwo,
-                              '--colors-border-one': settingsStore.customTheme.borderOne,
-                              '--colors-text-color': settingsStore.customTheme.textColor,
-                              '--colors-text-color-secondary':
-                                  settingsStore.customTheme.textColorSecondary,
-                          }
-                        : undefined
+                // Always read the resolved CSS variable values from the parent document so
+                // the iframe gets the correct colours for any theme (not just Custom).
+                const rootStyle = getComputedStyle(document.documentElement)
+                const getVar = (name: string): string =>
+                    rootStyle.getPropertyValue(name).trim()
+                const customStyle = {
+                    '--colors-accent': getVar('--colors-accent'),
+                    '--colors-bg-one': getVar('--colors-bg-one'),
+                    '--colors-bg-two': getVar('--colors-bg-two'),
+                    '--colors-border-one': getVar('--colors-border-one'),
+                    '--colors-text-color': getVar('--colors-text-color'),
+                    '--colors-text-color-secondary': getVar('--colors-text-color-secondary'),
+                }
                 postToIframe('customStyle', customStyle)
                 break
             }
