@@ -665,6 +665,7 @@ export default {
             switchFunction: 'फ़ंक्शन बदलें',
             switchMembers: 'सदस्य प्रोफ़ाइल बदलें',
             switchBaseProfile: 'आधार प्रोफ़ाइल बदलें',
+            adjustFixedSpeed: 'निश्चित गति समायोजित करें',
             editSources: 'स्रोत संपादित करें',
         },
         modes: {

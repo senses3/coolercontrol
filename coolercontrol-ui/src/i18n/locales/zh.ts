@@ -793,6 +793,7 @@ export default {
             switchFunction: '切换函数',
             switchMembers: '切换成员配置',
             switchBaseProfile: '切换基础配置',
+            adjustFixedSpeed: '调整固定速度',
             editSources: '编辑来源',
         },
         devices: {

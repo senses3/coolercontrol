@@ -318,16 +318,21 @@ impl Engine {
                 let sub_members = self
                     .get_ordered_member_profiles(&member.member_profile_uids)
                     .await?;
-                // Single-level enforcement: sub-members must all be Graph
-                if sub_members.iter().any(|p| p.p_type != ProfileType::Graph) {
+                // Single-level enforcement: sub-members must all be Graph or Fixed
+                if sub_members
+                    .iter()
+                    .any(|p| p.p_type != ProfileType::Graph && p.p_type != ProfileType::Fixed)
+                {
                     return Err(anyhow!(
-                        "Mix member '{}' contains non-Graph sub-members (multi-level nesting not allowed)",
+                        "Mix member '{}' contains non-Graph/Fixed sub-members \
+                         (multi-level nesting not allowed)",
                         member.name
                     ));
                 }
-                // Validate sub-member functions exist
+                // Validate sub-member functions exist (Graph profiles only)
                 if sub_members
                     .iter()
+                    .filter(|p| p.p_type == ProfileType::Graph)
                     .any(|p| all_function_uids.contains(&p.function_uid).not())
                 {
                     return Err(anyhow!(
@@ -984,9 +989,31 @@ impl Engine {
     /// This function finds out if the give Profile UID is in use, and if so, updates
     /// the settings for those devices.
     pub async fn profile_updated(&self, profile_uid: &ProfileUID) {
-        let affected_mix_profiles = self
+        let mut affected_mix_profiles = self
             .get_profiles_affected_by(profile_uid, ProfileType::Mix)
             .await;
+        // Also find parent Mix profiles that contain an affected child Mix.
+        // Single-level nesting means one extra pass suffices.
+        if affected_mix_profiles.is_empty().not() {
+            let child_mix_uids: Vec<ProfileUID> = affected_mix_profiles
+                .iter()
+                .map(|p| p.uid.clone())
+                .collect();
+            let parent_mixes: Vec<Profile> = self
+                .config
+                .get_profiles()
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|p| {
+                    p.p_type == ProfileType::Mix
+                        && p.member_profile_uids
+                            .iter()
+                            .any(|uid| child_mix_uids.contains(uid))
+                })
+                .collect();
+            affected_mix_profiles.extend(parent_mixes);
+        }
         let affected_overlay_profiles = self
             .get_profiles_affected_by(profile_uid, ProfileType::Overlay)
             .await;

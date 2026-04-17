@@ -19,6 +19,7 @@
 use crate::device::{ChannelName, DeviceUID, Duty, UID};
 use crate::engine::commanders::graph::GraphProfileCommander;
 use crate::engine::commanders::mix::MixProfileCommander;
+use crate::engine::commanders::OutputDedupState;
 use crate::engine::{utils, DeviceChannelProfileSetting};
 use crate::setting::{Offset, Profile, ProfileType, ProfileUID};
 use anyhow::anyhow;
@@ -28,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use std::ops::Not;
 use std::rc::Rc;
 
 type OverlayProfile = Profile;
@@ -39,6 +41,7 @@ pub struct OverlayProfileCommander {
         RefCell<HashMap<Rc<NormalizedOverlayProfile>, HashSet<DeviceChannelProfileSetting>>>,
     /// The last calculated Option<Duty> for each Overlay Profile.
     pub process_output_cache: RefCell<HashMap<ProfileUID, Option<Duty>>>,
+    output_dedup: RefCell<HashMap<ProfileUID, OutputDedupState>>,
 }
 
 impl OverlayProfileCommander {
@@ -47,6 +50,7 @@ impl OverlayProfileCommander {
         mix_commander: Rc<MixProfileCommander>,
     ) -> Self {
         Self {
+            output_dedup: RefCell::new(HashMap::new()),
             graph_commander,
             mix_commander,
             scheduled_settings: RefCell::new(HashMap::new()),
@@ -103,6 +107,9 @@ impl OverlayProfileCommander {
             self.process_output_cache
                 .borrow_mut()
                 .insert(overlay_profile.uid.clone(), None);
+            self.output_dedup
+                .borrow_mut()
+                .insert(overlay_profile.uid.clone(), OutputDedupState::new());
         }
         Ok(())
     }
@@ -148,6 +155,9 @@ impl OverlayProfileCommander {
             if device_channels.is_empty() {
                 overlay_profile_to_remove.replace(Rc::clone(overlay_profile));
                 self.process_output_cache
+                    .borrow_mut()
+                    .remove(&overlay_profile.profile_uid);
+                self.output_dedup
                     .borrow_mut()
                     .remove(&overlay_profile.profile_uid);
             }
@@ -220,10 +230,13 @@ impl OverlayProfileCommander {
     }
 
     /// Collects the duties to apply for all scheduled Overlay Profiles from the output cache.
+    /// Duties that haven't changed since the last application are suppressed unless the
+    /// safety latch counter has been reached.
     fn collect_duties_to_apply(&self) -> HashMap<DeviceUID, Vec<(ChannelName, Duty)>> {
         let settings = self.scheduled_settings.borrow();
         let mut output_to_apply = HashMap::with_capacity(settings.len());
         let output_cache_lock = self.process_output_cache.borrow();
+        let mut dedup_lock = self.output_dedup.borrow_mut();
         for (overlay_profile, device_channels) in settings.iter() {
             let optional_duty_to_set = output_cache_lock[&overlay_profile.profile_uid]
                 .as_ref()
@@ -231,6 +244,12 @@ impl OverlayProfileCommander {
             let Some(duty_to_set) = optional_duty_to_set else {
                 continue;
             };
+            let apply = dedup_lock
+                .get_mut(&overlay_profile.profile_uid)
+                .is_none_or(|state| state.should_apply(duty_to_set));
+            if apply.not() {
+                continue;
+            }
             for device_channel in device_channels {
                 // We only apply Overlay Profiles directly applied to fan channels
                 if let DeviceChannelProfileSetting::Overlay {

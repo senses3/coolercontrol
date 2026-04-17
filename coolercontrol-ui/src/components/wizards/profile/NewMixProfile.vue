@@ -64,6 +64,7 @@ const chosenMemberProfiles: Ref<Array<Profile>> = ref([])
 const memberProfileOptions: Ref<Array<Profile>> = computed(() =>
     settingsStore.profiles.filter((profile) => {
         if (profile.p_type === ProfileType.Graph) return true
+        if (profile.p_type === ProfileType.Fixed) return true
         if (profile.p_type !== ProfileType.Mix) return false
         // Exclude Mix profiles that already have Mix sub-members
         const hasMixSubMembers = profile.member_profile_uids.some(

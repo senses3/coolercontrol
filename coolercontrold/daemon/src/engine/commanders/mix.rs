@@ -29,12 +29,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::device::{ChannelName, DeviceUID, Duty, UID};
 use crate::engine::commanders::graph::GraphProfileCommander;
+use crate::engine::commanders::OutputDedupState;
 use crate::engine::DeviceChannelProfileSetting;
 use crate::setting::{Profile, ProfileMixFunctionType, ProfileType, ProfileUID};
 
 type MixProfile = Profile;
 
-/// A Commander for Mix Profile Processing
+/// A Commander for Mix Profile Processing.
 /// This has its own `GraphProfile` Commander for processing each member profile. It handles
 /// scheduling, caching, as well as processing of the `MixProfileFunction`.
 pub struct MixProfileCommander {
@@ -45,6 +46,7 @@ pub struct MixProfileCommander {
     /// The last calculated Option<Duty> for each Mix Profile.
     /// This allows other Profiles to use the output of a Mix Profile.
     pub process_output_cache: RefCell<HashMap<ProfileUID, Option<Duty>>>,
+    output_dedup: RefCell<HashMap<ProfileUID, OutputDedupState>>,
 }
 
 impl MixProfileCommander {
@@ -54,6 +56,7 @@ impl MixProfileCommander {
             scheduled_settings: RefCell::new(HashMap::new()),
             all_last_applied_duties: RefCell::new(HashMap::new()),
             process_output_cache: RefCell::new(HashMap::new()),
+            output_dedup: RefCell::new(HashMap::new()),
         }
     }
 
@@ -92,6 +95,9 @@ impl MixProfileCommander {
             self.process_output_cache
                 .borrow_mut()
                 .insert(mix_profile.uid.clone(), None);
+            self.output_dedup
+                .borrow_mut()
+                .insert(mix_profile.uid.clone(), OutputDedupState::new());
         }
         Ok(())
     }
@@ -110,11 +116,15 @@ impl MixProfileCommander {
                         .schedule_setting(device_channel.clone(), &member_profile)?;
                 }
                 ProfileType::Mix => {
-                    // Schedule the child Mix's own Graph sub-members via graph_commander
+                    // Schedule the child Mix's Graph sub-members via graph_commander.
+                    // Fixed sub-members are skipped here; their constant duties are
+                    // stored directly in the child's NormalizedMixProfile.
                     if let Some(sub_profiles) = member_sub_profiles.get(&member_profile.uid) {
                         for sub_profile in sub_profiles {
-                            self.graph_commander
-                                .schedule_setting(device_channel.clone(), sub_profile)?;
+                            if sub_profile.p_type == ProfileType::Graph {
+                                self.graph_commander
+                                    .schedule_setting(device_channel.clone(), sub_profile)?;
+                            }
                         }
                     }
                     // Add the child Mix itself to scheduled_settings with its own
@@ -140,9 +150,13 @@ impl MixProfileCommander {
                             .insert(member_profile.uid.clone(), None);
                     }
                 }
+                ProfileType::Fixed => {
+                    // Fixed profiles produce a constant duty stored in NormalizedMixProfile.
+                    // No graph commander scheduling needed.
+                }
                 _ => {
                     return Err(anyhow!(
-                        "Only Graph and Mix Profiles are supported as Mix members"
+                        "Only Graph, Fixed, and Mix Profiles are supported as Mix members"
                     ));
                 }
             }
@@ -174,6 +188,9 @@ impl MixProfileCommander {
                 self.process_output_cache
                     .borrow_mut()
                     .remove(&mix_profile.profile_uid);
+                self.output_dedup
+                    .borrow_mut()
+                    .remove(&mix_profile.profile_uid);
             }
         }
         for mix_profile in mix_profiles_to_remove {
@@ -198,7 +215,8 @@ impl MixProfileCommander {
         let scheduled = self.scheduled_settings.borrow();
 
         // Pass 1: Process children (Mix profiles with no Mix sub-members)
-        let mut pass1_results: HashMap<ProfileUID, Option<Duty>> = HashMap::new();
+        let mut pass1_results: HashMap<ProfileUID, Option<Duty>> =
+            HashMap::with_capacity(scheduled.len());
         for mix_profile in scheduled.keys() {
             if mix_profile.member_mix_profile_uids.is_empty().not() {
                 continue; // Skip parents in pass 1
@@ -224,7 +242,8 @@ impl MixProfileCommander {
 
         // Pass 2: Process parents (Mix profiles with Mix sub-members)
         let mix_duties = self.process_output_cache.borrow();
-        let mut pass2_results: HashMap<ProfileUID, Option<Duty>> = HashMap::new();
+        let mut pass2_results: HashMap<ProfileUID, Option<Duty>> =
+            HashMap::with_capacity(scheduled.len());
         for mix_profile in scheduled.keys() {
             if mix_profile.member_mix_profile_uids.is_empty() {
                 continue; // Skip children in pass 2
@@ -255,9 +274,18 @@ impl MixProfileCommander {
         mix_duties: &HashMap<ProfileUID, Option<Duty>>,
         last_applied_duties: &HashMap<ProfileUID, Duty>,
     ) -> Option<Duty> {
-        let mut member_values = Vec::with_capacity(mix_profile.member_profile_uids.len());
+        let mut member_duties = Vec::with_capacity(mix_profile.member_profile_uids.len());
         let mut members_have_no_output = true;
         for member_profile_uid in &mix_profile.member_profile_uids {
+            // Fixed members have a constant duty - no cache lookup needed.
+            if let Some(fixed_duty) = mix_profile
+                .member_fixed_profile_duties
+                .get(member_profile_uid)
+            {
+                members_have_no_output = false;
+                member_duties.push(fixed_duty);
+                continue;
+            }
             // Look up the member's output from the appropriate cache
             let output = if mix_profile
                 .member_mix_profile_uids
@@ -291,13 +319,13 @@ impl MixProfileCommander {
                 };
                 last_duty
             };
-            member_values.push(duty_value_for_calculation);
+            member_duties.push(duty_value_for_calculation);
         }
         if members_have_no_output {
             return None;
         }
         Some(Self::apply_mix_function(
-            &member_values,
+            &member_duties,
             mix_profile.mix_function,
         ))
     }
@@ -347,11 +375,33 @@ impl MixProfileCommander {
     }
 
     /// Collects the duties to apply for all scheduled Mix Profiles from the output cache.
+    /// Duties that haven't changed since the last application are suppressed unless the
+    /// safety latch counter has been reached.
     fn collect_duties_to_apply(&self) -> HashMap<DeviceUID, Vec<(ChannelName, Duty)>> {
-        Self::collect_duties_from_scheduled(
-            &self.scheduled_settings.borrow(),
-            &self.process_output_cache.borrow(),
-        )
+        let output_cache = self.process_output_cache.borrow();
+        let mut dedup_lock = self.output_dedup.borrow_mut();
+        // Build a filtered view with only the profiles that should apply this tick.
+        // Size is bounded by the number of scheduled profiles.
+        let filtered_cache: HashMap<ProfileUID, Option<Duty>> = output_cache
+            .iter()
+            .map(|(uid, duty_opt)| {
+                let effective = match duty_opt {
+                    Some(duty) => {
+                        let apply = dedup_lock
+                            .get_mut(uid)
+                            .is_none_or(|state| state.should_apply(*duty));
+                        if apply {
+                            Some(*duty)
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
+                };
+                (uid.clone(), effective)
+            })
+            .collect();
+        Self::collect_duties_from_scheduled(&self.scheduled_settings.borrow(), &filtered_cache)
     }
 
     /// For child Mix profiles (those referenced by a parent's `member_mix_profile_uids`),
@@ -407,26 +457,28 @@ impl MixProfileCommander {
         output_to_apply
     }
 
-    /// This function expects a non-empty `member_values` vector
+    /// Applies the mix function to the collected member duties.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn apply_mix_function(member_values: &[&Duty], mix_function: ProfileMixFunctionType) -> Duty {
-        // Since the member functions manage their own thresholds and the safety latch should
-        //  kick off about the same time for all of them, we don't check thresholds here.
+    fn apply_mix_function(member_duties: &[&Duty], mix_function: ProfileMixFunctionType) -> Duty {
+        debug_assert!(
+            member_duties.is_empty().not(),
+            "apply_mix_function called with empty member duties"
+        );
         match mix_function {
-            ProfileMixFunctionType::Min => **member_values.iter().min().unwrap(),
-            ProfileMixFunctionType::Max => **member_values.iter().max().unwrap(),
-            ProfileMixFunctionType::Avg => member_values
+            ProfileMixFunctionType::Min => **member_duties.iter().min().unwrap(),
+            ProfileMixFunctionType::Max => **member_duties.iter().max().unwrap(),
+            ProfileMixFunctionType::Avg => member_duties
                 .iter()
                 .map(|d| **d as usize)
                 .sum::<usize>()
-                .div(member_values.len()) as Duty,
-            ProfileMixFunctionType::Diff => member_values
+                .div(member_duties.len()) as Duty,
+            ProfileMixFunctionType::Diff => member_duties
                 .iter()
                 .map(|d| **d as isize)
                 .reduce(Sub::sub)
                 .unwrap_or_default()
                 .clamp(0, 100) as Duty,
-            ProfileMixFunctionType::Sum => member_values
+            ProfileMixFunctionType::Sum => member_duties
                 .iter()
                 .map(|d| **d as usize)
                 .sum::<usize>()
@@ -438,13 +490,27 @@ impl MixProfileCommander {
         profile: &Profile,
         member_profiles: &[Profile],
     ) -> NormalizedMixProfile {
+        debug_assert!(
+            profile.mix_function_type.is_some(),
+            "mix_function_type must be validated before normalization"
+        );
+        debug_assert!(
+            member_profiles.is_empty().not(),
+            "member_profiles must be validated before normalization"
+        );
         NormalizedMixProfile {
             profile_uid: profile.uid.clone(),
+            // Validated in schedule_setting before reaching here.
             mix_function: profile.mix_function_type.unwrap(),
             member_mix_profile_uids: member_profiles
                 .iter()
                 .filter(|p| p.p_type == ProfileType::Mix)
                 .map(|p| p.uid.clone())
+                .collect(),
+            member_fixed_profile_duties: member_profiles
+                .iter()
+                .filter(|p| p.p_type == ProfileType::Fixed)
+                .filter_map(|p| p.speed_fixed.map(|duty| (p.uid.clone(), duty)))
                 .collect(),
             member_profile_uids: member_profiles.iter().map(|p| p.uid.clone()).collect(),
         }
@@ -458,6 +524,8 @@ pub struct NormalizedMixProfile {
     member_profile_uids: Vec<ProfileUID>,
     /// Subset of `member_profile_uids` that are Mix-type profiles (children).
     member_mix_profile_uids: Vec<ProfileUID>,
+    /// Fixed-duty members: constant duty values keyed by profile UID.
+    member_fixed_profile_duties: HashMap<ProfileUID, Duty>,
 }
 
 impl Default for NormalizedMixProfile {
@@ -467,6 +535,7 @@ impl Default for NormalizedMixProfile {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: Vec::new(),
             member_mix_profile_uids: Vec::new(),
+            member_fixed_profile_duties: HashMap::new(),
         }
     }
 }
@@ -489,94 +558,97 @@ impl Hash for NormalizedMixProfile {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{HashMap, HashSet};
-    use std::rc::Rc;
-
-    use crate::engine::commanders::mix::{MixProfileCommander, NormalizedMixProfile};
+    use crate::engine::commanders::mix::{
+        MixProfileCommander, NormalizedMixProfile, OutputDedupState,
+    };
+    use crate::engine::commanders::DEFAULT_SAFETY_LATCH_COUNT;
     use crate::engine::DeviceChannelProfileSetting;
     use crate::setting::ProfileMixFunctionType;
+    use std::collections::{HashMap, HashSet};
+    use std::ops::Not;
+    use std::rc::Rc;
 
     #[test]
     fn apply_mix_function_test_min() {
-        let member_values = vec![&20, &21, &22, &23, &24];
+        let member_duties = vec![&20, &21, &22, &23, &24];
         let mix_function = ProfileMixFunctionType::Min;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 20);
     }
 
     #[test]
     fn apply_mix_function_test_max() {
-        let member_values = vec![&0, &1, &2, &3, &4];
+        let member_duties = vec![&0, &1, &2, &3, &4];
         let mix_function = ProfileMixFunctionType::Max;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 4);
     }
 
     #[test]
     fn apply_mix_function_test_avg() {
-        let member_values = vec![&0, &1, &2, &3, &4];
+        let member_duties = vec![&0, &1, &2, &3, &4];
         let mix_function = ProfileMixFunctionType::Avg;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 2);
     }
 
     #[test]
     fn apply_mix_function_test_avg_large() {
-        let member_values = vec![&120, &121, &122, &123, &124];
+        let member_duties = vec![&120, &121, &122, &123, &124];
         let mix_function = ProfileMixFunctionType::Avg;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 122);
     }
 
     #[test]
     fn apply_mix_function_test_diff() {
-        let member_values = vec![&50, &20];
+        let member_duties = vec![&50, &20];
         let mix_function = ProfileMixFunctionType::Diff;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 30);
     }
 
     #[test]
     fn apply_mix_function_test_diff_neg() {
-        let member_values = vec![&20, &50];
+        let member_duties = vec![&20, &50];
         let mix_function = ProfileMixFunctionType::Diff;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 0);
     }
 
     #[test]
     fn apply_mix_function_test_sum() {
         // Sum of two values within range.
-        let member_values = vec![&30, &40];
+        let member_duties = vec![&30, &40];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 70);
     }
 
     #[test]
     fn apply_mix_function_test_sum_clamped_at_max() {
         // Sum exceeds 100% — must clamp to 100.
-        let member_values = vec![&70, &60];
+        let member_duties = vec![&70, &60];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 100);
     }
 
     #[test]
     fn apply_mix_function_test_sum_three_members() {
         // Sum of three values, exact total in range.
-        let member_values = vec![&20, &30, &25];
+        let member_duties = vec![&20, &30, &25];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 75);
     }
 
     #[test]
     fn apply_mix_function_test_sum_at_boundary() {
         // Sum exactly at 100% — no clamping needed.
-        let member_values = vec![&50, &50];
+        let member_duties = vec![&50, &50];
         let mix_function = ProfileMixFunctionType::Sum;
-        let result = MixProfileCommander::apply_mix_function(&member_values, mix_function);
+        let result = MixProfileCommander::apply_mix_function(&member_duties, mix_function);
         assert_eq!(result, 100);
     }
 
@@ -588,6 +660,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_a".to_string(), Some(40u8)),
@@ -611,6 +684,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Avg,
             member_profile_uids: vec!["graph_c".to_string(), "child_mix".to_string()],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_c".to_string(), Some(80u8))]);
         let mix_duties = HashMap::from([("child_mix".to_string(), Some(60u8))]);
@@ -636,6 +710,7 @@ mod tests {
                 "child_mix".to_string(),
             ],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_1".to_string(), Some(50u8)),
@@ -660,6 +735,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "child_mix".to_string()],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_a".to_string(), Some(25u8))]);
         let mix_duties = HashMap::from([("child_mix".to_string(), Some(75u8))]);
@@ -681,6 +757,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Diff,
             member_profile_uids: vec!["child_mix".to_string(), "graph_a".to_string()],
             member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_a".to_string(), Some(30u8))]);
         let mix_duties = HashMap::from([("child_mix".to_string(), Some(80u8))]);
@@ -702,6 +779,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties =
             HashMap::from([("graph_a".to_string(), None), ("graph_b".to_string(), None)]);
@@ -724,6 +802,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_missing".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([("graph_a".to_string(), Some(50u8))]);
         let last_applied = HashMap::new();
@@ -744,6 +823,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_a".to_string(), Some(70u8)),
@@ -768,6 +848,7 @@ mod tests {
             mix_function: ProfileMixFunctionType::Max,
             member_profile_uids: vec!["graph_a".to_string(), "graph_b".to_string()],
             member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::new(),
         };
         let graph_duties = HashMap::from([
             ("graph_a".to_string(), Some(70u8)),
@@ -811,6 +892,7 @@ mod tests {
                 mix_function: ProfileMixFunctionType::Max,
                 member_profile_uids: vec!["g1".to_string()],
                 member_mix_profile_uids: vec![],
+                member_fixed_profile_duties: HashMap::new(),
             },
             vec![mix_channel("dev1", "fan1")],
         )]);
@@ -834,6 +916,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Max,
                     member_profile_uids: vec!["g1".to_string(), "g2".to_string()],
                     member_mix_profile_uids: vec![],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 // child_mix has both its own channel and the parent's channel
                 vec![mix_channel("dev1", "fan1"), mix_channel("dev2", "fan2")],
@@ -844,6 +927,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Avg,
                     member_profile_uids: vec!["child_mix".to_string(), "g3".to_string()],
                     member_mix_profile_uids: vec!["child_mix".to_string()],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 vec![mix_channel("dev2", "fan2")],
             ),
@@ -876,6 +960,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Max,
                     member_profile_uids: vec!["g1".to_string()],
                     member_mix_profile_uids: vec![],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 vec![mix_channel("dev2", "fan2")],
             ),
@@ -885,6 +970,7 @@ mod tests {
                     mix_function: ProfileMixFunctionType::Avg,
                     member_profile_uids: vec!["child_mix".to_string(), "g2".to_string()],
                     member_mix_profile_uids: vec!["child_mix".to_string()],
+                    member_fixed_profile_duties: HashMap::new(),
                 },
                 vec![mix_channel("dev2", "fan2")],
             ),
@@ -910,6 +996,7 @@ mod tests {
                 mix_function: ProfileMixFunctionType::Max,
                 member_profile_uids: vec!["g1".to_string()],
                 member_mix_profile_uids: vec![],
+                member_fixed_profile_duties: HashMap::new(),
             },
             vec![mix_channel("dev1", "fan1")],
         )]);
@@ -927,6 +1014,7 @@ mod tests {
                 mix_function: ProfileMixFunctionType::Max,
                 member_profile_uids: vec!["g1".to_string()],
                 member_mix_profile_uids: vec![],
+                member_fixed_profile_duties: HashMap::new(),
             },
             vec![DeviceChannelProfileSetting::Overlay {
                 device_uid: "dev1".to_string(),
@@ -936,5 +1024,205 @@ mod tests {
         let output_cache = HashMap::from([("mix_a".to_string(), Some(80u8))]);
         let result = MixProfileCommander::collect_duties_from_scheduled(&scheduled, &output_cache);
         assert!(result.is_empty());
+    }
+
+    // -- Fixed member profile tests --
+
+    /// Verify Fixed member duties are used directly without cache lookup.
+    #[test]
+    fn fixed_member_produces_constant_duty() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Max,
+            member_profile_uids: vec!["fixed_a".to_string(), "graph_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 45u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(70u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(70)); // Max of 45, 70
+    }
+
+    /// Verify Mix with only Fixed members always produces output.
+    #[test]
+    fn all_fixed_members_always_produce_output() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Avg,
+            member_profile_uids: vec!["fixed_a".to_string(), "fixed_b".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([
+                ("fixed_a".to_string(), 30u8),
+                ("fixed_b".to_string(), 50u8),
+            ]),
+        };
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &HashMap::new(),
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(40)); // Avg of 30, 50
+    }
+
+    /// Verify Fixed members work with Diff function (subtraction order matters).
+    #[test]
+    fn fixed_member_diff_function() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Diff,
+            member_profile_uids: vec!["graph_a".to_string(), "fixed_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 20u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(80u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(60)); // Diff: 80 - 20 = 60
+    }
+
+    /// Verify Fixed members combined with Graph and Mix members.
+    #[test]
+    fn fixed_graph_and_mix_members_combined() {
+        let parent = NormalizedMixProfile {
+            profile_uid: "parent".to_string(),
+            mix_function: ProfileMixFunctionType::Min,
+            member_profile_uids: vec![
+                "fixed_a".to_string(),
+                "graph_a".to_string(),
+                "child_mix".to_string(),
+            ],
+            member_mix_profile_uids: vec!["child_mix".to_string()],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 25u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(50u8))]);
+        let mix_duties = HashMap::from([("child_mix".to_string(), Some(40u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &parent,
+            &graph_duties,
+            &mix_duties,
+            &last_applied,
+        );
+        assert_eq!(result, Some(25)); // Min of 25, 50, 40
+    }
+
+    /// Verify a child Mix with Fixed sub-members processes correctly.
+    /// Reproduces the scenario where a Fixed profile is a member of a child Mix
+    /// (nested Mix). The child's Fixed member duty should come from its
+    /// NormalizedMixProfile, not from a graph cache lookup.
+    #[test]
+    fn child_mix_with_fixed_sub_member() {
+        let child = NormalizedMixProfile {
+            profile_uid: "child_mix".to_string(),
+            mix_function: ProfileMixFunctionType::Max,
+            member_profile_uids: vec!["graph_a".to_string(), "fixed_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 55u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), Some(40u8))]);
+        let last_applied = HashMap::new();
+        let result = MixProfileCommander::process_single_mix_profile(
+            &child,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        assert_eq!(result, Some(55)); // Max of 40, 55
+    }
+
+    /// Verify Fixed members keep Mix producing output even when Graph members have no output.
+    #[test]
+    fn fixed_member_provides_output_when_graph_has_none() {
+        let mix = NormalizedMixProfile {
+            profile_uid: "mix".to_string(),
+            mix_function: ProfileMixFunctionType::Max,
+            member_profile_uids: vec!["fixed_a".to_string(), "graph_a".to_string()],
+            member_mix_profile_uids: vec![],
+            member_fixed_profile_duties: HashMap::from([("fixed_a".to_string(), 60u8)]),
+        };
+        let graph_duties = HashMap::from([("graph_a".to_string(), None)]);
+        let last_applied = HashMap::from([("graph_a".to_string(), 30u8)]);
+        let result = MixProfileCommander::process_single_mix_profile(
+            &mix,
+            &graph_duties,
+            &HashMap::new(),
+            &last_applied,
+        );
+        // Fixed=60 has output, so members_have_no_output=false.
+        // Graph has None, so it uses last_applied=30 as fallback.
+        assert_eq!(result, Some(60)); // Max of 60, 30
+    }
+
+    // -- OutputDedupState tests --
+
+    /// Verify first call always applies (counter starts at latch count).
+    #[test]
+    fn dedup_first_call_always_applies() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50));
+    }
+
+    /// Verify identical duty is suppressed on the next tick.
+    #[test]
+    fn dedup_suppresses_identical_duty() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50)); // first: apply
+        assert!(state.should_apply(50).not()); // same: suppress
+        assert!(state.should_apply(50).not()); // same: suppress
+    }
+
+    /// Verify a changed duty is applied immediately and resets the counter.
+    #[test]
+    fn dedup_allows_changed_duty() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50));
+        assert!(state.should_apply(50).not());
+        assert!(state.should_apply(60)); // changed: apply immediately
+        assert!(state.should_apply(60).not()); // same again: suppress
+    }
+
+    /// Verify the safety latch fires after DEFAULT_SAFETY_LATCH_COUNT suppressed ticks.
+    #[test]
+    fn dedup_safety_latch_reapplies() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50)); // tick 0: first apply, counter resets to 0
+                                         // Ticks 1..=30: all suppressed (counter goes 0->1, 1->2, ..., 29->30)
+        for _ in 0..DEFAULT_SAFETY_LATCH_COUNT {
+            assert!(state.should_apply(50).not());
+        }
+        // Tick 31: counter is 30 == DEFAULT_SAFETY_LATCH_COUNT, safety latch fires
+        assert!(state.should_apply(50));
+        // Tick 32: suppressed again
+        assert!(state.should_apply(50).not());
+    }
+
+    /// Verify counter resets when duty changes mid-suppression.
+    #[test]
+    fn dedup_resets_on_duty_change() {
+        let mut state = OutputDedupState::new();
+        assert!(state.should_apply(50));
+        for _ in 0..10 {
+            assert!(state.should_apply(50).not());
+        }
+        // Change duty: apply immediately, counter resets to 0.
+        assert!(state.should_apply(70));
+        // Now need another full DEFAULT_SAFETY_LATCH_COUNT suppressed ticks before latch fires.
+        for _ in 0..DEFAULT_SAFETY_LATCH_COUNT {
+            assert!(state.should_apply(70).not());
+        }
+        assert!(state.should_apply(70)); // safety latch
     }
 }

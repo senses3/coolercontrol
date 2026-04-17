@@ -656,6 +656,7 @@ export default {
             switchFunction: 'تبديل الوظيفة',
             switchMembers: 'تبديل الملفات الأعضاء',
             switchBaseProfile: 'تبديل الملف الأساسي',
+            adjustFixedSpeed: 'ضبط السرعة الثابتة',
             editSources: 'تعديل المصادر',
         },
         modes: {
