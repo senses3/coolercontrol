@@ -31,6 +31,8 @@ use std::collections::HashMap;
 const MIN_DUTY: u8 = 0;
 const MAX_DUTY: u8 = 100;
 const MAX_COLORS: u8 = 4;
+const SPEED_CHANNEL_PUMP: &str = "pump";
+const SPEED_CHANNEL_FAN: &str = "fan";
 const LIQUIDCTL_PUMP_COLOR_CHANNEL: &str = "pump";
 const LIQUIDCTL_FAN_COLOR_CHANNEL: &str = "fan";
 const CC_PUMP_COLOR_CHANNEL: &str = "led-pump";
@@ -84,10 +86,9 @@ impl DeviceSupport for Ga2LcdSupport {
 
     fn extract_info(&self, device_response: &DeviceResponse) -> DeviceInfo {
         let mut channels = HashMap::with_capacity(4);
-        // `fan` and `pump`
-        for name in &device_response.properties.speed_channels {
+        for speed_channel in [SPEED_CHANNEL_PUMP, SPEED_CHANNEL_FAN] {
             channels.insert(
-                name.clone(),
+                speed_channel.to_string(),
                 ChannelInfo {
                     speed_options: Some(SpeedOptions {
                         min_duty: MIN_DUTY,

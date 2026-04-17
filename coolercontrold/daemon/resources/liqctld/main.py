@@ -669,11 +669,6 @@ class DeviceService:
                 speed_channels = [
                     f"fan{fan_number + 1}" for fan_number in range(fan_count)
                 ]
-        elif GA2LCD is not None and isinstance(lc_device, GA2LCD):
-            speed_channel_dict = getattr(lc_device, "_speed_channels", {})
-            speed_channels = list(speed_channel_dict.keys())
-            # color channels are the same for this driver
-            color_channels = list(speed_channel_dict.keys())
         return DeviceProperties(
             speed_channels=speed_channels,
             color_channels=color_channels,
