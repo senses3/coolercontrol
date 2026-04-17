@@ -381,6 +381,8 @@ export default {
             pluginEnabledRestart: 'Plugin enabled. Restart the daemon to apply.',
             disableFailed: 'Failed to disable plugin',
             enableFailed: 'Failed to enable plugin',
+            serviceLogs: 'Service Logs',
+            commandCopied: 'Command copied to clipboard',
         },
         add: {
             dashboard: 'Dashboard',

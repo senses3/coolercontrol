@@ -24,13 +24,40 @@ import { inject, Ref } from 'vue'
 import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
+import { useToast } from 'primevue/usetoast'
 import { PluginDto } from '@/models/Plugins.ts'
 
 const deviceStore = useDeviceStore()
+const toast = useToast()
 const { t } = useI18n()
 
 const dialogRef: Ref<DynamicDialogInstance> = inject('dialogRef')!
 const plugin: PluginDto = dialogRef.value.data.plugin
+const isManaged: boolean = dialogRef.value.data.isManaged ?? false
+
+const copyCommand = (text: string): void => {
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text))
+    } else {
+        fallbackCopy(text)
+    }
+    toast.add({
+        severity: 'info',
+        summary: t('layout.plugins.commandCopied'),
+        life: 2000,
+    })
+}
+
+const fallbackCopy = (text: string): void => {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+}
 </script>
 
 <template>
@@ -72,7 +99,7 @@ const plugin: PluginDto = dialogRef.value.data.plugin
                         }}
                     </td>
                 </tr>
-                <tr v-if="plugin.url">
+                <tr v-if="plugin.url" :class="{ 'border-b border-border-one': isManaged }">
                     <td class="py-3 px-4 font-semibold">{{ t('layout.plugins.url') }}</td>
                     <td class="py-3 px-4">
                         <a
@@ -88,6 +115,35 @@ const plugin: PluginDto = dialogRef.value.data.plugin
                             />
                             {{ t('layout.settings.plugins.pluginUrl') }}
                         </a>
+                    </td>
+                </tr>
+                <tr v-if="isManaged">
+                    <td class="py-3 px-4 font-semibold align-top">
+                        {{ t('layout.plugins.serviceLogs') }}
+                    </td>
+                    <td class="py-3 px-4 space-y-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-xs text-text-color-secondary">systemd:</span>
+                            <code class="ml-1 select-all"
+                                >journalctl -f -u cc-plugin-{{ plugin.id }}</code
+                            >
+                            <i
+                                class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                                @click="copyCommand(`journalctl -f -u cc-plugin-${plugin.id}`)"
+                            />
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-xs text-text-color-secondary">OpenRC:</span>
+                            <code class="ml-1 select-all"
+                                >grep cc-plugin-{{ plugin.id }} /var/log/messages</code
+                            >
+                            <i
+                                class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                                @click="
+                                    copyCommand(`grep cc-plugin-${plugin.id} /var/log/messages`)
+                                "
+                            />
+                        </div>
                     </td>
                 </tr>
             </tbody>

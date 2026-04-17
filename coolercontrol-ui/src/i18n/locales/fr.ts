@@ -392,6 +392,8 @@ export default {
             pluginEnabledRestart: 'Plugin activé. Redémarrez le daemon pour appliquer.',
             disableFailed: 'Impossible de désactiver le plugin',
             enableFailed: "Impossible d'activer le plugin",
+            serviceLogs: 'Journaux du service',
+            commandCopied: 'Commande copiee dans le presse-papiers',
         },
         add: {
             dashboard: 'Tableau de bord',

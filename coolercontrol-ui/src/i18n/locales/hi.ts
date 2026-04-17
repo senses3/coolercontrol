@@ -309,6 +309,8 @@ export default {
             pluginEnabledRestart: 'प्लगइन सक्षम किया गया। लागू करने के लिए डेमन पुनः आरंभ करें।',
             disableFailed: 'प्लगइन अक्षम करने में विफल',
             enableFailed: 'प्लगइन सक्षम करने में विफल',
+            serviceLogs: 'सेवा लॉग',
+            commandCopied: 'कमांड क्लिपबोर्ड पर कॉपी किया गया',
         },
         add: {
             dashboard: 'डैशबोर्ड',
