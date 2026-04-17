@@ -30,10 +30,24 @@ use hyper_util::rt::TokioIo;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tower::ServiceExt;
 use tower_http::services::ServeFile;
 use tower_serve_static::include_file;
+
+/// Content-Security-Policy for plugin UI HTML responses.
+/// `connect-src 'none'` forces plugins to use the pluginFetch relay for all network access.
+const PLUGIN_CONTENT_SECURITY_POLICY: &str = "default-src 'none'; \
+    script-src 'self'; \
+    style-src 'self' 'unsafe-inline'; \
+    img-src 'self' data: blob:; \
+    connect-src 'none'; \
+    font-src 'self' data:; \
+    frame-ancestors 'self'; \
+    object-src 'none'; \
+    base-uri 'none'; \
+    form-action 'none'";
 
 pub async fn get_plugins(
     State(AppState { plugin_handle, .. }): State<AppState>,
@@ -156,13 +170,23 @@ pub async fn get_ui_files(
     request: Request,
 ) -> Result<impl IntoApiResponse, CCError> {
     let safe_path = sanitize_file_path(&path.file_path)?;
+    let is_html = safe_path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("html"));
     let plugin_ui_dir = plugin_handle.get_ui_dir(path.plugin_id).await?;
-    ServeFile::new(plugin_ui_dir.join(safe_path))
+    let mut response = ServeFile::new(plugin_ui_dir.join(safe_path))
         .oneshot(request)
         .await
         .map_err(|_infallible| CCError::InternalError {
             msg: "Failed to serve file".to_string(),
-        })
+        })?;
+    if is_html {
+        response.headers_mut().insert(
+            axum::http::HeaderName::from_static("content-security-policy"),
+            axum::http::HeaderValue::from_static(PLUGIN_CONTENT_SECURITY_POLICY),
+        );
+    }
+    Ok(response)
 }
 
 /// Sanitize a relative file path for safe use in serving plugin UI files.
@@ -202,14 +226,40 @@ fn invalid_file_path() -> CCError {
     }
 }
 
+/// Max proxy response body: 10 MB.
+const PROXY_MAX_RESPONSE_BYTES: usize = 10 * 1024 * 1024;
+/// Max proxy request body: 1 MB.
+const PROXY_MAX_REQUEST_BYTES: usize = 1024 * 1024;
+/// Proxy operation timeout in seconds.
+const PROXY_TIMEOUT_SECS: u64 = 30;
+
+/// Safe response headers to forward from plugin proxy upstream responses.
+const PROXY_ALLOWED_RESPONSE_HEADERS: &[&str] = &[
+    "content-type",
+    "content-length",
+    "content-encoding",
+    "cache-control",
+    "etag",
+    "last-modified",
+];
+
 /// Reverse-proxy a request to a plugin's local HTTP server.
-/// Maps `/plugins/{plugin_id}/data/{*data_path}` → `http://127.0.0.1:{port}/{data_path}`.
+/// Maps `/plugins/{plugin_id}/data/{*data_path}` to `http://127.0.0.1:{port}/{data_path}`.
 /// The plugin must declare `[proxy] enabled = true` and `port = N` in its manifest.
 pub async fn proxy_plugin_data(
     Path(path): Path<PluginDataPath>,
     State(AppState { plugin_handle, .. }): State<AppState>,
     request: Request,
 ) -> Result<Response, CCError> {
+    if plugin_handle
+        .is_plugin_disabled(path.plugin_id.clone())
+        .await
+        .map_err(handle_error)?
+    {
+        return Err(CCError::UserError {
+            msg: format!("Plugin '{}' is disabled", path.plugin_id),
+        });
+    }
     let port = plugin_handle
         .get_proxy_port(path.plugin_id.clone())
         .await
@@ -229,14 +279,37 @@ pub async fn proxy_plugin_data(
     };
 
     let method = request.method().clone();
+    let auth_header = request
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .cloned();
     let body_bytes = request
         .into_body()
         .collect()
         .await
         .map_err(|e| CCError::InternalError { msg: e.to_string() })?
         .to_bytes();
+    check_proxy_body_size(body_bytes.len(), PROXY_MAX_REQUEST_BYTES, "request")?;
 
-    // Connect to the plugin's loopback HTTP server.
+    // The upstream connection and response are wrapped in a timeout.
+    tokio::time::timeout(
+        Duration::from_secs(PROXY_TIMEOUT_SECS),
+        proxy_upstream(port, &upstream_path, method, auth_header, body_bytes),
+    )
+    .await
+    .map_err(|_| CCError::InternalError {
+        msg: "Plugin proxy request timed out".to_string(),
+    })?
+}
+
+/// Execute the upstream proxy connection, send the request, and build the response.
+async fn proxy_upstream(
+    port: u16,
+    upstream_path: &str,
+    method: axum::http::Method,
+    auth_header: Option<axum::http::HeaderValue>,
+    body_bytes: hyper::body::Bytes,
+) -> Result<Response, CCError> {
     let stream = TcpStream::connect(format!("127.0.0.1:{port}"))
         .await
         .map_err(|e| CCError::InternalError {
@@ -252,12 +325,17 @@ pub async fn proxy_plugin_data(
         let _ = conn.await;
     });
 
-    let upstream_req = hyper::Request::builder()
+    let mut upstream_req = hyper::Request::builder()
         .method(method)
-        .uri(&upstream_path)
+        .uri(upstream_path)
         .header("host", format!("127.0.0.1:{port}"))
         .body(Full::new(body_bytes))
-        .map_err(|e| CCError::InternalError { msg: e.to_string() })?;
+        .map_err(|e: axum::http::Error| CCError::InternalError { msg: e.to_string() })?;
+    if let Some(auth_val) = auth_header {
+        upstream_req
+            .headers_mut()
+            .insert(axum::http::header::AUTHORIZATION, auth_val);
+    }
 
     let upstream_resp =
         sender
@@ -269,24 +347,39 @@ pub async fn proxy_plugin_data(
 
     let status = upstream_resp.status();
     let headers = upstream_resp.headers().clone();
-    let body_bytes = upstream_resp
+    let resp_bytes = upstream_resp
         .into_body()
         .collect()
         .await
         .map_err(|e| CCError::InternalError { msg: e.to_string() })?
         .to_bytes();
+    check_proxy_body_size(resp_bytes.len(), PROXY_MAX_RESPONSE_BYTES, "response")?;
 
     let mut response = Response::builder()
         .status(status)
-        .body(Body::from(body_bytes))
+        .body(Body::from(resp_bytes))
         .unwrap_or_else(|_| {
             Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(Body::empty())
                 .unwrap()
         });
-    *response.headers_mut() = headers;
+    for name in PROXY_ALLOWED_RESPONSE_HEADERS {
+        let header_name = axum::http::HeaderName::from_static(name);
+        if let Some(value) = headers.get(&header_name) {
+            response.headers_mut().insert(header_name, value.clone());
+        }
+    }
     Ok(response)
+}
+
+fn check_proxy_body_size(len: usize, max: usize, label: &str) -> Result<(), CCError> {
+    if len > max {
+        return Err(CCError::InternalError {
+            msg: format!("Plugin proxy {label} too large: {len} bytes (max {max})"),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -441,5 +534,90 @@ mod tests {
     fn test_sanitize_file_path_rejects_hidden_file_no_extension() {
         // ".gitignore" has no extension (the dot is part of the stem).
         assert!(sanitize_file_path(".gitignore").is_err());
+    }
+
+    #[test]
+    fn test_proxy_body_size_under_limit() {
+        // Body within limit should succeed.
+        assert!(check_proxy_body_size(1024, PROXY_MAX_RESPONSE_BYTES, "response").is_ok());
+    }
+
+    #[test]
+    fn test_proxy_body_size_at_limit() {
+        // Body exactly at limit should succeed.
+        assert!(check_proxy_body_size(
+            PROXY_MAX_RESPONSE_BYTES,
+            PROXY_MAX_RESPONSE_BYTES,
+            "response"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_proxy_body_size_over_limit() {
+        // Body exceeding limit should fail.
+        let result = check_proxy_body_size(
+            PROXY_MAX_RESPONSE_BYTES + 1,
+            PROXY_MAX_RESPONSE_BYTES,
+            "response",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_proxy_request_body_size_limit() {
+        // Request body exceeding the tighter request limit should fail.
+        assert!(check_proxy_body_size(
+            PROXY_MAX_REQUEST_BYTES + 1,
+            PROXY_MAX_REQUEST_BYTES,
+            "request"
+        )
+        .is_err());
+        assert!(
+            check_proxy_body_size(PROXY_MAX_REQUEST_BYTES, PROXY_MAX_REQUEST_BYTES, "request")
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_proxy_response_header_filtering() {
+        // Verify that only allowlisted headers pass through the proxy filter.
+        use axum::http::header::HeaderName;
+        use axum::http::HeaderMap;
+
+        let mut upstream_headers = HeaderMap::new();
+        upstream_headers.insert("content-type", "application/json".parse().unwrap());
+        upstream_headers.insert("content-length", "42".parse().unwrap());
+        upstream_headers.insert("etag", "\"abc123\"".parse().unwrap());
+        upstream_headers.insert("set-cookie", "session=evil".parse().unwrap());
+        upstream_headers.insert("location", "https://evil.com".parse().unwrap());
+        upstream_headers.insert("access-control-allow-origin", "*".parse().unwrap());
+
+        let mut filtered = HeaderMap::new();
+        for name in PROXY_ALLOWED_RESPONSE_HEADERS {
+            let header_name = HeaderName::from_static(name);
+            if let Some(value) = upstream_headers.get(&header_name) {
+                filtered.insert(header_name, value.clone());
+            }
+        }
+
+        assert!(filtered.get("content-type").is_some());
+        assert!(filtered.get("content-length").is_some());
+        assert!(filtered.get("etag").is_some());
+        assert!(filtered.get("set-cookie").is_none());
+        assert!(filtered.get("location").is_none());
+        assert!(filtered.get("access-control-allow-origin").is_none());
+    }
+
+    #[test]
+    fn test_plugin_csp_contains_required_directives() {
+        // Verify all security-critical CSP directives are present.
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("default-src 'none'"));
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("script-src 'self'"));
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("connect-src 'none'"));
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("frame-ancestors 'self'"));
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("form-action 'none'"));
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("object-src 'none'"));
+        assert!(PLUGIN_CONTENT_SECURITY_POLICY.contains("base-uri 'none'"));
     }
 }

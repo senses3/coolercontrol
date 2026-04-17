@@ -24,6 +24,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
+import { validatePluginFetchPath, buildSafeOptions } from '@/composables/pluginFetchValidation.ts'
 
 export type PluginIframeMode = 'modal' | 'full_page'
 
@@ -245,8 +246,11 @@ export function usePluginIframe(
             case 'pluginFetch': {
                 const { requestId, path, options } = event.data
                 if (typeof requestId !== 'string' || typeof path !== 'string') break
-                const url = `/plugins/${pluginId}/data${path}`
-                fetch(url, { credentials: 'include', ...options })
+                const safePath = validatePluginFetchPath(path)
+                if (safePath == null) break
+                const url = `/plugins/${pluginId}/data${safePath}`
+                const safeOptions = buildSafeOptions(options)
+                fetch(url, safeOptions)
                     .then((r) => (r.ok ? r.json() : null))
                     .catch(() => null)
                     .then((body) => {

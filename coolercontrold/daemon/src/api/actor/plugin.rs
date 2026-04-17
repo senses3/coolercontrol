@@ -77,6 +77,10 @@ enum PluginMessage {
         plugin_id: String,
         respond_to: oneshot::Sender<Result<Option<u16>>>,
     },
+    IsPluginDisabled {
+        plugin_id: String,
+        respond_to: oneshot::Sender<Result<bool>>,
+    },
 }
 impl PluginActor {
     pub fn new(
@@ -87,6 +91,29 @@ impl PluginActor {
             receiver,
             plugin_controller,
         }
+    }
+
+    fn collect_all_plugins(&self) -> PluginsDto {
+        let mut plugins = Vec::with_capacity(self.plugin_controller.plugins.len());
+        for manifest in self.plugin_controller.plugins.values() {
+            let address = match &manifest.address {
+                ConnectionType::None => String::new(),
+                ConnectionType::Uds(uds_path) => uds_path.display().to_string(),
+                ConnectionType::Tcp(addr) => addr.clone(),
+            };
+            plugins.push(PluginDto {
+                id: manifest.id.clone(),
+                service_type: manifest.service_type.to_string(),
+                description: manifest.description.clone(),
+                version: manifest.version.clone(),
+                url: manifest.url.clone(),
+                address,
+                privileged: manifest.privileged,
+                path: manifest.path.display().to_string(),
+                disabled: self.plugin_controller.is_plugin_disabled(&manifest.id),
+            });
+        }
+        PluginsDto { plugins }
     }
 }
 
@@ -102,26 +129,7 @@ impl ApiActor<PluginMessage> for PluginActor {
     async fn handle_message(&mut self, message: PluginMessage) {
         match message {
             PluginMessage::GetAll { respond_to } => {
-                let mut plugins = Vec::new();
-                for manifest in self.plugin_controller.plugins.values() {
-                    let address = match &manifest.address {
-                        ConnectionType::None => String::new(),
-                        ConnectionType::Uds(uds_path) => uds_path.display().to_string(),
-                        ConnectionType::Tcp(addr) => addr.clone(),
-                    };
-                    plugins.push(PluginDto {
-                        id: manifest.id.clone(),
-                        service_type: manifest.service_type.to_string(),
-                        description: manifest.description.clone(),
-                        version: manifest.version.clone(),
-                        url: manifest.url.clone(),
-                        address,
-                        privileged: manifest.privileged,
-                        path: manifest.path.display().to_string(),
-                        disabled: self.plugin_controller.is_plugin_disabled(&manifest.id),
-                    });
-                }
-                let _ = respond_to.send(PluginsDto { plugins });
+                let _ = respond_to.send(self.collect_all_plugins());
             }
             PluginMessage::GetConfig {
                 plugin_id,
@@ -180,7 +188,7 @@ impl ApiActor<PluginMessage> for PluginActor {
                     .plugin_controller
                     .get_plugin_status(&plugin_id)
                     .await
-                    .map(|status| status.into());
+                    .map(Into::into);
                 let _ = respond_to.send(result);
             }
             PluginMessage::DisablePlugin {
@@ -203,6 +211,13 @@ impl ApiActor<PluginMessage> for PluginActor {
             } => {
                 let result = self.plugin_controller.get_proxy_port(&plugin_id);
                 let _ = respond_to.send(result);
+            }
+            PluginMessage::IsPluginDisabled {
+                plugin_id,
+                respond_to,
+            } => {
+                let disabled = self.plugin_controller.is_plugin_disabled(&plugin_id);
+                let _ = respond_to.send(Ok(disabled));
             }
         }
     }
@@ -326,6 +341,16 @@ impl PluginHandle {
     pub async fn get_proxy_port(&self, plugin_id: String) -> Result<Option<u16>> {
         let (tx, rx) = oneshot::channel();
         let msg = PluginMessage::GetProxyPort {
+            plugin_id,
+            respond_to: tx,
+        };
+        let _ = self.sender.send(msg).await;
+        rx.await?
+    }
+
+    pub async fn is_plugin_disabled(&self, plugin_id: String) -> Result<bool> {
+        let (tx, rx) = oneshot::channel();
+        let msg = PluginMessage::IsPluginDisabled {
             plugin_id,
             respond_to: tx,
         };
