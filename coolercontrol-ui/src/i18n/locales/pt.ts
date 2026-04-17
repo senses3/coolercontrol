@@ -296,6 +296,8 @@ export default {
             pluginEnabledRestart: 'Plugin ativado. Reinicie o daemon para aplicar.',
             disableFailed: 'Falha ao desativar o plugin',
             enableFailed: 'Falha ao ativar o plugin',
+            serviceLogs: 'Logs do serviço',
+            commandCopied: 'Comando copiado para a area de transferencia',
         },
         add: {
             dashboard: 'Painel',

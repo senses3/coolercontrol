@@ -383,6 +383,8 @@ export default {
             pluginEnabledRestart: 'Плагин включён. Перезапустите демон для применения.',
             disableFailed: 'Не удалось отключить плагин',
             enableFailed: 'Не удалось включить плагин',
+            serviceLogs: 'Журналы сервиса',
+            commandCopied: 'Команда скопирована в буфер обмена',
         },
         add: {
             dashboard: 'Панель',

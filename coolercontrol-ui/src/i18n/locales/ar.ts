@@ -378,6 +378,8 @@ export default {
             pluginEnabledRestart: 'تم تفعيل الإضافة. أعد تشغيل الخدمة للتطبيق.',
             disableFailed: 'فشل في تعطيل الإضافة',
             enableFailed: 'فشل في تفعيل الإضافة',
+            serviceLogs: 'سجلات الخدمة',
+            commandCopied: 'تم نسخ الأمر إلى الحافظة',
         },
         add: {
             dashboard: 'لوحة معلومات',

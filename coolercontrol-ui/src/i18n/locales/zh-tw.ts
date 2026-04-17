@@ -372,6 +372,8 @@ export default {
             pluginEnabledRestart: '外掛已啟用。請重新啟動守護程式以套用。',
             disableFailed: '停用外掛失敗',
             enableFailed: '啟用外掛失敗',
+            serviceLogs: '服務日誌',
+            commandCopied: '命令已複製到剪貼簿',
         },
         add: {
             dashboard: '儀表板',

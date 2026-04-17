@@ -378,6 +378,8 @@ export default {
             pluginEnabledRestart: '플러그인이 활성화되었습니다. 적용하려면 데몬을 재시작하세요.',
             disableFailed: '플러그인 비활성화 실패',
             enableFailed: '플러그인 활성화 실패',
+            serviceLogs: '서비스 로그',
+            commandCopied: '명령이 클립보드에 복사됨',
         },
         add: {
             dashboard: '대시보드',

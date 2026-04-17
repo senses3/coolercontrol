@@ -385,6 +385,8 @@ export default {
             pluginEnabledRestart: 'Plugin habilitado. Reinicie el daemon para aplicar.',
             disableFailed: 'Error al deshabilitar el plugin',
             enableFailed: 'Error al habilitar el plugin',
+            serviceLogs: 'Registros del servicio',
+            commandCopied: 'Comando copiado al portapapeles',
         },
         add: {
             dashboard: 'Panel',
