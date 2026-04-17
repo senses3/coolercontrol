@@ -21,7 +21,6 @@ use crate::repositories::service_plugin::service_management::manager::ServiceSta
 use aide::axum::IntoApiResponse;
 use axum::body::Body;
 use axum::extract::{Path, Request, State};
-use axum::http::StatusCode;
 use axum::response::Response;
 use axum::Json;
 use http_body_util::{BodyExt, Full};
@@ -233,6 +232,12 @@ const PROXY_MAX_REQUEST_BYTES: usize = 1024 * 1024;
 /// Proxy operation timeout in seconds.
 const PROXY_TIMEOUT_SECS: u64 = 30;
 
+// Compile-time validation of proxy limit invariants.
+const _: () = assert!(PROXY_MAX_REQUEST_BYTES > 0);
+const _: () = assert!(PROXY_MAX_RESPONSE_BYTES > 0);
+const _: () = assert!(PROXY_MAX_REQUEST_BYTES <= PROXY_MAX_RESPONSE_BYTES);
+const _: () = assert!(PROXY_TIMEOUT_SECS > 0);
+
 /// Safe response headers to forward from plugin proxy upstream responses.
 const PROXY_ALLOWED_RESPONSE_HEADERS: &[&str] = &[
     "content-type",
@@ -358,12 +363,7 @@ async fn proxy_upstream(
     let mut response = Response::builder()
         .status(status)
         .body(Body::from(resp_bytes))
-        .unwrap_or_else(|_| {
-            Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::empty())
-                .unwrap()
-        });
+        .map_err(|e| CCError::InternalError { msg: e.to_string() })?;
     for name in PROXY_ALLOWED_RESPONSE_HEADERS {
         let header_name = axum::http::HeaderName::from_static(name);
         if let Some(value) = headers.get(&header_name) {

@@ -117,14 +117,12 @@ impl ServiceManifest {
             .and_then(toml_edit::Item::as_table)
             .and_then(|table| {
                 let enabled = table.get("enabled")?.as_bool()?;
-                if !enabled {
+                if enabled.not() {
                     return None;
                 }
-                let port = table.get("port")?.as_integer()?;
-                if port < 1024 || port > 65535 {
-                    return None;
-                }
-                Some(ProxyConfig { port: port as u16 })
+                let port_value = table.get("port")?.as_integer()?;
+                let port = u16::try_from(port_value).ok().filter(|&p| p >= 1024)?;
+                Some(ProxyConfig { port })
             });
         Ok(Self {
             id,

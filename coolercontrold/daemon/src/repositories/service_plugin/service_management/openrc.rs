@@ -26,6 +26,7 @@ use crate::repositories::utils::DirectCommand;
 use anyhow::{anyhow, Result};
 use std::fmt::Write;
 use std::fs::Permissions;
+use std::ops::Not;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -151,7 +152,7 @@ fn create_service_file(
     let _ = writeln!(script, "pidfile=\"/run/${{RC_SVCNAME}}.pid\"");
     let _ = writeln!(script, "command_background=true");
     if let Some(envs) = &service_definition.envs {
-        if !envs.is_empty() {
+        if envs.is_empty().not() {
             let _ = writeln!(script);
             for (var, val) in envs {
                 let _ = writeln!(script, "export {var}=\"{val}\"");
