@@ -19,7 +19,7 @@
 //! This is a library for CoolerControl plugins
 //! It provides a set of functions to interact with the CoolerControl app
 //! It is provided by the daemon for all plugins, and just needs it linked in the plugin's HTML file
-//! i.e.: <script type="text/javascript" src="../../cc-plugin-lib.js"></script>
+//! i.e.: <script type="text/javascript" src="/plugins/lib/cc-plugin-lib.js"></script>
 
 // Internal Variables
 /////////////////////////////////////////////////////////////
