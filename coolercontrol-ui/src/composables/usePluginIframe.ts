@@ -120,8 +120,7 @@ export function usePluginIframe(
                 // Always read the resolved CSS variable values from the parent document so
                 // the iframe gets the correct colours for any theme (not just Custom).
                 const rootStyle = getComputedStyle(document.documentElement)
-                const getVar = (name: string): string =>
-                    rootStyle.getPropertyValue(name).trim()
+                const getVar = (name: string): string => rootStyle.getPropertyValue(name).trim()
                 const customStyle = {
                     '--colors-accent': getVar('--colors-accent'),
                     '--colors-bg-one': getVar('--colors-bg-one'),
