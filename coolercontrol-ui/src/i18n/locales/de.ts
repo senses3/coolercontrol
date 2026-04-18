@@ -386,6 +386,8 @@ export default {
             pluginEnabledRestart: 'Plugin aktiviert. Daemon neu starten, um anzuwenden.',
             disableFailed: 'Plugin konnte nicht deaktiviert werden',
             enableFailed: 'Plugin konnte nicht aktiviert werden',
+            serviceLogs: 'Dienst-Protokolle',
+            commandCopied: 'Befehl in die Zwischenablage kopiert',
         },
         add: {
             dashboard: 'Dashboard',

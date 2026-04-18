@@ -371,6 +371,8 @@ export default {
             pluginEnabledRestart: '插件已启用。请重启守护进程以应用。',
             disableFailed: '禁用插件失败',
             enableFailed: '启用插件失败',
+            serviceLogs: '服务日志',
+            commandCopied: '命令已复制到剪贴板',
         },
         add: {
             dashboard: '仪表盘',

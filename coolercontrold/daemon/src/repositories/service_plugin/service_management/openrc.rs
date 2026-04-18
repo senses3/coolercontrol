@@ -144,24 +144,136 @@ fn create_service_file(
     let _ = writeln!(script, "#!/sbin/openrc-run");
     let _ = writeln!(script);
     let _ = writeln!(script, "description=\"{description}\"");
+    let _ = writeln!(script, "supervisor=\"supervise-daemon\"");
     let _ = writeln!(script, "command=\"{program_path}\"");
     let _ = writeln!(script, "command_args=\"{args}\"");
-    if let Some(username) = &service_definition.username {
-        let _ = writeln!(script, "command_user=\"{username}:{username}\"");
+    let sd_args = build_supervise_daemon_args(service_definition);
+    if sd_args.is_empty().not() {
+        let _ = writeln!(script, "supervise_daemon_args=\"{sd_args}\"");
     }
-    let _ = writeln!(script, "pidfile=\"/run/${{RC_SVCNAME}}.pid\"");
-    let _ = writeln!(script, "command_background=true");
-    if let Some(envs) = &service_definition.envs {
-        if envs.is_empty().not() {
-            let _ = writeln!(script);
-            for (var, val) in envs {
-                let _ = writeln!(script, "export {var}=\"{val}\"");
-            }
-        }
-    }
+    let _ = writeln!(script, "output_logger=\"logger -et '${{RC_SVCNAME}}'\"");
+    let _ = writeln!(script, "error_logger=\"logger -et '${{RC_SVCNAME}}' -p3\"");
     let _ = writeln!(script);
     let _ = writeln!(script, "depend() {{");
+    let _ = writeln!(script, "    use logger");
     let _ = writeln!(script, "    provide {provide}");
     let _ = write!(script, "}}");
     script
+}
+
+/// Builds the `supervise_daemon_args` value from user and env settings.
+fn build_supervise_daemon_args(service_definition: &ServiceDefinition) -> String {
+    let mut parts = Vec::with_capacity(4);
+    if let Some(username) = &service_definition.username {
+        parts.push(format!("-u {username}"));
+    }
+    if let Some(envs) = &service_definition.envs {
+        for (var, val) in envs {
+            parts.push(format!("-e {var}={val}"));
+        }
+    }
+    parts.join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_definition() -> ServiceDefinition {
+        ServiceDefinition {
+            service_id: "test-plugin".to_string(),
+            executable: PathBuf::from("/usr/bin/test-plugin"),
+            args: vec!["--port".to_string(), "8080".to_string()],
+            username: None,
+            wrk_dir: None,
+            envs: None,
+            disable_restart_on_failure: false,
+        }
+    }
+
+    #[test]
+    fn service_file_contains_required_directives() {
+        // A basic service file must contain the shebang, supervisor,
+        // command, logger directives, and depend block.
+        let script =
+            create_service_file("Test Plugin", "cc-plugin-test-plugin", &base_definition());
+        assert!(script.starts_with("#!/sbin/openrc-run"));
+        assert!(script.contains("description=\"Test Plugin\""));
+        assert!(script.contains("supervisor=\"supervise-daemon\""));
+        assert!(script.contains("command=\"/usr/bin/test-plugin\""));
+        assert!(script.contains("command_args=\"--port 8080\""));
+        assert!(script.contains("provide cc-plugin-test-plugin"));
+        assert!(script.contains("use logger"));
+    }
+
+    #[test]
+    fn service_file_does_not_use_old_background_mode() {
+        // The script must use supervise-daemon, not the older
+        // command_background approach.
+        let script =
+            create_service_file("Test Plugin", "cc-plugin-test-plugin", &base_definition());
+        assert!(script.contains("command_background").not());
+        assert!(script.contains("pidfile").not());
+        assert!(script.contains("output_log=").not());
+        assert!(script.contains("error_log=").not());
+    }
+
+    #[test]
+    fn service_file_logs_to_syslog() {
+        // Both stdout and stderr must be piped through logger to
+        // syslog, matching the main daemon's init script pattern.
+        let script =
+            create_service_file("Test Plugin", "cc-plugin-test-plugin", &base_definition());
+        assert!(script.contains("output_logger=\"logger -et '${RC_SVCNAME}'\""));
+        assert!(script.contains("error_logger=\"logger -et '${RC_SVCNAME}' -p3\""));
+    }
+
+    #[test]
+    fn service_file_includes_user_when_specified() {
+        // When a username is provided, the supervise-daemon must
+        // receive the -u flag to run as that user.
+        let mut def = base_definition();
+        def.username = Some("cc-plugin-user".to_string());
+        let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
+        assert!(script.contains("supervise_daemon_args=\"-u cc-plugin-user\""));
+    }
+
+    #[test]
+    fn service_file_omits_daemon_args_when_unneeded() {
+        // Without a username or envs, supervise_daemon_args must be absent.
+        let script =
+            create_service_file("Test Plugin", "cc-plugin-test-plugin", &base_definition());
+        assert!(script.contains("supervise_daemon_args").not());
+    }
+
+    #[test]
+    fn service_file_includes_env_vars() {
+        // Environment variables must appear as -e flags in
+        // supervise_daemon_args.
+        let mut def = base_definition();
+        def.envs = Some(vec![("MY_VAR".to_string(), "value".to_string())]);
+        let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
+        assert!(script.contains("supervise_daemon_args=\"-e MY_VAR=value\""));
+    }
+
+    #[test]
+    fn service_file_combines_user_and_env_vars() {
+        // When both username and env vars are set, they must appear
+        // together in supervise_daemon_args.
+        let mut def = base_definition();
+        def.username = Some("cc-plugin-user".to_string());
+        def.envs = Some(vec![("KEY".to_string(), "val".to_string())]);
+        let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
+        assert!(script.contains("supervise_daemon_args=\"-u cc-plugin-user -e KEY=val\""));
+    }
+
+    #[test]
+    fn service_file_omits_daemon_args_for_empty_envs() {
+        // An empty envs list with no username must not produce
+        // supervise_daemon_args.
+        let mut def = base_definition();
+        def.envs = Some(vec![]);
+        let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
+        assert!(script.contains("supervise_daemon_args").not());
+    }
 }

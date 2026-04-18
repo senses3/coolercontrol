@@ -399,6 +399,8 @@ export default {
                 'プラグインが有効化されました。適用するにはデーモンを再起動してください。',
             disableFailed: 'プラグインの無効化に失敗しました',
             enableFailed: 'プラグインの有効化に失敗しました',
+            serviceLogs: 'サービスログ',
+            commandCopied: 'コマンドをクリップボードにコピーしました',
         },
         add: {
             dashboard: 'ダッシュボード',
