@@ -259,9 +259,9 @@ pub async fn amd_gpu_overdrive_enable(notification_handle: NotificationHandle) -
 async fn regenerate_initramfs(initramfs_type: InitramfsType) -> Result<()> {
     info!("Regenerating initramfs ({initramfs_type:?})");
     let command = match initramfs_type {
-        InitramfsType::Debian => "update-initramfs -u",
+        InitramfsType::Debian => "update-initramfs -u -q",
         InitramfsType::Mkinitcpio => "mkinitcpio -P",
-        InitramfsType::Dracut => "dracut --regenerate-all --force",
+        InitramfsType::Dracut => "dracut --regenerate-all --force --quiet",
     };
     let result = ShellCommand::new(command, INITRAMFS_TIMEOUT).run().await;
     match result {
