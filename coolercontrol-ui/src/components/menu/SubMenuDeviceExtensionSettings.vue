@@ -329,8 +329,8 @@ const popoverClose = (): void => {
                             />
                         </td>
                     </tr>
-                    <tr v-if="isAmdGpuWithOverdrive">
-                        <td class="w-64 text-end pl-4">
+                    <tr v-if="isAmdGpuWithOverdrive" class="pb-2">
+                        <td class="w-64 text-end pl-4 pb-2">
                             <div class="flex flex-row leading-none items-center">
                                 <div
                                     v-tooltip.bottom="
@@ -347,7 +347,7 @@ const popoverClose = (): void => {
                                 {{ t('components.deviceExtensionSettings.overdrive') }}
                             </div>
                         </td>
-                        <td class="w-24 px-2 text-center">
+                        <td class="w-24 px-2 text-center pb-2">
                             <span v-if="amdOverdriveEnabled" class="text-green-400 font-semibold">
                                 {{ t('components.deviceExtensionSettings.overdriveActive') }}
                             </span>
