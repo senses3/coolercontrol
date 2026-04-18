@@ -17,17 +17,23 @@
  */
 
 /**
- * Validate a plugin fetch path to prevent path traversal attacks.
- * Returns the sanitized path or null if the path is invalid.
+ * Strict allowlist for plugin fetch paths. Anchored, no metacharacters
+ * that could escape origin: pathname is /[A-Za-z0-9._~/-]+, an optional
+ * query of [A-Za-z0-9._~=&%/-]*, and an optional fragment.
+ */
+const PLUGIN_PATH_RE = /^\/[A-Za-z0-9._~/-]*(\?[A-Za-z0-9._~=&%/-]*)?(#[A-Za-z0-9._~/-]*)?$/
+
+/**
+ * Validate a plugin fetch path. Returns the sanitized path or null if invalid.
+ * Rejects path traversal, protocol-relative paths, backslashes, and any
+ * character outside a conservative allowlist. The strict regex bounds the
+ * input so the resulting URL cannot redirect off-origin.
  */
 export function validatePluginFetchPath(path: string): string | null {
-    if (typeof path !== 'string' || path.length === 0 || !path.startsWith('/')) {
+    if (typeof path !== 'string' || !PLUGIN_PATH_RE.test(path)) {
         return null
     }
     if (path.startsWith('//')) {
-        return null
-    }
-    if (path.includes('\\')) {
         return null
     }
     const pathPart = path.split(/[?#]/, 1)[0]

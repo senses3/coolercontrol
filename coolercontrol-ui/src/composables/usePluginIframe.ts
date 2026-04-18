@@ -42,6 +42,38 @@ export function usePluginIframe(
     const iframeRef = ref<HTMLIFrameElement | null>(null)
     const nullOriginTarget: string = '*'
 
+    const doPluginFetch = (
+        safePath: string,
+        safeOptions: RequestInit,
+        requestId: string,
+    ): void => {
+        const safePluginId = encodeURIComponent(pluginId)
+        const url = new URL(window.location.origin)
+        url.pathname = `/plugins/${safePluginId}/data${safePath.split(/[?#]/, 1)[0]}`
+        const queryMatch = safePath.match(/\?([^#]*)/)
+        if (queryMatch) {
+            url.search = queryMatch[1]
+        }
+        const expectedPrefix = `${window.location.origin}/plugins/${safePluginId}/data`
+        const finalUrl = url.toString()
+        if (
+            finalUrl !== expectedPrefix &&
+            !finalUrl.startsWith(`${expectedPrefix}/`) &&
+            !finalUrl.startsWith(`${expectedPrefix}?`)
+        ) {
+            return
+        }
+        fetch(finalUrl, safeOptions)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
+            .then((body) => {
+                iframeRef.value?.contentWindow?.postMessage(
+                    { type: 'pluginFetchResponse', requestId, body },
+                    nullOriginTarget,
+                )
+            })
+    }
+
     const pluginUrl = (entryPoint: string = 'index.html'): string => {
         return `${deviceStore.daemonClient.daemonURL}plugins/${pluginId}/ui/${entryPoint}`
     }
@@ -248,27 +280,8 @@ export function usePluginIframe(
                 if (typeof requestId !== 'string' || typeof path !== 'string') break
                 const safePath = validatePluginFetchPath(path)
                 if (safePath == null) break
-                const expectedPrefix = `/plugins/${encodeURIComponent(pluginId)}/data`
-                const base = window.location.origin
-                let url: URL
-                try {
-                    url = new URL(`${expectedPrefix}${safePath}`, base)
-                } catch {
-                    break
-                }
-                if (url.origin !== base || !url.pathname.startsWith(`${expectedPrefix}/`)) {
-                    break
-                }
                 const safeOptions = buildSafeOptions(options)
-                fetch(url.toString(), safeOptions)
-                    .then((r) => (r.ok ? r.json() : null))
-                    .catch(() => null)
-                    .then((body) => {
-                        iframeRef.value?.contentWindow?.postMessage(
-                            { type: 'pluginFetchResponse', requestId, body },
-                            nullOriginTarget,
-                        )
-                    })
+                doPluginFetch(safePath, safeOptions, requestId)
                 break
             }
         }
