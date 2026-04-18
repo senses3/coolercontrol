@@ -292,10 +292,14 @@ pub async fn thinkpad_fan_control_modify(
 }
 
 pub async fn amd_gpu_overdrive_enable(
-    State(AppState { device_handle, .. }): State<AppState>,
+    State(AppState {
+        device_handle,
+        notification_handle,
+        ..
+    }): State<AppState>,
 ) -> Result<Json<String>, CCError> {
     device_handle
-        .amd_gpu_overdrive_enable()
+        .amd_gpu_overdrive_enable(notification_handle)
         .await
         .map(Json)
         .map_err(handle_error)

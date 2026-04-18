@@ -30,6 +30,7 @@ use crate::engine::commanders::lcd::{LcdCommander, DEFAULT_LCD_SHUTDOWN_IMAGE};
 use crate::engine::commanders::mix::MixProfileCommander;
 use crate::engine::commanders::overlay::OverlayProfileCommander;
 use crate::engine::{processors, DeviceChannelProfileSetting};
+use crate::notifier::NotificationHandle;
 use crate::paths;
 use crate::repositories::repository::{DeviceLock, Repository};
 use crate::setting::{
@@ -986,8 +987,11 @@ impl Engine {
             .inspect_err(|err| error!("Error attempting to enable ThinkPad Fan Control: {err}"))
     }
 
-    pub async fn amd_gpu_overdrive_enable(&self) -> Result<String> {
-        repositories::gpu::amd_overdrive::amd_gpu_overdrive_enable()
+    pub async fn amd_gpu_overdrive_enable(
+        &self,
+        notification_handle: NotificationHandle,
+    ) -> Result<String> {
+        repositories::gpu::amd_overdrive::amd_gpu_overdrive_enable(notification_handle)
             .await
             .inspect(|msg| info!("AMD GPU overdrive enable: {msg}"))
             .inspect_err(|err| error!("Error enabling AMD GPU overdrive: {err}"))

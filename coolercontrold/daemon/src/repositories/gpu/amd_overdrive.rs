@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::cc_fs;
+use crate::notifier::{notify_all_sessions, NotificationHandle, NotificationIcon};
 use crate::repositories::utils::{ShellCommand, ShellCommandResult};
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, warn};
@@ -164,7 +165,7 @@ async fn detect_amdgpu_configurator() -> Result<AmdgpuConfigurator> {
 
 /// Enables AMD GPU overdrive by configuring the ppfeaturemask kernel parameter.
 /// Detects the distro and uses the appropriate method (modprobe.d or rpm-ostree kargs).
-pub async fn amd_gpu_overdrive_enable() -> Result<String> {
+pub async fn amd_gpu_overdrive_enable(notification_handle: NotificationHandle) -> Result<String> {
     let current_mask = get_pp_feature_mask().await?;
     let new_mask = compute_overdrive_mask(current_mask);
     if new_mask == current_mask {
@@ -183,21 +184,56 @@ pub async fn amd_gpu_overdrive_enable() -> Result<String> {
             info!("Wrote AMD GPU overdrive config to {}", conf_path.display());
 
             if let Some(initramfs) = initramfs_type {
-                let result = regenerate_initramfs(initramfs).await;
-                if let Err(err) = &result {
-                    warn!(
-                        "Initramfs regeneration encountered an issue: {err}. \
-                        You may need to regenerate initramfs manually."
-                    );
-                }
+                // Spawn in background so the API responds immediately.
+                // The config file is already written, and a reboot is
+                // required regardless.
+                tokio::task::spawn_local(async move {
+                    let result = regenerate_initramfs(initramfs).await;
+                    if result.is_ok() {
+                        warn!(
+                            "Initramfs regeneration complete. \
+                            Please reboot to apply AMD GPU overdrive."
+                        );
+                        notify_all_sessions(
+                            "Initramfs Regeneration Complete",
+                            "Please reboot to apply AMD GPU overdrive.",
+                            NotificationIcon::Info,
+                            true,
+                            None,
+                            Some(&notification_handle),
+                        );
+                    } else if let Err(err) = result {
+                        warn!(
+                            "Initramfs regeneration failed: {err}. \
+                            You may need to regenerate initramfs manually."
+                        );
+                        notify_all_sessions(
+                            "Initramfs Regeneration Failed",
+                            &format!(
+                                "{err}. You may need to regenerate \
+                                initramfs manually."
+                            ),
+                            NotificationIcon::Error,
+                            true,
+                            Some(2),
+                            Some(&notification_handle),
+                        );
+                    }
+                });
+                Ok("AMD GPU overdrive configuration written. \
+                    Initramfs is regenerating in the background \
+                    - you will be notified when you can reboot."
+                    .to_owned())
             } else {
                 warn!(
                     "Unknown distro, skipping initramfs regeneration. \
                     You may need to regenerate initramfs manually \
                     if amdgpu is loaded from initramfs."
                 );
+                Ok("AMD GPU overdrive configuration written. \
+                    Please reboot to apply."
+                    .to_owned())
             }
-            Ok("AMD GPU overdrive configuration written. Please reboot to apply.".to_owned())
         }
         AmdgpuConfigurator::RpmOstreeKarg => {
             let karg = format!("amdgpu.ppfeaturemask=0x{new_mask:X}");

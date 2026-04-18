@@ -23,6 +23,7 @@ use crate::config::Config;
 use crate::device::{ChannelName, DeviceUID, Duty};
 use crate::engine::main::Engine;
 use crate::modes::ModeController;
+use crate::notifier::NotificationHandle;
 use crate::setting::{LcdModeName, LcdSettings, LightingSettings, ProfileUID, Setting};
 use crate::AllDevices;
 use anyhow::Result;
@@ -47,6 +48,7 @@ enum DeviceMessage {
         respond_to: oneshot::Sender<Result<()>>,
     },
     AmdGpuOverdriveEnable {
+        notification_handle: NotificationHandle,
         respond_to: oneshot::Sender<Result<String>>,
     },
     DevicesGet {
@@ -168,8 +170,14 @@ impl ApiActor<DeviceMessage> for DeviceActor {
                 let response = self.engine.thinkpad_fan_control(&enable).await;
                 let _ = respond_to.send(response);
             }
-            DeviceMessage::AmdGpuOverdriveEnable { respond_to } => {
-                let response = self.engine.amd_gpu_overdrive_enable().await;
+            DeviceMessage::AmdGpuOverdriveEnable {
+                notification_handle,
+                respond_to,
+            } => {
+                let response = self
+                    .engine
+                    .amd_gpu_overdrive_enable(notification_handle)
+                    .await;
                 let _ = respond_to.send(response);
             }
             DeviceMessage::DevicesGet { respond_to } => {
@@ -505,9 +513,15 @@ impl DeviceHandle {
         rx.await?
     }
 
-    pub async fn amd_gpu_overdrive_enable(&self) -> Result<String> {
+    pub async fn amd_gpu_overdrive_enable(
+        &self,
+        notification_handle: NotificationHandle,
+    ) -> Result<String> {
         let (tx, rx) = oneshot::channel();
-        let msg = DeviceMessage::AmdGpuOverdriveEnable { respond_to: tx };
+        let msg = DeviceMessage::AmdGpuOverdriveEnable {
+            notification_handle,
+            respond_to: tx,
+        };
         let _ = self.sender.send(msg).await;
         rx.await?
     }
