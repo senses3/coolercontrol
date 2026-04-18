@@ -355,6 +355,7 @@ const popoverClose = (): void => {
                                 v-else
                                 :label="t('components.deviceExtensionSettings.overdriveEnable')"
                                 :loading="amdOverdriveEnabling"
+                                class="border border-border-one bg-accent text-text-color"
                                 severity="warn"
                                 size="small"
                                 @click="enableAmdOverdrive"
