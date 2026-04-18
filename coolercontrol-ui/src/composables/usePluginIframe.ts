@@ -248,9 +248,19 @@ export function usePluginIframe(
                 if (typeof requestId !== 'string' || typeof path !== 'string') break
                 const safePath = validatePluginFetchPath(path)
                 if (safePath == null) break
-                const url = `/plugins/${pluginId}/data${safePath}`
+                const expectedPrefix = `/plugins/${encodeURIComponent(pluginId)}/data`
+                const base = window.location.origin
+                let url: URL
+                try {
+                    url = new URL(`${expectedPrefix}${safePath}`, base)
+                } catch {
+                    break
+                }
+                if (url.origin !== base || !url.pathname.startsWith(`${expectedPrefix}/`)) {
+                    break
+                }
                 const safeOptions = buildSafeOptions(options)
-                fetch(url, safeOptions)
+                fetch(url.toString(), safeOptions)
                     .then((r) => (r.ok ? r.json() : null))
                     .catch(() => null)
                     .then((body) => {

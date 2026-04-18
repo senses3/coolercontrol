@@ -55,6 +55,26 @@ describe('validatePluginFetchPath', () => {
     it('rejects bare traversal', () => {
         expect(validatePluginFetchPath('/..')).toBeNull()
     })
+
+    it('rejects protocol-relative paths', () => {
+        expect(validatePluginFetchPath('//evil.com/path')).toBeNull()
+    })
+
+    it('rejects backslashes', () => {
+        expect(validatePluginFetchPath('/foo\\bar')).toBeNull()
+    })
+
+    it('rejects traversal hidden behind a query string', () => {
+        expect(validatePluginFetchPath('/foo/../bar?x=1')).toBeNull()
+    })
+
+    it('rejects traversal hidden behind a fragment', () => {
+        expect(validatePluginFetchPath('/foo/../bar#frag')).toBeNull()
+    })
+
+    it('accepts a path with a fragment', () => {
+        expect(validatePluginFetchPath('/data#section')).toBe('/data#section')
+    })
 })
 
 describe('buildSafeOptions', () => {

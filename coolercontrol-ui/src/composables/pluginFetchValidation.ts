@@ -24,7 +24,14 @@ export function validatePluginFetchPath(path: string): string | null {
     if (typeof path !== 'string' || path.length === 0 || !path.startsWith('/')) {
         return null
     }
-    const segments = path.split('/')
+    if (path.startsWith('//')) {
+        return null
+    }
+    if (path.includes('\\')) {
+        return null
+    }
+    const pathPart = path.split(/[?#]/, 1)[0]
+    const segments = pathPart.split('/')
     for (const segment of segments) {
         if (segment === '..' || segment === '.') {
             return null
