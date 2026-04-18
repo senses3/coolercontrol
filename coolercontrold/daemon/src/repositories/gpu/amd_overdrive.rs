@@ -261,7 +261,7 @@ async fn regenerate_initramfs(initramfs_type: InitramfsType) -> Result<()> {
     let command = match initramfs_type {
         InitramfsType::Debian => "update-initramfs -u -q",
         InitramfsType::Mkinitcpio => "mkinitcpio -P",
-        InitramfsType::Dracut => "dracut --regenerate-all --force --quiet --stdlog 3",
+        InitramfsType::Dracut => "dracut --regenerate-all --force --quiet",
     };
     let result = ShellCommand::new(command, INITRAMFS_TIMEOUT).run().await;
     match result {
