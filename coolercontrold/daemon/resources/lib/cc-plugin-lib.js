@@ -270,7 +270,7 @@ const getStatus = async (force = false) => {
    Returns the parsed JSON body, or null on error.
    Note: the request is made by the parent window (which has credentials), not the sandboxed iframe. */
 const pluginFetch = async (path, options = {}) => {
-    const requestId = `${_messageCount}_${Date.now()}_${Math.random()}`
+    const requestId = crypto.randomUUID()
     return new Promise((resolve) => {
         const handler = (messageEvent) => {
             if (
