@@ -42,11 +42,7 @@ export function usePluginIframe(
     const iframeRef = ref<HTMLIFrameElement | null>(null)
     const nullOriginTarget: string = '*'
 
-    const doPluginFetch = (
-        safePath: string,
-        safeOptions: RequestInit,
-        requestId: string,
-    ): void => {
+    const doPluginFetch = (safePath: string, safeOptions: RequestInit, requestId: string): void => {
         const safePluginId = encodeURIComponent(pluginId)
         const url = new URL(window.location.origin)
         url.pathname = `/plugins/${safePluginId}/data${safePath.split(/[?#]/, 1)[0]}`
