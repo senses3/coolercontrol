@@ -24,9 +24,11 @@ use crate::device::{ChannelName, DeviceUID, Duty};
 use crate::engine::main::Engine;
 use crate::modes::ModeController;
 use crate::notifier::NotificationHandle;
+use crate::repositories::gpu::amd_overdrive;
 use crate::setting::{LcdModeName, LcdSettings, LightingSettings, ProfileUID, Setting};
 use crate::AllDevices;
 use anyhow::Result;
+use log::{error, info};
 use mime::Mime;
 use moro_local::Scope;
 use std::ops::Deref;
@@ -174,10 +176,10 @@ impl ApiActor<DeviceMessage> for DeviceActor {
                 notification_handle,
                 respond_to,
             } => {
-                let response = self
-                    .engine
-                    .amd_gpu_overdrive_enable(notification_handle)
-                    .await;
+                let response = amd_overdrive::amd_gpu_overdrive_enable(notification_handle)
+                    .await
+                    .inspect(|msg| info!("AMD GPU overdrive enable: {msg}"))
+                    .inspect_err(|err| error!("Error enabling AMD GPU overdrive: {err}"));
                 let _ = respond_to.send(response);
             }
             DeviceMessage::DevicesGet { respond_to } => {
