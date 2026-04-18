@@ -136,7 +136,6 @@ export default {
             general: 'Allgemein',
             device: 'Geräte',
             daemon: 'Daemon',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: 'Geräte und Sensoren',
                 detectionIssues: 'Erkennungsprobleme? Siehe',
@@ -205,8 +204,6 @@ export default {
             closeToTray: 'In Tray minimieren',
             zoom: 'Zoom',
             desktopStartupDelay: 'Desktop-Startverzögerung',
-            fanControl: 'Lüftersteuerung',
-            fullSpeed: 'Volle Geschwindigkeit',
             applySettingsOnStartup: 'Einstellungen beim Start anwenden',
             deviceDelayAtStartup: 'Geräteverzögerung beim Start',
             pollingRate: 'Abfragerate',
@@ -256,10 +253,6 @@ export default {
                 zoom: 'Legen Sie manuell den Zoom-Level der Benutzeroberfläche fest.',
                 desktopStartupDelay:
                     'Fügt eine Verzögerung vor dem Start der Desktop-Anwendung hinzu (in Sekunden).\nHilft bei Problemen, die dadurch entstehen, dass die Desktop-Anwendung\nautomatisch beim Login gestartet wird oder zu schnell startet',
-                thinkPadFanControl:
-                    'Dies ist ein Hilfsmittel zum Aktivieren der ThinkPad ACPI-Lüftersteuerung.\nLüftersteuerungsoperationen sind aus Sicherheitsgründen standardmäßig deaktiviert. CoolerControl kann versuchen, dies für Sie zu aktivieren, aber Sie sollten sich der Risiken für Ihre Hardware bewusst sein.\nFahren Sie auf eigenes Risiko fort.',
-                thinkPadFullSpeed:
-                    'Für ThinkPad-Laptops aktiviert dies den Vollgeschwindigkeitsmodus.\nDies ermöglicht es den Lüftern, bei Einstellung auf 100% auf ihr absolutes Maximum hochzudrehen, wird die Lüfter jedoch außerhalb der Spezifikation betreiben und zu erhöhtem Verschleiß führen.\nVerwenden Sie es mit Vorsicht.',
                 applySettingsOnStartup:
                     'Einstellungen automatisch beim Daemon-Start und beim Aufwachen aus dem Ruhezustand anwenden',
                 deviceDelayAtStartup:
@@ -1128,6 +1121,12 @@ export default {
             overdriveEnable: 'Aktivieren',
             overdriveActive: 'Aktiv',
             overdriveSuccess: 'Overdrive konfiguriert',
+            thinkPadFanControl: 'Lüftersteuerung',
+            thinkPadFanControlDesc:
+                'Aktiviert die ThinkPad ACPI Lüftersteuerung.\nDie Lüftersteuerung ist aus Sicherheitsgründen standardmäßig deaktiviert.\nFortfahren auf eigene Gefahr.',
+            thinkPadFullSpeed: 'Volle Geschwindigkeit',
+            thinkPadFullSpeedDesc:
+                'Aktiviert den Vollgeschwindigkeitsmodus für ThinkPad-Lüfter.\nErmöglicht es den Lüftern bei 100% auf das absolute Maximum zu drehen,\nbetreibt die Lüfter jedoch außerhalb der Spezifikation mit erhöhtem Verschleiß.',
         },
     },
     auth: {

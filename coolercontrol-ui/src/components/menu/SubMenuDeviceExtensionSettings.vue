@@ -57,6 +57,7 @@ const useHwmon = ref(false)
 let isAmdGpuWithOverdrive = false
 const amdOverdriveEnabled = ref(false)
 const amdOverdriveEnabling = ref(false)
+let isThinkPad = false
 
 for (const device of deviceStore.allDevices()) {
     if (device.uid === props.deviceUID && device.info != null) {
@@ -68,6 +69,9 @@ for (const device of deviceStore.allDevices()) {
         if (device.info.amd_gpu_overdrive != null) {
             isAmdGpuWithOverdrive = true
             amdOverdriveEnabled.value = device.info.amd_gpu_overdrive
+        }
+        if (device.info.thinkpad_fan_control != null) {
+            isThinkPad = true
         }
         break
     }
@@ -237,6 +241,10 @@ const enableAmdOverdrive = async () => {
     }
 }
 
+const applyThinkPadFanControl = (value: boolean | string | number) => {
+    settingsStore.applyThinkPadFanControl(Boolean(value))
+}
+
 const popoverOpen = (event: any): void => {
     popRef.value.toggle(event)
 }
@@ -359,6 +367,61 @@ const popoverClose = (): void => {
                                 severity="warn"
                                 size="small"
                                 @click="enableAmdOverdrive"
+                            />
+                        </td>
+                    </tr>
+                    <tr v-if="isThinkPad">
+                        <td class="w-64 text-end pl-4">
+                            <div class="flex flex-row leading-none items-center">
+                                <div
+                                    v-tooltip.bottom="
+                                        t(
+                                            'components.deviceExtensionSettings.thinkPadFanControlDesc',
+                                        )
+                                    "
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        class="mr-2"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="deviceStore.getREMSize(1.25)"
+                                    />
+                                </div>
+                                {{ t('components.deviceExtensionSettings.thinkPadFanControl') }}
+                            </div>
+                        </td>
+                        <td class="w-24 px-2 text-center">
+                            <el-switch
+                                v-model="settingsStore.thinkPadFanControlEnabled"
+                                size="large"
+                                @change="applyThinkPadFanControl"
+                            />
+                        </td>
+                    </tr>
+                    <tr v-if="isThinkPad">
+                        <td class="w-64 text-end pl-4">
+                            <div class="flex flex-row leading-none items-center">
+                                <div
+                                    v-tooltip.bottom="
+                                        t(
+                                            'components.deviceExtensionSettings.thinkPadFullSpeedDesc',
+                                        )
+                                    "
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        class="mr-2"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="deviceStore.getREMSize(1.25)"
+                                    />
+                                </div>
+                                {{ t('components.deviceExtensionSettings.thinkPadFullSpeed') }}
+                            </div>
+                        </td>
+                        <td class="w-24 px-2 text-center">
+                            <el-switch
+                                v-model="settingsStore.ccSettings.thinkpad_full_speed"
+                                size="large"
                             />
                         </td>
                     </tr>

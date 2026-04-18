@@ -24,7 +24,6 @@ import {
     mdiExport,
     mdiFormatListBulleted,
     mdiImport,
-    mdiLaptop,
     mdiMonitor,
     mdiRestart,
     mdiViewQuiltOutline,
@@ -80,15 +79,9 @@ const tabStyle = computed(() => {
     if (deviceStore.isQtApp()) {
         tabCount += 1
     }
-    if (deviceStore.isThinkPad) {
-        tabCount += 1
-    }
     const width = 100 / tabCount
     return `width: ${width}%`
 })
-const applyThinkPadFanControl = (value: boolean | string | number) => {
-    settingsStore.applyThinkPadFanControl(Boolean(value))
-}
 
 const isFullScreen = ref(fullscreenApi.isFullscreen)
 if (deviceStore.isQtApp()) {
@@ -459,21 +452,6 @@ onUnmounted(() => {
                             :size="deviceStore.getREMSize(1.5)"
                         />
                         {{ t('layout.settings.desktop', 'Desktop') }}
-                    </Tab>
-                    <Tab
-                        v-if="deviceStore.isThinkPad"
-                        value="3"
-                        as="div"
-                        class="flex justify-center items-center gap-2"
-                        :style="tabStyle"
-                        :disabled="!deviceStore.isThinkPad"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiLaptop"
-                            :size="deviceStore.getREMSize(1.5)"
-                        />
-                        {{ t('layout.settings.thinkpad', 'ThinkPad') }}
                     </Tab>
                 </TabList>
                 <TabPanels class="mt-2">
@@ -1496,54 +1474,6 @@ onUnmounted(() => {
                                                 <span class="pi pi-minus" />
                                             </template>
                                         </InputNumber>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </TabPanel>
-                    <TabPanel value="3">
-                        <!--ThinkPad Settings-->
-                        <table class="bg-bg-two rounded-lg">
-                            <tbody>
-                                <tr
-                                    v-tooltip.right="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.thinkPadFanControl'),
-                                    }"
-                                >
-                                    <td
-                                        class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.fanControl') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <el-switch
-                                            v-model="settingsStore.thinkPadFanControlEnabled"
-                                            size="large"
-                                            @change="applyThinkPadFanControl"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.right="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.thinkPadFullSpeed'),
-                                    }"
-                                >
-                                    <td
-                                        class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.fullSpeed') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <el-switch
-                                            v-model="settingsStore.ccSettings.thinkpad_full_speed"
-                                            size="large"
-                                        />
                                     </td>
                                 </tr>
                             </tbody>
