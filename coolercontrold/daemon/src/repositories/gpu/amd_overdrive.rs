@@ -93,33 +93,65 @@ fn parse_amdgpu_configurator(
         }
     }
     let ids: Vec<&str> = std::iter::once(id.as_str())
+        // often used for base distros:
         .chain(id_like.split_ascii_whitespace())
         .collect();
     for distro_id in &ids {
         match *distro_id {
-            "debian" | "ubuntu" => {
+            // Debian family: uses update-initramfs
+            "debian" | "ubuntu" | "pop" | "linuxmint" | "elementary" | "zorin" | "kali"
+            | "raspbian" | "neon" => {
                 return Ok(AmdgpuConfigurator::Modprobe(Some(InitramfsType::Debian)));
             }
-            "arch" | "cachyos" => {
+            // Arch family: uses mkinitcpio
+            "arch" | "cachyos" | "manjaro" | "endeavouros" | "garuda" | "steamos" | "artix" => {
                 return Ok(AmdgpuConfigurator::Modprobe(Some(
                     InitramfsType::Mkinitcpio,
                 )));
             }
+            // Fedora with ostree: uses rpm-ostree kernel arguments
             "fedora" if ostree_booted => {
                 return Ok(AmdgpuConfigurator::RpmOstreeKarg);
             }
-            "fedora" => {
+            // Dracut family: Fedora, RHEL, SUSE, Gentoo, Void
+            "fedora"
+            | "nobara"
+            | "ultramarine"
+            | "rhel"
+            | "centos"
+            | "rocky"
+            | "almalinux"
+            | "opensuse-tumbleweed"
+            | "opensuse-leap"
+            | "opensuse"
+            | "suse"
+            | "sles"
+            | "gentoo"
+            | "void" => {
                 return Ok(AmdgpuConfigurator::Modprobe(Some(InitramfsType::Dracut)));
             }
+            // Declarative distros: must configure through system config
             "nixos" => {
                 return Err(anyhow!(
-                    "Overdrive should be configured through NixOS system configuration"
+                    "Overdrive should be configured through \
+                    NixOS system configuration"
+                ));
+            }
+            "guix" => {
+                return Err(anyhow!(
+                    "Overdrive should be configured through \
+                    Guix system configuration"
                 ));
             }
             _ => (),
         }
     }
-    // Unknown distro: write modprobe.d but skip initramfs regen
+    // Unknown distro: write modprobe.d but skip initramfs regen.
+    warn!(
+        "Unrecognized distro (ID={id}, ID_LIKE={id_like}). \
+        Skipping initramfs regeneration. Please report your \
+        distribution so we can add support."
+    );
     Ok(AmdgpuConfigurator::Modprobe(None))
 }
 
@@ -308,6 +340,83 @@ mod tests {
         assert_eq!(result, AmdgpuConfigurator::RpmOstreeKarg);
     }
 
+    // Verify Pop!_OS is detected via ID=pop and uses update-initramfs.
+    #[test]
+    fn detect_popos() {
+        let os_release = "ID=pop\nID_LIKE=\"ubuntu debian\"\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Debian))
+        );
+    }
+
+    // Verify Manjaro is detected via ID=manjaro and uses mkinitcpio.
+    #[test]
+    fn detect_manjaro() {
+        let os_release = "ID=manjaro\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Mkinitcpio))
+        );
+    }
+
+    // Verify SteamOS is detected via ID=steamos and uses mkinitcpio.
+    #[test]
+    fn detect_steamos() {
+        let os_release = "ID=steamos\nID_LIKE=arch\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Mkinitcpio))
+        );
+    }
+
+    // Verify Nobara is detected via ID=nobara and uses dracut.
+    #[test]
+    fn detect_nobara() {
+        let os_release = "ID=nobara\nID_LIKE=fedora\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Dracut))
+        );
+    }
+
+    // Verify openSUSE Tumbleweed is detected and uses dracut.
+    #[test]
+    fn detect_opensuse_tumbleweed() {
+        let os_release = "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Dracut))
+        );
+    }
+
+    // Verify Gentoo is detected via ID=gentoo and uses dracut.
+    #[test]
+    fn detect_gentoo() {
+        let os_release = "ID=gentoo\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Dracut))
+        );
+    }
+
+    // Verify Void Linux is detected via ID=void and uses dracut.
+    #[test]
+    fn detect_void() {
+        let os_release = "ID=void\n";
+        let result = parse_amdgpu_configurator(os_release, false).unwrap();
+        assert_eq!(
+            result,
+            AmdgpuConfigurator::Modprobe(Some(InitramfsType::Dracut))
+        );
+    }
+
     // Verify NixOS returns an error directing to system configuration.
     #[test]
     fn detect_nixos_returns_error() {
@@ -320,10 +429,22 @@ mod tests {
             .contains("NixOS system configuration"));
     }
 
+    // Verify Guix returns an error directing to system configuration.
+    #[test]
+    fn detect_guix_returns_error() {
+        let os_release = "ID=guix\n";
+        let result = parse_amdgpu_configurator(os_release, false);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Guix system configuration"));
+    }
+
     // Verify unknown distros get modprobe.d config without initramfs regen.
     #[test]
     fn detect_unknown_distro() {
-        let os_release = "ID=gentoo\n";
+        let os_release = "ID=slackware\n";
         let result = parse_amdgpu_configurator(os_release, false).unwrap();
         assert_eq!(result, AmdgpuConfigurator::Modprobe(None));
     }
