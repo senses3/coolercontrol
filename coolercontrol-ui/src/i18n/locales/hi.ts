@@ -615,6 +615,8 @@ export default {
             automaticOrManual: 'स्वचालित या मैनुअल',
             driverNoSupportControl:
                 'वर्तमान में स्थापित ड्राइवर इस चैनल के नियंत्रण का समर्थन नहीं करता है।',
+            amdOverdriveNotEnabled:
+                'AMD GPU ओवरड्राइव सक्षम नहीं है। इसे इस डिवाइस की उन्नत सेटिंग्स में सक्षम करें (रीबूट आवश्यक)।',
             controlOrView: 'नियंत्रण या देखें',
             applySetting: 'सेटिंग लागू करें',
             defaultProfileInfo:
@@ -1094,6 +1096,12 @@ export default {
             commandDelay: 'कमांड विलंब',
             commandDelayDesc:
                 'इस डिवाइस को भेजे गए कमांड के बीच मिलीसेकंड में विलंब।\nयह उन डिवाइसों के लिए मददगार हो सकता है जिनमें\nएकाधिक कमांड तेजी से भेजे जाने पर संचार समस्याएं होती हैं।',
+            overdrive: 'GPU ओवरड्राइव',
+            overdriveDesc:
+                'AMD RDNA3/4 GPU को पंखा नियंत्रण के लिए ओवरड्राइव सक्षम करना आवश्यक है।\nयह amdgpu.ppfeaturemask कर्नेल पैरामीटर को कॉन्फ़िगर करता है\nऔर सिस्टम रीबूट की आवश्यकता है।',
+            overdriveEnable: 'सक्षम करें',
+            overdriveActive: 'सक्रिय',
+            overdriveSuccess: 'ओवरड्राइव कॉन्फ़िगर किया गया',
         },
     },
     auth: {

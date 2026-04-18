@@ -46,6 +46,9 @@ enum DeviceMessage {
         enable: bool,
         respond_to: oneshot::Sender<Result<()>>,
     },
+    AmdGpuOverdriveEnable {
+        respond_to: oneshot::Sender<Result<String>>,
+    },
     DevicesGet {
         respond_to: oneshot::Sender<Result<Vec<DeviceDto>>>,
     },
@@ -163,6 +166,10 @@ impl ApiActor<DeviceMessage> for DeviceActor {
         match msg {
             DeviceMessage::ThinkPadFanControl { enable, respond_to } => {
                 let response = self.engine.thinkpad_fan_control(&enable).await;
+                let _ = respond_to.send(response);
+            }
+            DeviceMessage::AmdGpuOverdriveEnable { respond_to } => {
+                let response = self.engine.amd_gpu_overdrive_enable().await;
                 let _ = respond_to.send(response);
             }
             DeviceMessage::DevicesGet { respond_to } => {
@@ -494,6 +501,13 @@ impl DeviceHandle {
             enable,
             respond_to: tx,
         };
+        let _ = self.sender.send(msg).await;
+        rx.await?
+    }
+
+    pub async fn amd_gpu_overdrive_enable(&self) -> Result<String> {
+        let (tx, rx) = oneshot::channel();
+        let msg = DeviceMessage::AmdGpuOverdriveEnable { respond_to: tx };
         let _ = self.sender.send(msg).await;
         rx.await?
     }

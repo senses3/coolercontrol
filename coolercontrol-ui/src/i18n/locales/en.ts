@@ -437,6 +437,8 @@ export default {
             automaticOrManual: 'Automatic or Manual',
             driverNoSupportControl:
                 'The currently installed driver does not support control of this channel.',
+            amdOverdriveNotEnabled:
+                "AMD GPU overdrive is not enabled. Enable it in this device's Advanced Settings (requires reboot).",
             controlOrView: 'Control or View',
             applySetting: 'Apply Setting',
             defaultProfileInfo:
@@ -1092,6 +1094,12 @@ export default {
             commandDelay: 'Command Delay',
             commandDelayDesc:
                 'Delay in milliseconds between commands sent to this device.\nThis can help with devices that have communication issues\nwhen multiple commands are sent in quick succession.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                'AMD RDNA3/4 GPUs require overdrive to be enabled for fan control.\nThis configures the amdgpu.ppfeaturemask kernel parameter\nand requires a system reboot to take effect.',
+            overdriveEnable: 'Enable',
+            overdriveActive: 'Active',
+            overdriveSuccess: 'Overdrive Configured',
         },
     },
     auth: {

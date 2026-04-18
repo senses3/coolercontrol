@@ -484,6 +484,8 @@ export default {
             automaticOrManual: '自動または手動',
             driverNoSupportControl:
                 '現在インストールされているドライバーはこのチャンネルの制御をサポートしていません。',
+            amdOverdriveNotEnabled:
+                'AMD GPU オーバードライブが有効になっていません。このデバイスの詳細設定で有効にしてください（再起動が必要）。',
             controlOrView: '制御または表示',
             applySetting: '設定を適用',
             defaultProfileInfo:
@@ -1106,6 +1108,12 @@ export default {
             commandDelay: 'コマンド遅延',
             commandDelayDesc:
                 'このデバイスに送信されるコマンド間の遅延（ミリ秒）。\n複数のコマンドが連続して送信される際に\n通信の問題があるデバイスに役立ちます。',
+            overdrive: 'GPU オーバードライブ',
+            overdriveDesc:
+                'AMD RDNA3/4 GPUではファン制御にオーバードライブの有効化が必要です。\namdgpu.ppfeaturemaskカーネルパラメータを設定し、\nシステムの再起動が必要です。',
+            overdriveEnable: '有効化',
+            overdriveActive: '有効',
+            overdriveSuccess: 'オーバードライブ設定完了',
         },
     },
     auth: {

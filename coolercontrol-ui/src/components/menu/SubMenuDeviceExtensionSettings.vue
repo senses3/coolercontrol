@@ -33,6 +33,7 @@ import { useToast } from 'primevue/usetoast'
 import { ElSwitch } from 'element-plus'
 import _ from 'lodash'
 import { CoolerControlDeviceSettingsDTO } from '@/models/CCSettings.ts'
+import { ErrorResponse } from '@/models/ErrorResponse.ts'
 
 const props = defineProps<{
     deviceUID: UID
@@ -53,6 +54,9 @@ const popRef = ref()
 let isLiquidctl = false
 let hasHwmonDriver = false
 const useHwmon = ref(false)
+let isAmdGpuWithOverdrive = false
+const amdOverdriveEnabled = ref(false)
+const amdOverdriveEnabling = ref(false)
 
 for (const device of deviceStore.allDevices()) {
     if (device.uid === props.deviceUID && device.info != null) {
@@ -60,6 +64,10 @@ for (const device of deviceStore.allDevices()) {
         if (isLiquidctl) {
             hasHwmonDriver =
                 device.info?.driver_info.locations.find((loc) => loc.includes('hwmon')) != null
+        }
+        if (device.info.amd_gpu_overdrive != null) {
+            isAmdGpuWithOverdrive = true
+            amdOverdriveEnabled.value = device.info.amd_gpu_overdrive
         }
         break
     }
@@ -208,6 +216,27 @@ const updateDelayMillis = _.debounce(() => {
     })
 }, 3000)
 
+const enableAmdOverdrive = async () => {
+    amdOverdriveEnabling.value = true
+    const result = await deviceStore.daemonClient.amdGpuOverdriveEnable()
+    amdOverdriveEnabling.value = false
+    if (result instanceof ErrorResponse) {
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: result.error ?? t('layout.settings.devices.unknownError'),
+            life: 6000,
+        })
+    } else {
+        toast.add({
+            severity: 'success',
+            summary: t('components.deviceExtensionSettings.overdriveSuccess'),
+            detail: result,
+            life: 10000,
+        })
+    }
+}
+
 const popoverOpen = (event: any): void => {
     popRef.value.toggle(event)
 }
@@ -297,6 +326,38 @@ const popoverClose = (): void => {
                                 size="large"
                                 :disabled="!hasHwmonDriver"
                                 @change="toggleUseHwmon"
+                            />
+                        </td>
+                    </tr>
+                    <tr v-if="isAmdGpuWithOverdrive">
+                        <td class="w-64 text-end pl-4">
+                            <div class="flex flex-row leading-none items-center">
+                                <div
+                                    v-tooltip.bottom="
+                                        t('components.deviceExtensionSettings.overdriveDesc')
+                                    "
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        class="mr-2"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="deviceStore.getREMSize(1.25)"
+                                    />
+                                </div>
+                                {{ t('components.deviceExtensionSettings.overdrive') }}
+                            </div>
+                        </td>
+                        <td class="w-24 px-2 text-center">
+                            <span v-if="amdOverdriveEnabled" class="text-green-400 font-semibold">
+                                {{ t('components.deviceExtensionSettings.overdriveActive') }}
+                            </span>
+                            <Button
+                                v-else
+                                :label="t('components.deviceExtensionSettings.overdriveEnable')"
+                                :loading="amdOverdriveEnabling"
+                                severity="warn"
+                                size="small"
+                                @click="enableAmdOverdrive"
                             />
                         </td>
                     </tr>

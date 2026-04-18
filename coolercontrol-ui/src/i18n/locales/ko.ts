@@ -432,6 +432,8 @@ export default {
             profileToApply: '적용할 프로파일',
             automaticOrManual: '자동 또는 수동',
             driverNoSupportControl: '현재 설치된 드라이버는 이 채널 제어를 지원하지 않습니다.',
+            amdOverdriveNotEnabled:
+                'AMD GPU 오버드라이브가 활성화되지 않았습니다. 이 장치의 고급 설정에서 활성화하세요 (재부팅 필요).',
             controlOrView: '제어 또는 보기',
             applySetting: '설성 적용',
             defaultProfileInfo:
@@ -1082,6 +1084,12 @@ export default {
             commandDelay: '명령 지연',
             commandDelayDesc:
                 '이 장치로 전송되는 명령 사이의 지연 시간(밀리초).\n여러 명령이 빠르게 연속으로 전송될 때\n통신 문제가 있는 장치에 도움이 될 수 있습니다.',
+            overdrive: 'GPU 오버드라이브',
+            overdriveDesc:
+                'AMD RDNA3/4 GPU는 팬 제어를 위해 오버드라이브를 활성화해야 합니다.\namdgpu.ppfeaturemask 커널 매개변수를 구성하며\n시스템 재부팅이 필요합니다.',
+            overdriveEnable: '활성화',
+            overdriveActive: '활성',
+            overdriveSuccess: '오버드라이브 구성됨',
         },
     },
     auth: {

@@ -433,6 +433,8 @@ export default {
             profileToApply: 'ملف التعريف المراد تطبيقه',
             automaticOrManual: 'تلقائي أو يدوي',
             driverNoSupportControl: 'برنامج التشغيل المثبت حاليًا لا يدعم التحكم في هذه القناة.',
+            amdOverdriveNotEnabled:
+                'لم يتم تفعيل AMD GPU overdrive. قم بتفعيله في الإعدادات المتقدمة لهذا الجهاز (يتطلب إعادة التشغيل).',
             controlOrView: 'تحكم أو عرض',
             applySetting: 'تطبيق الإعداد',
             defaultProfileInfo:
@@ -1082,6 +1084,12 @@ export default {
             commandDelay: 'تأخير الأوامر',
             commandDelayDesc:
                 'التأخير بالمللي ثانية بين الأوامر المرسلة إلى هذا الجهاز.\nيمكن أن يساعد هذا مع الأجهزة التي تعاني من مشاكل في الاتصال\nعند إرسال أوامر متعددة بتتابع سريع.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                'تتطلب وحدات معالجة الرسومات AMD RDNA3/4 تفعيل overdrive للتحكم في المراوح.\nيقوم هذا بتكوين معلمة النواة amdgpu.ppfeaturemask\nويتطلب إعادة تشغيل النظام.',
+            overdriveEnable: 'تفعيل',
+            overdriveActive: 'نشط',
+            overdriveSuccess: 'تم تكوين Overdrive',
         },
     },
     auth: {

@@ -44,10 +44,6 @@ use regex::Regex;
 
 pub const TEMP_FOR_FAN_CURVE: &str = "temp1";
 const AMD_HWMON_NAME: &str = "amdgpu";
-const PP_OVERDRIVE_MASK: u64 = 0x4000;
-const PP_FEATURE_MASK_PATH: &str = "/sys/module/amdgpu/parameters/ppfeaturemask";
-// using this requires that the initramfs is regenerated, which we don't currently do:
-// const MODULE_CONF_PATH: &str = "/etc/modprobe.d/99-amdgpu-overdrive.conf";
 const PATTERN_FAN_CURVE_POINT: &str = r"(?P<index>\d+):\s+(?P<temp>\d+)C\s+(?P<duty>\d+)%";
 const PATTERN_FAN_CURVE_LIMITS_TEMP: &str =
     r"FAN_CURVE\(hotspot temp\):\s+(?P<temp_min>\d+)C\s+(?P<temp_max>\d+)C";
@@ -145,6 +141,8 @@ impl GpuAMD {
                     debug!("Could not get RDNA3/4 fan curve info: {err}");
                 })
                 .ok();
+            let has_rdna_fan_ctrl = device_path.join("gpu_od/fan_ctrl").is_dir();
+            let overdrive_enabled = super::amd_overdrive::is_overdrive_enabled().await;
             let drm_device_name = Self::get_drm_device_name(&path).await;
             let pci_device_names = devices::get_device_pci_names(&path).await;
             let model = devices::get_device_model_name(&path)
@@ -162,6 +160,8 @@ impl GpuAMD {
                 },
                 device_path,
                 fan_curve_info,
+                has_rdna_fan_ctrl,
+                overdrive_enabled,
             };
             amd_infos.push(amd_driver_info);
         }
@@ -213,12 +213,13 @@ impl GpuAMD {
     async fn get_fan_curve_info(device_path: &Path) -> Result<FanCurveInfo> {
         let (path, fan_curve, temperature_range, speed_range) =
             Self::get_fan_curve_with_ranges(device_path).await?;
-        let changeable = Self::is_overdrive_enabled().await;
+        let changeable = super::amd_overdrive::is_overdrive_enabled().await;
         if changeable.not() {
-            let fan_control_boot_option = Self::get_fan_control_boot_option().await;
+            let fan_control_boot_option = super::amd_overdrive::get_fan_control_boot_option().await;
             warn!(
-                "AMD Fan Curve found but not controllable. \
-                You need to enable this feature with the kernel boot option: {fan_control_boot_option}"
+                "AMD RDNA3/4 fan curve detected but overdrive is not enabled. \
+                Enable it in the device's Advanced Settings \
+                or add kernel boot parameter: {fan_control_boot_option}"
             );
         }
 
@@ -301,28 +302,6 @@ impl GpuAMD {
         Ok((path, fan_curve, temperature_range, speed_range))
     }
 
-    async fn is_overdrive_enabled() -> bool {
-        (Self::get_pp_feature_mask().await.unwrap_or_default() & PP_OVERDRIVE_MASK) > 0
-    }
-
-    async fn get_fan_control_boot_option() -> String {
-        if let Ok(current_mask) = Self::get_pp_feature_mask().await {
-            let new_mask = current_mask | PP_OVERDRIVE_MASK;
-            format!("amdgpu.ppfeaturemask=0x{new_mask:X}")
-        } else {
-            "amdgpu.ppfeaturemask=0xffffffff".to_owned()
-        }
-    }
-
-    async fn get_pp_feature_mask() -> Result<u64> {
-        let ppfeaturemask = cc_fs::read_txt(PP_FEATURE_MASK_PATH).await?;
-        let ppfeaturemask = ppfeaturemask
-            .trim()
-            .strip_prefix("0x")
-            .context("Invalid ppfeaturemask")?;
-        u64::from_str_radix(ppfeaturemask, 16).context("Invalid ppfeaturemask")
-    }
-
     async fn get_zero_rpm_stop_temp_with_range(
         device_path: &Path,
     ) -> Result<(Option<PathBuf>, RangeInclusive<CurveTemp>)> {
@@ -364,8 +343,7 @@ impl GpuAMD {
             let id = index as u8 + 1;
             let mut channels = HashMap::new();
             let (min_duty, max_duty) = Self::get_min_max_duty(amd_driver.fan_curve_info.as_ref());
-            let fan_is_controllable =
-                Self::get_fan_is_controllable(amd_driver.fan_curve_info.as_ref());
+            let fan_is_controllable = Self::get_fan_is_controllable(&amd_driver);
             let supports_internal_profiles = amd_driver
                 .fan_curve_info
                 .as_ref()
@@ -462,6 +440,11 @@ impl GpuAMD {
                         .as_ref()
                         .map_or(17, |fc| fc.fan_curve.points.len() as u8),
                     model: amd_driver.hwmon.model.clone(),
+                    amd_gpu_overdrive: if amd_driver.has_rdna_fan_ctrl {
+                        Some(amd_driver.overdrive_enabled)
+                    } else {
+                        None
+                    },
                     driver_info: DriverInfo {
                         drv_type: DriverType::Kernel,
                         name: devices::get_device_driver_name(&amd_driver.hwmon.path).await,
@@ -516,8 +499,17 @@ impl GpuAMD {
 
     /// If `FanCurve` is present, we check if fan control is enabled, otherwise it must use
     /// the standard pwm sysfs interface (pre-RDNA3).
-    fn get_fan_is_controllable(fan_curve_info: Option<&FanCurveInfo>) -> bool {
-        fan_curve_info.is_none_or(|fan_curve_info| fan_curve_info.changeable)
+    fn get_fan_is_controllable(amd_driver: &AMDDriverInfo) -> bool {
+        if let Some(fan_curve_info) = &amd_driver.fan_curve_info {
+            // RDNA3/4 with parsed fan curve: controllable only if overdrive enabled
+            fan_curve_info.changeable
+        } else if amd_driver.has_rdna_fan_ctrl {
+            // RDNA3/4 but fan_curve_info failed to parse: check overdrive directly
+            amd_driver.overdrive_enabled
+        } else {
+            // Pre-RDNA3: standard hwmon controls, always controllable
+            true
+        }
     }
 
     async fn get_driver_locations(base_path: &Path) -> Vec<String> {
@@ -697,7 +689,6 @@ impl GpuAMD {
             fans::set_pwm_duty(&amd_driver_info.hwmon.path, channel_info, fixed_speed)
                 .await
                 .map_err(|err| {
-                    warn!("If you have an AMD RDNA3/4 (7000/9000 series) or newer card, kernel version >=6.12 is required to enable fan control.");
                     anyhow!(
                         "Error on {}:{channel_name} for duty {fixed_speed} - {err}",
                         amd_driver_info.hwmon.name
@@ -950,6 +941,10 @@ pub struct AMDDriverInfo {
     pub hwmon: HwmonDriverInfo,
     device_path: PathBuf,
     pub fan_curve_info: Option<FanCurveInfo>,
+    /// Whether the `gpu_od/fan_ctrl/` directory exists (RDNA3/4 indicator).
+    has_rdna_fan_ctrl: bool,
+    /// Whether the ppfeaturemask has the overdrive bit enabled.
+    overdrive_enabled: bool,
 }
 
 /// The PMFW (power management firmware) fan curve information.
@@ -1005,7 +1000,9 @@ struct FanCurve {
 
 #[cfg(test)]
 mod tests {
-    use crate::repositories::gpu::amd::{FanCurve, FanCurveInfo, GpuAMD};
+    use crate::repositories::gpu::amd::{AMDDriverInfo, FanCurve, FanCurveInfo, GpuAMD};
+    use crate::repositories::hwmon::hwmon_repo::HwmonDriverInfo;
+    use std::ops::Not;
     use std::ops::RangeInclusive;
     use std::path::PathBuf;
 
@@ -1160,5 +1157,56 @@ mod tests {
         // then
         assert!(stop_temp.is_some(), "Expected a stop temp");
         assert_eq!(stop_temp.unwrap(), 63);
+    }
+
+    fn basic_test_amd_driver(
+        fan_curve_info: Option<FanCurveInfo>,
+        has_rdna_fan_ctrl: bool,
+        overdrive_enabled: bool,
+    ) -> AMDDriverInfo {
+        AMDDriverInfo {
+            hwmon: HwmonDriverInfo::default(),
+            device_path: PathBuf::default(),
+            fan_curve_info,
+            has_rdna_fan_ctrl,
+            overdrive_enabled,
+        }
+    }
+
+    #[test]
+    fn fan_controllable_pre_rdna3() {
+        // Pre-RDNA3 GPUs have no fan curve info and no gpu_od directory
+        let driver = basic_test_amd_driver(None, false, false);
+        assert!(GpuAMD::get_fan_is_controllable(&driver));
+    }
+
+    // Verify RDNA3/4 with fan curve and overdrive enabled is controllable.
+    #[test]
+    fn fan_controllable_with_overdrive_enabled() {
+        let driver = basic_test_amd_driver(Some(basic_test_fan_curve_info()), true, true);
+        assert!(GpuAMD::get_fan_is_controllable(&driver));
+    }
+
+    // Verify RDNA3/4 with fan curve but overdrive disabled is not controllable.
+    #[test]
+    fn fan_not_controllable_with_overdrive_disabled() {
+        let mut info = basic_test_fan_curve_info();
+        info.changeable = false;
+        let driver = basic_test_amd_driver(Some(info), true, false);
+        assert!(GpuAMD::get_fan_is_controllable(&driver).not());
+    }
+
+    #[test]
+    fn fan_not_controllable_rdna_without_fan_curve_and_no_overdrive() {
+        // RDNA3/4 GPU where fan_curve_info failed to parse, overdrive not enabled
+        let driver = basic_test_amd_driver(None, true, false);
+        assert!(GpuAMD::get_fan_is_controllable(&driver).not());
+    }
+
+    #[test]
+    fn fan_controllable_rdna_without_fan_curve_but_overdrive_enabled() {
+        // RDNA3/4 GPU where fan_curve_info failed to parse, but overdrive is enabled
+        let driver = basic_test_amd_driver(None, true, true);
+        assert!(GpuAMD::get_fan_is_controllable(&driver));
     }
 }

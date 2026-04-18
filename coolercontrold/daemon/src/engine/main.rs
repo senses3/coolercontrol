@@ -986,6 +986,13 @@ impl Engine {
             .inspect_err(|err| error!("Error attempting to enable ThinkPad Fan Control: {err}"))
     }
 
+    pub async fn amd_gpu_overdrive_enable(&self) -> Result<String> {
+        repositories::gpu::amd_overdrive::amd_gpu_overdrive_enable()
+            .await
+            .inspect(|msg| info!("AMD GPU overdrive enable: {msg}"))
+            .inspect_err(|err| error!("Error enabling AMD GPU overdrive: {err}"))
+    }
+
     /// This function finds out if the give Profile UID is in use, and if so, updates
     /// the settings for those devices.
     pub async fn profile_updated(&self, profile_uid: &ProfileUID) {

@@ -72,6 +72,7 @@ export class DeviceInfo {
     readonly profile_min_length: number = 2
     readonly model?: string
     readonly thinkpad_fan_control?: boolean
+    readonly amd_gpu_overdrive?: boolean
 
     @Type(() => DriverInfo)
     readonly driver_info: DriverInfo
@@ -85,6 +86,7 @@ export class DeviceInfo {
         profile_min_length: number = 2,
         model?: string,
         thinkpad_fan_control?: boolean,
+        amd_gpu_overdrive?: boolean,
         driver_info: DriverInfo = new DriverInfo(),
     ) {
         this.channels = channels
@@ -95,6 +97,7 @@ export class DeviceInfo {
         this.profile_min_length = profile_min_length
         this.model = model
         this.thinkpad_fan_control = thinkpad_fan_control
+        this.amd_gpu_overdrive = amd_gpu_overdrive
         this.driver_info = driver_info
     }
 }

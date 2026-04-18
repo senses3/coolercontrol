@@ -743,6 +743,8 @@ export default {
             automaticOrManual: 'Automático ou Manual',
             driverNoSupportControl:
                 'O driver atualmente instalado não suporta o controle deste canal.',
+            amdOverdriveNotEnabled:
+                'AMD GPU overdrive não está habilitado. Habilite nas Configurações Avançadas deste dispositivo (requer reinicialização).',
             controlOrView: 'Controlar ou Visualizar',
             applySetting: 'Aplicar Configuração',
             defaultProfileInfo:
@@ -1140,6 +1142,12 @@ export default {
             commandDelay: 'Atraso de comando',
             commandDelayDesc:
                 'Atraso em milissegundos entre comandos enviados a este dispositivo.\nIsso pode ajudar com dispositivos que têm problemas de comunicação\nquando vários comandos são enviados em rápida sucessão.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                'GPUs AMD RDNA3/4 requerem overdrive habilitado para controle de ventiladores.\nIsto configura o parâmetro do kernel amdgpu.ppfeaturemask\ne requer uma reinicialização do sistema.',
+            overdriveEnable: 'Habilitar',
+            overdriveActive: 'Ativo',
+            overdriveSuccess: 'Overdrive configurado',
         },
     },
     auth: {

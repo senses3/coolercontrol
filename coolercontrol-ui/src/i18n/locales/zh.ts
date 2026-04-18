@@ -595,6 +595,7 @@ export default {
             profileToApply: '要应用的配置文件',
             automaticOrManual: '自动或手动',
             driverNoSupportControl: '当前安装的驱动程序不支持此通道的控制。',
+            amdOverdriveNotEnabled: 'AMD GPU 超频未启用。请在此设备的高级设置中启用（需要重启）。',
             controlOrView: '控制或查看',
             applySetting: '应用设置',
             defaultProfileInfo:
@@ -1065,6 +1066,12 @@ export default {
             commandDelay: '命令延迟',
             commandDelayDesc:
                 '发送到此设备的命令之间的延迟（毫秒）。\n当多个命令快速连续发送时，\n这可以帮助解决设备通信问题。',
+            overdrive: 'GPU 超频',
+            overdriveDesc:
+                'AMD RDNA3/4 GPU 需要启用超频才能控制风扇。\n这将配置 amdgpu.ppfeaturemask 内核参数，\n需要重启系统才能生效。',
+            overdriveEnable: '启用',
+            overdriveActive: '已激活',
+            overdriveSuccess: '超频已配置',
         },
     },
     auth: {

@@ -296,6 +296,11 @@ pub struct DeviceInfo {
     /// When present, then this is a `ThinkPad` device. True or False indicates whether Fan control
     /// is enabled for the kernel module and changing values is possible
     pub thinkpad_fan_control: Option<bool>,
+
+    /// When present, then this is an AMD RDNA3/4 GPU with PMFW fan curve support.
+    /// True indicates overdrive is enabled and fan control is available.
+    /// False indicates overdrive needs to be enabled via kernel boot parameter.
+    pub amd_gpu_overdrive: Option<bool>,
     pub driver_info: DriverInfo,
 }
 
@@ -311,6 +316,7 @@ impl Default for DeviceInfo {
             profile_min_length: 2,
             model: None,
             thinkpad_fan_control: None,
+            amd_gpu_overdrive: None,
             driver_info: DriverInfo::default(),
         }
     }
