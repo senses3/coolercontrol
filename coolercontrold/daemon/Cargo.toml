@@ -27,12 +27,12 @@ cc-stress = { path = "../cc-stress" }
 log = "0.4.29"
 env_logger = "0.11.10"
 systemd-journal-logger = "2.2.2"
-clap = { version = "4.6.0", features = [
+clap = { version = "4.6.1", features = [
   "derive",
 ] } # Command line argument parser - pkg
 anyhow = "1.0.102"
 derive_more = { version = "2.1.1", features = ["display", "error"] }
-tokio = { version = "1.50.0", default-features = false, features = [
+tokio = { version = "1.52.1", default-features = false, features = [
   "rt",
   "fs",
   "macros",
@@ -53,8 +53,8 @@ tokio-stream = { version = "0.1.18", default-features = false, features = [
 ] }
 moro-local = "0.4.0"
 async-trait = "0.1.89"
-bitflags = { version = "2.11.0", features = ["serde"] }
-axum = { version = "0.8.8", features = ["multipart", "macros", "query"] }
+bitflags = { version = "2.11.1", features = ["serde"] }
+axum = { version = "0.8.9", features = ["multipart", "macros", "query"] }
 # This should follow the dependencies of axum version as well
 tower = { version = "0.5.3" }
 tower-http = { version = "0.6.8", features = [
@@ -95,7 +95,7 @@ rcgen = "0.14.7"
 pin-project-lite = "0.2"
 tokio-rustls = "0.26"
 tempfile = "3.27.0"
-hyper = { version = "1.8.1", default-features = false, features = [
+hyper = { version = "1.9.0", default-features = false, features = [
   "http1",
   "client",
 ] }
@@ -118,7 +118,7 @@ futures-util = { version = "0.3.32", default-features = false, features = [
 sysinfo = { version = "=0.36", default-features = false, features = [
   "system",
 ] } # gets detailed system info
-chrono = { version = "0.4.43", features = [
+chrono = { version = "0.4.44", features = [
   "serde",
 ] } # We use timestamps in our status history
 strum = { version = "0.28.0", features = ["derive"] } # Enum -> String
@@ -126,8 +126,9 @@ regex = "1.12.3"
 heck = "0.5.0" # hanldes case conversion like CamelCase and Title Case.
 # nu-glob 0.108 requires >=1.86
 nu-glob = "=0.107"
-nvml-wrapper = "0.12.0"
-libloading = "0.8"
+nvml-wrapper = "0.12.1"
+# libloading 0.9.0 requires rust 1.88
+libloading = "=0.8"
 sha2 = "0.11.0"
 argon2 = "0.5"
 subtle = "2.6"
@@ -139,13 +140,13 @@ nix = { version = "0.31.2", default-features = false, features = [
   "sched",
   "net",
 ] }
-libdrm_amdgpu_sys = { version = "0.8.11", default-features = false, features = [
+libdrm_amdgpu_sys = { version = "0.8.13", default-features = false, features = [
   "dynamic_loading",
 ] }
-indexmap = "2"
+indexmap = "2.14"
 # image 0.25.9 requires >=1.87 (minimal features for notifier.rs PNG decoding)
 image = { version = "=0.25.8", default-features = false, features = ["png"] }
-uuid = { version = "1.23.0", features = ["v4"] }
+uuid = { version = "1.23.1", features = ["v4"] }
 # service plugin dependencies
 tonic = { version = "0.14.5", default-features = false, features = [
   "channel",
