@@ -23,9 +23,12 @@ use crate::config::Config;
 use crate::device::{ChannelName, DeviceUID, Duty};
 use crate::engine::main::Engine;
 use crate::modes::ModeController;
+use crate::notifier::NotificationHandle;
+use crate::repositories::gpu::amd_overdrive;
 use crate::setting::{LcdModeName, LcdSettings, LightingSettings, ProfileUID, Setting};
 use crate::AllDevices;
 use anyhow::Result;
+use log::{error, info};
 use mime::Mime;
 use moro_local::Scope;
 use std::ops::Deref;
@@ -45,6 +48,10 @@ enum DeviceMessage {
     ThinkPadFanControl {
         enable: bool,
         respond_to: oneshot::Sender<Result<()>>,
+    },
+    AmdGpuOverdriveEnable {
+        notification_handle: NotificationHandle,
+        respond_to: oneshot::Sender<Result<String>>,
     },
     DevicesGet {
         respond_to: oneshot::Sender<Result<Vec<DeviceDto>>>,
@@ -163,6 +170,16 @@ impl ApiActor<DeviceMessage> for DeviceActor {
         match msg {
             DeviceMessage::ThinkPadFanControl { enable, respond_to } => {
                 let response = self.engine.thinkpad_fan_control(&enable).await;
+                let _ = respond_to.send(response);
+            }
+            DeviceMessage::AmdGpuOverdriveEnable {
+                notification_handle,
+                respond_to,
+            } => {
+                let response = amd_overdrive::amd_gpu_overdrive_enable(notification_handle)
+                    .await
+                    .inspect(|msg| info!("AMD GPU overdrive enable: {msg}"))
+                    .inspect_err(|err| error!("Error enabling AMD GPU overdrive: {err}"));
                 let _ = respond_to.send(response);
             }
             DeviceMessage::DevicesGet { respond_to } => {
@@ -492,6 +509,19 @@ impl DeviceHandle {
         let (tx, rx) = oneshot::channel();
         let msg = DeviceMessage::ThinkPadFanControl {
             enable,
+            respond_to: tx,
+        };
+        let _ = self.sender.send(msg).await;
+        rx.await?
+    }
+
+    pub async fn amd_gpu_overdrive_enable(
+        &self,
+        notification_handle: NotificationHandle,
+    ) -> Result<String> {
+        let (tx, rx) = oneshot::channel();
+        let msg = DeviceMessage::AmdGpuOverdriveEnable {
+            notification_handle,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;

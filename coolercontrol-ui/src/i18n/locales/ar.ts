@@ -132,7 +132,6 @@ export default {
             general: 'عام',
             device: 'الأجهزة والمستشعرات',
             daemon: 'شيطان',
-            thinkpad: 'ثينك باد',
             devices: {
                 devicesAndSensors: 'الأجهزة والمستشعرات',
                 detectionIssues: 'مشاكل في الكشف؟ راجع',
@@ -209,8 +208,6 @@ export default {
             closeToTray: 'الإغلاق إلى شريط المهام',
             zoom: 'تكبير',
             desktopStartupDelay: 'تأخير بدء تشغيل سطح المكتب',
-            fanControl: 'التحكم في المروحة',
-            fullSpeed: 'السرعة القصوى',
             applySettingsOnStartup: 'تطبيق الإعدادات عند بدء التشغيل',
             deviceDelayAtStartup: 'تأخير الجهاز عند بدء التشغيل',
             pollingRate: 'معدل الاستطلاع',
@@ -250,10 +247,6 @@ export default {
                 zoom: 'تعيين مستوى تكبير واجهة المستخدم يدويًا.',
                 desktopStartupDelay:
                     'يضيف بعض التأخير قبل بدء تشغيل تطبيق سطح المكتب (بالثواني).\nيساعد في حل المشكلات التي تنشأ من بدء تشغيل تطبيق سطح المكتب\nتلقائيًا عند تسجيل الدخول أو البدء بسرعة كبيرة',
-                thinkPadFanControl:
-                    'هذه أداة مساعدة لتمكين التحكم في مروحة ThinkPad ACPI.\nعمليات التحكم في المروحة معطلة افتراضيًا لأسباب تتعلق بالسلامة. يمكن أن يحاول CoolerControl تمكين هذا نيابة عنك، ولكن يجب أن تكون على دراية بالمخاطر التي قد تلحق بالأجهزة.\nتابع على مسؤوليتك الخاصة.',
-                thinkPadFullSpeed:
-                    'بالنسبة لأجهزة ThinkPad المحمولة، هذا يمكّن وضع السرعة القصوى.\nهذا يسمح للمراوح بالدوران إلى أقصى حد لها عند ضبطها على 100٪، ولكنه سيشغل المراوح خارج المواصفات ويتسبب في زيادة التآكل.\nاستخدم بحذر.',
                 applySettingsOnStartup:
                     'تطبيق الإعدادات تلقائيًا عند بدء تشغيل الخدمة وعند الاستيقاظ من وضع السكون',
                 deviceDelayAtStartup:
@@ -433,6 +426,8 @@ export default {
             profileToApply: 'ملف التعريف المراد تطبيقه',
             automaticOrManual: 'تلقائي أو يدوي',
             driverNoSupportControl: 'برنامج التشغيل المثبت حاليًا لا يدعم التحكم في هذه القناة.',
+            amdOverdriveNotEnabled:
+                'لم يتم تفعيل AMD GPU overdrive. قم بتفعيله في الإعدادات المتقدمة لهذا الجهاز (يتطلب إعادة التشغيل).',
             controlOrView: 'تحكم أو عرض',
             applySetting: 'تطبيق الإعداد',
             defaultProfileInfo:
@@ -1082,6 +1077,18 @@ export default {
             commandDelay: 'تأخير الأوامر',
             commandDelayDesc:
                 'التأخير بالمللي ثانية بين الأوامر المرسلة إلى هذا الجهاز.\nيمكن أن يساعد هذا مع الأجهزة التي تعاني من مشاكل في الاتصال\nعند إرسال أوامر متعددة بتتابع سريع.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                'تتطلب وحدات معالجة الرسومات AMD RDNA3/4 تفعيل overdrive للتحكم في المراوح.\nيقوم هذا بتكوين معلمة النواة amdgpu.ppfeaturemask\nويتطلب إعادة تشغيل النظام.',
+            overdriveEnable: 'تفعيل',
+            overdriveActive: 'نشط',
+            overdriveSuccess: 'تم تكوين Overdrive',
+            thinkPadFanControl: 'التحكم في المروحة',
+            thinkPadFanControlDesc:
+                'تمكين التحكم في مروحة ThinkPad ACPI.\nالتحكم في المروحة معطل افتراضيًا لأسباب تتعلق بالسلامة.\nتابع على مسؤوليتك الخاصة.',
+            thinkPadFullSpeed: 'السرعة القصوى',
+            thinkPadFullSpeedDesc:
+                'تمكين وضع السرعة القصوى لمراوح ThinkPad.\nيسمح للمراوح بالدوران إلى أقصى حد عند 100٪،\nلكنه يشغل المراوح خارج المواصفات مع زيادة التآكل.',
         },
     },
     auth: {

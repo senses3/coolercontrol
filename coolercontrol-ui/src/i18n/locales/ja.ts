@@ -132,7 +132,6 @@ export default {
             general: '一般',
             device: 'デバイスとセンサー',
             daemon: 'デーモン',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: 'デバイスとセンサー',
                 detectionIssues: '検出に問題がありますか？',
@@ -201,8 +200,6 @@ export default {
             closeToTray: 'トレイに閉じる',
             zoom: 'ズーム',
             desktopStartupDelay: 'デスクトップ起動遅延',
-            fanControl: 'ファン制御',
-            fullSpeed: '最高速度',
             applySettingsOnStartup: '起動時に設定を適用',
             deviceDelayAtStartup: '起動時のデバイス遅延',
             pollingRate: 'ポーリングレート',
@@ -263,10 +260,6 @@ export default {
                 zoom: '手動でUIズームレベルを設定します。',
                 desktopStartupDelay:
                     'デスクトップアプリケーションを起動する前に遅延を追加します（秒単位）。\nデスクトップアプリケーションがログイン時に自動的に起動されるか、\nあまりにも早く起動することから生じる問題を解決するのに役立ちます。',
-                thinkPadFanControl:
-                    'これはThinkPad ACPIファン制御を有効にするためのヘルパーです。\n安全上の理由から、ファン制御操作はデフォルトで無効になっています。CoolerControlはこれを有効にしようとしますが、ハードウェアへのリスクを認識する必要があります。\n自己責任で進めてください。',
-                thinkPadFullSpeed:
-                    'ThinkPadラップトップの場合、これは全速モードを有効にします。\nこれにより、100%に設定されたときにファンが絶対最大まで回転できるようになりますが、ファンが仕様を超えて動作し、摩耗が増加します。\n注意して使用してください。',
                 applySettingsOnStartup:
                     'デーモン起動時およびスリープから復帰時に自動的に設定を適用します',
                 deviceDelayAtStartup:
@@ -484,6 +477,8 @@ export default {
             automaticOrManual: '自動または手動',
             driverNoSupportControl:
                 '現在インストールされているドライバーはこのチャンネルの制御をサポートしていません。',
+            amdOverdriveNotEnabled:
+                'AMD GPU オーバードライブが有効になっていません。このデバイスの詳細設定で有効にしてください（再起動が必要）。',
             controlOrView: '制御または表示',
             applySetting: '設定を適用',
             defaultProfileInfo:
@@ -1106,6 +1101,18 @@ export default {
             commandDelay: 'コマンド遅延',
             commandDelayDesc:
                 'このデバイスに送信されるコマンド間の遅延（ミリ秒）。\n複数のコマンドが連続して送信される際に\n通信の問題があるデバイスに役立ちます。',
+            overdrive: 'GPU オーバードライブ',
+            overdriveDesc:
+                'AMD RDNA3/4 GPUではファン制御にオーバードライブの有効化が必要です。\namdgpu.ppfeaturemaskカーネルパラメータを設定し、\nシステムの再起動が必要です。',
+            overdriveEnable: '有効化',
+            overdriveActive: '有効',
+            overdriveSuccess: 'オーバードライブ設定完了',
+            thinkPadFanControl: 'ファン制御',
+            thinkPadFanControlDesc:
+                'ThinkPad ACPIファン制御を有効にします。\nファン制御は安全上の理由からデフォルトで無効になっています。\n自己責任で続行してください。',
+            thinkPadFullSpeed: 'フルスピード',
+            thinkPadFullSpeedDesc:
+                'ThinkPadファンのフルスピードモードを有効にします。\n100%時にファンを絶対最大回転数まで回すことができますが、\n仕様外の動作となり摩耗が増加します。',
         },
     },
     auth: {

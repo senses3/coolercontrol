@@ -132,7 +132,6 @@ export default {
             general: 'General',
             device: 'Devices',
             daemon: 'Daemon',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: 'Devices and Sensors',
                 detectionIssues: 'Detection Issues? See the',
@@ -209,8 +208,6 @@ export default {
             closeToTray: 'Close to Tray',
             zoom: 'Zoom',
             desktopStartupDelay: 'Desktop Startup Delay',
-            fanControl: 'Fan Control',
-            fullSpeed: 'Full Speed',
             applySettingsOnStartup: 'Apply Settings on Startup',
             deviceDelayAtStartup: 'Device Delay at Startup',
             pollingRate: 'Polling Rate',
@@ -251,10 +248,6 @@ export default {
                 zoom: 'Manually set the UI Zoom level.',
                 desktopStartupDelay:
                     'Adds some delay before starting the desktop application (in seconds).\nHelps with issues that that arise from having the desktop application\nstarted automatically on login or starting too quickly',
-                thinkPadFanControl:
-                    'This is a helper to enable ThinkPad ACPI Fan Control.\nFan control operations are disabled by default for safety reasons. CoolerControl can try to enable this for you, but you should be aware of the risks to your hardware.\nProceed at your own risk.',
-                thinkPadFullSpeed:
-                    'For ThinkPad Laptops this enables Full-Speed mode.\nThis allows the fans to spin up to their absolute maximum when set to 100%, but will run the fans out of specification and cause increased wear.\nUse with caution.',
                 applySettingsOnStartup:
                     'Automatically apply settings on daemon startup and when waking from sleep',
                 deviceDelayAtStartup:
@@ -437,6 +430,8 @@ export default {
             automaticOrManual: 'Automatic or Manual',
             driverNoSupportControl:
                 'The currently installed driver does not support control of this channel.',
+            amdOverdriveNotEnabled:
+                "AMD GPU overdrive is not enabled. Enable it in this device's Advanced Settings (requires reboot).",
             controlOrView: 'Control or View',
             applySetting: 'Apply Setting',
             defaultProfileInfo:
@@ -1092,6 +1087,18 @@ export default {
             commandDelay: 'Command Delay',
             commandDelayDesc:
                 'Delay in milliseconds between commands sent to this device.\nThis can help with devices that have communication issues\nwhen multiple commands are sent in quick succession.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                'AMD RDNA3/4 GPUs require overdrive to be enabled for fan control.\nThis configures the amdgpu.ppfeaturemask kernel parameter\nand requires a system reboot to take effect.',
+            overdriveEnable: 'Enable',
+            overdriveActive: 'Active',
+            overdriveSuccess: 'Overdrive Configured',
+            thinkPadFanControl: 'Fan Control',
+            thinkPadFanControlDesc:
+                'Enables ThinkPad ACPI Fan Control.\nFan control is disabled by default for safety reasons.\nProceed at your own risk.',
+            thinkPadFullSpeed: 'Full Speed',
+            thinkPadFullSpeedDesc:
+                'Enables Full-Speed mode for ThinkPad fans.\nAllows fans to spin to absolute maximum at 100%,\nbut runs fans out of specification with increased wear.',
         },
     },
     auth: {

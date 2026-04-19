@@ -1222,6 +1222,25 @@ export default class DaemonClient {
     }
 
     /**
+     * Enables AMD GPU overdrive by configuring the ppfeaturemask kernel parameter.
+     * Returns the success message string or an ErrorResponse.
+     */
+    async amdGpuOverdriveEnable(): Promise<string | ErrorResponse> {
+        try {
+            const response = await this.getClient().post('/amd-gpu-overdrive')
+            this.logDaemonResponse(response, 'AMD GPU Overdrive Enable')
+            return response.data as string
+        } catch (err: any) {
+            this.logError(err)
+            if (err.response) {
+                return plainToInstance(ErrorResponse, err.response.data as object)
+            } else {
+                return new ErrorResponse('Unknown Cause')
+            }
+        }
+    }
+
+    /**
      * Sets the AseTek device driver type.
      */
     async setAseTekDeviceType(

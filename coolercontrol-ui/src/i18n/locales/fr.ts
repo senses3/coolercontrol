@@ -135,7 +135,6 @@ export default {
             general: 'Général',
             device: 'Appareils',
             daemon: 'Daemon',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: 'Appareils et capteurs',
                 detectionIssues: 'Problèmes de détection ? Consultez la',
@@ -212,8 +211,6 @@ export default {
             closeToTray: "Réduire dans la barre d'état",
             zoom: 'Zoom',
             desktopStartupDelay: 'Délai de démarrage du bureau',
-            fanControl: 'Contrôle des ventilateurs',
-            fullSpeed: 'Vitesse maximale',
             applySettingsOnStartup: 'Appliquer les paramètres au démarrage',
             deviceDelayAtStartup:
                 "Délai avant de commencer la communication de l'appareil (en secondes).\nAide avec les appareils qui prennent du temps à s'initialiser ou sont détectés de manière intermittente",
@@ -260,10 +257,6 @@ export default {
                 zoom: "Définir manuellement le niveau de zoom de l'interface utilisateur.",
                 desktopStartupDelay:
                     "Ajoute un délai avant de démarrer l'application de bureau (en secondes).\nAide à résoudre les problèmes qui surviennent lorsque l'application de bureau\nest démarrée automatiquement à la connexion ou démarre trop rapidement",
-                thinkPadFanControl:
-                    "Ceci est un assistant pour activer le contrôle du ventilateur ACPI de ThinkPad.\nLes opérations de contrôle du ventilateur sont désactivées par défaut pour des raisons de sécurité. CoolerControl peut essayer de l'activer pour vous, mais vous devez être conscient des risques pour votre matériel.\nProcédez à vos risques et périls.",
-                thinkPadFullSpeed:
-                    "Pour les ordinateurs portables ThinkPad, cela active le mode pleine vitesse.\nCela permet aux ventilateurs de tourner à leur maximum absolu lorsqu'ils sont réglés à 100 %, mais cela fera fonctionner les ventilateurs hors spécification et entraînera une usure accrue.\nUtilisez avec précaution.",
                 applySettingsOnStartup:
                     'Appliquer automatiquement les paramètres au démarrage du daemon et lors de la sortie de veille',
                 deviceDelayAtStartup:
@@ -450,6 +443,8 @@ export default {
             automaticOrManual: 'Automatique ou Manuel',
             driverNoSupportControl:
                 'Le pilote actuellement installé ne prend pas en charge le contrôle de ce canal.',
+            amdOverdriveNotEnabled:
+                "AMD GPU overdrive n'est pas activé. Activez-le dans les paramètres avancés de cet appareil (redémarrage requis).",
             controlOrView: 'Contrôler ou Afficher',
             applySetting: 'Appliquer le Paramètre',
             defaultProfileInfo:
@@ -1117,6 +1112,18 @@ export default {
             commandDelay: 'Délai de commande',
             commandDelayDesc:
                 'Délai en millisecondes entre les commandes envoyées à ce périphérique.\nCela peut aider les périphériques qui ont des problèmes de communication\nlorsque plusieurs commandes sont envoyées en succession rapide.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                "Les GPU AMD RDNA3/4 nécessitent l'activation de l'overdrive pour le contrôle des ventilateurs.\nCeci configure le paramètre noyau amdgpu.ppfeaturemask\net nécessite un redémarrage du système.",
+            overdriveEnable: 'Activer',
+            overdriveActive: 'Actif',
+            overdriveSuccess: 'Overdrive configuré',
+            thinkPadFanControl: 'Contrôle du ventilateur',
+            thinkPadFanControlDesc:
+                'Active le contrôle du ventilateur ThinkPad ACPI.\nLe contrôle du ventilateur est désactivé par défaut pour des raisons de sécurité.\nProcédez à vos propres risques.',
+            thinkPadFullSpeed: 'Pleine vitesse',
+            thinkPadFullSpeedDesc:
+                'Active le mode pleine vitesse pour les ventilateurs ThinkPad.\nPermet aux ventilateurs de tourner au maximum absolu à 100%,\nmais fait fonctionner les ventilateurs hors spécification avec une usure accrue.',
         },
     },
     auth: {

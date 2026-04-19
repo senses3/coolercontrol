@@ -135,7 +135,6 @@ export default {
             general: 'General',
             device: 'Dispositivos',
             daemon: 'Daemon',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: 'Dispositivos y sensores',
                 detectionIssues: '¿Problemas de detección? Consulte la',
@@ -212,8 +211,6 @@ export default {
             closeToTray: 'Cerrar a bandeja',
             zoom: 'Zoom',
             desktopStartupDelay: 'Retraso de inicio de escritorio',
-            fanControl: 'Control de ventiladores',
-            fullSpeed: 'Velocidad máxima',
             applySettingsOnStartup: 'Aplicar configuración al inicio',
             deviceDelayAtStartup: 'Retraso de dispositivo al inicio',
             pollingRate: 'Tasa de sondeo',
@@ -254,10 +251,6 @@ export default {
                 zoom: 'Establecer manualmente el nivel de zoom de la interfaz de usuario.',
                 desktopStartupDelay:
                     'Agrega un retraso antes de iniciar la aplicación de escritorio (en segundos).\nAyuda con problemas que surgen al tener la aplicación de escritorio\niniciada automáticamente al iniciar sesión o al iniciar demasiado rápido',
-                thinkPadFanControl:
-                    'Esto es un asistente para habilitar el control del ventilador ACPI de ThinkPad.\nLas operaciones de control del ventilador están deshabilitadas por defecto por razones de seguridad. CoolerControl puede intentar habilitar esto por usted, pero debe ser consciente de los riesgos para su hardware.\nProceda bajo su propio riesgo.',
-                thinkPadFullSpeed:
-                    'Para las laptops ThinkPad, esto habilita el modo de velocidad máxima.\nEsto permite que los ventiladores giren hasta su máximo absoluto cuando se establece al 100%, pero hará que los ventiladores funcionen fuera de especificación y causará un mayor desgaste.\nÚselo con precaución.',
                 applySettingsOnStartup:
                     'Aplicar automáticamente la configuración al iniciar el daemon y al despertar del sueño',
                 deviceDelayAtStartup:
@@ -442,6 +435,8 @@ export default {
             automaticOrManual: 'Automático o Manual',
             driverNoSupportControl:
                 'El controlador actualmente instalado no soporta el control de este canal.',
+            amdOverdriveNotEnabled:
+                'AMD GPU overdrive no está habilitado. Habilítelo en la configuración avanzada de este dispositivo (requiere reinicio).',
             controlOrView: 'Controlar o Ver',
             applySetting: 'Aplicar Configuración',
             defaultProfileInfo:
@@ -1102,6 +1097,18 @@ export default {
             commandDelay: 'Retardo de comando',
             commandDelayDesc:
                 'Retardo en milisegundos entre comandos enviados a este dispositivo.\nEsto puede ayudar con dispositivos que tienen problemas de comunicación\ncuando se envían múltiples comandos en rápida sucesión.',
+            overdrive: 'GPU Overdrive',
+            overdriveDesc:
+                'Las GPU AMD RDNA3/4 requieren que overdrive esté habilitado para el control de ventiladores.\nEsto configura el parámetro del kernel amdgpu.ppfeaturemask\ny requiere un reinicio del sistema.',
+            overdriveEnable: 'Habilitar',
+            overdriveActive: 'Activo',
+            overdriveSuccess: 'Overdrive configurado',
+            thinkPadFanControl: 'Control del ventilador',
+            thinkPadFanControlDesc:
+                'Habilita el control del ventilador ACPI de ThinkPad.\nEl control del ventilador está deshabilitado por defecto por razones de seguridad.\nProceda bajo su propio riesgo.',
+            thinkPadFullSpeed: 'Velocidad máxima',
+            thinkPadFullSpeedDesc:
+                'Habilita el modo de velocidad máxima para los ventiladores ThinkPad.\nPermite que los ventiladores giren al máximo absoluto al 100%,\npero opera los ventiladores fuera de especificación con mayor desgaste.',
         },
     },
     auth: {

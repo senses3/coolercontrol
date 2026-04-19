@@ -132,7 +132,6 @@ export default {
             general: '일반',
             device: '장치',
             daemon: '데몬',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: '장치 및 센서',
                 detectionIssues: '감지에 문제가 있나요?',
@@ -209,8 +208,6 @@ export default {
             closeToTray: '트레이에서 닫기',
             zoom: '확대/축소',
             desktopStartupDelay: '데스크톱 시작 지연',
-            fanControl: '팬 제어',
-            fullSpeed: '최고 속도',
             applySettingsOnStartup: '시작 시 설정 적용',
             deviceDelayAtStartup: '장치 시작 시 지연',
             pollingRate: '폴링 레이트',
@@ -249,10 +246,6 @@ export default {
                 zoom: 'UI 확대/축소 수준을 수동으로 설정합니다.',
                 desktopStartupDelay:
                     '데스크톱 애플리케이션 시작 전에 (몇 초 정도의) 지연 시간을 추가합니다.\n로그인 시 데스크톱 애플리케이션이 자동으로 시작되거나 너무 빨리 시작될 때\n발생하는 문제를 해결하는 데 도움이 됨',
-                thinkPadFanControl:
-                    '이것은 ThinkPad ACPI 팬 제어 기능을 활성화하는 도움기입니다.\n안전상의 이유로 팬 제어 기능은 기본적으로 비활성화되어 있습니다. CoolerControl은 이 기능을 활성화하려고 시도할 수 있지만 하드웨어에 대한 위험성을 인지해야 합니다.\n본인의 책임 하에 진행하세요.',
-                thinkPadFullSpeed:
-                    'ThinkPad 노트북의 경우 이 기능을 통해 최고 속도 모드를 활성화합니다.\n이 설정은 팬을 100%로 설정했을 때 최대 속도로 회전시킬 수 있지만, 팬의 사양을 초과하여 마모가 증가할 수 있습니다.\n주의해서 사용하세요.',
                 applySettingsOnStartup:
                     '데몬 시작 시 및 절전 모드에서 깨어날 때 설정을 자동으로 적용함',
                 deviceDelayAtStartup:
@@ -432,6 +425,8 @@ export default {
             profileToApply: '적용할 프로파일',
             automaticOrManual: '자동 또는 수동',
             driverNoSupportControl: '현재 설치된 드라이버는 이 채널 제어를 지원하지 않습니다.',
+            amdOverdriveNotEnabled:
+                'AMD GPU 오버드라이브가 활성화되지 않았습니다. 이 장치의 고급 설정에서 활성화하세요 (재부팅 필요).',
             controlOrView: '제어 또는 보기',
             applySetting: '설성 적용',
             defaultProfileInfo:
@@ -1082,6 +1077,18 @@ export default {
             commandDelay: '명령 지연',
             commandDelayDesc:
                 '이 장치로 전송되는 명령 사이의 지연 시간(밀리초).\n여러 명령이 빠르게 연속으로 전송될 때\n통신 문제가 있는 장치에 도움이 될 수 있습니다.',
+            overdrive: 'GPU 오버드라이브',
+            overdriveDesc:
+                'AMD RDNA3/4 GPU는 팬 제어를 위해 오버드라이브를 활성화해야 합니다.\namdgpu.ppfeaturemask 커널 매개변수를 구성하며\n시스템 재부팅이 필요합니다.',
+            overdriveEnable: '활성화',
+            overdriveActive: '활성',
+            overdriveSuccess: '오버드라이브 구성됨',
+            thinkPadFanControl: '팬 제어',
+            thinkPadFanControlDesc:
+                'ThinkPad ACPI 팬 제어를 활성화합니다.\n안전상의 이유로 팬 제어는 기본적으로 비활성화되어 있습니다.\n본인의 책임 하에 진행하십시오.',
+            thinkPadFullSpeed: '최대 속도',
+            thinkPadFullSpeedDesc:
+                'ThinkPad 팬의 최대 속도 모드를 활성화합니다.\n100%에서 팬이 절대 최대 회전수로 회전할 수 있지만,\n사양을 초과하여 마모가 증가합니다.',
         },
     },
     auth: {

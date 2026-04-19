@@ -90,7 +90,6 @@ export const useDeviceStore = defineStore('device', () => {
     // Reactive properties ------------------------------------------------
 
     const currentDeviceStatus = shallowRef(new Map<UID, Map<string, ChannelValues>>())
-    const isThinkPad = ref(false)
     const loggedIn: Ref<boolean> = ref(false)
     const isDefaultPasswd: Ref<boolean> = ref(true)
     const accessDenied: Ref<boolean> = ref(false)
@@ -678,9 +677,6 @@ export const useDeviceStore = defineStore('device', () => {
         }
         sortDevices(dto)
         for (const device of dto.devices) {
-            if (device.info?.thinkpad_fan_control != null) {
-                isThinkPad.value = true
-            }
             if (device.lc_info?.unknown_asetek) {
                 // wait until the Onboarding dialog isn't open without blocking:
                 setTimeout(async () => {
@@ -1251,7 +1247,6 @@ export const useDeviceStore = defineStore('device', () => {
         getREMSize,
         isQtApp,
         isSafariWebKit,
-        isThinkPad,
         connectToQtIPC,
         reSortDevicesByMenuOrder,
         plugins,

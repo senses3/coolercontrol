@@ -111,6 +111,15 @@ const channelIsControllable = (): boolean => {
     return false
 }
 
+const speedWarningTooltip = (): string => {
+    for (const device of deviceStore.allDevices()) {
+        if (device.uid === props.deviceUID && device.info?.amd_gpu_overdrive === false) {
+            return t('views.speed.amdOverdriveNotEnabled')
+        }
+    }
+    return t('views.speed.driverNoSupportControl')
+}
+
 if (channelIsControllable()) {
     if (startingDeviceSetting?.speed_fixed != null) {
         startingManualControlEnabled = true
@@ -594,7 +603,7 @@ onUnmounted(() => {
                 <div
                     v-if="!channelIsControllable()"
                     class="pr-4 py-2 flex flex-row leading-none items-center"
-                    v-tooltip.bottom="t('views.speed.driverNoSupportControl')"
+                    v-tooltip.bottom="speedWarningTooltip"
                 >
                     <svg-icon
                         type="mdi"

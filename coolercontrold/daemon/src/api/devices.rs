@@ -291,6 +291,20 @@ pub async fn thinkpad_fan_control_modify(
         .map_err(handle_error)
 }
 
+pub async fn amd_gpu_overdrive_enable(
+    State(AppState {
+        device_handle,
+        notification_handle,
+        ..
+    }): State<AppState>,
+) -> Result<Json<String>, CCError> {
+    device_handle
+        .amd_gpu_overdrive_enable(notification_handle)
+        .await
+        .map(Json)
+        .map_err(handle_error)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceDto {
     pub name: String,

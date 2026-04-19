@@ -131,7 +131,6 @@ export default {
             general: '一般',
             device: '裝置和傳感器',
             daemon: '後台服務',
-            thinkpad: 'ThinkPad',
             devices: {
                 devicesAndSensors: '裝置和傳感器',
                 detectionIssues: '檢測問題？請查看',
@@ -207,8 +206,6 @@ export default {
             closeToTray: '關閉時最小化到託盤',
             zoom: '縮放',
             desktopStartupDelay: '桌面啟動延遲',
-            fanControl: '風扇控制',
-            fullSpeed: '全速模式',
             applySettingsOnStartup: '啟動時應用設定',
             deviceDelayAtStartup: '啟動時裝置延遲',
             pollingRate: '輪詢速率',
@@ -245,10 +242,6 @@ export default {
                 zoom: '手動設置UI縮放級別。',
                 desktopStartupDelay:
                     '在啟動桌面應用程式之前添加一些延遲（以秒為單位）。\n有助於解決在登錄時自動啟動桌面應用程式或啟動過快時出現的問題',
-                thinkPadFanControl:
-                    '這是一個幫助啟用ThinkPad ACPI風扇控制的助手。\n出於安全原因，風扇控制操作默認為禁用。CoolerControl可以嘗試為您啟用此功能，但您應該了解對硬體的風險。\n請自行承擔風險。',
-                thinkPadFullSpeed:
-                    '對於ThinkPad筆記型電腦，這將啟用全速模式。\n這允許風扇在設置為100%時旋轉到其絕對最大值，但會使風扇超出規格運行並導致磨損增加。\n請謹慎使用。',
                 applySettingsOnStartup: '在啟動守護程式和從睡眠中喚醒時自動應用設置',
                 deviceDelayAtStartup:
                     '在開始裝置通信之前的延遲（以秒為單位）。\n有助於需要時間初始化或間歇性檢測到的裝置',
@@ -596,6 +589,8 @@ export default {
             profileToApply: '要應用的設定檔',
             automaticOrManual: '自動或手動',
             driverNoSupportControl: '當前安裝的驅動程序不支持此通道的控制。',
+            amdOverdriveNotEnabled:
+                'AMD GPU 超頻未啟用。請在此裝置的進階設定中啟用（需要重新啟動）。',
             controlOrView: '控制或查看',
             applySetting: '應用設置',
             defaultProfileInfo:
@@ -1064,6 +1059,18 @@ export default {
             commandDelay: '命令延遲',
             commandDelayDesc:
                 '傳送到此裝置的命令之間的延遲（毫秒）。\n當多個命令快速連續傳送時，\n這可以幫助解決裝置通訊問題。',
+            overdrive: 'GPU 超頻',
+            overdriveDesc:
+                'AMD RDNA3/4 GPU 需要啟用超頻才能控制風扇。\n這將設定 amdgpu.ppfeaturemask 核心參數，\n需要重新啟動系統才能生效。',
+            overdriveEnable: '啟用',
+            overdriveActive: '已啟用',
+            overdriveSuccess: '超頻已設定',
+            thinkPadFanControl: '風扇控制',
+            thinkPadFanControlDesc:
+                '啟用 ThinkPad ACPI 風扇控制。\n出於安全原因，風扇控制預設為停用狀態。\n繼續操作需自行承擔風險。',
+            thinkPadFullSpeed: '全速',
+            thinkPadFullSpeedDesc:
+                '啟用 ThinkPad 風扇的全速模式。\n允許風扇在 100% 時以絕對最大轉速運轉，\n但會使風扇超出規格運作並增加磨損。',
         },
     },
     auth: {

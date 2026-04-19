@@ -209,6 +209,20 @@ fn device_routes() -> ApiRouter<AppState> {
             .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
         )
         .api_route(
+            "/amd-gpu-overdrive",
+            post_with(devices::amd_gpu_overdrive_enable, |o| {
+                o.summary("AMD GPU Overdrive Enable")
+                    .description(
+                        "Enables AMD GPU overdrive by configuring the ppfeaturemask \
+                        kernel parameter. Requires a reboot to take effect.",
+                    )
+                    .tag("device")
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
+        )
+        .api_route(
             "/devices",
             get_with(devices::get, |o| {
                 o.summary("All Devices")
