@@ -539,6 +539,12 @@ pub trait DeviceSupport: Debug {
         }
     }
 
+    /// Maps a CC lighting channel name to the `liquidctl` color channel name.
+    /// Override for devices where CC channel names differ from `liquidctl` channel names.
+    fn liquidctl_color_channel_name<'a>(&self, channel_name: &'a str) -> &'a str {
+        channel_name
+    }
+
     fn channel_to_frontend_name(&self, lighting_channel: &str) -> String {
         lighting_channel.replace(['-', '_'], " ").to_title_case()
     }

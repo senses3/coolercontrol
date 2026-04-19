@@ -36,6 +36,7 @@ pub enum BaseDriver {
     ControlHub,      // control_hub.py
     Coolit,          // coolit.py
     CorsairHidPsu,   // corsair_hid_psu.py
+    GA2LCD,          // ga2_lcd.py
     Ddr4Temperature, // ddr4.py - NOT currently Supported - requires unsafe ops
     VengeanceRgb,    // ddr4.py - NOT currently Supported - requires unsafe ops
     HydroPlatinum,   // hydro_platinum.py

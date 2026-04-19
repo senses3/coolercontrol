@@ -50,10 +50,12 @@ except ImportError:
     H1V2 = None
 try:  # >= 1.16.0
     from liquidctl.driver.control_hub import ControlHub
+    from liquidctl.driver.ga2_lcd import GA2LCD
     from liquidctl.driver.lianli_uni import LianLiUni
 except ImportError:
     LianLiUni = None
     ControlHub = None
+    GA2LCD = None
 from liquidctl.driver.asetek import Legacy690Lc, Modern690Lc
 from liquidctl.driver.base import BaseDriver
 from liquidctl.driver.commander_pro import CommanderPro

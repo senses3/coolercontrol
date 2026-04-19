@@ -686,10 +686,13 @@ impl LiquidctlRepo {
         } else {
             None
         };
+        let lc_channel_name = self
+            .device_mapper
+            .liquidctl_color_channel_name(&device_data.driver_type, channel_name);
         self.liqctld_client
             .put_color(
                 &device_data.type_index,
-                channel_name,
+                lc_channel_name,
                 mode,
                 colors,
                 time_per_color,
