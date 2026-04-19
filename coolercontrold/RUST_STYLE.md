@@ -1,6 +1,6 @@
 # Rust Style for coolercontrold
 
-This is the authoritative style guide for the `coolercontrold` Rust daemon. 
+This is the authoritative style guide for the `coolercontrold` Rust daemon.
 
 Design goals in priority order: **safety, performance, developer experience.**
 
