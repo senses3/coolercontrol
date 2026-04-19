@@ -24,7 +24,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
-import { ThemeMode } from '@/models/UISettings.ts'
+import { validatePluginFetchPath, buildSafeOptions } from '@/composables/pluginFetchValidation.ts'
 
 export type PluginIframeMode = 'modal' | 'full_page'
 
@@ -41,6 +41,34 @@ export function usePluginIframe(
     const router = useRouter()
     const iframeRef = ref<HTMLIFrameElement | null>(null)
     const nullOriginTarget: string = '*'
+
+    const doPluginFetch = (safePath: string, safeOptions: RequestInit, requestId: string): void => {
+        const safePluginId = encodeURIComponent(pluginId)
+        const url = new URL(window.location.origin)
+        url.pathname = `/plugins/${safePluginId}/data${safePath.split(/[?#]/, 1)[0]}`
+        const queryMatch = safePath.match(/\?([^#]*)/)
+        if (queryMatch) {
+            url.search = queryMatch[1]
+        }
+        const expectedPrefix = `${window.location.origin}/plugins/${safePluginId}/data`
+        const finalUrl = url.toString()
+        if (
+            finalUrl !== expectedPrefix &&
+            !finalUrl.startsWith(`${expectedPrefix}/`) &&
+            !finalUrl.startsWith(`${expectedPrefix}?`)
+        ) {
+            return
+        }
+        fetch(finalUrl, safeOptions)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null)
+            .then((body) => {
+                iframeRef.value?.contentWindow?.postMessage(
+                    { type: 'pluginFetchResponse', requestId, body },
+                    nullOriginTarget,
+                )
+            })
+    }
 
     const pluginUrl = (entryPoint: string = 'index.html'): string => {
         return `${deviceStore.daemonClient.daemonURL}plugins/${pluginId}/ui/${entryPoint}`
@@ -118,18 +146,18 @@ export function usePluginIframe(
                 postToIframe('style', mainStyleLinkEl())
                 break
             case 'customStyle': {
-                const customStyle =
-                    settingsStore.themeMode === ThemeMode.CUSTOM
-                        ? {
-                              '--colors-accent': settingsStore.customTheme.accent,
-                              '--colors-bg-one': settingsStore.customTheme.bgOne,
-                              '--colors-bg-two': settingsStore.customTheme.bgTwo,
-                              '--colors-border-one': settingsStore.customTheme.borderOne,
-                              '--colors-text-color': settingsStore.customTheme.textColor,
-                              '--colors-text-color-secondary':
-                                  settingsStore.customTheme.textColorSecondary,
-                          }
-                        : undefined
+                // Always read the resolved CSS variable values from the parent document so
+                // the iframe gets the correct colours for any theme (not just Custom).
+                const rootStyle = getComputedStyle(document.documentElement)
+                const getVar = (name: string): string => rootStyle.getPropertyValue(name).trim()
+                const customStyle = {
+                    '--colors-accent': getVar('--colors-accent'),
+                    '--colors-bg-one': getVar('--colors-bg-one'),
+                    '--colors-bg-two': getVar('--colors-bg-two'),
+                    '--colors-border-one': getVar('--colors-border-one'),
+                    '--colors-text-color': getVar('--colors-text-color'),
+                    '--colors-text-color-secondary': getVar('--colors-text-color-secondary'),
+                }
                 postToIframe('customStyle', customStyle)
                 break
             }
@@ -241,6 +269,15 @@ export function usePluginIframe(
                     status.set(deviceUID, deviceChannelStatus)
                 }
                 postToIframe('status', status)
+                break
+            }
+            case 'pluginFetch': {
+                const { requestId, path, options } = event.data
+                if (typeof requestId !== 'string' || typeof path !== 'string') break
+                const safePath = validatePluginFetchPath(path)
+                if (safePath == null) break
+                const safeOptions = buildSafeOptions(options)
+                doPluginFetch(safePath, safeOptions, requestId)
                 break
             }
         }

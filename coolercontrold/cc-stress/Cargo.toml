@@ -27,7 +27,7 @@ wgpu = { version = "24", default-features = false, features = [
   "angle",
   "wgsl",
 ] }
-tokio = { version = "1.50.0", default-features = false, features = [
+tokio = { version = "1.52.1", default-features = false, features = [
   "rt",
   "time",
 ] }

@@ -941,6 +941,27 @@ fn plugins_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::session_auth_middleware)),
         )
+        .api_route(
+            "/plugins/{plugin_id}/data/{*data_path}",
+            get_with(plugins::proxy_plugin_data, |o| {
+                o.summary("CoolerControl Plugin Data Proxy")
+                    .description(
+                        "Reverse-proxies a request to the plugin's local HTTP server. \
+                         The plugin must declare [proxy] in its manifest.",
+                    )
+                    .tag("plugins")
+                    .security_requirement("CookieAuth")
+            })
+            .post_with(plugins::proxy_plugin_data, |o| {
+                o.summary("CoolerControl Plugin Data Proxy (POST)")
+                    .description(
+                        "Reverse-proxies a POST request to the plugin's local HTTP server.",
+                    )
+                    .tag("plugins")
+                    .security_requirement("CookieAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::session_auth_middleware)),
+        )
 }
 
 fn alert_routes() -> ApiRouter<AppState> {

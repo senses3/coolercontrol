@@ -168,6 +168,17 @@ impl PluginController {
         Ok(dir)
     }
 
+    /// Returns the proxy port for a plugin that has `[proxy]` configured, or `None` if not set.
+    pub fn get_proxy_port(&self, plugin_id: &str) -> Result<Option<u16>> {
+        let manifest = self
+            .plugins
+            .get(plugin_id)
+            .ok_or_else(|| CCError::NotFound {
+                msg: "Plugin not found".to_string(),
+            })?;
+        Ok(manifest.proxy.as_ref().map(|p| p.port))
+    }
+
     /// Start a managed integration plugin's service.
     pub async fn start_plugin(&self, plugin_id: &str) -> Result<()> {
         let service_id = self.get_integration_service_id(plugin_id)?;
