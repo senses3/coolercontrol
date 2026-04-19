@@ -35,7 +35,7 @@ pub struct ServiceManifest {
     pub envs: Vec<(String, String)>, // if needed (set log level, etc.) "ENV1=value1 ENV2=value2"
     pub address: ConnectionType,     // required for all device service plugins
     pub privileged: bool,            // for device service plugins (false by default)
-    pub proxy: Option<ProxyConfig>,  // for integration plugins that expose a local HTTP API
+    pub proxy: Option<ProxyConfig>,  // for plugins that expose a local HTTP API
     pub path: PathBuf,               // This plugin's folder path
 }
 
@@ -169,7 +169,7 @@ impl ServiceManifest {
     }
 }
 
-/// Configuration for an integration plugin's local HTTP proxy.
+/// Configuration for a plugin's local HTTP proxy.
 #[derive(Debug, Clone)]
 pub struct ProxyConfig {
     /// The loopback port the plugin's HTTP server listens on.
