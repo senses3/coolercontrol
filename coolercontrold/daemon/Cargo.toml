@@ -89,11 +89,24 @@ axum_typed_multipart = "=0.16.4"
 axum_typed_multipart_macros = "=0.16.4"
 # possible openApi improvement, but doesn't work for us currently:
 #aide-axum-typed-multipart-2 = "0.16.0"
-# TLS support
-axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+# TLS support: use ring as the rustls crypto provider (already pulled in by rcgen)
+# to avoid the aws-lc-rs/aws-lc-sys C dependency tree.
+axum-server = { version = "0.8.0", default-features = false, features = [
+  "tls-rustls-no-provider",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+  "ring",
+  "logging",
+  "std",
+  "tls12",
+] }
 rcgen = "0.14.7"
 pin-project-lite = "0.2"
-tokio-rustls = "0.26"
+tokio-rustls = { version = "0.26", default-features = false, features = [
+  "ring",
+  "logging",
+  "tls12",
+] }
 tempfile = "3.27.0"
 hyper = { version = "1.9.0", default-features = false, features = [
   "http1",
