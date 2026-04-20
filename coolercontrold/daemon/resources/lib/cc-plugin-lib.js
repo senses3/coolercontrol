@@ -189,7 +189,8 @@ const successfulConfigSaveCallback = async (callback) => {
     _successfulConfigSaveCallback = callback
 }
 
-/* Close the plugin UI. In modal mode this closes the dialog. In full-page mode this navigates back. */
+/* Previously closed the plugin modal. Now a no-op — the plugin UI is full-page and has no
+   dismiss action. Kept for backward compatibility with existing plugin code. */
 const close = () => {
     window.parent.postMessage({ type: 'close' }, document.location.origin)
 }
@@ -199,7 +200,8 @@ const restart = () => {
     window.parent.postMessage({ type: 'restart' }, document.location.origin)
 }
 
-/* Restart only this plugin's service (integration plugins only). Returns true on success. */
+/* Restart only this plugin's service (integration plugins only). Returns true on success.
+   For device plugins, use restart() to trigger a full daemon restart instead. */
 const restartPlugin = async () => {
     _pluginRestarted = null
     _increaseMessageCount()

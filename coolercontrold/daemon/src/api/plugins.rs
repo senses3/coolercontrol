@@ -38,7 +38,7 @@ use tower_serve_static::include_file;
 /// Content-Security-Policy for plugin UI HTML responses.
 /// `connect-src 'none'` forces plugins to use the pluginFetch relay for all network access.
 const PLUGIN_CONTENT_SECURITY_POLICY: &str = "default-src 'none'; \
-    script-src 'self'; \
+    script-src 'self' 'unsafe-inline'; \
     style-src 'self' 'unsafe-inline'; \
     img-src 'self' data: blob:; \
     connect-src 'none'; \
@@ -180,9 +180,14 @@ pub async fn get_ui_files(
             msg: "Failed to serve file".to_string(),
         })?;
     if is_html {
-        response.headers_mut().insert(
+        let headers = response.headers_mut();
+        headers.insert(
             axum::http::HeaderName::from_static("content-security-policy"),
             axum::http::HeaderValue::from_static(PLUGIN_CONTENT_SECURITY_POLICY),
+        );
+        headers.insert(
+            axum::http::header::CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("no-cache, max-age=60"),
         );
     }
     Ok(response)

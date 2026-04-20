@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QDesktopServices>
+#include <QDir>
 #include <QFileDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -92,7 +93,7 @@ class PersistentCookieJar final : public QNetworkCookieJar {
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent),
       m_view(new QWebEngineView(parent)),
-      m_profile(new QWebEngineProfile("coolercontrol", m_view)),
+      m_profile(new QWebEngineProfile(WEBENGINE_PROFILE_NAME.c_str(), m_view)),
       m_page(new QWebEnginePage(m_profile)),
       m_channel(new QWebChannel(m_page)),
       m_ipc(new IPC(this)),
@@ -472,6 +473,8 @@ void MainWindow::setTrayActionToShow() const { m_showAction->setText(tr("&Show")
 void MainWindow::setTrayActionToHide() const { m_showAction->setText(tr("&Hide")); }
 
 void MainWindow::showVersionMismatchDialog(const QString& daemonVersion) const {
+  m_profile->clearHttpCache();
+  qInfo() << "Browser cache cleared due to version mismatch.";
   const auto appVersion = QString::fromStdString(COOLER_CONTROL_VERSION);
   QMessageBox dialog;
   dialog.setWindowTitle(tr("Version Mismatch"));

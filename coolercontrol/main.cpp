@@ -17,7 +17,10 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDBusInterface>
+#include <QDir>
 #include <QLoggingCategory>
+#include <QStandardPaths>
+#include <optional>
 
 #include "constants.h"
 #include "dbus_listener.h"
@@ -72,7 +75,8 @@ void handleCmdOptions(const bool debug, const bool fullDebug, const bool disable
   setLogFilters(debug, fullDebug);
 }
 
-void parseCLIOptions(const QApplication& a) {
+// Returns an exit code if the app should exit immediately, or std::nullopt to continue launching.
+std::optional<int> parseCLIOptions(const QApplication& a) {
   QCommandLineParser parser;
   parser.setApplicationDescription("CoolerControl GUI Desktop Application");
   parser.addHelpOption();
@@ -92,9 +96,28 @@ void parseCLIOptions(const QApplication& a) {
       "Additional Chromium flags to pass to the WebEngine (e.g. \"--ozone-platform=wayland\").",
       "flags");
   parser.addOption(chromiumFlagsOption);
+  const QCommandLineOption clearCacheOption("clear-cache",
+                                            "Clear the browser HTTP cache and exit.");
+  parser.addOption(clearCacheOption);
   parser.process(a);
+  if (parser.isSet(clearCacheOption)) {
+    const QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
+                              "/QtWebEngine/" + WEBENGINE_PROFILE_NAME.c_str();
+    QDir cacheDir(cachePath);
+    if (!cacheDir.exists()) {
+      qInfo() << "Browser cache directory does not exist, nothing to clear.";
+      return 0;
+    }
+    if (cacheDir.removeRecursively()) {
+      qInfo() << "Browser cache cleared:" << cachePath;
+      return 0;
+    }
+    qWarning() << "Failed to clear browser cache at:" << cachePath;
+    return 1;
+  }
   handleCmdOptions(parser.isSet(debugOption), parser.isSet(fullDebugOption),
                    parser.isSet(gpuOption), parser.value(chromiumFlagsOption));
+  return std::nullopt;
 }
 
 /// Entrypoint for the application
@@ -116,7 +139,9 @@ int main(int argc, char* argv[]) {
   QApplication::setDesktopFileName(APP_ID.data());
   QApplication::setApplicationVersion(COOLER_CONTROL_VERSION.data());
   QApplication::setQuitOnLastWindowClosed(false);
-  parseCLIOptions(a);
+  if (const auto exitCode = parseCLIOptions(a); exitCode.has_value()) {
+    return exitCode.value();
+  }
   // single-instance
   auto connection = QDBusConnection::sessionBus();
   if (connection.isConnected()) {
