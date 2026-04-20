@@ -13,8 +13,9 @@ override_dh_auto_configure:
 	dh_auto_configure --buildsystem=cmake --sourcedirectory=coolercontrol
 
 override_dh_auto_build:
-	if [ -e "coolercontrold-vendor.tar.gz" ]; then \
-		tar xf coolercontrold-vendor.tar.gz >/dev/null 2>&1 ;\
+	@vendor_tar=$$(ls coolercontrold-vendor*.tar.gz 2>/dev/null | head -n1); \
+	if [ -n "$$vendor_tar" ]; then \
+		tar xf "$$vendor_tar" >/dev/null 2>&1 ;\
 	else \
 		dh_auto_build --sourcedirectory=coolercontrol-ui ;\
 	fi
@@ -22,7 +23,8 @@ override_dh_auto_build:
 	dh_auto_build --sourcedirectory=coolercontrold
 
 override_dh_auto_test:
-	if [ ! -e "coolercontrold-vendor.tar.gz" ]; then \
+	@vendor_tar=$$(ls coolercontrold-vendor*.tar.gz 2>/dev/null | head -n1); \
+	if [ -z "$$vendor_tar" ]; then \
 		dh_auto_test --sourcedirectory=coolercontrol-ui ;\
 	fi
 	dh_auto_test --sourcedirectory=coolercontrold
