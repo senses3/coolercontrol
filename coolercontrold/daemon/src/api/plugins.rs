@@ -180,9 +180,14 @@ pub async fn get_ui_files(
             msg: "Failed to serve file".to_string(),
         })?;
     if is_html {
-        response.headers_mut().insert(
+        let headers = response.headers_mut();
+        headers.insert(
             axum::http::HeaderName::from_static("content-security-policy"),
             axum::http::HeaderValue::from_static(PLUGIN_CONTENT_SECURITY_POLICY),
+        );
+        headers.insert(
+            axum::http::header::CACHE_CONTROL,
+            axum::http::HeaderValue::from_static("no-cache, max-age=60"),
         );
     }
     Ok(response)
