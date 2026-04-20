@@ -38,7 +38,7 @@ use tower_serve_static::include_file;
 /// Content-Security-Policy for plugin UI HTML responses.
 /// `connect-src 'none'` forces plugins to use the pluginFetch relay for all network access.
 const PLUGIN_CONTENT_SECURITY_POLICY: &str = "default-src 'none'; \
-    script-src 'self'; \
+    script-src 'self' 'unsafe-inline'; \
     style-src 'self' 'unsafe-inline'; \
     img-src 'self' data: blob:; \
     connect-src 'none'; \
