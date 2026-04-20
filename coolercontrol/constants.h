@@ -40,6 +40,7 @@ constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;
 constexpr int DEFAULT_CONNECTION_TIMEOUT_MS = 8000;
 // 2s is good at startup, so as not to hit the daemon with lots of requests at once (+UI)
 constexpr int DEFAULT_CONNECTION_RETRY_INTERVAL_MS = 2000;
+const std::string WEBENGINE_PROFILE_NAME = "coolercontrol";
 const std::string USER_ID = "CCAdmin";
 const std::string ENDPOINT_HEALTH = "/health";
 const std::string ENDPOINT_MODES = "/modes";
