@@ -288,7 +288,7 @@ onUnmounted(() => {
                 />
 
                 <!-- Lifecycle controls (managed integration plugins only, when enabled) -->
-                <template v-if="isManaged">
+                <template v-if="isManaged && isIntegration">
                     <Button
                         v-tooltip.bottom="t('layout.plugins.start')"
                         class="!p-1.5"

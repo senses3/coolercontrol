@@ -199,7 +199,8 @@ const restart = () => {
     window.parent.postMessage({ type: 'restart' }, document.location.origin)
 }
 
-/* Restart only this plugin's service (integration plugins only). Returns true on success. */
+/* Restart only this plugin's service (integration plugins only). Returns true on success.
+   For device plugins, use restart() to trigger a full daemon restart instead. */
 const restartPlugin = async () => {
     _pluginRestarted = null
     _increaseMessageCount()
