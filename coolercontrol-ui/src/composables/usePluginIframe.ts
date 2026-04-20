@@ -22,23 +22,20 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import { validatePluginFetchPath, buildSafeOptions } from '@/composables/pluginFetchValidation.ts'
 
 export type PluginIframeMode = 'modal' | 'full_page'
 
-export function usePluginIframe(
-    pluginId: string,
-    mode: PluginIframeMode,
-    closeCallback?: () => void,
-) {
+// Note: the former `closeCallback` parameter was removed when the plugin UI moved from a modal
+// to a full-page view. The `close()` postMessage and its handler are now no-ops kept for
+// backward compatibility; there is no longer anything to close or a callback to invoke.
+export function usePluginIframe(pluginId: string, mode: PluginIframeMode) {
     const deviceStore = useDeviceStore()
     const settingsStore = useSettingsStore()
     const toast = useToast()
     const confirm = useConfirm()
     const { t } = useI18n()
-    const router = useRouter()
     const iframeRef = ref<HTMLIFrameElement | null>(null)
     const nullOriginTarget: string = '*'
 
@@ -92,16 +89,7 @@ export function usePluginIframe(
         iframeRef.value?.contentWindow?.postMessage({ type, body }, nullOriginTarget)
     }
 
-    const handleClose = (): void => {
-        if (mode === 'modal' && closeCallback) {
-            closeCallback()
-        } else {
-            router.back()
-        }
-    }
-
     const handleRestart = (): void => {
-        handleClose()
         confirm.require({
             message: t('layout.topbar.restartConfirmMessage'),
             header: t('layout.topbar.restartConfirmHeader'),
@@ -200,7 +188,8 @@ export function usePluginIframe(
                 break
             }
             case 'close':
-                handleClose()
+                // No-op: plugins previously used close() to dismiss a modal, but the plugin UI
+                // is now full-page. Kept for backward compatibility with existing plugin code.
                 break
             case 'restart':
                 handleRestart()
