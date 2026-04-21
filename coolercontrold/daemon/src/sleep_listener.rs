@@ -94,6 +94,7 @@ impl<'s> SleepListener {
                     return Ok(Self::create_deaf_listener());
                 }
             };
+        info!("DBUS sleep listener connected.");
         let listener = Self {
             preparing_to_sleep: Rc::new(Cell::new(false)),
             resuming: Rc::new(Cell::new(false)),
