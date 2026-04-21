@@ -40,6 +40,11 @@ const EARLY_EXIT_CHECK: Duration = Duration::from_millis(500);
 /// force-kills it. Belt-and-suspenders against a stuck child whose own
 /// self-termination failed (e.g. blocking syscall, hung GPU driver).
 const WATCHDOG_GRACE_SECS: u64 = 10;
+/// Bound on `child.wait()` during stop. SIGKILL is uninterruptible, so a child
+/// that isn't reaped within this window is stuck in kernel D-state (e.g. buggy
+/// GPU driver ioctl). Moving on keeps the actor responsive; the kernel reaps
+/// the zombie when the blocking syscall returns.
+const STOP_REAP_TIMEOUT_SECS: u64 = 5;
 
 /// Which backend is running (or will run) a stress test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -218,6 +223,28 @@ impl StressTestActor {
         token
     }
 
+    /// SIGKILL the child and reap it with a bounded wait.
+    ///
+    /// A child stuck in kernel D-state cannot be reaped from userspace; logging
+    /// and moving on prevents the actor's message handler from blocking
+    /// indefinitely, which would otherwise queue up subsequent stress-test
+    /// requests and wedge `StopAll` mid-sequence.
+    async fn kill_and_reap(child: &mut Child, label: &str) {
+        let _ = child.kill().await;
+        if tokio::time::timeout(
+            Duration::from_secs(STOP_REAP_TIMEOUT_SECS),
+            child.wait(),
+        )
+        .await
+        .is_err()
+        {
+            warn!(
+                "{label} stress child did not reap within {STOP_REAP_TIMEOUT_SECS}s \
+                 after SIGKILL; process may be in kernel D-state. Continuing."
+            );
+        }
+    }
+
     async fn check_early_exit(child: &mut Child, label: &str) -> Result<()> {
         tokio::time::sleep(EARLY_EXIT_CHECK).await;
         match child.try_wait() {
@@ -370,8 +397,7 @@ impl StressTestActor {
             token.cancel();
         }
         if let Some(mut child) = self.cpu_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "CPU").await;
             self.cpu_duration_secs = None;
             self.cpu_backend = None;
             info!("CPU stress test stopped");
@@ -439,8 +465,7 @@ impl StressTestActor {
             token.cancel();
         }
         if let Some(mut child) = self.gpu_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "GPU").await;
             self.gpu_duration_secs = None;
             self.gpu_backend = None;
             info!("GPU stress test stopped");
@@ -544,8 +569,7 @@ impl StressTestActor {
             token.cancel();
         }
         if let Some(mut child) = self.ram_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "RAM").await;
             self.ram_duration_secs = None;
             self.ram_backend = None;
             info!("RAM stress test stopped");
@@ -650,8 +674,7 @@ impl StressTestActor {
             token.cancel();
         }
         if let Some(mut child) = self.drive_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "Drive").await;
             self.drive_duration_secs = None;
             self.drive_backend = None;
             info!("Drive stress test stopped");
