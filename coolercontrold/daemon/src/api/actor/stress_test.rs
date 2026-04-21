@@ -392,7 +392,18 @@ impl StressTestActor {
 
         let resolved = Self::resolve_backend(backend);
         let mut child = self.spawn_gpu(resolved, duration_secs)?;
-        Self::check_early_exit(&mut child, "GPU").await?;
+        if let Err(e) = Self::check_early_exit(&mut child, "GPU").await {
+            // The GPU stressor is an optional stress-ng feature and is not
+            // compiled into many distro packages; surface that hint so the
+            // user knows to switch to the built-in backend.
+            if resolved == StressBackend::StressNg {
+                return Err(anyhow!(
+                    "{e}. The GPU stressor is likely not enabled in the installed \
+                     stress-ng binary; try the built-in backend instead."
+                ));
+            }
+            return Err(e);
+        }
 
         self.gpu_watchdog = child
             .id()
