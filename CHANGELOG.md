@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Release notes are automatically generated from this file and git tags.
 -->
 
+## [4.2.1] - 2026-04-21
+
+### Changed
+
+- Stress-ng capability checks at startup removed, users choose which stress tests to run (#572,
+  !477)
+- Watchdogs added to ensure stress-ng processes are cleanly killed in edge cases
+
+### Fixed
+
+- Potential hang when D-Bus does not respond (!478)
+- Several issues on some systems with stress-ng
+- UI cache is no longer cleared on version mismatch, which could cause an issue.
+
 ## [4.2.0] - 2026-04-20
 
 ### Added
