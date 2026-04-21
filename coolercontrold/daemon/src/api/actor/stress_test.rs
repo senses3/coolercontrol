@@ -231,12 +231,9 @@ impl StressTestActor {
     /// requests and wedge `StopAll` mid-sequence.
     async fn kill_and_reap(child: &mut Child, label: &str) {
         let _ = child.kill().await;
-        if tokio::time::timeout(
-            Duration::from_secs(STOP_REAP_TIMEOUT_SECS),
-            child.wait(),
-        )
-        .await
-        .is_err()
+        if tokio::time::timeout(Duration::from_secs(STOP_REAP_TIMEOUT_SECS), child.wait())
+            .await
+            .is_err()
         {
             warn!(
                 "{label} stress child did not reap within {STOP_REAP_TIMEOUT_SECS}s \
