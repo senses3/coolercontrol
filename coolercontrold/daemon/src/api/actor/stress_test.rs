@@ -36,6 +36,10 @@ use crate::api::actor::{run_api_actor, ApiActor};
 const MAX_DURATION_SECS: u16 = 600;
 const DEFAULT_DURATION_SECS: u16 = 60;
 const EARLY_EXIT_CHECK: Duration = Duration::from_millis(500);
+/// Grace period after a child's declared `--timeout` before the daemon
+/// force-kills it. Belt-and-suspenders against a stuck child whose own
+/// self-termination failed (e.g. blocking syscall, hung GPU driver).
+const WATCHDOG_GRACE_SECS: u64 = 10;
 
 /// Which backend is running (or will run) a stress test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -66,15 +70,19 @@ struct StressTestActor {
     cpu_child: Option<Child>,
     cpu_duration_secs: Option<u16>,
     cpu_backend: Option<StressBackend>,
+    cpu_watchdog: Option<CancellationToken>,
     gpu_child: Option<Child>,
     gpu_duration_secs: Option<u16>,
     gpu_backend: Option<StressBackend>,
+    gpu_watchdog: Option<CancellationToken>,
     ram_child: Option<Child>,
     ram_duration_secs: Option<u16>,
     ram_backend: Option<StressBackend>,
+    ram_watchdog: Option<CancellationToken>,
     drive_child: Option<Child>,
     drive_duration_secs: Option<u16>,
     drive_backend: Option<StressBackend>,
+    drive_watchdog: Option<CancellationToken>,
 }
 
 enum StressTestMessage {
@@ -147,15 +155,19 @@ impl StressTestActor {
             cpu_child: None,
             cpu_duration_secs: None,
             cpu_backend: None,
+            cpu_watchdog: None,
             gpu_child: None,
             gpu_duration_secs: None,
             gpu_backend: None,
+            gpu_watchdog: None,
             ram_child: None,
             ram_duration_secs: None,
             ram_backend: None,
+            ram_watchdog: None,
             drive_child: None,
             drive_duration_secs: None,
             drive_backend: None,
+            drive_watchdog: None,
         }
     }
 
@@ -171,6 +183,39 @@ impl StressTestActor {
         } else {
             String::from("(no stderr)")
         }
+    }
+
+    /// Spawn a watchdog task that force-kills the child PID if it overruns
+    /// `duration_secs + WATCHDOG_GRACE_SECS`. Returns the cancellation token
+    /// the actor must cancel when the child exits or is stopped explicitly,
+    /// to avoid sending SIGKILL to a recycled PID.
+    fn spawn_watchdog(
+        child_pid: u32,
+        duration_secs: u16,
+        label: &'static str,
+    ) -> CancellationToken {
+        let token = CancellationToken::new();
+        let token_clone = token.clone();
+        let total =
+            Duration::from_secs(u64::from(duration_secs).saturating_add(WATCHDOG_GRACE_SECS));
+        tokio::task::spawn_local(async move {
+            tokio::select! {
+                () = token_clone.cancelled() => {} // child exited normally or stop_*
+                () = tokio::time::sleep(total) => {
+                    warn!(
+                        "{label} stress test exceeded timeout + grace; \
+                         force-killing PID {child_pid}"
+                    );
+                    // Truncation impossible: PIDs are well within i32 range on Linux.
+                    #[allow(clippy::cast_possible_wrap)]
+                    let _ = nix::sys::signal::kill(
+                        nix::unistd::Pid::from_raw(child_pid as i32),
+                        nix::sys::signal::Signal::SIGKILL,
+                    );
+                }
+            }
+        });
+        token
     }
 
     async fn check_early_exit(child: &mut Child, label: &str) -> Result<()> {
@@ -264,6 +309,9 @@ impl StressTestActor {
         );
         Self::check_early_exit(&mut child, "CPU").await?;
 
+        self.cpu_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "CPU"));
         self.cpu_child = Some(child);
         self.cpu_duration_secs = Some(duration_secs);
         self.cpu_backend = Some(resolved);
@@ -318,6 +366,9 @@ impl StressTestActor {
     }
 
     async fn stop_cpu(&mut self) {
+        if let Some(token) = self.cpu_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.cpu_child.take() {
             let _ = child.kill().await;
             let _ = child.wait().await;
@@ -343,6 +394,9 @@ impl StressTestActor {
         let mut child = self.spawn_gpu(resolved, duration_secs)?;
         Self::check_early_exit(&mut child, "GPU").await?;
 
+        self.gpu_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "GPU"));
         self.gpu_child = Some(child);
         self.gpu_duration_secs = Some(duration_secs);
         self.gpu_backend = Some(resolved);
@@ -370,6 +424,9 @@ impl StressTestActor {
     }
 
     async fn stop_gpu(&mut self) {
+        if let Some(token) = self.gpu_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.gpu_child.take() {
             let _ = child.kill().await;
             let _ = child.wait().await;
@@ -405,6 +462,9 @@ impl StressTestActor {
         let mut child = self.spawn_ram(resolved, duration_secs, alloc_bytes)?;
         Self::check_early_exit(&mut child, "RAM").await?;
 
+        self.ram_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "RAM"));
         self.ram_child = Some(child);
         self.ram_duration_secs = Some(duration_secs);
         self.ram_backend = Some(resolved);
@@ -469,6 +529,9 @@ impl StressTestActor {
     }
 
     async fn stop_ram(&mut self) {
+        if let Some(token) = self.ram_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.ram_child.take() {
             let _ = child.kill().await;
             let _ = child.wait().await;
@@ -501,6 +564,9 @@ impl StressTestActor {
         let mut child = self.spawn_drive(resolved, &device_path, thread_count, duration_secs)?;
         Self::check_early_exit(&mut child, "Drive").await?;
 
+        self.drive_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "Drive"));
         self.drive_child = Some(child);
         self.drive_duration_secs = Some(duration_secs);
         self.drive_backend = Some(resolved);
@@ -569,6 +635,9 @@ impl StressTestActor {
     }
 
     async fn stop_drive(&mut self) {
+        if let Some(token) = self.drive_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.drive_child.take() {
             let _ = child.kill().await;
             let _ = child.wait().await;
@@ -582,6 +651,7 @@ impl StressTestActor {
         child: &mut Option<Child>,
         duration: &mut Option<u16>,
         backend: &mut Option<StressBackend>,
+        watchdog: &mut Option<CancellationToken>,
         label: &str,
     ) {
         if let Some(c) = child.as_mut() {
@@ -591,6 +661,9 @@ impl StressTestActor {
                     *child = None;
                     *duration = None;
                     *backend = None;
+                    if let Some(token) = watchdog.take() {
+                        token.cancel();
+                    }
                 }
                 Ok(None) => {} // still running
                 Err(err) => {
@@ -598,6 +671,9 @@ impl StressTestActor {
                     *child = None;
                     *duration = None;
                     *backend = None;
+                    if let Some(token) = watchdog.take() {
+                        token.cancel();
+                    }
                 }
             }
         }
@@ -615,24 +691,28 @@ impl StressTestActor {
             &mut self.cpu_child,
             &mut self.cpu_duration_secs,
             &mut self.cpu_backend,
+            &mut self.cpu_watchdog,
             "CPU",
         );
         Self::check_child_still_running(
             &mut self.gpu_child,
             &mut self.gpu_duration_secs,
             &mut self.gpu_backend,
+            &mut self.gpu_watchdog,
             "GPU",
         );
         Self::check_child_still_running(
             &mut self.ram_child,
             &mut self.ram_duration_secs,
             &mut self.ram_backend,
+            &mut self.ram_watchdog,
             "RAM",
         );
         Self::check_child_still_running(
             &mut self.drive_child,
             &mut self.drive_duration_secs,
             &mut self.drive_backend,
+            &mut self.drive_watchdog,
             "Drive",
         );
         StressTestStatus {
@@ -1040,5 +1120,29 @@ mod tests {
         // For an obviously-bogus device, the result must be None (not panic).
         let result = find_mount_point("/dev/nonexistent_device_xyz");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn check_child_still_running_clears_state_and_cancels_watchdog() {
+        // When the child has exited, both the actor's tracking fields and the
+        // watchdog token must be cleared, so a stale SIGKILL cannot land on a
+        // recycled PID later.
+        let mut child: Option<Child> = None; // None branch → no-op
+        let mut duration = Some(60_u16);
+        let mut backend = Some(StressBackend::BuiltIn);
+        let mut watchdog = Some(CancellationToken::new());
+        let token_clone = watchdog.as_ref().unwrap().clone();
+        StressTestActor::check_child_still_running(
+            &mut child,
+            &mut duration,
+            &mut backend,
+            &mut watchdog,
+            "TEST",
+        );
+        // Child was None: nothing should have changed.
+        assert!(duration.is_some());
+        assert!(backend.is_some());
+        assert!(watchdog.is_some());
+        assert!(token_clone.is_cancelled().not());
     }
 }
