@@ -436,14 +436,18 @@ export default {
             downloadCurrentLog: '下載當前日誌',
             stressTest: '熱壓力測試',
             stressTestTooltip:
-                '生成持續熱負載以驗證<br>風扇曲線和冷卻配置文件。<br>結果可能因硬體而異。<br>安裝 stress-ng 以獲得更好的效果。',
+                '生成持續熱負載以驗證<br>風扇曲線和冷卻配置文件。<br>結果可能因硬體而異。<br>安裝 stress-ng 以獲得額外的後端。',
             cpuStress: 'CPU 壓力',
             gpuStress: 'GPU 壓力',
             gpuStressTooltip: '使用內建後端時<br>可能需要 Vulkan 或 OpenGL ES 驅動程式。',
             ramStress: 'RAM 壓力',
             driveStress: '磁碟壓力',
-            driveStressTooltip: '對區塊裝置進行 I/O 壓力測試<br>以在磁碟控制器上產生熱量。',
+            driveStressTooltip:
+                '對區塊裝置進行 I/O 壓力測試<br>以在磁碟控制器上產生熱量。<br>stress-ng 需要掛載裝置。',
             builtInBackend: '內建',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                '選擇壓力測試後端。<br>內建無需外部依賴即可運作。<br>stress-ng (已安裝時) 提供額外的壓力測試變體。',
             selectDrive: '選擇磁碟',
             threadCount: '執行緒數',
             duration: '持續時間 (秒)',

@@ -529,7 +529,7 @@ export default {
             downloadCurrentLog: 'Download Current Log',
             stressTest: 'Thermal Stress Tests',
             stressTestTooltip:
-                'Generate sustained thermal load to validate<br>fan curves and cooling profiles.<br>Results may vary depending on hardware.<br>Install stress-ng for improved results.',
+                'Generate sustained thermal load to validate<br>fan curves and cooling profiles.<br>Results may vary depending on hardware.<br>Install stress-ng for additional backends.',
             cpuStress: 'CPU Stress',
             gpuStress: 'GPU Stress',
             gpuStressTooltip:
@@ -537,8 +537,11 @@ export default {
             ramStress: 'RAM Stress',
             driveStress: 'Drive Stress',
             driveStressTooltip:
-                'I/O stress on a block device to generate<br>heat on drive controllers.',
+                'I/O stress on a block device to generate<br>heat on drive controllers.<br>stress-ng requires the device to be mounted.',
             builtInBackend: 'built-in',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                'Choose the stress-test backend.<br>Built-in works without external dependencies.<br>stress-ng (when installed) provides additional stressor variants.',
             selectDrive: 'Select drive',
             threadCount: 'Threads',
             duration: 'Duration (s)',

@@ -35,14 +35,17 @@ import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import { $enum } from 'ts-enum-util'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import { useConfirm } from 'primevue/useconfirm'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
 const deviceStore = useDeviceStore()
 const daemonState = useDaemonState()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 
 const healthCheck = await deviceStore.health()
@@ -152,6 +155,7 @@ const cpuBackend = ref<string>('built_in')
 const gpuBackend = ref<string>('built_in')
 const ramBackend = ref<string>('built_in')
 const driveBackend = ref<string>('built_in')
+const stressNgAvailable = ref(false)
 const cpuLoading = ref(false)
 const gpuLoading = ref(false)
 const ramLoading = ref(false)
@@ -159,6 +163,11 @@ const driveLoading = ref(false)
 const availableDrives = ref<Array<{ device_path: string; model?: string; size_bytes: number }>>([])
 const selectedDrive = ref<string | null>(null)
 let statusPollInterval: ReturnType<typeof setInterval> | null = null
+
+const backendOptions = computed(() => [
+    { label: t('views.appInfo.stressNgBackend'), value: 'stress_ng' },
+    { label: t('views.appInfo.builtInBackend'), value: 'built_in' },
+])
 
 const pollStatus = async () => {
     const status = await deviceStore.daemonClient.stressTestStatus()
@@ -170,6 +179,7 @@ const pollStatus = async () => {
     gpuBackend.value = status.gpu_backend ?? 'built_in'
     ramBackend.value = status.ram_backend ?? 'built_in'
     driveBackend.value = status.drive_backend ?? 'built_in'
+    stressNgAvailable.value = status.stress_ng_available ?? false
     if (
         !status.cpu_active &&
         !status.gpu_active &&
@@ -216,7 +226,11 @@ const confirmOrRun = (action: () => void, starting: 'cpu' | 'gpu' | 'ram' | 'dri
 
 const doCpuStress = async () => {
     cpuLoading.value = true
-    const err = await deviceStore.daemonClient.startCpuStress(undefined, cpuDuration.value)
+    const err = await deviceStore.daemonClient.startCpuStress(
+        undefined,
+        cpuDuration.value,
+        stressNgAvailable.value ? settingsStore.cpuStressBackend : undefined,
+    )
     cpuLoading.value = false
     if (err) {
         toast.add({ severity: 'error', summary: 'CPU Stress', detail: err.error, life: 5000 })
@@ -236,7 +250,10 @@ const stopCpuStress = async () => {
 
 const doGpuStress = async () => {
     gpuLoading.value = true
-    const err = await deviceStore.daemonClient.startGpuStress(gpuDuration.value)
+    const err = await deviceStore.daemonClient.startGpuStress(
+        gpuDuration.value,
+        stressNgAvailable.value ? settingsStore.gpuStressBackend : undefined,
+    )
     gpuLoading.value = false
     if (err) {
         toast.add({ severity: 'error', summary: 'GPU Stress', detail: err.error, life: 5000 })
@@ -256,7 +273,10 @@ const stopGpuStress = async () => {
 
 const doRamStress = async () => {
     ramLoading.value = true
-    const err = await deviceStore.daemonClient.startRamStress(ramDuration.value)
+    const err = await deviceStore.daemonClient.startRamStress(
+        ramDuration.value,
+        stressNgAvailable.value ? settingsStore.ramStressBackend : undefined,
+    )
     ramLoading.value = false
     if (err) {
         toast.add({ severity: 'error', summary: 'RAM Stress', detail: err.error, life: 5000 })
@@ -284,6 +304,7 @@ const doDriveStress = async () => {
         selectedDrive.value,
         undefined,
         driveDuration.value,
+        stressNgAvailable.value ? settingsStore.driveStressBackend : undefined,
     )
     driveLoading.value = false
     if (err) {
@@ -601,7 +622,21 @@ onBeforeUnmount(() => {
                                                     ? t('views.appInfo.active')
                                                     : t('views.appInfo.inactive')
                                             }}</span>
+                                            <SelectButton
+                                                v-if="stressNgAvailable && !cpuActive"
+                                                v-model="settingsStore.cpuStressBackend"
+                                                :options="backendOptions"
+                                                option-label="label"
+                                                option-value="value"
+                                                :allow-empty="false"
+                                                v-tooltip.top="{
+                                                    escape: false,
+                                                    value: t('views.appInfo.backendTooltip'),
+                                                }"
+                                                class="ml-1 stress-backend-select"
+                                            />
                                             <span
+                                                v-else
                                                 class="text-xs text-text-color-secondary ml-1 opacity-70"
                                                 >[{{ backendLabel(cpuBackend) }}]</span
                                             >
@@ -673,7 +708,21 @@ onBeforeUnmount(() => {
                                                     ? t('views.appInfo.active')
                                                     : t('views.appInfo.inactive')
                                             }}</span>
+                                            <SelectButton
+                                                v-if="stressNgAvailable && !gpuActive"
+                                                v-model="settingsStore.gpuStressBackend"
+                                                :options="backendOptions"
+                                                option-label="label"
+                                                option-value="value"
+                                                :allow-empty="false"
+                                                v-tooltip.top="{
+                                                    escape: false,
+                                                    value: t('views.appInfo.backendTooltip'),
+                                                }"
+                                                class="ml-1 stress-backend-select"
+                                            />
                                             <span
+                                                v-else
                                                 class="text-xs text-text-color-secondary ml-1 opacity-70"
                                                 >[{{ backendLabel(gpuBackend) }}]</span
                                             >
@@ -741,7 +790,21 @@ onBeforeUnmount(() => {
                                                     ? t('views.appInfo.active')
                                                     : t('views.appInfo.inactive')
                                             }}</span>
+                                            <SelectButton
+                                                v-if="stressNgAvailable && !ramActive"
+                                                v-model="settingsStore.ramStressBackend"
+                                                :options="backendOptions"
+                                                option-label="label"
+                                                option-value="value"
+                                                :allow-empty="false"
+                                                v-tooltip.top="{
+                                                    escape: false,
+                                                    value: t('views.appInfo.backendTooltip'),
+                                                }"
+                                                class="ml-1 stress-backend-select"
+                                            />
                                             <span
+                                                v-else
                                                 class="text-xs text-text-color-secondary ml-1 opacity-70"
                                                 >[{{ backendLabel(ramBackend) }}]</span
                                             >
@@ -829,7 +892,21 @@ onBeforeUnmount(() => {
                                                     ? t('views.appInfo.active')
                                                     : t('views.appInfo.inactive')
                                             }}</span>
+                                            <SelectButton
+                                                v-if="stressNgAvailable && !driveActive"
+                                                v-model="settingsStore.driveStressBackend"
+                                                :options="backendOptions"
+                                                option-label="label"
+                                                option-value="value"
+                                                :allow-empty="false"
+                                                v-tooltip.top="{
+                                                    escape: false,
+                                                    value: t('views.appInfo.backendTooltip'),
+                                                }"
+                                                class="ml-1 stress-backend-select"
+                                            />
                                             <span
+                                                v-else
                                                 class="text-xs text-text-color-secondary ml-1 opacity-70"
                                                 >[{{ backendLabel(driveBackend) }}]</span
                                             >
@@ -904,5 +981,10 @@ onBeforeUnmount(() => {
 .table-data {
     padding: 0.5rem;
     border: 1px solid rgb(var(--colors-border-one));
+}
+
+.stress-backend-select :deep(.p-button) {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
 }
 </style>

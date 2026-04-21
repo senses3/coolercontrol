@@ -133,6 +133,10 @@ export const useSettingsStore = defineStore('settings', () => {
     const entityColors: Ref<Array<[string, string]>> = ref([])
     const eyeCandy: Ref<boolean> = ref(false)
     const showOnboarding: Ref<boolean> = ref(true)
+    const cpuStressBackend: Ref<'stress_ng' | 'built_in'> = ref('stress_ng')
+    const gpuStressBackend: Ref<'stress_ng' | 'built_in'> = ref('built_in')
+    const ramStressBackend: Ref<'stress_ng' | 'built_in'> = ref('stress_ng')
+    const driveStressBackend: Ref<'stress_ng' | 'built_in'> = ref('built_in')
     const tags: Ref<Map<string, TagSettings>> = ref(new Map<string, TagSettings>())
 
     async function initializeSettings(allDevicesIter: IterableIterator<Device>): Promise<void> {
@@ -233,6 +237,10 @@ export const useSettingsStore = defineStore('settings', () => {
         entityColors.value = uiSettings.entityColors
         eyeCandy.value = uiSettings.eyeCandy
         showOnboarding.value = uiSettings.showOnboarding
+        cpuStressBackend.value = uiSettings.cpuStressBackend ?? 'stress_ng'
+        gpuStressBackend.value = uiSettings.gpuStressBackend ?? 'built_in'
+        ramStressBackend.value = uiSettings.ramStressBackend ?? 'stress_ng'
+        driveStressBackend.value = uiSettings.driveStressBackend ?? 'built_in'
         tags.value.clear()
         if (uiSettings.tagNames.length === uiSettings.tagColors.length) {
             for (const [i, name] of uiSettings.tagNames.entries()) {
@@ -908,6 +916,10 @@ export const useSettingsStore = defineStore('settings', () => {
                 entityColors.value,
                 eyeCandy,
                 showOnboarding,
+                cpuStressBackend,
+                gpuStressBackend,
+                ramStressBackend,
+                driveStressBackend,
                 tags.value,
             ],
             _.debounce(
@@ -963,6 +975,10 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.entityColors = entityColors.value
                     uiSettings.eyeCandy = eyeCandy.value
                     uiSettings.showOnboarding = showOnboarding.value
+                    uiSettings.cpuStressBackend = cpuStressBackend.value
+                    uiSettings.gpuStressBackend = gpuStressBackend.value
+                    uiSettings.ramStressBackend = ramStressBackend.value
+                    uiSettings.driveStressBackend = driveStressBackend.value
                     tags.value.forEach((tagSettings, name) => {
                         uiSettings.tagNames.push(name)
                         uiSettings.tagColors.push(tagSettings.color)
@@ -1306,6 +1322,10 @@ export const useSettingsStore = defineStore('settings', () => {
         entityColors,
         eyeCandy,
         showOnboarding,
+        cpuStressBackend,
+        gpuStressBackend,
+        ramStressBackend,
+        driveStressBackend,
         allDaemonDeviceSettings,
         ccSettings,
         ccDeviceSettings,

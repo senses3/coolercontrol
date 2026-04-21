@@ -537,7 +537,7 @@ export default {
             downloadCurrentLog: 'Aktuelle Logs herunterladen',
             stressTest: 'Thermische Stresstests',
             stressTestTooltip:
-                'Erzeugt anhaltende Thermallast zur Validierung<br>von Lüfterkurven und Kühlprofilen.<br>Ergebnisse können je nach Hardware variieren.<br>Installieren Sie stress-ng für bessere Ergebnisse.',
+                'Erzeugt anhaltende Thermallast zur Validierung<br>von Lüfterkurven und Kühlprofilen.<br>Ergebnisse können je nach Hardware variieren.<br>Installieren Sie stress-ng für zusätzliche Backends.',
             cpuStress: 'CPU-Stress',
             gpuStress: 'GPU-Stress',
             gpuStressTooltip:
@@ -545,8 +545,11 @@ export default {
             ramStress: 'RAM-Stress',
             driveStress: 'Laufwerk-Stress',
             driveStressTooltip:
-                'I/O-Stress auf einem Blockgerät zur<br>Wärmeerzeugung an Laufwerkscontrollern.',
+                'I/O-Stress auf einem Blockgerät zur<br>Wärmeerzeugung an Laufwerkscontrollern.<br>stress-ng erfordert, dass das Gerät eingehängt ist.',
             builtInBackend: 'eingebaut',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                'Wählen Sie das Stresstest-Backend.<br>Das eingebaute Backend funktioniert ohne externe Abhängigkeiten.<br>stress-ng (sofern installiert) bietet zusätzliche Stressor-Varianten.',
             selectDrive: 'Laufwerk auswählen',
             threadCount: 'Threads',
             duration: 'Dauer (s)',

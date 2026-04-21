@@ -575,7 +575,7 @@ export default {
             downloadCurrentLog: '現在のログをダウンロード',
             stressTest: '熱ストレステスト',
             stressTestTooltip:
-                '持続的な熱負荷を生成して<br>ファンカーブと冷却プロファイルを検証します。<br>結果はハードウェアにより異なる場合があります。<br>stress-ngをインストールするとより良い結果が得られます。',
+                '持続的な熱負荷を生成して<br>ファンカーブと冷却プロファイルを検証します。<br>結果はハードウェアにより異なる場合があります。<br>stress-ngをインストールすると追加のバックエンドが利用できます。',
             cpuStress: 'CPUストレス',
             gpuStress: 'GPUストレス',
             gpuStressTooltip:
@@ -583,8 +583,11 @@ export default {
             ramStress: 'RAMストレス',
             driveStress: 'ドライブストレス',
             driveStressTooltip:
-                'ブロックデバイスへのI/Oストレスで<br>ドライブコントローラーの発熱を促進します。',
+                'ブロックデバイスへのI/Oストレスで<br>ドライブコントローラーの発熱を促進します。<br>stress-ngはデバイスがマウントされている必要があります。',
             builtInBackend: '内蔵',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                'ストレステストのバックエンドを選択します。<br>内蔵は外部依存なしで動作します。<br>stress-ng (インストール時) は追加のストレッサーバリアントを提供します。',
             selectDrive: 'ドライブを選択',
             threadCount: 'スレッド数',
             duration: '時間 (秒)',

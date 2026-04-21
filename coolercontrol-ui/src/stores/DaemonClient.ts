@@ -1479,11 +1479,13 @@ export default class DaemonClient {
     async startCpuStress(
         threadCount?: number,
         durationSecs?: number,
+        backend?: 'stress_ng' | 'built_in',
     ): Promise<undefined | ErrorResponse> {
         try {
             const response = await this.getClient().post('/stress-test/cpu', {
                 thread_count: threadCount,
                 duration_secs: durationSecs,
+                backend: backend,
             })
             this.logDaemonResponse(response, 'Start CPU Stress')
             return undefined
@@ -1502,10 +1504,14 @@ export default class DaemonClient {
         }
     }
 
-    async startGpuStress(durationSecs?: number): Promise<undefined | ErrorResponse> {
+    async startGpuStress(
+        durationSecs?: number,
+        backend?: 'stress_ng' | 'built_in',
+    ): Promise<undefined | ErrorResponse> {
         try {
             const response = await this.getClient().post('/stress-test/gpu', {
                 duration_secs: durationSecs,
+                backend: backend,
             })
             this.logDaemonResponse(response, 'Start GPU Stress')
             return undefined
@@ -1524,10 +1530,14 @@ export default class DaemonClient {
         }
     }
 
-    async startRamStress(durationSecs?: number): Promise<undefined | ErrorResponse> {
+    async startRamStress(
+        durationSecs?: number,
+        backend?: 'stress_ng' | 'built_in',
+    ): Promise<undefined | ErrorResponse> {
         try {
             const response = await this.getClient().post('/stress-test/ram', {
                 duration_secs: durationSecs,
+                backend: backend,
             })
             this.logDaemonResponse(response, 'Start RAM Stress')
             return undefined
@@ -1562,12 +1572,14 @@ export default class DaemonClient {
         devicePath: string,
         threads?: number,
         durationSecs?: number,
+        backend?: 'stress_ng' | 'built_in',
     ): Promise<undefined | ErrorResponse> {
         try {
             const response = await this.getClient().post('/stress-test/drive', {
                 device_path: devicePath,
                 threads: threads,
                 duration_secs: durationSecs,
+                backend: backend,
             })
             this.logDaemonResponse(response, 'Start Drive Stress')
             return undefined
@@ -1597,6 +1609,7 @@ export default class DaemonClient {
     }
 
     async stressTestStatus(): Promise<{
+        stress_ng_available: boolean
         cpu_active: boolean
         cpu_duration_secs?: number
         cpu_backend: string
@@ -1616,6 +1629,7 @@ export default class DaemonClient {
             return response.data
         } catch {
             return {
+                stress_ng_available: false,
                 cpu_active: false,
                 cpu_backend: 'built_in',
                 gpu_active: false,

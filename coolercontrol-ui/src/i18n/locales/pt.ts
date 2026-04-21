@@ -463,7 +463,7 @@ export default {
             downloadCurrentLog: 'Baixar Log Atual',
             stressTest: 'Testes de estresse térmico',
             stressTestTooltip:
-                'Gera carga térmica sustentada para validar<br>curvas de ventilador e perfis de resfriamento.<br>Os resultados podem variar dependendo do hardware.<br>Instale stress-ng para melhores resultados.',
+                'Gera carga térmica sustentada para validar<br>curvas de ventilador e perfis de resfriamento.<br>Os resultados podem variar dependendo do hardware.<br>Instale stress-ng para backends adicionais.',
             cpuStress: 'Estresse de CPU',
             gpuStress: 'Estresse de GPU',
             gpuStressTooltip:
@@ -471,8 +471,11 @@ export default {
             ramStress: 'Estresse de RAM',
             driveStress: 'Estresse de disco',
             driveStressTooltip:
-                'Estresse de E/S em um dispositivo de bloco para gerar<br>calor nos controladores de disco.',
+                'Estresse de E/S em um dispositivo de bloco para gerar<br>calor nos controladores de disco.<br>stress-ng requer que o dispositivo esteja montado.',
             builtInBackend: 'integrado',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                'Escolha o backend do teste de estresse.<br>O backend integrado funciona sem dependências externas.<br>stress-ng (quando instalado) fornece variantes adicionais de estressores.',
             selectDrive: 'Selecionar disco',
             threadCount: 'Threads',
             duration: 'Duração (s)',
