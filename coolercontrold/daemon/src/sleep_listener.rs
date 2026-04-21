@@ -24,6 +24,8 @@ use std::cell::Cell;
 use std::env;
 use std::ops::Not;
 use std::rc::Rc;
+use std::time::Duration;
+use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use zbus::export::ordered_stream::OrderedStreamExt;
 use zbus::{Connection, Proxy};
@@ -32,6 +34,10 @@ const SLEEP_DEFAULT_BUS_NAME: &str = "org.freedesktop.login1";
 const SLEEP_OBJECTPATH: &str = "/org/freedesktop/login1";
 const SLEEP_INTERFACE: &str = "org.freedesktop.login1.Manager";
 const SIGNAL_PREPARE_FOR_SLEEP: &str = "PrepareForSleep";
+// The whole DBus handshake (connect + proxy + AddMatch for PrepareForSleep) should complete in
+// tens of milliseconds on a healthy system. We cap it so a wedged logind/dbus-broker can't block
+// the main loop from ever starting; on timeout we fall back to the deaf listener.
+const DBUS_SETUP_TIMEOUT_S: u64 = 5;
 
 pub struct SleepListener {
     preparing_to_sleep: Rc<Cell<bool>>,
@@ -57,23 +63,37 @@ impl<'s> SleepListener {
             info!("DBUS sleep listener disabled.");
             return Ok(Self::create_deaf_listener());
         }
-        let conn_result = Connection::system().await;
-        if conn_result.is_err() {
-            // See issue:
-            // https://gitlab.com/coolercontrol/coolercontrol/-/issues/264
-            warn!("Could not connect to DBUS, sleep listener will not work!");
-            return Ok(Self::create_deaf_listener());
-        }
-        let conn = conn_result?;
-        let proxy = Proxy::new(
-            &conn,
-            SLEEP_DEFAULT_BUS_NAME,
-            SLEEP_OBJECTPATH,
-            SLEEP_INTERFACE,
-        )
-        .await?;
-
-        let mut sleep_signal = proxy.receive_signal(SIGNAL_PREPARE_FOR_SLEEP).await?;
+        // We wrap the full setup (not just the connect) because we've seen the hang land on
+        // the AddMatch inside `receive_signal` as well, not only on `Connection::system`.
+        // See https://gitlab.com/coolercontrol/coolercontrol/-/issues/264.
+        let setup = async {
+            let conn = Connection::system().await?;
+            let proxy = Proxy::new(
+                &conn,
+                SLEEP_DEFAULT_BUS_NAME,
+                SLEEP_OBJECTPATH,
+                SLEEP_INTERFACE,
+            )
+            .await?;
+            let signal = proxy.receive_signal(SIGNAL_PREPARE_FOR_SLEEP).await?;
+            Ok::<_, zbus::Error>((conn, signal))
+        };
+        let (conn, mut sleep_signal) =
+            match timeout(Duration::from_secs(DBUS_SETUP_TIMEOUT_S), setup).await {
+                Ok(Ok(pair)) => pair,
+                Ok(Err(err)) => {
+                    warn!("Could not connect to DBUS, sleep listener will not work: {err}");
+                    return Ok(Self::create_deaf_listener());
+                }
+                Err(_) => {
+                    warn!(
+                        "DBUS sleep listener setup timed out after {DBUS_SETUP_TIMEOUT_S}s; \
+                         continuing without it. Sleep/resume events will not be handled \
+                         on this run."
+                    );
+                    return Ok(Self::create_deaf_listener());
+                }
+            };
         let listener = Self {
             preparing_to_sleep: Rc::new(Cell::new(false)),
             resuming: Rc::new(Cell::new(false)),
