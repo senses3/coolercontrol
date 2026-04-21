@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::ops::Not;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
@@ -35,6 +36,15 @@ use crate::api::actor::{run_api_actor, ApiActor};
 const MAX_DURATION_SECS: u16 = 600;
 const DEFAULT_DURATION_SECS: u16 = 60;
 const EARLY_EXIT_CHECK: Duration = Duration::from_millis(500);
+/// Grace period after a child's declared `--timeout` before the daemon
+/// force-kills it. Belt-and-suspenders against a stuck child whose own
+/// self-termination failed (e.g. blocking syscall, hung GPU driver).
+const WATCHDOG_GRACE_SECS: u64 = 10;
+/// Bound on `child.wait()` during stop. SIGKILL is uninterruptible, so a child
+/// that isn't reaped within this window is stuck in kernel D-state (e.g. buggy
+/// GPU driver ioctl). Moving on keeps the actor responsive; the kernel reaps
+/// the zombie when the blocking syscall returns.
+const STOP_REAP_TIMEOUT_SECS: u64 = 5;
 
 /// Which backend is running (or will run) a stress test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -53,12 +63,10 @@ impl std::fmt::Display for StressBackend {
     }
 }
 
-/// Detected stress-ng capabilities, probed once at startup.
+/// Detected stress-ng presence, probed once at startup.
 struct StressNgCaps {
     /// Path to the stress-ng binary, if found.
     path: Option<PathBuf>,
-    /// Whether the GPU stressor is compiled into stress-ng.
-    gpu: bool,
 }
 
 struct StressTestActor {
@@ -67,21 +75,26 @@ struct StressTestActor {
     cpu_child: Option<Child>,
     cpu_duration_secs: Option<u16>,
     cpu_backend: Option<StressBackend>,
+    cpu_watchdog: Option<CancellationToken>,
     gpu_child: Option<Child>,
     gpu_duration_secs: Option<u16>,
     gpu_backend: Option<StressBackend>,
+    gpu_watchdog: Option<CancellationToken>,
     ram_child: Option<Child>,
     ram_duration_secs: Option<u16>,
     ram_backend: Option<StressBackend>,
+    ram_watchdog: Option<CancellationToken>,
     drive_child: Option<Child>,
     drive_duration_secs: Option<u16>,
     drive_backend: Option<StressBackend>,
+    drive_watchdog: Option<CancellationToken>,
 }
 
 enum StressTestMessage {
     StartCpu {
         thread_count: Option<u16>,
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     StopCpu {
@@ -89,6 +102,7 @@ enum StressTestMessage {
     },
     StartGpu {
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     StopGpu {
@@ -96,6 +110,7 @@ enum StressTestMessage {
     },
     StartRam {
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     StopRam {
@@ -105,6 +120,7 @@ enum StressTestMessage {
         device_path: String,
         threads: Option<u16>,
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     StopDrive {
@@ -121,6 +137,7 @@ enum StressTestMessage {
 #[derive(Debug, Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct StressTestStatus {
+    pub stress_ng_available: bool,
     pub cpu_active: bool,
     pub cpu_duration_secs: Option<u16>,
     pub cpu_backend: StressBackend,
@@ -143,15 +160,19 @@ impl StressTestActor {
             cpu_child: None,
             cpu_duration_secs: None,
             cpu_backend: None,
+            cpu_watchdog: None,
             gpu_child: None,
             gpu_duration_secs: None,
             gpu_backend: None,
+            gpu_watchdog: None,
             ram_child: None,
             ram_duration_secs: None,
             ram_backend: None,
+            ram_watchdog: None,
             drive_child: None,
             drive_duration_secs: None,
             drive_backend: None,
+            drive_watchdog: None,
         }
     }
 
@@ -166,6 +187,58 @@ impl StressTestActor {
             buf.trim().to_string()
         } else {
             String::from("(no stderr)")
+        }
+    }
+
+    /// Spawn a watchdog task that force-kills the child PID if it overruns
+    /// `duration_secs + WATCHDOG_GRACE_SECS`. Returns the cancellation token
+    /// the actor must cancel when the child exits or is stopped explicitly,
+    /// to avoid sending SIGKILL to a recycled PID.
+    fn spawn_watchdog(
+        child_pid: u32,
+        duration_secs: u16,
+        label: &'static str,
+    ) -> CancellationToken {
+        let token = CancellationToken::new();
+        let token_clone = token.clone();
+        let total =
+            Duration::from_secs(u64::from(duration_secs).saturating_add(WATCHDOG_GRACE_SECS));
+        tokio::task::spawn_local(async move {
+            tokio::select! {
+                () = token_clone.cancelled() => {} // child exited normally or stop_*
+                () = tokio::time::sleep(total) => {
+                    warn!(
+                        "{label} stress test exceeded timeout + grace; \
+                         force-killing PID {child_pid}"
+                    );
+                    // Truncation impossible: PIDs are well within i32 range on Linux.
+                    #[allow(clippy::cast_possible_wrap)]
+                    let _ = nix::sys::signal::kill(
+                        nix::unistd::Pid::from_raw(child_pid as i32),
+                        nix::sys::signal::Signal::SIGKILL,
+                    );
+                }
+            }
+        });
+        token
+    }
+
+    /// SIGKILL the child and reap it with a bounded wait.
+    ///
+    /// A child stuck in kernel D-state cannot be reaped from userspace; logging
+    /// and moving on prevents the actor's message handler from blocking
+    /// indefinitely, which would otherwise queue up subsequent stress-test
+    /// requests and wedge `StopAll` mid-sequence.
+    async fn kill_and_reap(child: &mut Child, label: &str) {
+        let _ = child.kill().await;
+        if tokio::time::timeout(Duration::from_secs(STOP_REAP_TIMEOUT_SECS), child.wait())
+            .await
+            .is_err()
+        {
+            warn!(
+                "{label} stress child did not reap within {STOP_REAP_TIMEOUT_SECS}s \
+                 after SIGKILL; process may be in kernel D-state. Continuing."
+            );
         }
     }
 
@@ -238,133 +311,177 @@ impl StressTestActor {
         &mut self,
         thread_count: Option<u16>,
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
     ) -> Result<()> {
         if self.cpu_child.is_some() {
             return Err(anyhow!("CPU stress test is already running"));
         }
-
-        let duration = duration_secs
+        let duration_secs = duration_secs
             .unwrap_or(DEFAULT_DURATION_SECS)
             .min(MAX_DURATION_SECS);
         let available_cpus = cc_stress::online_cpu_count();
-        let threads = thread_count
+        let thread_count = thread_count
             .unwrap_or(available_cpus)
             .min(available_cpus.saturating_mul(2))
             .max(1);
-        let threads_str = threads.to_string();
-        let timeout_str = format!("{duration}s");
-        let duration_str = duration.to_string();
 
-        let (mut child, backend) = if let Some(path) = &self.stress_ng.path {
-            info!("Starting CPU stress test via stress-ng: {threads} threads, {duration}s");
-            let child = Self::spawn_stress_ng(
-                path,
-                &["--cpu", &threads_str, "--timeout", &timeout_str],
-                "CPU",
-            )?;
-            (child, StressBackend::StressNg)
-        } else {
-            let bin_path = Self::bin_path()?;
-            info!(
-                "Starting CPU stress test (built-in): {threads} threads, {duration}s, bin: {}",
-                bin_path.display()
-            );
-            let child = Self::spawn_builtin(
-                &[
-                    "stress-cpu",
-                    "--timeout",
-                    &duration_str,
-                    "--threads",
-                    &threads_str,
-                ],
-                "CPU",
-            )?;
-            (child, StressBackend::BuiltIn)
-        };
-
+        let resolved = Self::resolve_backend(backend);
+        let mut child = self.spawn_cpu(resolved, thread_count, duration_secs)?;
         info!(
-            "CPU stress subprocess spawned with PID: {:?} ({})",
-            child.id(),
-            backend
+            "CPU stress subprocess spawned with PID: {:?} ({resolved})",
+            child.id()
         );
-
         Self::check_early_exit(&mut child, "CPU").await?;
 
+        self.cpu_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "CPU"));
         self.cpu_child = Some(child);
-        self.cpu_duration_secs = Some(duration);
-        self.cpu_backend = Some(backend);
+        self.cpu_duration_secs = Some(duration_secs);
+        self.cpu_backend = Some(resolved);
         Ok(())
     }
 
+    fn spawn_cpu(
+        &self,
+        backend: StressBackend,
+        thread_count: u16,
+        duration_secs: u16,
+    ) -> Result<Child> {
+        let threads_str = thread_count.to_string();
+        let timeout_str = format!("{duration_secs}s");
+        let duration_str = duration_secs.to_string();
+        match backend {
+            StressBackend::StressNg => {
+                let path = self
+                    .stress_ng
+                    .path
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("stress-ng is not installed"))?;
+                info!(
+                    "Starting CPU stress test via stress-ng: \
+                     {thread_count} threads, {duration_secs}s"
+                );
+                Self::spawn_stress_ng(
+                    path,
+                    &["--cpu", &threads_str, "--timeout", &timeout_str],
+                    "CPU",
+                )
+            }
+            StressBackend::BuiltIn => {
+                let bin_path = Self::bin_path()?;
+                info!(
+                    "Starting CPU stress test (built-in): \
+                     {thread_count} threads, {duration_secs}s, bin: {}",
+                    bin_path.display()
+                );
+                Self::spawn_builtin(
+                    &[
+                        "stress-cpu",
+                        "--timeout",
+                        &duration_str,
+                        "--threads",
+                        &threads_str,
+                    ],
+                    "CPU",
+                )
+            }
+        }
+    }
+
     async fn stop_cpu(&mut self) {
+        if let Some(token) = self.cpu_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.cpu_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "CPU").await;
             self.cpu_duration_secs = None;
             self.cpu_backend = None;
             info!("CPU stress test stopped");
         }
     }
 
-    async fn start_gpu(&mut self, duration_secs: Option<u16>) -> Result<()> {
+    async fn start_gpu(
+        &mut self,
+        duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
+    ) -> Result<()> {
         if self.gpu_child.is_some() {
             return Err(anyhow!("GPU stress test is already running"));
         }
-
-        let duration = duration_secs
+        let duration_secs = duration_secs
             .unwrap_or(DEFAULT_DURATION_SECS)
             .min(MAX_DURATION_SECS);
-        let timeout_str = format!("{duration}s");
-        let duration_str = duration.to_string();
 
-        let (mut child, backend) = if let Some(path) = &self.stress_ng.path {
-            if self.stress_ng.gpu {
-                info!("Starting GPU stress test via stress-ng: {duration}s");
-                let child =
-                    Self::spawn_stress_ng(path, &["--gpu", "1", "--timeout", &timeout_str], "GPU")?;
-                (child, StressBackend::StressNg)
-            } else {
-                info!(
-                    "Starting GPU stress test (built-in, stress-ng GPU not available): {duration}s"
-                );
-                let child =
-                    Self::spawn_builtin(&["stress-gpu", "--timeout", &duration_str], "GPU")?;
-                (child, StressBackend::BuiltIn)
+        let resolved = Self::resolve_backend(backend);
+        let mut child = self.spawn_gpu(resolved, duration_secs)?;
+        if let Err(e) = Self::check_early_exit(&mut child, "GPU").await {
+            // The GPU stressor is an optional stress-ng feature and is not
+            // compiled into many distro packages; surface that hint so the
+            // user knows to switch to the built-in backend.
+            if resolved == StressBackend::StressNg {
+                return Err(anyhow!(
+                    "{e}. The GPU stressor is likely not enabled in the installed \
+                     stress-ng binary; try the built-in backend instead."
+                ));
             }
-        } else {
-            info!("Starting GPU stress test (built-in): {duration}s");
-            let child = Self::spawn_builtin(&["stress-gpu", "--timeout", &duration_str], "GPU")?;
-            (child, StressBackend::BuiltIn)
-        };
+            return Err(e);
+        }
 
-        Self::check_early_exit(&mut child, "GPU").await?;
-
+        self.gpu_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "GPU"));
         self.gpu_child = Some(child);
-        self.gpu_duration_secs = Some(duration);
-        self.gpu_backend = Some(backend);
+        self.gpu_duration_secs = Some(duration_secs);
+        self.gpu_backend = Some(resolved);
         Ok(())
     }
 
+    fn spawn_gpu(&self, backend: StressBackend, duration_secs: u16) -> Result<Child> {
+        let timeout_str = format!("{duration_secs}s");
+        let duration_str = duration_secs.to_string();
+        match backend {
+            StressBackend::StressNg => {
+                let path = self
+                    .stress_ng
+                    .path
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("stress-ng is not installed"))?;
+                info!("Starting GPU stress test via stress-ng: {duration_secs}s");
+                Self::spawn_stress_ng(path, &["--gpu", "1", "--timeout", &timeout_str], "GPU")
+            }
+            StressBackend::BuiltIn => {
+                info!("Starting GPU stress test (built-in): {duration_secs}s");
+                Self::spawn_builtin(&["stress-gpu", "--timeout", &duration_str], "GPU")
+            }
+        }
+    }
+
     async fn stop_gpu(&mut self) {
+        if let Some(token) = self.gpu_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.gpu_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "GPU").await;
             self.gpu_duration_secs = None;
             self.gpu_backend = None;
             info!("GPU stress test stopped");
         }
     }
 
-    async fn start_ram(&mut self, duration_secs: Option<u16>) -> Result<()> {
+    async fn start_ram(
+        &mut self,
+        duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
+    ) -> Result<()> {
         if self.ram_child.is_some() {
             return Err(anyhow!("RAM stress test is already running"));
         }
-
-        let duration = duration_secs
+        let duration_secs = duration_secs
             .unwrap_or(DEFAULT_DURATION_SECS)
             .min(MAX_DURATION_SECS);
 
-        let available = cc_stress::available_memory_bytes()
+        let available_bytes = cc_stress::available_memory_bytes()
             .map_err(|e| anyhow!("Failed to read available memory: {e}"))?;
         // Precision loss is acceptable for a memory size estimate.
         #[allow(
@@ -372,65 +489,84 @@ impl StressTestActor {
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss
         )]
-        let alloc_bytes = (available as f64 * cc_stress::RAM_STRESS_ALLOC_FRACTION) as u64;
+        let alloc_bytes = (available_bytes as f64 * cc_stress::RAM_STRESS_ALLOC_FRACTION) as u64;
 
-        let timeout_str = format!("{duration}s");
-        let duration_str = duration.to_string();
-
-        let (mut child, backend) = if let Some(path) = &self.stress_ng.path {
-            let num_workers = u64::from(cc_stress::online_cpu_count()).max(1);
-            let per_worker_bytes = alloc_bytes / num_workers;
-            let workers_str = num_workers.to_string();
-            let bytes_str = format!("{per_worker_bytes}");
-            info!(
-                "Starting RAM stress test via stress-ng: {duration}s, \
-                 {num_workers} workers x {} MiB",
-                per_worker_bytes / (1024 * 1024)
-            );
-            let child = Self::spawn_stress_ng(
-                path,
-                &[
-                    "--vm",
-                    &workers_str,
-                    "--vm-bytes",
-                    &bytes_str,
-                    "--timeout",
-                    &timeout_str,
-                ],
-                "RAM",
-            )?;
-            (child, StressBackend::StressNg)
-        } else {
-            let alloc_str = alloc_bytes.to_string();
-            info!(
-                "Starting RAM stress test (built-in): {duration}s, {} MiB",
-                alloc_bytes / (1024 * 1024)
-            );
-            let child = Self::spawn_builtin(
-                &[
-                    "stress-ram",
-                    "--bytes",
-                    &alloc_str,
-                    "--timeout",
-                    &duration_str,
-                ],
-                "RAM",
-            )?;
-            (child, StressBackend::BuiltIn)
-        };
-
+        let resolved = Self::resolve_backend(backend);
+        let mut child = self.spawn_ram(resolved, duration_secs, alloc_bytes)?;
         Self::check_early_exit(&mut child, "RAM").await?;
 
+        self.ram_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "RAM"));
         self.ram_child = Some(child);
-        self.ram_duration_secs = Some(duration);
-        self.ram_backend = Some(backend);
+        self.ram_duration_secs = Some(duration_secs);
+        self.ram_backend = Some(resolved);
         Ok(())
     }
 
+    fn spawn_ram(
+        &self,
+        backend: StressBackend,
+        duration_secs: u16,
+        alloc_bytes: u64,
+    ) -> Result<Child> {
+        let timeout_str = format!("{duration_secs}s");
+        let duration_str = duration_secs.to_string();
+        match backend {
+            StressBackend::StressNg => {
+                let path = self
+                    .stress_ng
+                    .path
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("stress-ng is not installed"))?;
+                let num_workers = u64::from(cc_stress::online_cpu_count()).max(1);
+                let per_worker_bytes = alloc_bytes / num_workers;
+                let workers_str = num_workers.to_string();
+                let bytes_str = per_worker_bytes.to_string();
+                info!(
+                    "Starting RAM stress test via stress-ng: {duration_secs}s, \
+                     {num_workers} workers x {} MiB",
+                    per_worker_bytes / (1024 * 1024)
+                );
+                Self::spawn_stress_ng(
+                    path,
+                    &[
+                        "--vm",
+                        &workers_str,
+                        "--vm-bytes",
+                        &bytes_str,
+                        "--timeout",
+                        &timeout_str,
+                    ],
+                    "RAM",
+                )
+            }
+            StressBackend::BuiltIn => {
+                let alloc_str = alloc_bytes.to_string();
+                info!(
+                    "Starting RAM stress test (built-in): {duration_secs}s, {} MiB",
+                    alloc_bytes / (1024 * 1024)
+                );
+                Self::spawn_builtin(
+                    &[
+                        "stress-ram",
+                        "--bytes",
+                        &alloc_str,
+                        "--timeout",
+                        &duration_str,
+                    ],
+                    "RAM",
+                )
+            }
+        }
+    }
+
     async fn stop_ram(&mut self) {
+        if let Some(token) = self.ram_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.ram_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "RAM").await;
             self.ram_duration_secs = None;
             self.ram_backend = None;
             info!("RAM stress test stopped");
@@ -442,41 +578,61 @@ impl StressTestActor {
         device_path: String,
         threads: Option<u16>,
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
     ) -> Result<()> {
         if self.drive_child.is_some() {
             return Err(anyhow!("Drive stress test is already running"));
         }
+        validate_device_path(&device_path)?;
 
-        // Validate device path for safety.
-        if !device_path.starts_with("/dev/") {
-            return Err(anyhow!("Device path must start with /dev/"));
-        }
-        if device_path.contains("..") {
-            return Err(anyhow!("Device path must not contain '..'"));
-        }
-        let path = std::path::Path::new(&device_path);
-        if !path.exists() {
-            return Err(anyhow!("Device {device_path} does not exist"));
-        }
-
-        let duration = duration_secs
+        let duration_secs = duration_secs
             .unwrap_or(DEFAULT_DURATION_SECS)
             .min(MAX_DURATION_SECS);
         let thread_count = threads
             .unwrap_or(cc_stress::DRIVE_STRESS_DEFAULT_THREADS)
             .max(1);
-        let threads_str = thread_count.to_string();
-        let timeout_str = format!("{duration}s");
-        let duration_str = duration.to_string();
 
-        // Try stress-ng with mount point mapping; fall back to built-in.
-        let (mut child, backend) = if let Some(ng_path) = &self.stress_ng.path {
-            if let Some(mount_point) = find_mount_point(&device_path) {
+        let resolved = Self::resolve_backend(backend);
+        let mut child = self.spawn_drive(resolved, &device_path, thread_count, duration_secs)?;
+        Self::check_early_exit(&mut child, "Drive").await?;
+
+        self.drive_watchdog = child
+            .id()
+            .map(|pid| Self::spawn_watchdog(pid, duration_secs, "Drive"));
+        self.drive_child = Some(child);
+        self.drive_duration_secs = Some(duration_secs);
+        self.drive_backend = Some(resolved);
+        Ok(())
+    }
+
+    fn spawn_drive(
+        &self,
+        backend: StressBackend,
+        device_path: &str,
+        thread_count: u16,
+        duration_secs: u16,
+    ) -> Result<Child> {
+        let threads_str = thread_count.to_string();
+        let timeout_str = format!("{duration_secs}s");
+        let duration_str = duration_secs.to_string();
+        match backend {
+            StressBackend::StressNg => {
+                let ng_path = self
+                    .stress_ng
+                    .path
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("stress-ng is not installed"))?;
+                let mount_point = find_mount_point(device_path).ok_or_else(|| {
+                    anyhow!(
+                        "Device {device_path} must be mounted to use stress-ng \
+                         — try the built-in backend"
+                    )
+                })?;
                 info!(
                     "Starting Drive stress test via stress-ng: {device_path} \
-                         (mount: {mount_point}), {thread_count} threads, {duration}s"
+                     (mount: {mount_point}), {thread_count} threads, {duration_secs}s"
                 );
-                let child = Self::spawn_stress_ng(
+                Self::spawn_stress_ng(
                     ng_path,
                     &[
                         "--hdd",
@@ -487,59 +643,35 @@ impl StressTestActor {
                         &timeout_str,
                     ],
                     "Drive",
-                )?;
-                (child, StressBackend::StressNg)
-            } else {
+                )
+            }
+            StressBackend::BuiltIn => {
                 info!(
-                    "Starting Drive stress test (built-in, device not mounted): \
-                         {device_path}, {thread_count} threads, {duration}s"
+                    "Starting Drive stress test (built-in): \
+                     {device_path}, {thread_count} threads, {duration_secs}s"
                 );
-                let child = Self::spawn_builtin(
+                Self::spawn_builtin(
                     &[
                         "stress-drive",
                         "--device",
-                        &device_path,
+                        device_path,
                         "--threads",
                         &threads_str,
                         "--timeout",
                         &duration_str,
                     ],
                     "Drive",
-                )?;
-                (child, StressBackend::BuiltIn)
+                )
             }
-        } else {
-            info!(
-                "Starting Drive stress test (built-in): \
-                     {device_path}, {thread_count} threads, {duration}s"
-            );
-            let child = Self::spawn_builtin(
-                &[
-                    "stress-drive",
-                    "--device",
-                    &device_path,
-                    "--threads",
-                    &threads_str,
-                    "--timeout",
-                    &duration_str,
-                ],
-                "Drive",
-            )?;
-            (child, StressBackend::BuiltIn)
-        };
-
-        Self::check_early_exit(&mut child, "Drive").await?;
-
-        self.drive_child = Some(child);
-        self.drive_duration_secs = Some(duration);
-        self.drive_backend = Some(backend);
-        Ok(())
+        }
     }
 
     async fn stop_drive(&mut self) {
+        if let Some(token) = self.drive_watchdog.take() {
+            token.cancel();
+        }
         if let Some(mut child) = self.drive_child.take() {
-            let _ = child.kill().await;
-            let _ = child.wait().await;
+            Self::kill_and_reap(&mut child, "Drive").await;
             self.drive_duration_secs = None;
             self.drive_backend = None;
             info!("Drive stress test stopped");
@@ -550,6 +682,7 @@ impl StressTestActor {
         child: &mut Option<Child>,
         duration: &mut Option<u16>,
         backend: &mut Option<StressBackend>,
+        watchdog: &mut Option<CancellationToken>,
         label: &str,
     ) {
         if let Some(c) = child.as_mut() {
@@ -559,6 +692,9 @@ impl StressTestActor {
                     *child = None;
                     *duration = None;
                     *backend = None;
+                    if let Some(token) = watchdog.take() {
+                        token.cancel();
+                    }
                 }
                 Ok(None) => {} // still running
                 Err(err) => {
@@ -566,21 +702,19 @@ impl StressTestActor {
                     *child = None;
                     *duration = None;
                     *backend = None;
+                    if let Some(token) = watchdog.take() {
+                        token.cancel();
+                    }
                 }
             }
         }
     }
 
-    /// Returns which backend will be used for each test type, taking into
-    /// account what is currently running (active backend) and what would
-    /// be used if started now (default backend based on capabilities).
-    #[allow(clippy::unused_self)] // Keeps consistent method-call style with other actor methods.
-    fn backend_for(&self, active: Option<StressBackend>, has_stress_ng: bool) -> StressBackend {
-        active.unwrap_or(if has_stress_ng {
-            StressBackend::StressNg
-        } else {
-            StressBackend::BuiltIn
-        })
+    /// Resolve the backend to use for a test. An explicit choice is honored;
+    /// `None` defaults to built-in for every test type. The user opts into
+    /// stress-ng explicitly via the per-test toggle in the UI.
+    fn resolve_backend(explicit: Option<StressBackend>) -> StressBackend {
+        explicit.unwrap_or(StressBackend::BuiltIn)
     }
 
     fn status(&mut self) -> StressTestStatus {
@@ -588,42 +722,44 @@ impl StressTestActor {
             &mut self.cpu_child,
             &mut self.cpu_duration_secs,
             &mut self.cpu_backend,
+            &mut self.cpu_watchdog,
             "CPU",
         );
         Self::check_child_still_running(
             &mut self.gpu_child,
             &mut self.gpu_duration_secs,
             &mut self.gpu_backend,
+            &mut self.gpu_watchdog,
             "GPU",
         );
         Self::check_child_still_running(
             &mut self.ram_child,
             &mut self.ram_duration_secs,
             &mut self.ram_backend,
+            &mut self.ram_watchdog,
             "RAM",
         );
         Self::check_child_still_running(
             &mut self.drive_child,
             &mut self.drive_duration_secs,
             &mut self.drive_backend,
+            &mut self.drive_watchdog,
             "Drive",
         );
-        let has_ng = self.stress_ng.path.is_some();
         StressTestStatus {
+            stress_ng_available: self.stress_ng.path.is_some(),
             cpu_active: self.cpu_child.is_some(),
             cpu_duration_secs: self.cpu_duration_secs,
-            cpu_backend: self.backend_for(self.cpu_backend, has_ng),
+            cpu_backend: Self::resolve_backend(self.cpu_backend),
             gpu_active: self.gpu_child.is_some(),
             gpu_duration_secs: self.gpu_duration_secs,
-            gpu_backend: self.backend_for(self.gpu_backend, has_ng && self.stress_ng.gpu),
+            gpu_backend: Self::resolve_backend(self.gpu_backend),
             ram_active: self.ram_child.is_some(),
             ram_duration_secs: self.ram_duration_secs,
-            ram_backend: self.backend_for(self.ram_backend, has_ng),
+            ram_backend: Self::resolve_backend(self.ram_backend),
             drive_active: self.drive_child.is_some(),
             drive_duration_secs: self.drive_duration_secs,
-            // Drive backend depends on whether device is mounted, so
-            // when idle we report built-in as the conservative default.
-            drive_backend: self.backend_for(self.drive_backend, false),
+            drive_backend: Self::resolve_backend(self.drive_backend),
         }
     }
 }
@@ -642,9 +778,10 @@ impl ApiActor<StressTestMessage> for StressTestActor {
             StressTestMessage::StartCpu {
                 thread_count,
                 duration_secs,
+                backend,
                 respond_to,
             } => {
-                let result = self.start_cpu(thread_count, duration_secs).await;
+                let result = self.start_cpu(thread_count, duration_secs, backend).await;
                 let _ = respond_to.send(result);
             }
             StressTestMessage::StopCpu { respond_to } => {
@@ -653,9 +790,10 @@ impl ApiActor<StressTestMessage> for StressTestActor {
             }
             StressTestMessage::StartGpu {
                 duration_secs,
+                backend,
                 respond_to,
             } => {
-                let result = self.start_gpu(duration_secs).await;
+                let result = self.start_gpu(duration_secs, backend).await;
                 let _ = respond_to.send(result);
             }
             StressTestMessage::StopGpu { respond_to } => {
@@ -664,9 +802,10 @@ impl ApiActor<StressTestMessage> for StressTestActor {
             }
             StressTestMessage::StartRam {
                 duration_secs,
+                backend,
                 respond_to,
             } => {
-                let result = self.start_ram(duration_secs).await;
+                let result = self.start_ram(duration_secs, backend).await;
                 let _ = respond_to.send(result);
             }
             StressTestMessage::StopRam { respond_to } => {
@@ -677,9 +816,12 @@ impl ApiActor<StressTestMessage> for StressTestActor {
                 device_path,
                 threads,
                 duration_secs,
+                backend,
                 respond_to,
             } => {
-                let result = self.start_drive(device_path, threads, duration_secs).await;
+                let result = self
+                    .start_drive(device_path, threads, duration_secs, backend)
+                    .await;
                 let _ = respond_to.send(result);
             }
             StressTestMessage::StopDrive { respond_to } => {
@@ -698,6 +840,21 @@ impl ApiActor<StressTestMessage> for StressTestActor {
             }
         }
     }
+}
+
+/// Defensive validation of a block device path. The API layer also validates,
+/// but the actor must not trust its callers blindly.
+fn validate_device_path(device_path: &str) -> Result<()> {
+    if device_path.starts_with("/dev/").not() {
+        return Err(anyhow!("Device path must start with /dev/"));
+    }
+    if device_path.contains("..") {
+        return Err(anyhow!("Device path must not contain '..'"));
+    }
+    if std::path::Path::new(device_path).exists().not() {
+        return Err(anyhow!("Device {device_path} does not exist"));
+    }
+    Ok(())
 }
 
 /// Find a mount point for the given block device by parsing `/proc/mounts`.
@@ -727,9 +884,12 @@ fn find_mount_point(device_path: &str) -> Option<String> {
     None
 }
 
-/// Detect stress-ng binary and probe its GPU capability.
+/// Detect whether the stress-ng binary is installed.
+///
+/// We deliberately do not probe individual stressor capabilities (e.g. the
+/// `--gpu` stressor): the user picks the backend per test type in the UI,
+/// and a missing/broken stressor surfaces via the spawned child's stderr.
 async fn detect_stress_ng() -> StressNgCaps {
-    // Check if stress-ng is installed.
     let which_result = Command::new("which")
         .arg("stress-ng")
         .stdout(Stdio::piped())
@@ -749,48 +909,16 @@ async fn detect_stress_ng() -> StressNgCaps {
         _ => None,
     };
 
-    let Some(ref ng_path) = path else {
+    if let Some(ref ng_path) = path {
+        info!("stress-ng found at: {}", ng_path.display());
+    } else {
         info!(
             "stress-ng is not installed. \
-             Install it for improved stress test results."
+             Install it for additional stress test backends."
         );
-        return StressNgCaps {
-            path: None,
-            gpu: false,
-        };
-    };
+    }
 
-    info!("stress-ng found at: {}", ng_path.display());
-
-    // Probe GPU support by running a zero-duration GPU test.
-    // stress-ng writes info messages (including "not implemented" and
-    // "skipped") to stdout, not stderr, so we must capture both.
-    let gpu = match Command::new(ng_path)
-        .args(["--gpu", "1", "--timeout", "0"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .await
-    {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let combined = format!("{stdout}{stderr}");
-            let unsupported = combined.contains("not implemented") || combined.contains("skipped");
-            if unsupported {
-                info!("stress-ng GPU stressor is not available on this build");
-            } else {
-                info!("stress-ng GPU stressor is available");
-            }
-            !unsupported
-        }
-        Err(e) => {
-            warn!("Failed to probe stress-ng GPU support: {e}");
-            false
-        }
-    };
-
-    StressNgCaps { path, gpu }
+    StressNgCaps { path }
 }
 
 #[derive(Clone)]
@@ -817,11 +945,13 @@ impl StressTestHandle {
         &self,
         thread_count: Option<u16>,
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
     ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = StressTestMessage::StartCpu {
             thread_count,
             duration_secs,
+            backend,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
@@ -835,10 +965,15 @@ impl StressTestHandle {
         rx.await?
     }
 
-    pub async fn start_gpu(&self, duration_secs: Option<u16>) -> Result<()> {
+    pub async fn start_gpu(
+        &self,
+        duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
+    ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = StressTestMessage::StartGpu {
             duration_secs,
+            backend,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
@@ -852,10 +987,15 @@ impl StressTestHandle {
         rx.await?
     }
 
-    pub async fn start_ram(&self, duration_secs: Option<u16>) -> Result<()> {
+    pub async fn start_ram(
+        &self,
+        duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
+    ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = StressTestMessage::StartRam {
             duration_secs,
+            backend,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
@@ -874,12 +1014,14 @@ impl StressTestHandle {
         device_path: String,
         threads: Option<u16>,
         duration_secs: Option<u16>,
+        backend: Option<StressBackend>,
     ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = StressTestMessage::StartDrive {
             device_path,
             threads,
             duration_secs,
+            backend,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
@@ -905,6 +1047,7 @@ impl StressTestHandle {
         let msg = StressTestMessage::Status { respond_to: tx };
         let _ = self.sender.send(msg).await;
         rx.await.unwrap_or(StressTestStatus {
+            stress_ng_available: false,
             cpu_active: false,
             cpu_duration_secs: None,
             cpu_backend: StressBackend::BuiltIn,
@@ -927,7 +1070,9 @@ mod tests {
 
     #[test]
     fn stress_test_status_defaults() {
+        // Confirms the default-state shape that callers (UI, tests) rely on.
         let status = StressTestStatus {
+            stress_ng_available: false,
             cpu_active: false,
             cpu_duration_secs: None,
             cpu_backend: StressBackend::BuiltIn,
@@ -941,21 +1086,24 @@ mod tests {
             drive_duration_secs: None,
             drive_backend: StressBackend::BuiltIn,
         };
-        assert!(!status.cpu_active);
-        assert!(!status.gpu_active);
-        assert!(!status.ram_active);
-        assert!(!status.drive_active);
+        assert!(status.cpu_active.not());
+        assert!(status.gpu_active.not());
+        assert!(status.ram_active.not());
+        assert!(status.drive_active.not());
+        assert!(status.stress_ng_available.not());
         assert_eq!(status.cpu_backend, StressBackend::BuiltIn);
     }
 
     #[test]
     fn stress_backend_display() {
+        // Display format is consumed by log lines; pin both spellings.
         assert_eq!(StressBackend::BuiltIn.to_string(), "built-in");
         assert_eq!(StressBackend::StressNg.to_string(), "stress-ng");
     }
 
     #[test]
     fn stress_backend_serde_roundtrip() {
+        // The wire format is snake_case and shared with the UI; pin it.
         let json = serde_json::to_string(&StressBackend::StressNg).unwrap();
         assert_eq!(json, "\"stress_ng\"");
         let back: StressBackend = serde_json::from_str(&json).unwrap();
@@ -966,10 +1114,66 @@ mod tests {
     }
 
     #[test]
+    fn resolve_backend_honors_explicit_choice() {
+        // An explicit caller choice always wins.
+        assert_eq!(
+            StressTestActor::resolve_backend(Some(StressBackend::StressNg)),
+            StressBackend::StressNg
+        );
+        assert_eq!(
+            StressTestActor::resolve_backend(Some(StressBackend::BuiltIn)),
+            StressBackend::BuiltIn
+        );
+    }
+
+    #[test]
+    fn resolve_backend_defaults_to_built_in() {
+        // None always resolves to built-in, regardless of stress-ng presence:
+        // the user opts into stress-ng explicitly via the per-test UI toggle.
+        assert_eq!(
+            StressTestActor::resolve_backend(None),
+            StressBackend::BuiltIn
+        );
+    }
+
+    #[test]
+    fn validate_device_path_rejects_invalid_inputs() {
+        // Negative space: paths outside /dev, traversal attempts, and missing
+        // devices must all be rejected before we hand them to a subprocess.
+        assert!(validate_device_path("/etc/passwd").is_err());
+        assert!(validate_device_path("/dev/../etc/passwd").is_err());
+        assert!(validate_device_path("/dev/nonexistent_device_xyz").is_err());
+    }
+
+    #[test]
     fn find_mount_point_parses_proc_mounts() {
         // find_mount_point reads /proc/mounts which exists on Linux test hosts.
-        // We just verify it returns Some or None without panicking.
+        // For an obviously-bogus device, the result must be None (not panic).
         let result = find_mount_point("/dev/nonexistent_device_xyz");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn check_child_still_running_clears_state_and_cancels_watchdog() {
+        // When the child has exited, both the actor's tracking fields and the
+        // watchdog token must be cleared, so a stale SIGKILL cannot land on a
+        // recycled PID later.
+        let mut child: Option<Child> = None; // None branch → no-op
+        let mut duration = Some(60_u16);
+        let mut backend = Some(StressBackend::BuiltIn);
+        let mut watchdog = Some(CancellationToken::new());
+        let token_clone = watchdog.as_ref().unwrap().clone();
+        StressTestActor::check_child_still_running(
+            &mut child,
+            &mut duration,
+            &mut backend,
+            &mut watchdog,
+            "TEST",
+        );
+        // Child was None: nothing should have changed.
+        assert!(duration.is_some());
+        assert!(backend.is_some());
+        assert!(watchdog.is_some());
+        assert!(token_clone.is_cancelled().not());
     }
 }

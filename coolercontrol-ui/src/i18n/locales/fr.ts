@@ -544,7 +544,7 @@ export default {
             downloadCurrentLog: 'Télécharger le Journal Actuel',
             stressTest: 'Tests de stress thermique',
             stressTestTooltip:
-                'Génère une charge thermique soutenue pour valider<br>les courbes de ventilateur et les profils de refroidissement.<br>Les résultats peuvent varier selon le matériel.<br>Installez stress-ng pour de meilleurs résultats.',
+                'Génère une charge thermique soutenue pour valider<br>les courbes de ventilateur et les profils de refroidissement.<br>Les résultats peuvent varier selon le matériel.<br>Installez stress-ng pour des backends supplémentaires.',
             cpuStress: 'Stress CPU',
             gpuStress: 'Stress GPU',
             gpuStressTooltip:
@@ -552,8 +552,11 @@ export default {
             ramStress: 'Stress RAM',
             driveStress: 'Stress disque',
             driveStressTooltip:
-                "Stress d'E/S sur un périphérique bloc pour générer<br>de la chaleur sur les contrôleurs de disque.",
+                "Stress d'E/S sur un périphérique bloc pour générer<br>de la chaleur sur les contrôleurs de disque.<br>stress-ng nécessite que le périphérique soit monté.",
             builtInBackend: 'intégré',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                "Choisissez le backend du test de stress.<br>Le backend intégré fonctionne sans dépendances externes.<br>stress-ng (lorsqu'il est installé) fournit des variantes de stresseurs supplémentaires.",
             selectDrive: 'Sélectionner un disque',
             threadCount: 'Threads',
             duration: 'Durée (s)',

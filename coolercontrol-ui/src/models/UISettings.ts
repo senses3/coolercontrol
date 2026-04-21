@@ -204,4 +204,8 @@ export class UISettingsDTO {
     showOnboarding: boolean = true
     tagNames: Array<string> = []
     tagColors: Array<string> = []
+    cpuStressBackend: 'stress_ng' | 'built_in' = 'built_in'
+    gpuStressBackend: 'stress_ng' | 'built_in' = 'built_in'
+    ramStressBackend: 'stress_ng' | 'built_in' = 'built_in'
+    driveStressBackend: 'stress_ng' | 'built_in' = 'built_in'
 }

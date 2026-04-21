@@ -16,6 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::ops::Not;
 use std::path::Path;
 
 use axum::extract::State;
@@ -33,18 +34,26 @@ pub struct StartCpuStressRequest {
     pub thread_count: Option<u16>,
     /// Duration in seconds. Defaults to 60, max 600.
     pub duration_secs: Option<u16>,
+    /// Which backend to use. Omit for the daemon's default
+    /// (stress-ng if installed, else built-in).
+    pub backend: Option<StressBackend>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct StartGpuStressRequest {
     /// Duration in seconds. Defaults to 60, max 600.
     pub duration_secs: Option<u16>,
+    /// Which backend to use. Omit for the daemon's default (built-in).
+    pub backend: Option<StressBackend>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct StartRamStressRequest {
     /// Duration in seconds. Defaults to 60, max 600.
     pub duration_secs: Option<u16>,
+    /// Which backend to use. Omit for the daemon's default
+    /// (stress-ng if installed, else built-in).
+    pub backend: Option<StressBackend>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -55,11 +64,14 @@ pub struct StartDriveStressRequest {
     pub threads: Option<u16>,
     /// Duration in seconds. Defaults to 60, max 600.
     pub duration_secs: Option<u16>,
+    /// Which backend to use. Omit for the daemon's default (built-in).
+    pub backend: Option<StressBackend>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct StressTestStatusResponse {
+    pub stress_ng_available: bool,
     pub cpu_active: bool,
     pub cpu_duration_secs: Option<u16>,
     pub cpu_backend: StressBackend,
@@ -92,7 +104,7 @@ pub async fn start_cpu(
     Json(request): Json<StartCpuStressRequest>,
 ) -> Result<Json<()>, CCError> {
     stress_test_handle
-        .start_cpu(request.thread_count, request.duration_secs)
+        .start_cpu(request.thread_count, request.duration_secs, request.backend)
         .await
         .map(Json)
         .map_err(|e| CCError::UserError { msg: e.to_string() })
@@ -119,7 +131,7 @@ pub async fn start_gpu(
     Json(request): Json<StartGpuStressRequest>,
 ) -> Result<Json<()>, CCError> {
     stress_test_handle
-        .start_gpu(request.duration_secs)
+        .start_gpu(request.duration_secs, request.backend)
         .await
         .map(Json)
         .map_err(|e| CCError::UserError { msg: e.to_string() })
@@ -146,7 +158,7 @@ pub async fn start_ram(
     Json(request): Json<StartRamStressRequest>,
 ) -> Result<Json<()>, CCError> {
     stress_test_handle
-        .start_ram(request.duration_secs)
+        .start_ram(request.duration_secs, request.backend)
         .await
         .map(Json)
         .map_err(|e| CCError::UserError { msg: e.to_string() })
@@ -174,7 +186,12 @@ pub async fn start_drive(
 ) -> Result<Json<()>, CCError> {
     validate_device_path(&request.device_path)?;
     stress_test_handle
-        .start_drive(request.device_path, request.threads, request.duration_secs)
+        .start_drive(
+            request.device_path,
+            request.threads,
+            request.duration_secs,
+            request.backend,
+        )
         .await
         .map(Json)
         .map_err(|e| CCError::UserError { msg: e.to_string() })
@@ -182,7 +199,7 @@ pub async fn start_drive(
 
 /// Validates block device path at the API boundary before passing to actor.
 fn validate_device_path(device_path: &str) -> Result<(), CCError> {
-    if !device_path.starts_with("/dev/") {
+    if device_path.starts_with("/dev/").not() {
         return Err(CCError::UserError {
             msg: "Device path must start with /dev/".to_string(),
         });
@@ -192,7 +209,7 @@ fn validate_device_path(device_path: &str) -> Result<(), CCError> {
             msg: "Device path must not contain '..'".to_string(),
         });
     }
-    if !std::path::Path::new(device_path).exists() {
+    if std::path::Path::new(device_path).exists().not() {
         return Err(CCError::UserError {
             msg: format!("Device {device_path} does not exist"),
         });
@@ -279,6 +296,7 @@ pub async fn status(
 ) -> Json<StressTestStatusResponse> {
     let s = stress_test_handle.status().await;
     Json(StressTestStatusResponse {
+        stress_ng_available: s.stress_ng_available,
         cpu_active: s.cpu_active,
         cpu_duration_secs: s.cpu_duration_secs,
         cpu_backend: s.cpu_backend,

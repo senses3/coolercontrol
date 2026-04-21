@@ -473,8 +473,6 @@ void MainWindow::setTrayActionToShow() const { m_showAction->setText(tr("&Show")
 void MainWindow::setTrayActionToHide() const { m_showAction->setText(tr("&Hide")); }
 
 void MainWindow::showVersionMismatchDialog(const QString& daemonVersion) const {
-  m_profile->clearHttpCache();
-  qInfo() << "Browser cache cleared due to version mismatch.";
   const auto appVersion = QString::fromStdString(COOLER_CONTROL_VERSION);
   QMessageBox dialog;
   dialog.setWindowTitle(tr("Version Mismatch"));
