@@ -342,27 +342,57 @@ if (channelDashboard.value.dataTypes.length > 0) {
             </div>
 
             <!-- Manual -->
-            <div v-if="controlMode === 'manual'" class="flex flex-col gap-4">
-                <div class="flex items-center gap-4">
+            <div
+                v-if="controlMode === 'manual'"
+                class="flex flex-col gap-3 rounded-lg border border-border-one p-3"
+            >
+                <span class="text-xs text-text-color-secondary">
+                    {{ t('layout.shell.coolingPage.manualDuty') }}
+                </span>
+                <div class="flex flex-wrap items-center gap-4">
                     <UiSlider
                         v-model="manualDuty"
                         :min="speedOptions?.min_duty ?? 0"
                         :max="speedOptions?.max_duty ?? 100"
-                        class="max-w-md"
+                        class="w-full max-w-md"
                     />
-                    <span class="w-12 text-right tabular-nums text-text-color">
-                        {{ manualDuty }}%
-                    </span>
+                    <div
+                        class="flex items-center gap-1 rounded-lg border border-border-one bg-bg-two px-2 py-1"
+                    >
+                        <input
+                            type="number"
+                            :value="manualDuty"
+                            :min="speedOptions?.min_duty ?? 0"
+                            :max="speedOptions?.max_duty ?? 100"
+                            step="1"
+                            class="w-14 bg-transparent text-right tabular-nums text-text-color outline-none"
+                            @change="
+                                (e) =>
+                                    (manualDuty = Math.min(
+                                        Math.max(
+                                            Number((e.target as HTMLInputElement).value),
+                                            speedOptions?.min_duty ?? 0,
+                                        ),
+                                        speedOptions?.max_duty ?? 100,
+                                    ))
+                            "
+                        />
+                        <span class="text-text-color-secondary">%</span>
+                    </div>
                 </div>
                 <SpeedFixedChart
                     :duty="manualDuty"
                     :current-device-u-i-d="deviceUID"
                     :current-sensor-name="channelName"
+                    style="--gauge-height: 24rem"
                 />
             </div>
 
             <!-- Unmanaged -->
-            <div v-else-if="controlMode === 'unmanaged'" class="flex flex-col gap-4">
+            <div
+                v-else-if="controlMode === 'unmanaged'"
+                class="flex flex-col gap-3 rounded-lg border border-border-one p-3"
+            >
                 <p class="max-w-xl text-sm text-text-color-secondary">
                     {{ t('layout.shell.coolingPage.unmanagedHint') }}
                 </p>
@@ -370,6 +400,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :default-profile="true"
                     :current-device-u-i-d="deviceUID"
                     :current-sensor-name="channelName"
+                    style="--gauge-height: 24rem"
                 />
             </div>
 

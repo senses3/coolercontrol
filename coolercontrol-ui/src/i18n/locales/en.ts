@@ -129,6 +129,7 @@ export default {
                 noChannels: 'No controllable fan or pump channels were detected.',
                 guidedSetup: 'Guided Setup',
                 manualAt: 'Manual {duty}%',
+                manualDuty: 'Manual duty',
                 modeProfile: 'Profile',
                 modeManual: 'Manual',
                 modeUnmanaged: 'Unmanaged',
