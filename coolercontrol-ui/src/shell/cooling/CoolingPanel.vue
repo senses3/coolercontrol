@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiPin, mdiPinOutline } from '@mdi/js'
+import { mdiAlert, mdiPinOff, mdiPinOutline } from '@mdi/js'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -29,7 +29,6 @@ import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels, pinId, type CoolingChannel } from '@/shell/cooling/channels.ts'
-import UiCollapsible from '@/shell/ui/UiCollapsible.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
@@ -87,7 +86,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
 </script>
 
 <template>
-    <div class="flex flex-col gap-0.5 p-2 text-sm">
+    <div class="flex flex-col gap-0.5 p-2 pb-10 text-sm">
         <template v-if="pinnedChannels.length > 0">
             <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
                 {{ t('layout.shell.coolingPanel.pinned') }}
@@ -95,14 +94,14 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
             <div
                 v-for="channel in pinnedChannels"
                 :key="`pin-${channel.deviceUID}-${channel.channelName}`"
-                class="group flex items-center rounded-lg hover:bg-surface-hover"
+                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
             >
                 <RouterLink
                     :to="{
                         name: 'cooling-channel',
                         params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
                     }"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                 >
                     <span
                         class="h-2 w-2 shrink-0 rounded-full"
@@ -124,7 +123,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         class="shrink-0 text-warning"
                     />
                     <span
-                        class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden"
+                        class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
                     >
                         <span
                             v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
@@ -140,7 +139,9 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         </span>
                     </span>
                 </RouterLink>
-                <div class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex">
+                <div
+                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                >
                     <CCColorPicker
                         :model-value="channelColor(channel.deviceUID, channel.channelName)"
                         :size="1.25"
@@ -152,7 +153,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         :title="t('layout.shell.coolingPanel.unpin')"
                         @click.prevent="togglePin(channel)"
                     >
-                        <svg-icon type="mdi" :path="mdiPin" :size="16" />
+                        <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
                     </button>
                 </div>
             </div>
@@ -170,14 +171,14 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
             <div
                 v-for="channel in group.channels"
                 :key="channel.channelName"
-                class="group flex items-center rounded-lg hover:bg-surface-hover"
+                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
             >
                 <RouterLink
                     :to="{
                         name: 'cooling-channel',
                         params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
                     }"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                 >
                     <span
                         class="h-2 w-2 shrink-0 rounded-full"
@@ -196,7 +197,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         class="shrink-0 text-warning"
                     />
                     <span
-                        class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden"
+                        class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
                     >
                         <span
                             v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
@@ -212,7 +213,9 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         </span>
                     </span>
                 </RouterLink>
-                <div class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex">
+                <div
+                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                >
                     <CCColorPicker
                         :model-value="channelColor(channel.deviceUID, channel.channelName)"
                         :size="1.25"
@@ -230,7 +233,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                     >
                         <svg-icon
                             type="mdi"
-                            :path="isPinned(channel) ? mdiPin : mdiPinOutline"
+                            :path="isPinned(channel) ? mdiPinOff : mdiPinOutline"
                             :size="16"
                         />
                     </button>
@@ -239,29 +242,30 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
         </template>
 
         <UiSeparator class="my-1" />
-        <UiCollapsible :title="t('layout.shell.coolingPanel.library')">
-            <div class="px-2 pb-1 pt-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.shell.coolingPanel.profiles') }}
-            </div>
-            <RouterLink
-                v-for="profile in profileLinks"
-                :key="profile.uid"
-                :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-                class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-            >
-                {{ profile.name }}
-            </RouterLink>
-            <div class="px-2 pb-1 pt-2 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.shell.coolingPanel.functions') }}
-            </div>
-            <RouterLink
-                v-for="fun in functionLinks"
-                :key="fun.uid"
-                :to="{ name: 'functions', params: { functionUID: fun.uid } }"
-                class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-            >
-                {{ fun.name }}
-            </RouterLink>
-        </UiCollapsible>
+        <div class="truncate px-2 pb-1 pt-3 text-xs uppercase text-text-color-secondary">
+            {{ t('layout.shell.coolingPanel.library') }}
+        </div>
+        <div class="px-3 pb-1 pt-1 text-xs uppercase text-text-color-secondary opacity-70">
+            {{ t('layout.shell.coolingPanel.profiles') }}
+        </div>
+        <RouterLink
+            v-for="profile in profileLinks"
+            :key="profile.uid"
+            :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
+            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+        >
+            {{ profile.name }}
+        </RouterLink>
+        <div class="px-3 pb-1 pt-2 text-xs uppercase text-text-color-secondary opacity-70">
+            {{ t('layout.shell.coolingPanel.functions') }}
+        </div>
+        <RouterLink
+            v-for="fun in functionLinks"
+            :key="fun.uid"
+            :to="{ name: 'functions', params: { functionUID: fun.uid } }"
+            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+        >
+            {{ fun.name }}
+        </RouterLink>
     </div>
 </template>

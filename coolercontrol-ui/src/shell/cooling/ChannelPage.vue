@@ -294,13 +294,18 @@ if (channelDashboard.value.dataTypes.length > 0) {
 
 <template>
     <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" @wheel.capture="onPageWheelCapture">
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-start gap-3">
             <div class="min-w-0">
-                <EntityTitleRename
-                    :current-name="channelLabel"
-                    :save-name-function="saveChannelName"
-                />
-                <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
+                <div class="flex items-baseline gap-2">
+                    <EntityTitleRename
+                        class="!py-0 !pl-0"
+                        :current-name="channelLabel"
+                        :save-name-function="saveChannelName"
+                    />
+                    <span class="truncate text-sm text-text-color-secondary">
+                        {{ deviceLabel }}
+                    </span>
+                </div>
             </div>
             <div class="ml-auto flex items-center gap-3">
                 <span class="text-2xl font-semibold tabular-nums text-text-color">

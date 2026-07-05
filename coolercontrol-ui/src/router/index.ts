@@ -124,18 +124,21 @@ const router = createRouter({
                     name: 'modes',
                     component: () => import('@/views/ModeView.vue'),
                     props: true,
+                    meta: { section: 'cooling' },
                 },
                 {
                     path: '/profiles/:profileUID',
                     name: 'profiles',
                     component: () => import('@/views/ProfileView.vue'),
                     props: true,
+                    meta: { section: 'cooling' },
                 },
                 {
                     path: '/functions/:functionUID',
                     name: 'functions',
                     component: () => import('@/views/FunctionView.vue'),
                     props: true,
+                    meta: { section: 'cooling' },
                 },
                 {
                     path: '/alerts/:alertUID?',
