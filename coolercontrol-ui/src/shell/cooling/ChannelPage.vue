@@ -50,7 +50,6 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
 import GraphProfileEditor, { type GraphTempSource } from '@/shell/cooling/GraphProfileEditor.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
-import UiCollapsible from '@/shell/ui/UiCollapsible.vue'
 import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
@@ -488,6 +487,12 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     <svg-icon type="mdi" :path="mdiAutoFix" :size="16" />
                     {{ t('layout.shell.coolingPage.guidedSetup') }}
                 </UiButton>
+                <ChannelExtensionSettings
+                    ref="extensionSettingsRef"
+                    :device-u-i-d="deviceUID"
+                    :channel-name="channelName"
+                    :chosen-profile="controlMode === 'automatic' ? editedProfile : undefined"
+                />
                 <UiButton class="ml-auto" :disabled="!canApply" @click="apply">
                     {{ t('layout.shell.coolingPage.apply') }}
                 </UiButton>
@@ -709,15 +714,5 @@ if (channelDashboard.value.dataTypes.length > 0) {
         <div class="shrink-0" style="--time-chart-height: 24rem">
             <TimeChart :dashboard="channelDashboard" />
         </div>
-
-        <UiCollapsible v-if="controllable" :title="t('layout.shell.coolingPage.advanced')">
-            <div class="p-2">
-                <ChannelExtensionSettings
-                    ref="extensionSettingsRef"
-                    :device-u-i-d="deviceUID"
-                    :channel-name="channelName"
-                />
-            </div>
-        </UiCollapsible>
     </div>
 </template>
