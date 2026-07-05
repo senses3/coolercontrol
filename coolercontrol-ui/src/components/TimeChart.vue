@@ -417,6 +417,10 @@ for (const lineName of uLineNames) {
 }
 
 const hourFormat = settingsStore.time24 ? 'HH' : 'h'
+// Escalating tick increments so axes still render values at small chart
+// heights: uPlot picks the first increment whose ticks fit, so full-height
+// rendering is unchanged while smaller charts fall back to coarser steps.
+const incrSteps = (base: number): number[] => [base, base * 2, base * 2.5, base * 5, base * 10]
 const uOptions: uPlot.Options = {
     width: 200,
     height: 200,
@@ -472,7 +476,7 @@ const uOptions: uPlot.Options = {
                 width: 1,
                 size: 5,
             },
-            incrs: [10],
+            incrs: incrSteps(10),
             // values: (_, ticks) => ticks.map((rawValue) => rawValue + '°/%'),
             border: {
                 show: true,
@@ -520,23 +524,23 @@ const uOptions: uPlot.Options = {
             incrs: (_self: uPlot, _axisIdx: number, _scaleMin: number, scaleMax: number) => {
                 if (settingsStore.frequencyPrecision === 1) {
                     if (scaleMax > 7000) {
-                        return [1000]
+                        return incrSteps(1000)
                     } else if (scaleMax > 3000) {
-                        return [500]
+                        return incrSteps(500)
                     } else if (scaleMax > 1300) {
-                        return [200]
+                        return incrSteps(200)
                     } else if (scaleMax > 700) {
-                        return [100]
+                        return incrSteps(100)
                     } else {
-                        return [50]
+                        return incrSteps(50)
                     }
                 } else {
                     if (scaleMax > 2) {
-                        return [1]
+                        return incrSteps(1)
                     } else if (scaleMax > 1) {
-                        return [0.5]
+                        return incrSteps(0.5)
                     } else {
-                        return [0.2]
+                        return incrSteps(0.2)
                     }
                 }
             },
@@ -572,29 +576,29 @@ const uOptions: uPlot.Options = {
 
             incrs: (_self: uPlot, _axisIdx: number, _scaleMin: number, scaleMax: number) => {
                 if (scaleMax > 7000) {
-                    return [1000]
+                    return incrSteps(1000)
                 } else if (scaleMax > 3000) {
-                    return [500]
+                    return incrSteps(500)
                 } else if (scaleMax > 1200) {
-                    return [200]
+                    return incrSteps(200)
                 } else if (scaleMax > 500) {
-                    return [100]
+                    return incrSteps(100)
                 } else if (scaleMax > 180) {
-                    return [50]
+                    return incrSteps(50)
                 } else if (scaleMax > 120) {
-                    return [20]
+                    return incrSteps(20)
                 } else if (scaleMax > 50) {
-                    return [10]
+                    return incrSteps(10)
                 } else if (scaleMax > 23) {
-                    return [5]
+                    return incrSteps(5)
                 } else if (scaleMax > 13) {
-                    return [2]
+                    return incrSteps(2)
                 } else if (scaleMax > 7) {
-                    return [1]
+                    return incrSteps(1)
                 } else if (scaleMax > 1) {
-                    return [0.5]
+                    return incrSteps(0.5)
                 }
-                return [0.1]
+                return incrSteps(0.1)
             },
             // values: (_, ticks) => ticks.map((rawValue) => rawValue + ' W'),
             border: {
