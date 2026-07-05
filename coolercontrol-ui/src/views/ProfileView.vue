@@ -2109,19 +2109,6 @@ function onKnobMouseup(e: MouseEvent) {
             <div v-else-if="selectedType === ProfileType.Graph" class="flex flex-wrap justify-end">
                 <div class="p-2 pr-1">
                     <Select
-                        v-model="chosenFunction"
-                        :options="settingsStore.functions"
-                        option-label="name"
-                        :placeholder="t('views.profiles.function')"
-                        class="w-44 h-[2.375rem]"
-                        checkmark
-                        dropdown-icon="pi pi-directions"
-                        scroll-height="40rem"
-                        v-tooltip.top="t('views.profiles.functionToApply')"
-                    />
-                </div>
-                <div class="p-2 pr-0">
-                    <Select
                         v-model="chosenTemp"
                         :options="tempSources"
                         class="w-44 h-[2.375rem]"
@@ -2172,6 +2159,19 @@ function onKnobMouseup(e: MouseEvent) {
                             </div>
                         </template>
                     </Select>
+                </div>
+                <div class="p-2 pr-0">
+                    <Select
+                        v-model="chosenFunction"
+                        :options="settingsStore.functions"
+                        option-label="name"
+                        :placeholder="t('views.profiles.function')"
+                        class="w-44 h-[2.375rem]"
+                        checkmark
+                        dropdown-icon="pi pi-directions"
+                        scroll-height="40rem"
+                        v-tooltip.top="t('views.profiles.functionToApply')"
+                    />
                 </div>
             </div>
             <div v-else-if="selectedType === ProfileType.Fixed" class="p-2 pr-0">
