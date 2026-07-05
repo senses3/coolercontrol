@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiPinOff, mdiPinOutline } from '@mdi/js'
+import { mdiAlert, mdiChartMultiple, mdiFunction, mdiPinOff, mdiPinOutline } from '@mdi/js'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -102,6 +102,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
                     }"
                     class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
+                    exact-active-class="!text-accent"
                 >
                     <span
                         class="h-2 w-2 shrink-0 rounded-full"
@@ -179,6 +180,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
                     }"
                     class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
+                    exact-active-class="!text-accent"
                 >
                     <span
                         class="h-2 w-2 shrink-0 rounded-full"
@@ -245,25 +247,33 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
         <div class="truncate px-2 pb-1 pt-3 text-xs uppercase text-text-color-secondary">
             {{ t('layout.shell.coolingPanel.library') }}
         </div>
-        <div class="px-3 pb-1 pt-1 text-xs uppercase text-text-color-secondary opacity-70">
+        <div
+            class="flex items-center gap-1.5 px-3 pb-1 pt-1 text-xs uppercase text-text-color-secondary opacity-70"
+        >
+            <svg-icon type="mdi" :path="mdiChartMultiple" :size="14" />
             {{ t('layout.shell.coolingPanel.profiles') }}
         </div>
         <RouterLink
             v-for="profile in profileLinks"
             :key="profile.uid"
             :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            exact-active-class="bg-surface-hover !text-accent"
         >
             {{ profile.name }}
         </RouterLink>
-        <div class="px-3 pb-1 pt-2 text-xs uppercase text-text-color-secondary opacity-70">
+        <div
+            class="flex items-center gap-1.5 px-3 pb-1 pt-2 text-xs uppercase text-text-color-secondary opacity-70"
+        >
+            <svg-icon type="mdi" :path="mdiFunction" :size="14" />
             {{ t('layout.shell.coolingPanel.functions') }}
         </div>
         <RouterLink
             v-for="fun in functionLinks"
             :key="fun.uid"
             :to="{ name: 'functions', params: { functionUID: fun.uid } }"
-            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            exact-active-class="bg-surface-hover !text-accent"
         >
             {{ fun.name }}
         </RouterLink>
