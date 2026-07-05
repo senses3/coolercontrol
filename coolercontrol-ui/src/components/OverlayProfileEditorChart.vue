@@ -206,10 +206,10 @@ const option = {
     xAxis: {
         name: t('views.profiles.profileOutputDuty'),
         nameLocation: 'middle',
-        nameGap: deviceStore.getREMSize(2.0),
+        nameGap: deviceStore.getREMSize(1.5),
         nameTextStyle: {
-            color: colors.themeColors.text_color,
-            fontSize: deviceStore.getREMSize(1.25),
+            color: colors.themeColors.text_color_secondary,
+            fontSize: deviceStore.getREMSize(0.85),
         },
         min: dutyMin,
         max: dutyMax,
@@ -238,10 +238,10 @@ const option = {
     yAxis: {
         name: t('views.profiles.offsetDuty'),
         nameLocation: 'middle',
-        nameGap: deviceStore.getREMSize(3.25),
+        nameGap: deviceStore.getREMSize(2.4),
         nameTextStyle: {
-            color: colors.themeColors.text_color,
-            fontSize: deviceStore.getREMSize(1.25),
+            color: colors.themeColors.text_color_secondary,
+            fontSize: deviceStore.getREMSize(0.85),
         },
         min: offsetMin,
         max: offsetMax,
@@ -721,8 +721,8 @@ type TablePosition = 'top-left' | 'bottom-right'
 const tablePosition: Ref<TablePosition> = ref('top-left')
 
 const tablePositionClasses = computed(() => ({
-    'top-14 left-[7.5rem]': tablePosition.value === 'top-left',
-    'bottom-36 right-[6.5rem]': tablePosition.value === 'bottom-right',
+    'top-16 left-[5.5rem]': tablePosition.value === 'top-left',
+    'bottom-16 right-[7rem]': tablePosition.value === 'bottom-right',
 }))
 
 const cycleTablePosition = () => {
