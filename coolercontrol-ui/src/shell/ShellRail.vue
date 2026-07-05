@@ -39,12 +39,12 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
 </script>
 
 <template>
-    <nav class="flex h-full w-[4.5rem] flex-col items-center gap-1 py-2">
+    <nav class="flex h-full w-20 flex-col items-center gap-1 py-2">
         <RouterLink
             v-for="section in railSections"
             :key="section.id"
             :to="{ name: section.routeName }"
-            class="flex w-16 flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             :class="
                 activeSection === section.id
                     ? 'text-accent'
@@ -52,7 +52,7 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
             "
         >
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.5)" />
-            <span class="text-xs leading-tight">{{ t(section.labelKey) }}</span>
+            <span class="text-[0.8125rem] leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
         <div class="flex-1" />
         <UiTooltip :text="t('layout.shell.laterPhase')" side="right">
