@@ -1119,6 +1119,8 @@ onMounted(async () => {
     })
     window.addEventListener('resize', updateResponsiveGraphHeight)
     setTimeout(updateResponsiveGraphHeight)
+    // anchor as soon as the chart has a layout; retry covers slow first paint
+    setTimeout(updateTablePosition, 50)
     setTimeout(updateTablePosition, 300)
 
     // handle the graphics on graph resize & zoom
@@ -1185,6 +1187,7 @@ onUnmounted(() => {
         <!-- Points Table Overlay -->
         <div
             class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
+            :class="{ invisible: Object.keys(tableStyle).length === 0 }"
             :style="tableStyle"
         >
             <div
