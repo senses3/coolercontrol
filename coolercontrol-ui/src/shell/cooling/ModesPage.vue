@@ -63,7 +63,7 @@ const activate = async (modeUID: string): Promise<void> => {
                 </RouterLink>
                 <span
                     v-if="mode.uid === settingsStore.modeActiveCurrent"
-                    class="text-xs text-accent"
+                    class="text-sm text-accent"
                 >
                     {{ t('layout.shell.coolingPage.activeMode') }}
                 </span>

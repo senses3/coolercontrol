@@ -47,7 +47,7 @@ const pillIcon = (kind: ChainPill['kind']): string => {
 </script>
 
 <template>
-    <div class="flex flex-wrap items-center gap-1.5 text-sm">
+    <div class="flex flex-wrap items-center gap-1.5 text-base">
         <template v-for="(pill, index) in pills" :key="`${pill.kind}-${index}`">
             <button
                 type="button"

@@ -42,7 +42,7 @@ const section = computed(() => {
             <UiSeparator />
             <UiScrollArea>
                 <CoolingPanel v-if="section.id === 'cooling'" />
-                <div v-else class="p-3 text-sm text-text-color-secondary">
+                <div v-else class="p-3 text-base text-text-color-secondary">
                     {{ t('layout.shell.panelPlaceholder', { phase: section.phase }) }}
                 </div>
             </UiScrollArea>

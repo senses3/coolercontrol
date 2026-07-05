@@ -53,7 +53,7 @@ const activeModeName = computed<string | undefined>(
 )
 
 const itemClass =
-    'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm ' +
+    'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-base ' +
     'text-text-color outline-none data-[highlighted]:bg-surface-hover'
 </script>
 

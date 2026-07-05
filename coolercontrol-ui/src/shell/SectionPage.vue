@@ -32,7 +32,7 @@ const section = computed(() => sectionById(props.sectionId)!)
     <div class="flex h-full flex-col items-center justify-center gap-3 text-text-color-secondary">
         <svg-icon type="mdi" :path="section.icon" :size="48" />
         <div class="text-xl text-text-color">{{ t(section.labelKey) }}</div>
-        <div class="text-sm">
+        <div class="text-base">
             {{ t('layout.shell.sectionPlaceholder', { phase: section.phase }) }}
         </div>
     </div>

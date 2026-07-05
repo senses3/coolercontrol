@@ -302,7 +302,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         :current-name="channelLabel"
                         :save-name-function="saveChannelName"
                     />
-                    <span class="truncate text-sm text-text-color-secondary">
+                    <span class="truncate text-base text-text-color-secondary">
                         {{ deviceLabel }}
                     </span>
                 </div>
@@ -313,7 +313,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 </span>
                 <span
                     v-if="live?.rpm != null"
-                    class="text-sm tabular-nums text-text-color-secondary"
+                    class="text-base tabular-nums text-text-color-secondary"
                 >
                     {{ live.rpm }} rpm
                 </span>
@@ -356,7 +356,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 v-if="controlMode === 'manual'"
                 class="flex flex-col gap-3 rounded-lg border border-border-one p-3"
             >
-                <span class="text-xs text-text-color-secondary">
+                <span class="text-sm text-text-color-secondary">
                     {{ t('layout.shell.coolingPage.manualDuty') }}
                 </span>
                 <div class="flex flex-wrap items-center gap-4">
@@ -403,7 +403,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 v-else-if="controlMode === 'unmanaged'"
                 class="flex flex-col gap-3 rounded-lg border border-border-one p-3"
             >
-                <p class="max-w-xl text-sm text-text-color-secondary">
+                <p class="max-w-xl text-base text-text-color-secondary">
                     {{ t('layout.shell.coolingPage.unmanagedHint') }}
                 </p>
                 <SpeedFixedChart
@@ -421,7 +421,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     class="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-lg border border-border-one p-3"
                 >
                     <div class="flex flex-col gap-1">
-                        <span class="text-xs text-text-color-secondary">
+                        <span class="text-sm text-text-color-secondary">
                             {{ t('layout.shell.coolingPage.chain.profile') }}
                         </span>
                         <UiSelect
@@ -435,7 +435,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         class="flex items-center gap-2 self-center"
                     >
                         <span
-                            class="inline-flex items-center gap-1.5 rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-xs text-text-color-secondary"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-sm text-text-color-secondary"
                             :title="t('layout.shell.coolingPage.sharedTooltip')"
                         >
                             <svg-icon type="mdi" :path="mdiShareVariantOutline" :size="13" />
@@ -467,7 +467,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 </div>
             </div>
         </template>
-        <p v-else class="text-sm text-text-color-secondary">
+        <p v-else class="text-base text-text-color-secondary">
             {{ t('layout.shell.coolingPage.notControllable') }}
         </p>
 

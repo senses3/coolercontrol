@@ -42,8 +42,8 @@ const variants: Record<Variant, string> = {
 }
 
 const sizes: Record<Size, string> = {
-    md: 'h-9 px-4 text-sm',
-    icon: 'h-9 w-9 p-0',
+    md: 'h-10 px-4 text-base',
+    icon: 'h-10 w-10 p-0',
 }
 
 const classes = computed(() => [base, variants[props.variant], sizes[props.size]].join(' '))

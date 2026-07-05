@@ -52,7 +52,7 @@ withDefaults(
 <template>
     <SelectRoot v-model="model" :disabled="disabled">
         <SelectTrigger
-            class="inline-flex h-9 min-w-40 items-center justify-between gap-2 rounded-lg border border-border-one bg-bg-two px-3 text-sm text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border-one bg-bg-two px-3 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
         >
             <SelectValue :placeholder="placeholder" class="truncate" />
             <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" />
@@ -69,7 +69,7 @@ withDefaults(
                         :key="option.value"
                         :value="option.value"
                         :disabled="option.disabled"
-                        class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-text-color outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                     >
                         <SelectItemText>{{ option.label }}</SelectItemText>
                         <SelectItemIndicator>
