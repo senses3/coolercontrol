@@ -36,7 +36,7 @@ const section = computed(() => {
 <template>
     <div class="flex h-full flex-col">
         <template v-if="section != null">
-            <div class="px-3 py-2 text-base font-medium text-text-color">
+            <div class="px-3 py-2 text-lg font-medium text-text-color">
                 {{ t(section.labelKey) }}
             </div>
             <UiSeparator />

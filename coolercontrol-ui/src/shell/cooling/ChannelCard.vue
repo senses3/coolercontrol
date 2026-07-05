@@ -112,7 +112,7 @@ const openWizard = (): void => {
                         class="shrink-0 text-warning"
                     />
                 </div>
-                <div class="truncate text-xs text-text-color-secondary">{{ deviceLabel }}</div>
+                <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>
             <button
                 v-if="channel.controllable"
@@ -143,7 +143,7 @@ const openWizard = (): void => {
             :color="color"
             class="text-text-color-secondary"
         />
-        <div class="truncate text-xs text-text-color-secondary">
+        <div class="truncate text-sm text-text-color-secondary">
             {{ assignedSummary }}
         </div>
     </RouterLink>

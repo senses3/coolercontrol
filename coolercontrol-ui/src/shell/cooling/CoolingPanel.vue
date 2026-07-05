@@ -86,7 +86,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
 </script>
 
 <template>
-    <div class="flex flex-col gap-0.5 p-2 pb-10 text-sm">
+    <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <template v-if="pinnedChannels.length > 0">
             <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
                 {{ t('layout.shell.coolingPanel.pinned') }}
@@ -133,7 +133,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         </span>
                         <span
                             v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                            class="text-xs tabular-nums text-text-color-secondary"
+                            class="text-sm tabular-nums text-text-color-secondary"
                         >
                             {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
                         </span>
@@ -207,7 +207,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         </span>
                         <span
                             v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                            class="text-xs tabular-nums text-text-color-secondary"
+                            class="text-sm tabular-nums text-text-color-secondary"
                         >
                             {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
                         </span>

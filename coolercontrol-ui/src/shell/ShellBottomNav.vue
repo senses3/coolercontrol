@@ -41,7 +41,7 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
             :class="activeSection === section.id ? 'text-accent' : 'text-text-color-secondary'"
         >
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.4)" />
-            <span class="text-[0.65rem] leading-tight">{{ t(section.labelKey) }}</span>
+            <span class="text-xs leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
     </nav>
 </template>

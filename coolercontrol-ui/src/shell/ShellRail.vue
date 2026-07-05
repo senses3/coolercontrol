@@ -52,7 +52,7 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
             "
         >
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.5)" />
-            <span class="text-[0.65rem] leading-tight">{{ t(section.labelKey) }}</span>
+            <span class="text-xs leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
         <div class="flex-1" />
         <UiTooltip :text="t('layout.shell.laterPhase')" side="right">

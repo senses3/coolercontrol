@@ -62,7 +62,7 @@ const itemClass =
         <UiTooltip :text="daemonState.status">
             <span class="h-2.5 w-2.5 rounded-full" :class="statusColor" />
         </UiTooltip>
-        <span class="text-sm text-text-color-secondary">{{ daemonState.systemName }}</span>
+        <span class="text-base text-text-color-secondary">{{ daemonState.systemName }}</span>
         <div class="flex-1" />
         <UiDropdownMenu>
             <template #trigger>
