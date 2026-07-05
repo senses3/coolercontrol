@@ -42,7 +42,6 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
-import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
 
@@ -461,7 +460,6 @@ if (channelDashboard.value.dataTypes.length > 0) {
             {{ t('layout.shell.coolingPage.notControllable') }}
         </p>
 
-        <UiSeparator />
         <div class="shrink-0" style="--time-chart-height: 24rem">
             <TimeChart :dashboard="channelDashboard" />
         </div>
