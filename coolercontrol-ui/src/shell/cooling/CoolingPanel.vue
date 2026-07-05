@@ -19,12 +19,12 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiBookmarkMultipleOutline, mdiPin, mdiPinOutline } from '@mdi/js'
+import { mdiAlert, mdiPin, mdiPinOutline } from '@mdi/js'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { UID } from '@/models/Device.ts'
-import type { Color } from '@/models/Device.ts'
+import type { ChannelValues } from '@/stores/DeviceStore.ts'
+import type { Color, UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -42,6 +42,9 @@ const groups = computed(() => coolingChannels(deviceStore.allDevices()))
 const deviceLabel = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
 
+const deviceColor = (deviceUID: UID): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor ?? ''
+
 const channelLabel = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.name ??
     channelName
@@ -50,14 +53,8 @@ const channelColor = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.color ??
     ''
 
-const liveValue = (deviceUID: UID, channelName: string): string => {
-    const values = currentDeviceStatus.value.get(deviceUID)?.get(channelName)
-    if (values == null) return ''
-    const parts: string[] = []
-    if (values.duty != null) parts.push(`${values.duty}%`)
-    if (values.rpm != null) parts.push(`${values.rpm} rpm`)
-    return parts.join(' ')
-}
+const liveFor = (deviceUID: UID, channelName: string): ChannelValues | undefined =>
+    currentDeviceStatus.value.get(deviceUID)?.get(channelName)
 
 const isUnhealthy = (deviceUID: UID, channelName: string): boolean =>
     settingsStore.healthFailsafe.some(
@@ -85,10 +82,6 @@ const setChannelColor = (channel: CoolingChannel, newColor: Color): void => {
     if (setting != null) setting.userColor = newColor
 }
 
-const activeModeName = computed<string | undefined>(
-    () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
-)
-
 const profileLinks = computed(() => settingsStore.profiles.filter((profile) => profile.uid !== '0'))
 const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun.uid !== '0'))
 </script>
@@ -99,36 +92,79 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
             <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
                 {{ t('layout.shell.coolingPanel.pinned') }}
             </div>
-            <RouterLink
+            <div
                 v-for="channel in pinnedChannels"
                 :key="`pin-${channel.deviceUID}-${channel.channelName}`"
-                :to="{
-                    name: 'cooling-channel',
-                    params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
-                }"
-                class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                class="group flex items-center rounded-lg hover:bg-surface-hover"
             >
-                <span
-                    class="h-2 w-2 shrink-0 rounded-full"
-                    :style="{
-                        backgroundColor: channelColor(channel.deviceUID, channel.channelName),
+                <RouterLink
+                    :to="{
+                        name: 'cooling-channel',
+                        params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
                     }"
-                />
-                <span class="truncate">
-                    {{ channelLabel(channel.deviceUID, channel.channelName) }}
-                </span>
-                <span class="truncate text-xs text-text-color-secondary">
-                    {{ deviceLabel(channel.deviceUID) }}
-                </span>
-                <span class="ml-auto whitespace-nowrap text-xs text-text-color-secondary">
-                    {{ liveValue(channel.deviceUID, channel.channelName) }}
-                </span>
-            </RouterLink>
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    <span
+                        class="h-2 w-2 shrink-0 rounded-full"
+                        :style="{
+                            backgroundColor: channelColor(channel.deviceUID, channel.channelName),
+                        }"
+                    />
+                    <span class="truncate">
+                        {{ channelLabel(channel.deviceUID, channel.channelName) }}
+                    </span>
+                    <span class="truncate text-xs text-text-color-secondary">
+                        {{ deviceLabel(channel.deviceUID) }}
+                    </span>
+                    <svg-icon
+                        v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
+                        type="mdi"
+                        :path="mdiAlert"
+                        :size="14"
+                        class="shrink-0 text-warning"
+                    />
+                    <span
+                        class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden"
+                    >
+                        <span
+                            v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
+                            class="tabular-nums text-text-color"
+                        >
+                            {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
+                        </span>
+                        <span
+                            v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
+                            class="text-xs tabular-nums text-text-color-secondary"
+                        >
+                            {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
+                        </span>
+                    </span>
+                </RouterLink>
+                <div class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex">
+                    <CCColorPicker
+                        :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                        :size="1.25"
+                        @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                    />
+                    <button
+                        type="button"
+                        class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                        :title="t('layout.shell.coolingPanel.unpin')"
+                        @click.prevent="togglePin(channel)"
+                    >
+                        <svg-icon type="mdi" :path="mdiPin" :size="16" />
+                    </button>
+                </div>
+            </div>
             <UiSeparator class="my-1" />
         </template>
 
         <template v-for="group in groups" :key="group.deviceUID">
-            <div class="truncate px-2 pb-1 pt-2 text-xs uppercase text-text-color-secondary">
+            <div
+                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
+                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
+                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
+            >
                 {{ deviceLabel(group.deviceUID) }}
             </div>
             <div
@@ -159,14 +195,27 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         :size="14"
                         class="shrink-0 text-warning"
                     />
-                    <span class="ml-auto whitespace-nowrap text-xs text-text-color-secondary">
-                        {{ liveValue(channel.deviceUID, channel.channelName) }}
+                    <span
+                        class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden"
+                    >
+                        <span
+                            v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
+                            class="tabular-nums text-text-color"
+                        >
+                            {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
+                        </span>
+                        <span
+                            v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
+                            class="text-xs tabular-nums text-text-color-secondary"
+                        >
+                            {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
+                        </span>
                     </span>
                 </RouterLink>
-                <div class="hidden items-center gap-0.5 pr-1 group-hover:flex">
+                <div class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex">
                     <CCColorPicker
                         :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                        :size="0.9"
+                        :size="1.25"
                         @update:model-value="(c: Color) => setChannelColor(channel, c)"
                     />
                     <button
@@ -182,7 +231,7 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                         <svg-icon
                             type="mdi"
                             :path="isPinned(channel) ? mdiPin : mdiPinOutline"
-                            :size="14"
+                            :size="16"
                         />
                     </button>
                 </div>
@@ -190,17 +239,6 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
         </template>
 
         <UiSeparator class="my-1" />
-        <RouterLink
-            :to="{ name: 'cooling-modes' }"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-        >
-            <svg-icon type="mdi" :path="mdiBookmarkMultipleOutline" :size="16" />
-            <span>{{ t('layout.shell.modes') }}</span>
-            <span v-if="activeModeName" class="ml-auto truncate text-xs text-text-color-secondary">
-                {{ activeModeName }}
-            </span>
-        </RouterLink>
-
         <UiCollapsible :title="t('layout.shell.coolingPanel.library')">
             <div class="px-2 pb-1 pt-1 text-xs uppercase text-text-color-secondary">
                 {{ t('layout.shell.coolingPanel.profiles') }}

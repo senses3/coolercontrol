@@ -116,6 +116,8 @@ export default {
             sectionPlaceholder: 'This section arrives in phase {phase} of the UI redesign.',
             panelPlaceholder: 'Section content arrives in phase {phase}.',
             laterPhase: 'Moves here in a later phase',
+            manageModes: 'Manage modes',
+            noModes: 'No modes saved',
             coolingPanel: {
                 pinned: 'Pinned',
                 pin: 'Pin',

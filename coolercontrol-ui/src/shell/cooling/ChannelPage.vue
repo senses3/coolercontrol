@@ -26,6 +26,7 @@ import { v4 as uuidV4 } from 'uuid'
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
+import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
 import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
 import TimeChart from '@/components/TimeChart.vue'
@@ -74,6 +75,8 @@ const uiSetting = computed(() =>
         ?.sensorsAndChannels.get(props.channelName),
 )
 const channelLabel = computed(() => uiSetting.value?.name ?? props.channelName)
+const saveChannelName = async (newName: string): Promise<boolean> =>
+    await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
 const deviceLabel = computed(
     () => settingsStore.allUIDeviceSettings.get(props.deviceUID)?.name ?? '',
 )
@@ -293,7 +296,10 @@ if (channelDashboard.value.dataTypes.length > 0) {
     <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" @wheel.capture="onPageWheelCapture">
         <div class="flex flex-wrap items-center gap-3">
             <div class="min-w-0">
-                <h1 class="truncate text-xl font-semibold text-text-color">{{ channelLabel }}</h1>
+                <EntityTitleRename
+                    :current-name="channelLabel"
+                    :save-name-function="saveChannelName"
+                />
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>
             <div class="ml-auto flex items-center gap-3">

@@ -19,17 +19,23 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiBookmarkMultipleOutline } from '@mdi/js'
+import { mdiBookmarkCheck, mdiBookmarkMultipleOutline, mdiBookmarkOutline, mdiTune } from '@mdi/js'
+import { DropdownMenuItem, DropdownMenuSeparator } from 'reka-ui'
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 
 const { t } = useI18n()
+const router = useRouter()
 const daemonState = useDaemonState()
 const deviceStore = useDeviceStore()
+const settingsStore = useSettingsStore()
 
 const statusColor = computed(() => {
     switch (daemonState.status) {
@@ -41,6 +47,14 @@ const statusColor = computed(() => {
             return 'bg-error'
     }
 })
+
+const activeModeName = computed<string | undefined>(
+    () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
+)
+
+const itemClass =
+    'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm ' +
+    'text-text-color outline-none data-[highlighted]:bg-surface-hover'
 </script>
 
 <template>
@@ -50,17 +64,50 @@ const statusColor = computed(() => {
         </UiTooltip>
         <span class="text-sm text-text-color-secondary">{{ daemonState.systemName }}</span>
         <div class="flex-1" />
-        <UiTooltip :text="t('layout.shell.laterPhase')">
-            <span>
-                <UiButton variant="outline" disabled>
+        <UiDropdownMenu>
+            <template #trigger>
+                <UiButton variant="outline">
                     <svg-icon
                         type="mdi"
                         :path="mdiBookmarkMultipleOutline"
                         :size="deviceStore.getREMSize(1.1)"
                     />
-                    {{ t('layout.shell.modes') }}
+                    {{ activeModeName ?? t('layout.shell.modes') }}
                 </UiButton>
-            </span>
-        </UiTooltip>
+            </template>
+            <DropdownMenuItem
+                v-for="mode in settingsStore.modes"
+                :key="mode.uid"
+                :class="itemClass"
+                @select="settingsStore.activateMode(mode.uid)"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="
+                        mode.uid === settingsStore.modeActiveCurrent
+                            ? mdiBookmarkCheck
+                            : mdiBookmarkOutline
+                    "
+                    :size="15"
+                    :class="
+                        mode.uid === settingsStore.modeActiveCurrent
+                            ? 'text-accent'
+                            : 'text-text-color-secondary'
+                    "
+                />
+                <span class="truncate">{{ mode.name }}</span>
+            </DropdownMenuItem>
+            <div
+                v-if="settingsStore.modes.length === 0"
+                class="px-2 py-1.5 text-sm text-text-color-secondary"
+            >
+                {{ t('layout.shell.noModes') }}
+            </div>
+            <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            <DropdownMenuItem :class="itemClass" @select="router.push({ name: 'cooling-modes' })">
+                <svg-icon type="mdi" :path="mdiTune" :size="15" class="text-text-color-secondary" />
+                {{ t('layout.shell.manageModes') }}
+            </DropdownMenuItem>
+        </UiDropdownMenu>
     </header>
 </template>
