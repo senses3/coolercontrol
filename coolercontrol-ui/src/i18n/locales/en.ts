@@ -126,6 +126,9 @@ export default {
                 profiles: 'Profiles',
                 functions: 'Functions',
             },
+            monitoringPanel: {
+                newDashboard: 'New Dashboard',
+            },
             coolingPage: {
                 landingHint: 'Select a fan or pump to view and adjust its cooling.',
                 noChannels: 'No controllable fan or pump channels were detected.',

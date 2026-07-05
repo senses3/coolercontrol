@@ -22,6 +22,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { sectionById, type SectionId } from '@/shell/sections.ts'
 import CoolingPanel from '@/shell/cooling/CoolingPanel.vue'
+import MonitoringPanel from '@/shell/monitoring/MonitoringPanel.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
@@ -42,6 +43,7 @@ const section = computed(() => {
             <UiSeparator />
             <UiScrollArea>
                 <CoolingPanel v-if="section.id === 'cooling'" />
+                <MonitoringPanel v-else-if="section.id === 'monitoring'" />
                 <div v-else class="p-3 text-base text-text-color-secondary">
                     {{ t('layout.shell.panelPlaceholder', { phase: section.phase }) }}
                 </div>
