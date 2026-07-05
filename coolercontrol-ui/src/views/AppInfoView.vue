@@ -140,7 +140,7 @@ const sourceRoute = (ref: SourceRef): RouteLocationRaw => {
         case HealthEntityType.Lcd:
             return {
                 name: 'device-lcd',
-                params: { deviceId: ref.entity_uid, channelName: ref.channel_name },
+                params: { deviceUID: ref.entity_uid, channelName: ref.channel_name },
             }
     }
 }
