@@ -384,7 +384,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :duty="manualDuty"
                     :current-device-u-i-d="deviceUID"
                     :current-sensor-name="channelName"
-                    style="--gauge-height: 24rem"
+                    style="--gauge-height: clamp(24rem, calc(100vh - 32rem), 44rem)"
                 />
             </div>
 
@@ -400,7 +400,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :default-profile="true"
                     :current-device-u-i-d="deviceUID"
                     :current-sensor-name="channelName"
-                    style="--gauge-height: 24rem"
+                    style="--gauge-height: clamp(24rem, calc(100vh - 32rem), 44rem)"
                 />
             </div>
 
