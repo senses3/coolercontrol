@@ -135,6 +135,7 @@ export default {
                 unmanagedHint:
                     'The device or its firmware controls this channel. CoolerControl will not send any speed commands.',
                 apply: 'Apply',
+                saveAndApply: 'Save & Apply',
                 selectProfile: 'Select a profile',
                 sharedWith: 'Shared with {count} more',
                 sharedTooltip: 'This profile also drives other channels.',

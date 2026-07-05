@@ -333,7 +333,11 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :disabled="!canApply"
                     @click="apply"
                 >
-                    {{ t('layout.shell.coolingPage.apply') }}
+                    {{
+                        editorDirty
+                            ? t('layout.shell.coolingPage.saveAndApply')
+                            : t('layout.shell.coolingPage.apply')
+                    }}
                 </UiButton>
             </div>
 
