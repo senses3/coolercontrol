@@ -149,6 +149,8 @@ export default {
                 overlayBase: 'Base profile',
                 addPoint: 'Add point',
                 removePoint: 'Remove point',
+                points: 'Points',
+                movePointsTable: 'Move table',
                 editFunction: 'Edit',
                 notControllable:
                     'This channel reports its speed but cannot be controlled by CoolerControl.',

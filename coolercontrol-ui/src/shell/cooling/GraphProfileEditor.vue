@@ -19,8 +19,9 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiClose, mdiPlus } from '@mdi/js'
+import { mdiClose, mdiCursorMove, mdiInformationOutline } from '@mdi/js'
 import * as echarts from 'echarts/core'
+import type { ElementEvent } from 'echarts/core'
 import { GraphicComponent, GridComponent, MarkLineComponent } from 'echarts/components'
 import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
@@ -30,6 +31,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 
 echarts.use([GraphicComponent, GridComponent, MarkLineComponent, LineChart, CanvasRenderer])
 
@@ -50,6 +52,8 @@ const props = defineProps<{
     maxPoints: number
 }>()
 const emit = defineEmits<{ (e: 'changed', points: Array<[number, number]>): void }>()
+
+const MIN_TEMP_SEPARATION = 0.1
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -116,12 +120,17 @@ const option = {
 
 const round1 = (value: number): number => Math.round(value * 10) / 10
 
+// Constrains a point between its neighbors: temps stay separated and ordered,
+// duties stay monotonic (non-decreasing), matching the legacy editor rules.
 const clampPoint = (index: number, temp: number, duty: number): [number, number] => {
-    const prevTemp = index > 0 ? localPoints.value[index - 1][0] + 0.1 : axisMin()
+    const points = localPoints.value
+    const prevTemp = index > 0 ? points[index - 1][0] + MIN_TEMP_SEPARATION : axisMin()
     const nextTemp =
-        index < localPoints.value.length - 1 ? localPoints.value[index + 1][0] - 0.1 : axisMax()
+        index < points.length - 1 ? points[index + 1][0] - MIN_TEMP_SEPARATION : axisMax()
     const clampedTemp = round1(Math.min(Math.max(temp, prevTemp), nextTemp))
-    const clampedDuty = Math.round(Math.min(Math.max(duty, props.dutyMin), props.dutyMax))
+    let clampedDuty = Math.round(Math.min(Math.max(duty, props.dutyMin), props.dutyMax))
+    if (index > 0) clampedDuty = Math.max(clampedDuty, points[index - 1][1])
+    if (index < points.length - 1) clampedDuty = Math.min(clampedDuty, points[index + 1][1])
     return [clampedTemp, clampedDuty]
 }
 
@@ -134,28 +143,31 @@ const refreshSeries = (): void => {
 const graphicIds: string[] = []
 const syncGraphics = (): void => {
     if (chart.value == null) return
-    const graphics: object[] = localPoints.value.map((point, dataIndex) => ({
-        id: `pt-${dataIndex}`,
-        type: 'circle',
-        position: chart.value?.convertToPixel('grid', point),
-        shape: { cx: 0, cy: 0, r: 12 },
-        invisible: true,
-        draggable: true,
-        z: 100,
-        ondrag: function (this: { x: number; y: number }) {
-            onPointDrag(dataIndex, this.x, this.y)
-        },
-        ondragend: function (this: { x: number; y: number }) {
-            onPointDrag(dataIndex, this.x, this.y)
-            afterEdit()
-        },
-    }))
-    // remove stale graphics after a point deletion
-    for (const staleId of graphicIds.slice(localPoints.value.length)) {
+    // No graphic for the last point: it is pinned to the axis end (legacy rule).
+    const draggableCount = Math.max(localPoints.value.length - 1, 0)
+    const graphics: object[] = localPoints.value
+        .slice(0, draggableCount)
+        .map((point, dataIndex) => ({
+            id: `pt-${dataIndex}`,
+            type: 'circle',
+            position: chart.value?.convertToPixel('grid', point),
+            shape: { cx: 0, cy: 0, r: 12 },
+            invisible: true,
+            draggable: true,
+            z: 100,
+            ondrag: function (this: { x: number; y: number }) {
+                onPointDrag(dataIndex, this.x, this.y)
+            },
+            ondragend: function (this: { x: number; y: number }) {
+                onPointDrag(dataIndex, this.x, this.y)
+                afterEdit()
+            },
+        }))
+    for (const staleId of graphicIds.slice(draggableCount)) {
         graphics.push({ id: staleId, $action: 'remove' })
     }
     graphicIds.length = 0
-    graphicIds.push(...localPoints.value.map((_, i) => `pt-${i}`))
+    for (let i = 0; i < draggableCount; i++) graphicIds.push(`pt-${i}`)
     chart.value.setOption({ graphic: graphics })
 }
 
@@ -182,29 +194,56 @@ const onInputChange = (index: number, temp: number, duty: number): void => {
     afterEdit()
 }
 
-const addPoint = (): void => {
+// Left-click on the line inserts a point at the click position.
+const onZrClick = (params: ElementEvent): void => {
+    if ((params.target as { type?: string } | undefined)?.type !== 'ec-polyline') return
     if (localPoints.value.length >= props.maxPoints) return
-    // insert into the largest temperature gap
-    let gapIndex = 0
-    let largestGap = 0
-    for (let i = 0; i < localPoints.value.length - 1; i++) {
-        const gap = localPoints.value[i + 1][0] - localPoints.value[i][0]
-        if (gap > largestGap) {
-            largestGap = gap
-            gapIndex = i
+    const posXY = chart.value?.convertFromPixel('grid', [params.offsetX, params.offsetY]) as
+        | [number, number]
+        | undefined
+    if (posXY == null) return
+    const points = localPoints.value
+    let insertAt = points.length - 1
+    for (const [i, point] of points.entries()) {
+        if (point[0] > posXY[0]) {
+            insertAt = i
+            break
         }
     }
-    const left = localPoints.value[gapIndex]
-    const right = localPoints.value[gapIndex + 1]
-    localPoints.value.splice(gapIndex + 1, 0, [
-        round1((left[0] + right[0]) / 2),
-        Math.round((left[1] + right[1]) / 2),
-    ])
+    if (insertAt <= 0) insertAt = 1
+    const prev = points[insertAt - 1]
+    const next = points[insertAt]
+    const temp = round1(
+        Math.min(Math.max(posXY[0], prev[0] + MIN_TEMP_SEPARATION), next[0] - MIN_TEMP_SEPARATION),
+    )
+    if (temp <= prev[0] || temp >= next[0]) return
+    const duty = Math.round(Math.min(Math.max(posXY[1], prev[1]), next[1]))
+    points.splice(insertAt, 0, [temp, duty])
     afterEdit()
+}
+
+// Right-click on a point removes it (never the first or last point).
+const onZrContextmenu = (params: ElementEvent): void => {
+    params.stop()
+    ;(params.event as Event | undefined)?.preventDefault?.()
+    if (localPoints.value.length <= props.minPoints) return
+    if (chart.value == null) return
+    for (let i = 1; i < localPoints.value.length - 1; i++) {
+        const pixel = chart.value.convertToPixel('grid', localPoints.value[i]) as
+            | [number, number]
+            | undefined
+        if (pixel == null) continue
+        const distance = Math.hypot(pixel[0] - params.offsetX, pixel[1] - params.offsetY)
+        if (distance <= 14) {
+            removePoint(i)
+            return
+        }
+    }
 }
 
 const removePoint = (index: number): void => {
     if (localPoints.value.length <= props.minPoints) return
+    if (index === 0 || index === localPoints.value.length - 1) return
     localPoints.value.splice(index, 1)
     afterEdit()
 }
@@ -248,9 +287,16 @@ watch(
     },
 )
 
+// Floating points-table overlay, repositionable like the legacy editor.
+const tablePosition = ref<'top-left' | 'bottom-right'>('top-left')
+const cycleTablePosition = (): void => {
+    tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
+}
+
 const wrapper = ref<HTMLElement>()
 let resizeObserver: ResizeObserver | null = null
 onMounted(() => {
+    chart.value?.setOption(option)
     refreshSeries()
     setTempMarkLine()
     nextTick(() => syncGraphics())
@@ -269,19 +315,53 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div ref="wrapper" class="flex flex-col gap-3">
-        <v-chart ref="chart" class="h-72 w-full" :option="option" />
-        <div class="flex flex-wrap items-center gap-2">
+    <div ref="wrapper" class="relative">
+        <div @contextmenu.prevent>
+            <v-chart
+                ref="chart"
+                class="h-96 w-full"
+                :option="option"
+                :manual-update="true"
+                @zr:click="onZrClick"
+                @zr:contextmenu="onZrContextmenu"
+            />
+        </div>
+        <div class="absolute right-2 top-2 z-10 text-text-color-secondary">
+            <UiTooltip :text="t('views.profiles.graphProfileMouseActions')" side="left">
+                <span>
+                    <svg-icon type="mdi" :path="mdiInformationOutline" :size="18" />
+                </span>
+            </UiTooltip>
+        </div>
+        <div
+            class="absolute z-10 max-h-80 overflow-y-auto rounded-lg border border-border-one bg-bg-two/90 shadow-lg"
+            :class="tablePosition === 'top-left' ? 'left-14 top-4' : 'bottom-12 right-8'"
+        >
+            <div
+                class="sticky top-0 flex items-center justify-between gap-3 border-b border-border-one bg-bg-two/95 px-2 py-1"
+            >
+                <span class="text-xs uppercase text-text-color-secondary">
+                    {{ t('layout.shell.coolingPage.points') }}
+                </span>
+                <button
+                    type="button"
+                    class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    :title="t('layout.shell.coolingPage.movePointsTable')"
+                    @click="cycleTablePosition"
+                >
+                    <svg-icon type="mdi" :path="mdiCursorMove" :size="14" />
+                </button>
+            </div>
             <div
                 v-for="(point, index) in localPoints"
                 :key="index"
-                class="flex items-center gap-1 rounded-lg border border-border-one bg-bg-two px-2 py-1 text-sm"
+                class="flex items-center gap-1 px-2 py-0.5 text-sm"
             >
                 <input
                     type="number"
                     :value="point[0]"
                     step="0.1"
-                    class="w-16 bg-transparent text-right tabular-nums text-text-color outline-none"
+                    class="w-14 bg-transparent text-right tabular-nums text-text-color outline-none"
                     @change="
                         (e) =>
                             onInputChange(
@@ -309,23 +389,18 @@ onBeforeUnmount(() => {
                 <span class="text-text-color-secondary">%</span>
                 <button
                     type="button"
-                    class="ml-1 rounded p-0.5 text-text-color-secondary outline-none hover:text-error focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-40"
-                    :disabled="localPoints.length <= minPoints"
+                    class="ml-1 rounded p-0.5 text-text-color-secondary outline-none hover:text-error focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-30"
+                    :disabled="
+                        index === 0 ||
+                        index === localPoints.length - 1 ||
+                        localPoints.length <= minPoints
+                    "
                     :title="t('layout.shell.coolingPage.removePoint')"
                     @click="removePoint(index)"
                 >
                     <svg-icon type="mdi" :path="mdiClose" :size="14" />
                 </button>
             </div>
-            <button
-                type="button"
-                class="flex items-center gap-1 rounded-lg border border-dashed border-border-one px-2 py-1 text-sm text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-40"
-                :disabled="localPoints.length >= maxPoints"
-                @click="addPoint"
-            >
-                <svg-icon type="mdi" :path="mdiPlus" :size="14" />
-                {{ t('layout.shell.coolingPage.addPoint') }}
-            </button>
         </div>
     </div>
 </template>
