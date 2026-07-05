@@ -33,7 +33,7 @@ const activate = async (modeUID: string): Promise<void> => {
 </script>
 
 <template>
-    <div class="flex h-full flex-col p-4">
+    <div class="flex h-full flex-col overflow-y-auto p-4">
         <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.modes') }}</h1>
         <div v-if="settingsStore.modes.length > 0" class="mt-4 flex flex-col gap-2">
             <div

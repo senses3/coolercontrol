@@ -117,7 +117,10 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
                 <span class="truncate">
                     {{ channelLabel(channel.deviceUID, channel.channelName) }}
                 </span>
-                <span class="ml-auto text-xs text-text-color-secondary">
+                <span class="truncate text-xs text-text-color-secondary">
+                    {{ deviceLabel(channel.deviceUID) }}
+                </span>
+                <span class="ml-auto whitespace-nowrap text-xs text-text-color-secondary">
                     {{ liveValue(channel.deviceUID, channel.channelName) }}
                 </span>
             </RouterLink>

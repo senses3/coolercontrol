@@ -32,7 +32,7 @@ const channels = computed(() =>
 </script>
 
 <template>
-    <div class="flex h-full flex-col">
+    <div class="flex h-full flex-col overflow-y-auto">
         <div class="flex items-center gap-3 px-4 pt-4">
             <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.cooling') }}</h1>
             <span class="text-sm text-text-color-secondary">

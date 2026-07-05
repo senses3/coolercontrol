@@ -259,10 +259,21 @@ const memberProfiles = computed<Profile[]>(
             .map((uid) => settingsStore.profiles.find((p) => p.uid === uid))
             .filter((p) => p != null) as Profile[],
 )
+// Mirrors ProfileView's member rule: Graph/Fixed always; Mix only without Mix
+// sub-members and without a circular reference; Default/Overlay never.
 const memberCandidates = computed<Profile[]>(() =>
-    settingsStore.profiles.filter(
-        (profile) => profile.uid !== '0' && profile.uid !== editedProfile.value?.uid,
-    ),
+    settingsStore.profiles.filter((profile) => {
+        if (profile.uid === '0' || profile.uid === editedProfile.value?.uid) return false
+        if (profile.p_type === ProfileType.Graph || profile.p_type === ProfileType.Fixed) {
+            return true
+        }
+        if (profile.p_type !== ProfileType.Mix) return false
+        const hasMixSubMembers = profile.member_profile_uids.some(
+            (uid) => settingsStore.profiles.find((p) => p.uid === uid)?.p_type === ProfileType.Mix,
+        )
+        if (hasMixSubMembers) return false
+        return !profile.member_profile_uids.includes(editedProfile.value?.uid ?? '')
+    }),
 )
 const toggleMember = (uid: UID): void => {
     if (editedProfile.value == null) return
@@ -271,6 +282,17 @@ const toggleMember = (uid: UID): void => {
         ? members.filter((member) => member !== uid)
         : [...members, uid]
 }
+
+// Overlay bases may only be Graph or Mix profiles, like ProfileView.
+const overlayBaseOptions = computed<UiSelectOption[]>(() =>
+    settingsStore.profiles
+        .filter(
+            (profile) =>
+                (profile.p_type === ProfileType.Graph || profile.p_type === ProfileType.Mix) &&
+                profile.uid !== editedProfile.value?.uid,
+        )
+        .map((profile) => ({ label: profile.name, value: profile.uid })),
+)
 
 const overlayBaseUID = computed<string | undefined>({
     get: () => editedProfile.value?.member_profile_uids[0],
@@ -643,9 +665,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                             </span>
                             <UiSelect
                                 v-model="overlayBaseUID"
-                                :options="
-                                    profileOptions.filter((o) => o.value !== editedProfile!.uid)
-                                "
+                                :options="overlayBaseOptions"
                                 :placeholder="t('layout.shell.coolingPage.selectProfile')"
                             />
                         </div>
@@ -686,7 +706,9 @@ if (channelDashboard.value.dataTypes.length > 0) {
         </p>
 
         <UiSeparator />
-        <TimeChart :dashboard="channelDashboard" class="min-h-72" />
+        <div class="shrink-0" style="--time-chart-height: 24rem">
+            <TimeChart :dashboard="channelDashboard" />
+        </div>
 
         <UiCollapsible v-if="controllable" :title="t('layout.shell.coolingPage.advanced')">
             <div class="p-2">

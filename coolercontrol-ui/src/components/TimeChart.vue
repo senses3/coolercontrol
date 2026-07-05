@@ -835,7 +835,7 @@ onMounted(async () => {
 <style scoped lang="scss">
 #u-plot-chart {
     width: 100%;
-    height: calc(100vh - 5.75rem);
+    height: var(--time-chart-height, calc(100vh - 5.75rem));
 }
 
 // zoom selection style
