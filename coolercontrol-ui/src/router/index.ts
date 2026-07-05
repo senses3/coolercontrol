@@ -50,10 +50,56 @@ const sectionRoutes: RouteRecordRaw[] = [
         meta: { section: 'cooling' },
     },
     {
+        // Section landing is the home dashboard (DashboardView's no-param fallback).
         path: 'monitoring',
         name: 'section-monitoring',
-        component: () => import('@/shell/SectionPage.vue'),
-        props: { sectionId: 'monitoring' },
+        component: () => import('@/views/DashboardView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/dashboards/:dashboardUID',
+        name: 'monitoring-dashboard',
+        component: () => import('@/views/DashboardView.vue'),
+        props: true,
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/sensors/:deviceUID/:channelName',
+        name: 'monitoring-sensor',
+        component: () => import('@/views/DashboardView.vue'),
+        props: true,
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/alerts',
+        name: 'monitoring-alerts',
+        component: () => import('@/views/AlertsOverView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/alerts/new',
+        name: 'monitoring-alert-new',
+        component: () => import('@/views/AlertView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/alerts/:alertUID',
+        name: 'monitoring-alert',
+        component: () => import('@/views/AlertView.vue'),
+        props: true,
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/custom-sensors/new',
+        name: 'monitoring-custom-sensor-new',
+        component: () => import('@/views/CustomSensorView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/custom-sensors/:customSensorID',
+        name: 'monitoring-custom-sensor',
+        component: () => import('@/views/CustomSensorView.vue'),
+        props: true,
         meta: { section: 'monitoring' },
     },
     {
@@ -116,8 +162,13 @@ const router = createRouter({
                 {
                     path: '/dashboards/:dashboardUID?',
                     name: 'dashboards',
-                    component: () => import('@/views/DashboardView.vue'),
-                    props: true,
+                    redirect: (to) =>
+                        to.params.dashboardUID
+                            ? {
+                                  name: 'monitoring-dashboard',
+                                  params: { dashboardUID: to.params.dashboardUID },
+                              }
+                            : { name: 'section-monitoring' },
                 },
                 {
                     path: '/modes/:modeUID',
@@ -143,26 +194,37 @@ const router = createRouter({
                 {
                     path: '/alerts/:alertUID?',
                     name: 'alerts',
-                    component: () => import('@/views/AlertView.vue'),
-                    props: true,
+                    redirect: (to) =>
+                        to.params.alertUID
+                            ? { name: 'monitoring-alert', params: { alertUID: to.params.alertUID } }
+                            : { name: 'monitoring-alert-new' },
                 },
                 {
                     path: '/alerts-overview',
                     name: 'alerts-overview',
-                    component: () => import('@/views/AlertsOverView.vue'),
-                    props: true,
+                    redirect: { name: 'monitoring-alerts' },
                 },
                 {
                     path: '/custom-sensors/:customSensorID?',
                     name: 'custom-sensors',
-                    component: () => import('@/views/CustomSensorView.vue'),
-                    props: true,
+                    redirect: (to) =>
+                        to.params.customSensorID
+                            ? {
+                                  name: 'monitoring-custom-sensor',
+                                  params: { customSensorID: to.params.customSensorID },
+                              }
+                            : { name: 'monitoring-custom-sensor-new' },
                 },
                 {
                     path: '/dashboards/:deviceUID/:channelName',
                     name: 'single-dashboard',
-                    component: () => import('@/views/SingleDashboardView.vue'),
-                    props: true,
+                    redirect: (to) => ({
+                        name: 'monitoring-sensor',
+                        params: {
+                            deviceUID: to.params.deviceUID,
+                            channelName: to.params.channelName,
+                        },
+                    }),
                 },
                 {
                     path: '/devices/:deviceUID/speed/:channelName',

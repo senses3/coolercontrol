@@ -25,6 +25,7 @@ import {
     mdiFolderSearchOutline,
     mdiMemory,
     mdiRestart,
+    mdiTrashCanOutline,
 } from '@mdi/js'
 import {
     CustomSensor,
@@ -40,7 +41,7 @@ import InputText from 'primevue/inputtext'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
-import { onMounted, ref, toRaw, type Ref, watch, computed, inject } from 'vue'
+import { onMounted, ref, toRaw, type Ref, watch, computed } from 'vue'
 import { $enum } from 'ts-enum-util'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -59,13 +60,11 @@ import { v4 as uuidV4 } from 'uuid'
 import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
-import { Emitter, EventType } from 'mitt'
 import HealthWarning from '@/components/HealthWarning.vue'
 
 interface Props {
     customSensorID?: string
 }
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 interface AvailableTemp {
     deviceUID: string // needed here as well for the dropdown selector
@@ -459,13 +458,19 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     if (newName.length > 0) {
         sensorName.value = newName
         currentName.value = newName
-        emitter.emit('device-sensor-name-update', {
-            deviceUID: customSensorsDeviceUID,
-            sensorId: customSensor.id,
-            name: newName,
-        })
     }
     return true
+}
+const deleteSensor = (): void => {
+    confirm.require({
+        message: t('views.customSensors.deleteCustomSensorConfirm', { name: currentName.value }),
+        header: t('views.customSensors.deleteCustomSensor'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            contextIsDirty.value = false
+            await settingsStore.deleteCustomSensor(customSensorsDeviceUID, customSensor.id)
+        },
+    })
 }
 const updateTemps = () => {
     for (const tempDevice of tempSources.value) {
@@ -683,6 +688,21 @@ onMounted(async () => {
                     scroll-height="400px"
                     v-tooltip.top="t('views.dashboard.chartType')"
                 />
+            </div>
+            <div v-if="!shouldCreateSensor" class="p-2 pr-0">
+                <Button
+                    outlined
+                    class="h-[2.375rem] px-3"
+                    v-tooltip.top="t('views.customSensors.deleteCustomSensor')"
+                    @click="deleteSensor"
+                >
+                    <svg-icon
+                        class="outline-0"
+                        type="mdi"
+                        :path="mdiTrashCanOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </Button>
             </div>
             <div v-if="!shouldCreateSensor" class="p-2">
                 <Select
