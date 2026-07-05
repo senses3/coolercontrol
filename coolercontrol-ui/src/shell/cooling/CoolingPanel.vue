@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiChartMultiple, mdiFunction, mdiPinOff, mdiPinOutline } from '@mdi/js'
+import { mdiAlert, mdiChartMultiple, mdiFunction, mdiPinOff, mdiPinOutline, mdiPlus } from '@mdi/js'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -28,6 +28,8 @@ import type { Color, UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { HealthEntityType } from '@/models/DeviceHealth.ts'
+import { useLibraryWizards } from '@/composables/useLibraryWizards.ts'
 import { coolingChannels, pinId, type CoolingChannel } from '@/shell/cooling/channels.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
@@ -83,6 +85,16 @@ const setChannelColor = (channel: CoolingChannel, newColor: Color): void => {
 
 const profileLinks = computed(() => settingsStore.profiles.filter((profile) => profile.uid !== '0'))
 const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun.uid !== '0'))
+const { openProfileWizard, openFunctionWizard } = useLibraryWizards()
+
+// A profile is unhealthy when the daemon reports a missing or stale temp source for it.
+const isProfileUnhealthy = (profileUID: string): boolean =>
+    settingsStore.healthMissing.some(
+        (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
+    ) ||
+    settingsStore.healthStaleSource.some(
+        (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
+    )
 </script>
 
 <template>
@@ -247,35 +259,68 @@ const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun
         <div class="truncate px-2 pb-1 pt-3 text-xs uppercase text-text-color-secondary">
             {{ t('layout.shell.coolingPanel.library') }}
         </div>
-        <div
-            class="flex items-center gap-1.5 px-3 pb-1 pt-1 text-xs uppercase text-text-color-secondary opacity-70"
-        >
-            <svg-icon type="mdi" :path="mdiChartMultiple" :size="14" />
-            {{ t('layout.shell.coolingPanel.profiles') }}
+        <div class="flex items-center justify-between px-3 pb-1 pt-1">
+            <span class="text-xs uppercase text-text-color-secondary opacity-70">
+                {{ t('layout.shell.coolingPanel.profiles') }}
+            </span>
+            <button
+                type="button"
+                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                :title="t('layout.menu.tooltips.addProfile')"
+                @click="openProfileWizard"
+            >
+                <svg-icon type="mdi" :path="mdiPlus" :size="16" />
+            </button>
         </div>
         <RouterLink
             v-for="profile in profileLinks"
             :key="profile.uid"
             :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
             exact-active-class="bg-surface-hover !text-accent"
         >
-            {{ profile.name }}
+            <svg-icon
+                type="mdi"
+                :path="mdiChartMultiple"
+                :size="14"
+                class="shrink-0 text-text-color-secondary"
+            />
+            <span class="truncate">{{ profile.name }}</span>
+            <svg-icon
+                v-if="isProfileUnhealthy(profile.uid)"
+                type="mdi"
+                :path="mdiAlert"
+                :size="14"
+                class="shrink-0 text-warning"
+            />
         </RouterLink>
-        <div
-            class="flex items-center gap-1.5 px-3 pb-1 pt-2 text-xs uppercase text-text-color-secondary opacity-70"
-        >
-            <svg-icon type="mdi" :path="mdiFunction" :size="14" />
-            {{ t('layout.shell.coolingPanel.functions') }}
+        <div class="flex items-center justify-between px-3 pb-1 pt-2">
+            <span class="text-xs uppercase text-text-color-secondary opacity-70">
+                {{ t('layout.shell.coolingPanel.functions') }}
+            </span>
+            <button
+                type="button"
+                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                :title="t('layout.menu.tooltips.addFunction')"
+                @click="openFunctionWizard"
+            >
+                <svg-icon type="mdi" :path="mdiPlus" :size="16" />
+            </button>
         </div>
         <RouterLink
             v-for="fun in functionLinks"
             :key="fun.uid"
             :to="{ name: 'functions', params: { functionUID: fun.uid } }"
-            class="block truncate rounded-lg px-4 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
             exact-active-class="bg-surface-hover !text-accent"
         >
-            {{ fun.name }}
+            <svg-icon
+                type="mdi"
+                :path="mdiFunction"
+                :size="14"
+                class="shrink-0 text-text-color-secondary"
+            />
+            <span class="truncate">{{ fun.name }}</span>
         </RouterLink>
     </div>
 </template>
