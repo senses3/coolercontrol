@@ -105,8 +105,14 @@ const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'devices',
         name: 'section-devices',
-        component: () => import('@/shell/SectionPage.vue'),
-        props: { sectionId: 'devices' },
+        component: () => import('@/shell/devices/DevicesLanding.vue'),
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'devices/:deviceUID',
+        name: 'devices-device',
+        component: () => import('@/shell/devices/DevicePage.vue'),
+        props: true,
         meta: { section: 'devices' },
     },
 ]
@@ -238,16 +244,18 @@ const router = createRouter({
                     }),
                 },
                 {
-                    path: '/devices/:deviceId/lighting/:channelName',
+                    path: '/devices/:deviceUID/lighting/:channelName',
                     name: 'device-lighting',
                     component: () => import('@/views/LightingView.vue'),
                     props: true,
+                    meta: { section: 'devices' },
                 },
                 {
-                    path: '/devices/:deviceId/lcd/:channelName',
+                    path: '/devices/:deviceUID/lcd/:channelName',
                     name: 'device-lcd',
                     component: () => import('@/views/LcdView.vue'),
                     props: true,
+                    meta: { section: 'devices' },
                 },
                 {
                     path: '/plugins-overview',

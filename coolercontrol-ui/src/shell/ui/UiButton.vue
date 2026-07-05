@@ -20,7 +20,7 @@
 import { computed } from 'vue'
 
 type Variant = 'solid' | 'ghost' | 'outline'
-type Size = 'md' | 'icon'
+type Size = 'sm' | 'md' | 'icon'
 
 const props = withDefaults(
     defineProps<{
@@ -42,6 +42,7 @@ const variants: Record<Variant, string> = {
 }
 
 const sizes: Record<Size, string> = {
+    sm: 'h-8 px-3 text-sm',
     md: 'h-10 px-4 text-base',
     icon: 'h-10 w-10 p-0',
 }

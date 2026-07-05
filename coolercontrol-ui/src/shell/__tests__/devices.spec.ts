@@ -1,0 +1,115 @@
+/*
+ * CoolerControl - monitor and control your cooling and other devices
+ * Copyright (c) 2021-2025  Guy Boldon and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+// Device.ts uses class-transformer decorators which need the metadata polyfill.
+import 'reflect-metadata'
+import { describe, expect, it } from 'vitest'
+import { type Device, DeviceType } from '@/models/Device.ts'
+import { deviceChannelLinks, hardwareDevices, sensorToggles } from '../devices/devices.ts'
+
+interface FakeChannel {
+    speed_options?: object
+    lighting_modes?: object[]
+    lcd_modes?: object[]
+}
+
+function fakeDevice(
+    uid: string,
+    type: DeviceType,
+    temps: string[],
+    channels: Record<string, FakeChannel>,
+    statusChannels: string[] = [],
+): Device {
+    return {
+        uid,
+        type,
+        info: {
+            temps: new Map(temps.map((name) => [name, {}])),
+            channels: new Map(
+                Object.entries(channels).map(([name, channel]) => [
+                    name,
+                    { lighting_modes: [], lcd_modes: [], ...channel },
+                ]),
+            ),
+        },
+        status: {
+            temps: temps.map((name) => ({ name })),
+            channels: statusChannels.map((name) => ({ name })),
+        },
+    } as unknown as Device
+}
+
+describe('hardwareDevices', () => {
+    it('excludes custom-sensor devices', () => {
+        const hwmon = fakeDevice('d1', DeviceType.HWMON, [], {})
+        const custom = fakeDevice('c1', DeviceType.CUSTOM_SENSORS, ['sensor1'], {})
+        expect(hardwareDevices([hwmon, custom]).map((d) => d.uid)).toEqual(['d1'])
+    })
+})
+
+describe('deviceChannelLinks', () => {
+    it('lists lighting channels before lcd channels', () => {
+        const device = fakeDevice('d1', DeviceType.LIQUIDCTL, [], {
+            lcd: { lcd_modes: [{}] },
+            led1: { lighting_modes: [{}] },
+            fan1: { speed_options: {} },
+        })
+        expect(deviceChannelLinks(device)).toEqual([
+            { deviceUID: 'd1', channelName: 'led1', kind: 'lighting' },
+            { deviceUID: 'd1', channelName: 'lcd', kind: 'lcd' },
+        ])
+    })
+})
+
+describe('sensorToggles', () => {
+    it('collects temps, keyword channels, fans, lighting, lcd without duplicates', () => {
+        const device = fakeDevice(
+            'd1',
+            DeviceType.HWMON,
+            ['temp1'],
+            {
+                fan1: { speed_options: {} },
+                led1: { lighting_modes: [{}] },
+            },
+            ['CPU Load', 'GPU Freq'],
+        )
+        expect(sensorToggles(device, []).map((tog) => tog.channelName)).toEqual([
+            'temp1',
+            'GPU Freq',
+            'CPU Load',
+            'fan1',
+            'led1',
+        ])
+        expect(sensorToggles(device, []).every((tog) => tog.enabled)).toBe(true)
+    })
+
+    it('appends persisted disabled channels sorted and unchecked', () => {
+        const device = fakeDevice('d1', DeviceType.HWMON, ['temp1'], {})
+        const toggles = sensorToggles(device, ['zeta', 'alpha'])
+        expect(toggles.map((tog) => [tog.channelName, tog.enabled])).toEqual([
+            ['temp1', true],
+            ['alpha', false],
+            ['zeta', false],
+        ])
+    })
+
+    it('does not duplicate a disabled name that is also detected', () => {
+        const device = fakeDevice('d1', DeviceType.HWMON, ['temp1'], {})
+        expect(sensorToggles(device, ['temp1'])).toEqual([{ channelName: 'temp1', enabled: true }])
+    })
+})

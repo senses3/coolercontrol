@@ -129,6 +129,22 @@ export default {
             monitoringPanel: {
                 newDashboard: 'New Dashboard',
             },
+            devicesPanel: {
+                disabled: 'Disabled',
+            },
+            devicesPage: {
+                landingHint: 'Select a device to view its details and settings.',
+                temps: 'temps',
+                fans: 'fans',
+                lighting: 'lighting',
+                lcd: 'LCD',
+                deviceDisabled: 'This device is disabled.',
+                enableDevice: 'Enable Device',
+                disableDevice: 'Disable this device',
+                disable: 'Disable',
+                sensors: 'Sensors',
+                lightingLcd: 'Lighting & LCD',
+            },
             coolingPage: {
                 landingHint: 'Select a fan or pump to view and adjust its cooling.',
                 noChannels: 'No controllable fan or pump channels were detected.',
