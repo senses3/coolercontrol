@@ -171,6 +171,8 @@ const onPillClick = (kind: ChainPill['kind']): void => {
 // ----- apply / fork -----
 const applying = ref(false)
 const extensionSettingsRef = ref()
+const editorRef = ref()
+const editorDirty = computed<boolean>(() => editorRef.value?.contextIsDirty === true)
 
 const assignmentDirty = computed<boolean>(() => {
     if (controlMode.value === 'manual') {
@@ -187,7 +189,10 @@ const assignmentDirty = computed<boolean>(() => {
 
 const canApply = computed<boolean>(() => {
     if (!controllable.value || applying.value) return false
-    if (controlMode.value === 'automatic' && selectedProfileUID.value == null) return false
+    if (controlMode.value === 'automatic') {
+        if (selectedProfileUID.value == null) return false
+        return assignmentDirty.value || editorDirty.value
+    }
     return assignmentDirty.value
 })
 
@@ -208,11 +213,18 @@ const apply = async (): Promise<void> => {
                 new DeviceSettingWriteProfileDTO('0'),
             )
         } else if (selectedProfileUID.value != null) {
-            await settingsStore.saveDaemonDeviceSettingProfile(
-                props.deviceUID,
-                props.channelName,
-                new DeviceSettingWriteProfileDTO(selectedProfileUID.value),
-            )
+            if (editorDirty.value) {
+                await editorRef.value?.saveProfileState?.()
+                // still dirty means the editor's validation rejected the save
+                if (editorDirty.value) return
+            }
+            if (assignmentDirty.value) {
+                await settingsStore.saveDaemonDeviceSettingProfile(
+                    props.deviceUID,
+                    props.channelName,
+                    new DeviceSettingWriteProfileDTO(selectedProfileUID.value),
+                )
+            }
         }
         extensionSettingsRef.value?.saveChannelExtensionSettings?.()
     } finally {
@@ -315,7 +327,12 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :channel-name="channelName"
                     :chosen-profile="controlMode === 'automatic' ? selectedProfile : undefined"
                 />
-                <UiButton class="ml-auto" :disabled="!canApply" @click="apply">
+                <UiButton
+                    class="ml-auto"
+                    :class="{ 'animate-pulse-fast': editorDirty }"
+                    :disabled="!canApply"
+                    @click="apply"
+                >
                     {{ t('layout.shell.coolingPage.apply') }}
                 </UiButton>
             </div>
@@ -396,9 +413,11 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     class="rounded-lg border border-border-one"
                 >
                     <ProfileEditor
+                        ref="editorRef"
                         :key="selectedProfileUID"
                         :profile-u-i-d="selectedProfileUID"
                         graph-height="clamp(30rem, calc(100vh - 26rem), 44rem)"
+                        hide-save
                     />
                 </div>
             </div>

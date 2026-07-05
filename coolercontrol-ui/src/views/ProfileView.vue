@@ -95,6 +95,9 @@ interface Props {
     profileUID: string
     // Fixed graph height when embedded (e.g. '26rem'); viewport-based when absent.
     graphHeight?: string
+    // Hides the internal save button; the host page saves via the exposed
+    // saveProfileState (e.g. the channel page's Apply button).
+    hideSave?: boolean
 }
 
 const props = defineProps<Props>()
@@ -2002,6 +2005,9 @@ function onKnobMouseup(e: MouseEvent) {
     if (e.button === 3) window.history.back()
     else if (e.button === 4) window.history.forward()
 }
+
+// For host pages that embed this editor and drive saving themselves.
+defineExpose({ saveProfileState, contextIsDirty })
 </script>
 
 <template>
@@ -2200,7 +2206,7 @@ function onKnobMouseup(e: MouseEvent) {
                     </template>
                 </InputNumber>
             </div>
-            <div class="p-2">
+            <div v-if="!hideSave" class="p-2">
                 <Button
                     class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
