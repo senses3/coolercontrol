@@ -17,7 +17,7 @@
   -->
 
 <script setup lang="ts">
-import { RouterView, useRouter } from 'vue-router'
+import { RouterView } from 'vue-router'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
@@ -31,9 +31,8 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import { ElLoading, ElSwitch } from 'element-plus'
 import 'element-plus/es/components/loading/style/css'
-import { StartupPage, ThemeMode } from '@/models/UISettings.ts'
+import { ThemeMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
-import { features } from '@/features.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
 import { svgLoader, svgLoaderBackground, svgLoaderViewBox } from '@/models/Loader.ts'
@@ -47,7 +46,6 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const daemonState = useDaemonState()
-const router = useRouter()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 const daemonPort: Ref<number> = ref(deviceStore.getDaemonPort())
@@ -300,28 +298,12 @@ onMounted(async () => {
         return
     }
     await settingsStore.initializeSettings(deviceStore.allDevices())
-    // Prime the calibration cache before `loaded` flips below: the Controls
-    // Overview can be the configured startup page, and its FanChannelNode
-    // buttons read `statusFor` on first paint.
+    // Prime the calibration cache before `loaded` flips below: the cooling
+    // channel page reads `statusFor` on first paint.
     await calibrationStore.refreshAllStatuses()
     // Re-attach to a calibration batch the daemon is still driving after a
     // reload (the daemon owns the queue, so it survived the suspend/reload).
     const calibrationBatchResumed = await calibrationStore.ensureBatchPolling()
-    // Honor the configured startup page, but only when the user landed on the
-    // default root route (no deep link). The empty path's component is
-    // AppInfoView, so AppInfo needs no redirect; Controls and HomeDashboard do.
-    if (router.currentRoute.value.name === 'startup-page') {
-        if (features.newShell) {
-            await router.replace({ name: 'section-home' })
-        } else {
-            const startup = settingsStore.startupPage
-            if (startup === StartupPage.Controls) {
-                await router.replace({ name: 'system-controls' })
-            } else if (startup === StartupPage.HomeDashboard) {
-                await router.replace({ name: 'dashboards' })
-            }
-        }
-    }
     applyCustomTheme()
     await daemonState.init()
     await deviceStore.loadAllPlugins()

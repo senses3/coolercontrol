@@ -18,14 +18,10 @@
 
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 // @ts-ignore
-import AppLayout from '@/layout/AppLayout.vue'
-import { useSettingsStore } from '@/stores/SettingsStore'
-import { StartupPage } from '@/models/UISettings'
-import { features } from '@/features.ts'
+import ShellLayout from '@/shell/ShellLayout.vue'
 
-// New-shell section routes, registered only when the newShell flag is on.
-// Placeholder pages until each section's phase lands; the settings section
-// reuses the existing settings route.
+// Shell section routes. Placeholder pages until each section's phase lands;
+// the settings section reuses the existing settings route.
 const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'home',
@@ -78,26 +74,31 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            component: features.newShell ? () => import('@/shell/ShellLayout.vue') : AppLayout,
+            component: ShellLayout,
             children: [
-                ...(features.newShell ? sectionRoutes : []),
+                ...sectionRoutes,
                 {
                     path: '',
                     name: 'startup-page',
-                    component: () => import('@/views/AppInfoView.vue'),
-                    props: false,
+                    redirect: { name: 'section-home' },
                 },
+                // Legacy route names kept as redirects: wizards, bookmarks,
+                // and the Qt app navigate by these.
                 {
                     path: 'controls',
                     name: 'system-controls',
-                    component: () => import('@/views/ControlsView.vue'),
-                    props: true,
+                    redirect: { name: 'section-cooling' },
                 },
                 {
                     path: 'controls/:deviceUID/:channelName',
                     name: 'channel-control-flow',
-                    component: () => import('@/views/ChannelControlFlowView.vue'),
-                    props: true,
+                    redirect: (to) => ({
+                        name: 'cooling-channel',
+                        params: {
+                            deviceUID: to.params.deviceUID,
+                            channelName: to.params.channelName,
+                        },
+                    }),
                 },
                 {
                     path: 'app-info',
@@ -163,8 +164,13 @@ const router = createRouter({
                 {
                     path: '/devices/:deviceUID/speed/:channelName',
                     name: 'device-speed',
-                    component: () => import('@/views/SpeedView.vue'),
-                    props: true,
+                    redirect: (to) => ({
+                        name: 'cooling-channel',
+                        params: {
+                            deviceUID: to.params.deviceUID,
+                            channelName: to.params.channelName,
+                        },
+                    }),
                 },
                 {
                     path: '/devices/:deviceId/lighting/:channelName',
@@ -199,24 +205,6 @@ const router = createRouter({
             ],
         },
     ],
-})
-
-// Redirect the default root route to the user's configured startup page.
-// Skipped on initial load (settings not yet loaded); App.vue handles that case
-// after settings init. Subsequent navigations to "/" honor the setting.
-// AppInfo is the default fallback; the empty path's component is AppInfoView,
-// so when startupPage === AppInfo we just stay put without a redirect.
-router.beforeEach((to) => {
-    if (to.name !== 'startup-page') return true
-    if (features.newShell) return { name: 'section-home' }
-    const settingsStore = useSettingsStore()
-    if (settingsStore.startupPage === StartupPage.Controls) {
-        return { name: 'system-controls' }
-    }
-    if (settingsStore.startupPage === StartupPage.HomeDashboard) {
-        return { name: 'dashboards' }
-    }
-    return true
 })
 
 export default router

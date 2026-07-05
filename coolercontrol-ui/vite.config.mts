@@ -70,7 +70,6 @@ function reflectMetadataPlugin(): Plugin {
 // clean. Consumed at runtime via src/features.ts.
 const FEATURE_BRANCHES: Record<string, string[]> = {
     coolingWizard: ['cooling-wizard', 'compio-base'],
-    newShell: ['feat/ui-shell'],
 }
 
 function currentGitBranch(): string {
