@@ -427,6 +427,12 @@ const apply = async (): Promise<void> => {
     }
 }
 
+// Chart canvases consume plain wheel events for zoom; stop them in the capture
+// phase so the page scrolls. Ctrl+wheel (and trackpad pinch) passes through.
+const onPageWheelCapture = (event: WheelEvent): void => {
+    if (!event.ctrlKey) event.stopPropagation()
+}
+
 const openWizard = (): void => {
     wizard.open({
         deviceUID: props.deviceUID,
@@ -457,7 +463,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
 </script>
 
 <template>
-    <div class="flex h-full flex-col gap-4 overflow-y-auto p-4">
+    <div class="flex h-full flex-col gap-4 overflow-y-auto p-4" @wheel.capture="onPageWheelCapture">
         <div class="flex flex-wrap items-center gap-3">
             <div class="min-w-0">
                 <h1 class="truncate text-xl font-semibold text-text-color">{{ channelLabel }}</h1>

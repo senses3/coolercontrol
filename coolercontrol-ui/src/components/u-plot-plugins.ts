@@ -427,6 +427,9 @@ export const mouseWheelZoomPlugin = () => {
                     }
                     const rect = u.over.getBoundingClientRect()
                     u.over.addEventListener('wheel', (e) => {
+                        // Plain wheel scrolls the page; Ctrl+wheel (and trackpad
+                        // pinch, which sets ctrlKey) zooms the chart.
+                        if (!e.ctrlKey) return
                         e.preventDefault()
                         const xMin = u.data[0][0]!
                         const xMax = u.data[0][u.data[0].length - 1]!

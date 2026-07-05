@@ -751,7 +751,8 @@ onMounted(async () => {
     // plugin's listener on the child u.over element (bubbling phase).
     uChartElement.addEventListener(
         'wheel',
-        () => {
+        (event: WheelEvent) => {
+            if (!event.ctrlKey) return
             if (settingsStore.eyeCandy && rafId !== null) {
                 if (
                     chart!.scales.x.min != chart!.data[0][0] ||

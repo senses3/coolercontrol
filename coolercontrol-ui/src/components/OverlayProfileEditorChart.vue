@@ -276,6 +276,8 @@ const option = {
             yAxisIndex: 0,
             filterMode: 'none',
             preventDefaultMouseMove: false,
+            zoomOnMouseWheel: 'ctrl',
+            moveOnMouseWheel: false,
             minValueSpan: 20,
             throttle: 25,
         },
