@@ -20,7 +20,7 @@
 // specific branch builds via FEATURE_BRANCHES in vite.config and hidden
 // everywhere else (main, release, and builds where the branch is undetectable).
 
-export type FeatureName = 'coolingWizard'
+export type FeatureName = 'coolingWizard' | 'newShell'
 
 // Injected by vite.config from the git branch at build time.
 declare const __FEATURES__: Partial<Record<FeatureName, boolean>>
@@ -30,4 +30,5 @@ const injected: Partial<Record<FeatureName, boolean>> =
 
 export const features: Readonly<Record<FeatureName, boolean>> = Object.freeze({
     coolingWizard: injected.coolingWizard ?? false,
+    newShell: injected.newShell ?? false,
 })
