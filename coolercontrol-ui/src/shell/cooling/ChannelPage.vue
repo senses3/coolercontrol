@@ -19,16 +19,14 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAutoFix, mdiShareVariantOutline } from '@mdi/js'
+import { mdiAutoFix, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
-import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
-import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vue'
 import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
 import TimeChart from '@/components/TimeChart.vue'
 import { useFanControlWizard } from '@/composables/useFanControlWizard.ts'
@@ -38,22 +36,18 @@ import {
     DeviceSettingWriteProfileDTO,
 } from '@/models/DaemonSettings.ts'
 import type { Device, UID } from '@/models/Device.ts'
-import {
-    Profile,
-    ProfileMixFunctionType,
-    ProfileTempSource,
-    ProfileType,
-    getProfileMixFunctionTypeDisplayName,
-} from '@/models/Profile.ts'
+import { Profile } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
-import GraphProfileEditor, { type GraphTempSource } from '@/shell/cooling/GraphProfileEditor.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
+
+// The original, fully featured profile editor, embedded with a fixed height.
+const ProfileEditor = defineAsyncComponent(() => import('@/views/ProfileView.vue'))
 
 type ControlMode = 'automatic' | 'manual' | 'unmanaged'
 
@@ -111,24 +105,9 @@ const controlModeOptions = computed(() => [
     { label: t('layout.shell.coolingPage.modeUnmanaged'), value: 'unmanaged' },
 ])
 
-// ----- edited profile copy -----
-const cloneProfile = (profile: Profile): Profile =>
-    plainToInstance(Profile, instanceToPlain(profile))
-
-const editedProfile = ref<Profile | undefined>()
-const originalProfileJson = ref<string>('')
-const resetEditedProfile = (): void => {
-    const profile = settingsStore.profiles.find((p) => p.uid === selectedProfileUID.value)
-    editedProfile.value = profile != null ? cloneProfile(profile) : undefined
-    originalProfileJson.value = profile != null ? JSON.stringify(instanceToPlain(profile)) : ''
-}
-resetEditedProfile()
-watch(selectedProfileUID, resetEditedProfile)
-
-const profileDirty = computed<boolean>(() => {
-    if (editedProfile.value == null) return false
-    return JSON.stringify(instanceToPlain(editedProfile.value)) !== originalProfileJson.value
-})
+const selectedProfile = computed<Profile | undefined>(() =>
+    settingsStore.profiles.find((profile) => profile.uid === selectedProfileUID.value),
+)
 
 // channels (other than this one) also driven by the selected profile
 const sharedChannels = computed<Array<{ deviceUID: UID; channelName: string }>>(() => {
@@ -143,163 +122,12 @@ const sharedChannels = computed<Array<{ deviceUID: UID; channelName: string }>>(
     }
     return users
 })
-const shareMode = ref<'all' | 'fork'>('all')
-const shareOptions = computed(() => [
-    {
-        label: t('layout.shell.coolingPage.updateAll', { count: sharedChannels.value.length + 1 }),
-        value: 'all',
-    },
-    { label: t('layout.shell.coolingPage.forkForFan'), value: 'fork' },
-])
 
-// ----- select options -----
 const profileOptions = computed<UiSelectOption[]>(() =>
     settingsStore.profiles
         .filter((profile) => profile.uid !== '0')
         .map((profile) => ({ label: profile.name, value: profile.uid })),
 )
-const functionOptions = computed<UiSelectOption[]>(() =>
-    settingsStore.functions.map((fun) => ({ label: fun.name, value: fun.uid })),
-)
-const mixFunctionOptions = computed<UiSelectOption[]>(() =>
-    Object.values(ProfileMixFunctionType).map((mixType) => ({
-        label: getProfileMixFunctionTypeDisplayName(mixType),
-        value: mixType,
-    })),
-)
-
-interface TempOption extends UiSelectOption {
-    deviceUID: UID
-    tempName: string
-}
-const tempSourceOptions = computed<TempOption[]>(() => {
-    const options: TempOption[] = []
-    for (const dev of deviceStore.allDevices()) {
-        if (dev.info == null || dev.status.temps.length === 0) continue
-        const deviceSettings = settingsStore.allUIDeviceSettings.get(dev.uid)
-        const devName = deviceSettings?.name ?? dev.uid
-        for (const temp of dev.status.temps) {
-            const label = deviceSettings?.sensorsAndChannels.get(temp.name)?.name ?? temp.name
-            options.push({
-                label: `${devName}: ${label}`,
-                value: `${dev.uid}/${temp.name}`,
-                deviceUID: dev.uid,
-                tempName: temp.name,
-            })
-        }
-    }
-    return options
-})
-
-const selectedTempValue = computed<string | undefined>({
-    get: () =>
-        editedProfile.value?.temp_source != null
-            ? `${editedProfile.value.temp_source.device_uid}/${editedProfile.value.temp_source.temp_name}`
-            : undefined,
-    set: (value) => {
-        if (editedProfile.value == null || value == null) return
-        const option = tempSourceOptions.value.find((o) => o.value === value)
-        if (option == null) return
-        editedProfile.value.temp_source = new ProfileTempSource(option.tempName, option.deviceUID)
-    },
-})
-
-const graphTempSource = computed<GraphTempSource | undefined>(() => {
-    const source = editedProfile.value?.temp_source
-    if (source == null) return undefined
-    let sourceDevice: Device | undefined
-    for (const candidate of deviceStore.allDevices()) {
-        if (candidate.uid === source.device_uid) {
-            sourceDevice = candidate
-            break
-        }
-    }
-    return {
-        deviceUID: source.device_uid,
-        tempName: source.temp_name,
-        color:
-            settingsStore.allUIDeviceSettings
-                .get(source.device_uid)
-                ?.sensorsAndChannels.get(source.temp_name)?.color ?? '',
-        tempMin: sourceDevice?.info?.temp_min ?? 0,
-        tempMax: sourceDevice?.info?.temp_max ?? 100,
-    }
-})
-
-const graphPointLimits = computed(() => {
-    const source = editedProfile.value?.temp_source
-    let sourceDevice: Device | undefined
-    if (source != null) {
-        for (const candidate of deviceStore.allDevices()) {
-            if (candidate.uid === source.device_uid) {
-                sourceDevice = candidate
-                break
-            }
-        }
-    }
-    return {
-        min: sourceDevice?.info?.profile_min_length ?? 2,
-        max: sourceDevice?.info?.profile_max_length ?? 17,
-    }
-})
-
-const onGraphChanged = (points: Array<[number, number]>): void => {
-    if (editedProfile.value == null) return
-    editedProfile.value.speed_profile = points
-}
-const onOverlayChanged = (points: Array<[number, number]>): void => {
-    if (editedProfile.value == null) return
-    editedProfile.value.offset_profile = points
-}
-
-const memberProfiles = computed<Profile[]>(
-    () =>
-        (editedProfile.value?.member_profile_uids ?? [])
-            .map((uid) => settingsStore.profiles.find((p) => p.uid === uid))
-            .filter((p) => p != null) as Profile[],
-)
-// Mirrors ProfileView's member rule: Graph/Fixed always; Mix only without Mix
-// sub-members and without a circular reference; Default/Overlay never.
-const memberCandidates = computed<Profile[]>(() =>
-    settingsStore.profiles.filter((profile) => {
-        if (profile.uid === '0' || profile.uid === editedProfile.value?.uid) return false
-        if (profile.p_type === ProfileType.Graph || profile.p_type === ProfileType.Fixed) {
-            return true
-        }
-        if (profile.p_type !== ProfileType.Mix) return false
-        const hasMixSubMembers = profile.member_profile_uids.some(
-            (uid) => settingsStore.profiles.find((p) => p.uid === uid)?.p_type === ProfileType.Mix,
-        )
-        if (hasMixSubMembers) return false
-        return !profile.member_profile_uids.includes(editedProfile.value?.uid ?? '')
-    }),
-)
-const toggleMember = (uid: UID): void => {
-    if (editedProfile.value == null) return
-    const members = editedProfile.value.member_profile_uids
-    editedProfile.value.member_profile_uids = members.includes(uid)
-        ? members.filter((member) => member !== uid)
-        : [...members, uid]
-}
-
-// Overlay bases may only be Graph or Mix profiles, like ProfileView.
-const overlayBaseOptions = computed<UiSelectOption[]>(() =>
-    settingsStore.profiles
-        .filter(
-            (profile) =>
-                (profile.p_type === ProfileType.Graph || profile.p_type === ProfileType.Mix) &&
-                profile.uid !== editedProfile.value?.uid,
-        )
-        .map((profile) => ({ label: profile.name, value: profile.uid })),
-)
-
-const overlayBaseUID = computed<string | undefined>({
-    get: () => editedProfile.value?.member_profile_uids[0],
-    set: (value) => {
-        if (editedProfile.value == null || value == null) return
-        editedProfile.value.member_profile_uids = [value]
-    },
-})
 
 // ----- chain strip -----
 const chainPills = computed<ChainPill[]>(() => {
@@ -311,11 +139,11 @@ const chainPills = computed<ChainPill[]>(() => {
             },
         ]
     }
-    if (controlMode.value === 'unmanaged' || editedProfile.value == null) {
+    if (controlMode.value === 'unmanaged' || selectedProfile.value == null) {
         return [{ kind: 'profile', label: t('common.unmanaged') }]
     }
     const pills: ChainPill[] = []
-    const source = editedProfile.value.temp_source
+    const source = selectedProfile.value.temp_source
     if (source != null) {
         const label =
             settingsStore.allUIDeviceSettings
@@ -323,9 +151,9 @@ const chainPills = computed<ChainPill[]>(() => {
                 ?.sensorsAndChannels.get(source.temp_name)?.name ?? source.temp_name
         pills.push({ kind: 'tempSource', label })
     }
-    pills.push({ kind: 'profile', label: editedProfile.value.name })
+    pills.push({ kind: 'profile', label: selectedProfile.value.name })
     const fun = settingsStore.functions.find(
-        (candidate) => candidate.uid === editedProfile.value?.function_uid,
+        (candidate) => candidate.uid === selectedProfile.value?.function_uid,
     )
     if (fun != null && fun.uid !== '0') {
         pills.push({ kind: 'function', label: fun.name })
@@ -334,19 +162,13 @@ const chainPills = computed<ChainPill[]>(() => {
 })
 
 const profileSection = ref<HTMLElement>()
-const tempSection = ref<HTMLElement>()
-const functionSection = ref<HTMLElement>()
+const editorSection = ref<HTMLElement>()
 const onPillClick = (kind: ChainPill['kind']): void => {
-    const target =
-        kind === 'tempSource'
-            ? tempSection.value
-            : kind === 'function'
-              ? functionSection.value
-              : profileSection.value
-    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const target = kind === 'profile' ? profileSection.value : editorSection.value
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-// ----- apply / save -----
+// ----- apply / fork -----
 const applying = ref(false)
 const extensionSettingsRef = ref()
 
@@ -365,34 +187,9 @@ const assignmentDirty = computed<boolean>(() => {
 
 const canApply = computed<boolean>(() => {
     if (!controllable.value || applying.value) return false
-    if (controlMode.value === 'automatic') {
-        if (selectedProfileUID.value == null) return false
-        return assignmentDirty.value || profileDirty.value
-    }
+    if (controlMode.value === 'automatic' && selectedProfileUID.value == null) return false
     return assignmentDirty.value
 })
-
-const saveEditedProfile = async (): Promise<UID | undefined> => {
-    if (editedProfile.value == null) return selectedProfileUID.value
-    if (!profileDirty.value) return selectedProfileUID.value
-    if (sharedChannels.value.length > 0 && shareMode.value === 'fork') {
-        const forked = cloneProfile(editedProfile.value)
-        forked.uid = uuidV4()
-        forked.name = `${editedProfile.value.name} (${channelLabel.value})`
-        settingsStore.profiles.push(forked)
-        const saved = await settingsStore.saveProfile(forked.uid)
-        if (!saved) return undefined
-        return forked.uid
-    }
-    const index = settingsStore.profiles.findIndex(
-        (profile) => profile.uid === editedProfile.value?.uid,
-    )
-    if (index < 0) return undefined
-    settingsStore.profiles[index] = cloneProfile(editedProfile.value)
-    const updated = await settingsStore.updateProfile(editedProfile.value.uid)
-    if (!updated) return undefined
-    return editedProfile.value.uid
-}
 
 const apply = async (): Promise<void> => {
     if (applying.value) return
@@ -410,18 +207,37 @@ const apply = async (): Promise<void> => {
                 props.channelName,
                 new DeviceSettingWriteProfileDTO('0'),
             )
-        } else {
-            const profileUID = await saveEditedProfile()
-            if (profileUID == null) return
+        } else if (selectedProfileUID.value != null) {
             await settingsStore.saveDaemonDeviceSettingProfile(
                 props.deviceUID,
                 props.channelName,
-                new DeviceSettingWriteProfileDTO(profileUID),
+                new DeviceSettingWriteProfileDTO(selectedProfileUID.value),
             )
-            selectedProfileUID.value = profileUID
-            resetEditedProfile()
         }
         extensionSettingsRef.value?.saveChannelExtensionSettings?.()
+    } finally {
+        applying.value = false
+    }
+}
+
+// Clones the shared profile so edits below only affect this fan.
+const forkProfile = async (): Promise<void> => {
+    const source = selectedProfile.value
+    if (source == null || applying.value) return
+    applying.value = true
+    try {
+        const forked = plainToInstance(Profile, instanceToPlain(source))
+        forked.uid = uuidV4()
+        forked.name = `${source.name} (${channelLabel.value})`
+        settingsStore.profiles.push(forked)
+        const saved = await settingsStore.saveProfile(forked.uid)
+        if (!saved) return
+        await settingsStore.saveDaemonDeviceSettingProfile(
+            props.deviceUID,
+            props.channelName,
+            new DeviceSettingWriteProfileDTO(forked.uid),
+        )
+        selectedProfileUID.value = forked.uid
     } finally {
         applying.value = false
     }
@@ -497,7 +313,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     ref="extensionSettingsRef"
                     :device-u-i-d="deviceUID"
                     :channel-name="channelName"
-                    :chosen-profile="controlMode === 'automatic' ? editedProfile : undefined"
+                    :chosen-profile="controlMode === 'automatic' ? selectedProfile : undefined"
                 />
                 <UiButton class="ml-auto" :disabled="!canApply" @click="apply">
                     {{ t('layout.shell.coolingPage.apply') }}
@@ -552,180 +368,39 @@ if (channelDashboard.value.dataTypes.length > 0) {
                             :placeholder="t('layout.shell.coolingPage.selectProfile')"
                         />
                     </div>
-                    <template v-if="editedProfile != null">
-                        <div
-                            v-if="editedProfile.p_type === ProfileType.Graph"
-                            ref="tempSection"
-                            class="flex flex-col gap-1"
-                        >
-                            <span class="text-xs text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.chain.tempSource') }}
-                            </span>
-                            <UiSelect
-                                v-model="selectedTempValue"
-                                :options="tempSourceOptions"
-                                :placeholder="t('layout.shell.coolingPage.selectTempSource')"
-                            />
-                        </div>
-                        <div
-                            v-if="editedProfile.p_type === ProfileType.Mix"
-                            class="flex flex-col gap-1"
-                        >
-                            <span class="text-xs text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.mixFunction') }}
-                            </span>
-                            <UiSelect
-                                :model-value="editedProfile.mix_function_type"
-                                :options="mixFunctionOptions"
-                                @update:model-value="
-                                    (mixType: string | undefined) =>
-                                        (editedProfile!.mix_function_type =
-                                            mixType as ProfileMixFunctionType)
-                                "
-                            />
-                        </div>
-                        <div
-                            v-if="editedProfile.p_type === ProfileType.Overlay"
-                            class="flex flex-col gap-1"
-                        >
-                            <span class="text-xs text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.overlayBase') }}
-                            </span>
-                            <UiSelect
-                                v-model="overlayBaseUID"
-                                :options="overlayBaseOptions"
-                                :placeholder="t('layout.shell.coolingPage.selectProfile')"
-                            />
-                        </div>
-                        <div ref="functionSection" class="flex flex-col gap-1">
-                            <span class="text-xs text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.chain.function') }}
-                            </span>
-                            <div class="flex items-center gap-2">
-                                <UiSelect
-                                    :model-value="editedProfile.function_uid"
-                                    :options="functionOptions"
-                                    @update:model-value="
-                                        (uid: string | undefined) =>
-                                            (editedProfile!.function_uid = uid ?? '0')
-                                    "
-                                />
-                                <RouterLink
-                                    v-if="editedProfile.function_uid !== '0'"
-                                    :to="{
-                                        name: 'functions',
-                                        params: { functionUID: editedProfile.function_uid },
-                                    }"
-                                    class="text-sm text-accent outline-none hover:underline"
-                                >
-                                    {{ t('layout.shell.coolingPage.editFunction') }}
-                                </RouterLink>
-                            </div>
-                        </div>
-                    </template>
                     <div
                         v-if="sharedChannels.length > 0"
-                        class="inline-flex items-center gap-1.5 self-center rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-xs text-text-color-secondary"
-                        :title="t('layout.shell.coolingPage.sharedTooltip')"
+                        class="flex items-center gap-2 self-center"
                     >
-                        <svg-icon type="mdi" :path="mdiShareVariantOutline" :size="13" />
-                        {{
-                            t('layout.shell.coolingPage.sharedWith', {
-                                count: sharedChannels.length,
-                            })
-                        }}
+                        <span
+                            class="inline-flex items-center gap-1.5 rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-xs text-text-color-secondary"
+                            :title="t('layout.shell.coolingPage.sharedTooltip')"
+                        >
+                            <svg-icon type="mdi" :path="mdiShareVariantOutline" :size="13" />
+                            {{
+                                t('layout.shell.coolingPage.sharedWith', {
+                                    count: sharedChannels.length,
+                                })
+                            }}
+                        </span>
+                        <UiButton variant="outline" :disabled="applying" @click="forkProfile">
+                            <svg-icon type="mdi" :path="mdiSourceFork" :size="14" />
+                            {{ t('layout.shell.coolingPage.forkForFan') }}
+                        </UiButton>
                     </div>
                 </div>
 
-                <template v-if="editedProfile != null">
-                    <div
-                        v-if="profileDirty && sharedChannels.length > 0"
-                        class="flex flex-wrap items-center gap-3 rounded-lg border border-warning/50 bg-bg-two p-3"
-                    >
-                        <span class="text-sm text-text-color">
-                            {{ t('layout.shell.coolingPage.sharedEditPrompt') }}
-                        </span>
-                        <UiToggleGroup v-model="shareMode" :options="shareOptions" />
-                    </div>
-
-                    <!-- Fixed -->
-                    <div
-                        v-if="editedProfile.p_type === ProfileType.Fixed"
-                        class="flex items-center gap-4"
-                    >
-                        <UiSlider
-                            :model-value="editedProfile.speed_fixed ?? 50"
-                            :min="speedOptions?.min_duty ?? 0"
-                            :max="speedOptions?.max_duty ?? 100"
-                            class="max-w-md"
-                            @update:model-value="
-                                (duty: number) => (editedProfile!.speed_fixed = duty)
-                            "
-                        />
-                        <span class="w-12 text-right tabular-nums text-text-color">
-                            {{ editedProfile.speed_fixed ?? 50 }}%
-                        </span>
-                    </div>
-
-                    <!-- Graph -->
-                    <template v-else-if="editedProfile.p_type === ProfileType.Graph">
-                        <GraphProfileEditor
-                            v-if="graphTempSource != null"
-                            :points="editedProfile.speed_profile"
-                            :temp-source="graphTempSource"
-                            :duty-min="speedOptions?.min_duty ?? 0"
-                            :duty-max="speedOptions?.max_duty ?? 100"
-                            :min-points="graphPointLimits.min"
-                            :max-points="graphPointLimits.max"
-                            @changed="onGraphChanged"
-                        />
-                        <p v-else class="text-sm text-text-color-secondary">
-                            {{ t('layout.shell.coolingPage.selectTempSourceHint') }}
-                        </p>
-                    </template>
-
-                    <!-- Mix -->
-                    <template v-else-if="editedProfile.p_type === ProfileType.Mix">
-                        <div class="flex flex-col gap-1">
-                            <span class="text-xs text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.memberProfiles') }}
-                            </span>
-                            <div class="flex flex-wrap gap-2">
-                                <label
-                                    v-for="candidate in memberCandidates"
-                                    :key="candidate.uid"
-                                    class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-one bg-bg-two px-2.5 py-1 text-sm text-text-color hover:bg-surface-hover"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        :checked="
-                                            editedProfile.member_profile_uids.includes(
-                                                candidate.uid,
-                                            )
-                                        "
-                                        class="accent-accent"
-                                        @change="toggleMember(candidate.uid)"
-                                    />
-                                    {{ candidate.name }}
-                                </label>
-                            </div>
-                        </div>
-                        <MixProfileEditorChart
-                            v-if="
-                                memberProfiles.length > 0 && editedProfile.mix_function_type != null
-                            "
-                            :profiles="memberProfiles"
-                            :mix-function-type="editedProfile.mix_function_type"
-                        />
-                    </template>
-
-                    <!-- Overlay -->
-                    <OverlayProfileEditorChart
-                        v-else-if="editedProfile.p_type === ProfileType.Overlay"
-                        :profile-u-i-d="editedProfile.uid"
-                        @changed="onOverlayChanged"
+                <div
+                    v-if="selectedProfileUID != null"
+                    ref="editorSection"
+                    class="rounded-lg border border-border-one"
+                >
+                    <ProfileEditor
+                        :key="selectedProfileUID"
+                        :profile-u-i-d="selectedProfileUID"
+                        graph-height="26rem"
                     />
-                </template>
+                </div>
             </div>
         </template>
         <p v-else class="text-sm text-text-color-secondary">

@@ -93,6 +93,8 @@ echarts.use([
 
 interface Props {
     profileUID: string
+    // Fixed graph height when embedded (e.g. '26rem'); viewport-based when absent.
+    graphHeight?: string
 }
 
 const props = defineProps<Props>()
@@ -1843,6 +1845,10 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
     const controlPanel = document.getElementById('control-panel')
+    if (graphEl != null && props.graphHeight != null) {
+        graphEl.style.height = props.graphHeight
+        return
+    }
     if (graphEl != null && controlPanel != null) {
         const panelHeight = controlPanel.getBoundingClientRect().height
         if (panelHeight > 56) {
