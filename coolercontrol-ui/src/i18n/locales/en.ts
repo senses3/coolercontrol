@@ -105,6 +105,18 @@ export default {
         },
     },
     layout: {
+        shell: {
+            home: 'Home',
+            cooling: 'Cooling',
+            monitoring: 'Monitoring',
+            devices: 'Devices',
+            settings: 'Settings',
+            plugins: 'Plugins',
+            modes: 'Modes',
+            sectionPlaceholder: 'This section arrives in phase {phase} of the UI redesign.',
+            panelPlaceholder: 'Section content arrives in phase {phase}.',
+            laterPhase: 'Moves here in a later phase',
+        },
         topbar: {
             login: 'Login',
             logout: 'Logout',

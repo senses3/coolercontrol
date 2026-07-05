@@ -33,6 +33,7 @@ import { ElLoading, ElSwitch } from 'element-plus'
 import 'element-plus/es/components/loading/style/css'
 import { StartupPage, ThemeMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
+import { features } from '@/features.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
 import { svgLoader, svgLoaderBackground, svgLoaderViewBox } from '@/models/Loader.ts'
@@ -310,11 +311,15 @@ onMounted(async () => {
     // default root route (no deep link). The empty path's component is
     // AppInfoView, so AppInfo needs no redirect; Controls and HomeDashboard do.
     if (router.currentRoute.value.name === 'startup-page') {
-        const startup = settingsStore.startupPage
-        if (startup === StartupPage.Controls) {
-            await router.replace({ name: 'system-controls' })
-        } else if (startup === StartupPage.HomeDashboard) {
-            await router.replace({ name: 'dashboards' })
+        if (features.newShell) {
+            await router.replace({ name: 'section-home' })
+        } else {
+            const startup = settingsStore.startupPage
+            if (startup === StartupPage.Controls) {
+                await router.replace({ name: 'system-controls' })
+            } else if (startup === StartupPage.HomeDashboard) {
+                await router.replace({ name: 'dashboards' })
+            }
         }
     }
     applyCustomTheme()

@@ -16,11 +16,46 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 // @ts-ignore
 import AppLayout from '@/layout/AppLayout.vue'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { StartupPage } from '@/models/UISettings'
+import { features } from '@/features.ts'
+
+// New-shell section routes, registered only when the newShell flag is on.
+// Placeholder pages until each section's phase lands; the settings section
+// reuses the existing settings route.
+const sectionRoutes: RouteRecordRaw[] = [
+    {
+        path: 'home',
+        name: 'section-home',
+        component: () => import('@/shell/SectionPage.vue'),
+        props: { sectionId: 'home' },
+        meta: { section: 'home' },
+    },
+    {
+        path: 'cooling',
+        name: 'section-cooling',
+        component: () => import('@/shell/SectionPage.vue'),
+        props: { sectionId: 'cooling' },
+        meta: { section: 'cooling' },
+    },
+    {
+        path: 'monitoring',
+        name: 'section-monitoring',
+        component: () => import('@/shell/SectionPage.vue'),
+        props: { sectionId: 'monitoring' },
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'devices',
+        name: 'section-devices',
+        component: () => import('@/shell/SectionPage.vue'),
+        props: { sectionId: 'devices' },
+        meta: { section: 'devices' },
+    },
+]
 
 const router = createRouter({
     // For our use case, using the hash history allows users to bookmark links
@@ -31,8 +66,9 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            component: AppLayout,
+            component: features.newShell ? () => import('@/shell/ShellLayout.vue') : AppLayout,
             children: [
+                ...(features.newShell ? sectionRoutes : []),
                 {
                     path: '',
                     name: 'startup-page',
@@ -62,6 +98,7 @@ const router = createRouter({
                     name: 'settings',
                     component: () => import('@/layout/AppSettings.vue'),
                     props: true,
+                    meta: { section: 'settings' },
                 },
                 {
                     path: '/dashboards/:dashboardUID?',
@@ -133,12 +170,14 @@ const router = createRouter({
                     path: '/plugins-overview',
                     name: 'plugins-overview',
                     component: () => import('@/views/PluginsOverView.vue'),
+                    meta: { section: 'plugins' },
                 },
                 {
                     path: '/plugins/:pluginId',
                     name: 'plugin-page',
                     component: () => import('@/views/PluginPageView.vue'),
                     props: true,
+                    meta: { section: 'plugins' },
                 },
                 {
                     path: '/:pathMatch(.*)', // match any other route
@@ -157,6 +196,7 @@ const router = createRouter({
 // so when startupPage === AppInfo we just stay put without a redirect.
 router.beforeEach((to) => {
     if (to.name !== 'startup-page') return true
+    if (features.newShell) return { name: 'section-home' }
     const settingsStore = useSettingsStore()
     if (settingsStore.startupPage === StartupPage.Controls) {
         return { name: 'system-controls' }
