@@ -85,7 +85,12 @@ const daemonSetting = computed(() =>
     settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName),
 )
 
-const live = computed(() => currentDeviceStatus.value.get(props.deviceUID)?.get(props.channelName))
+const liveDuty = computed(
+    () => currentDeviceStatus.value.get(props.deviceUID)?.get(props.channelName)?.duty,
+)
+const liveRpm = computed(
+    () => currentDeviceStatus.value.get(props.deviceUID)?.get(props.channelName)?.rpm,
+)
 
 // ----- control mode state -----
 const initialControlMode = (): ControlMode => {
@@ -96,7 +101,7 @@ const initialControlMode = (): ControlMode => {
     return 'unmanaged'
 }
 const controlMode = ref<ControlMode>(initialControlMode())
-const manualDuty = ref<number>(daemonSetting.value?.speed_fixed ?? Number(live.value?.duty ?? '50'))
+const manualDuty = ref<number>(daemonSetting.value?.speed_fixed ?? Number(liveDuty.value ?? '50'))
 const selectedProfileUID = ref<UID | undefined>(
     daemonSetting.value?.profile_uid !== '0' ? daemonSetting.value?.profile_uid : undefined,
 )
@@ -309,13 +314,13 @@ if (channelDashboard.value.dataTypes.length > 0) {
             </div>
             <div class="ml-auto flex items-center gap-3">
                 <span class="text-2xl font-semibold tabular-nums text-text-color">
-                    {{ live?.duty != null ? `${live.duty}%` : '--' }}
+                    {{ liveDuty != null ? `${liveDuty}%` : '--' }}
                 </span>
                 <span
-                    v-if="live?.rpm != null"
+                    v-if="liveRpm != null"
                     class="text-base tabular-nums text-text-color-secondary"
                 >
-                    {{ live.rpm }} rpm
+                    {{ liveRpm }} rpm
                 </span>
             </div>
         </div>

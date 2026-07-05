@@ -48,8 +48,14 @@ const deviceLabel = computed(
 )
 const color = computed(() => uiSetting.value?.color ?? '')
 
-const live = computed(() =>
-    currentDeviceStatus.value.get(props.channel.deviceUID)?.get(props.channel.channelName),
+const liveDuty = computed(
+    () =>
+        currentDeviceStatus.value.get(props.channel.deviceUID)?.get(props.channel.channelName)
+            ?.duty,
+)
+const liveRpm = computed(
+    () =>
+        currentDeviceStatus.value.get(props.channel.deviceUID)?.get(props.channel.channelName)?.rpm,
 )
 
 const daemonSetting = computed(() =>
@@ -127,13 +133,13 @@ const openWizard = (): void => {
         <div class="flex items-end justify-between gap-2">
             <div>
                 <span class="text-2xl font-semibold tabular-nums text-text-color">
-                    {{ live?.duty != null ? `${live.duty}%` : '--' }}
+                    {{ liveDuty != null ? `${liveDuty}%` : '--' }}
                 </span>
                 <span
-                    v-if="live?.rpm != null"
+                    v-if="liveRpm != null"
                     class="ml-2 text-sm tabular-nums text-text-color-secondary"
                 >
-                    {{ live.rpm }} rpm
+                    {{ liveRpm }} rpm
                 </span>
             </div>
         </div>

@@ -720,13 +720,9 @@ const MIN_DUTY_SEPARATION = 1
 type TablePosition = 'top-left' | 'bottom-right'
 const tablePosition: Ref<TablePosition> = ref('top-left')
 
-const tablePositionClasses = computed(() => ({
-    'top-16 left-[7.5rem]': tablePosition.value === 'top-left',
-    'bottom-20 right-[7rem]': tablePosition.value === 'bottom-right',
-}))
-
 const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
+    updateTablePosition()
 }
 
 // Select point from table
@@ -1061,6 +1057,40 @@ const updatePosition = (): void => {
             position: controlGraph.value?.convertToPixel('grid', item.value),
         })),
     })
+    updateTablePosition()
+}
+
+// Anchors the points table to the plot's actual corners, canvas-accurate.
+const tableStyle: Ref<Record<string, string>> = ref({})
+const updateTablePosition = (): void => {
+    const chartEl = document.getElementById('control-graph')
+    const parentEl = chartEl?.parentElement
+    const canvasRect = chartEl?.querySelector('canvas')?.getBoundingClientRect()
+    if (controlGraph.value == null || parentEl == null || canvasRect == null) return
+    const parentRect = parentEl.getBoundingClientRect()
+    const offX = canvasRect.left - parentRect.left
+    const offY = canvasRect.top - parentRect.top
+    const pad = deviceStore.getREMSize(0.5)
+    if (tablePosition.value === 'top-left') {
+        const px = controlGraph.value.convertToPixel('grid', [dutyMin, offsetMax]) as [
+            number,
+            number,
+        ]
+        tableStyle.value = {
+            left: `${offX + px[0] + pad}px`,
+            top: `${offY + px[1] + pad}px`,
+        }
+    } else {
+        const px = controlGraph.value.convertToPixel('grid', [dutyMax, offsetMin]) as [
+            number,
+            number,
+        ]
+        tableStyle.value = {
+            left: `${offX + px[0] - pad}px`,
+            top: `${offY + px[1] - pad}px`,
+            transform: 'translate(-100%, -100%)',
+        }
+    }
 }
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -1089,6 +1119,7 @@ onMounted(async () => {
     })
     window.addEventListener('resize', updateResponsiveGraphHeight)
     setTimeout(updateResponsiveGraphHeight)
+    setTimeout(updateTablePosition, 300)
 
     // handle the graphics on graph resize & zoom
     controlGraph.value?.chart?.on('dataZoom', updatePosition)
@@ -1154,7 +1185,7 @@ onUnmounted(() => {
         <!-- Points Table Overlay -->
         <div
             class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
-            :class="tablePositionClasses"
+            :style="tableStyle"
         >
             <div
                 class="flex justify-between items-center px-2 py-1 border-b border-border-one sticky top-0 bg-bg-two/95"
