@@ -2014,6 +2014,23 @@ function onKnobMouseup(e: MouseEvent) {
             :save-name-function="saveNameFunction"
         />
         <div class="flex flex-wrap gap-x-1 justify-end">
+            <div class="p-2 pr-0">
+                <Select
+                    v-model="selectedType"
+                    :options="profileTypeOptions"
+                    option-label="label"
+                    option-value="value"
+                    :placeholder="t('views.profiles.profileType')"
+                    class="w-[6.5rem] h-[2.375rem]"
+                    dropdown-icon="pi pi-chart-line"
+                    scroll-height="400px"
+                    checkmark
+                    v-tooltip.top="{
+                        escape: false,
+                        value: t('views.profiles.tooltip.profileType'),
+                    }"
+                />
+            </div>
             <div v-if="selectedType === ProfileType.Mix" class="p-2 pr-0 flex flex-row">
                 <Select
                     v-model="chosenProfileMixFunction"
@@ -2184,21 +2201,6 @@ function onKnobMouseup(e: MouseEvent) {
                 </InputNumber>
             </div>
             <div class="p-2">
-                <Select
-                    v-model="selectedType"
-                    :options="profileTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.profileType')"
-                    class="w-[6.5rem] h-[2.375rem] mr-3"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('views.profiles.tooltip.profileType'),
-                    }"
-                />
                 <Button
                     class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"

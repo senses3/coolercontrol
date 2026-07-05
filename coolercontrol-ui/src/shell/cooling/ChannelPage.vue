@@ -398,7 +398,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     <ProfileEditor
                         :key="selectedProfileUID"
                         :profile-u-i-d="selectedProfileUID"
-                        graph-height="26rem"
+                        graph-height="clamp(30rem, calc(100vh - 26rem), 44rem)"
                     />
                 </div>
             </div>
