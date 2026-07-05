@@ -538,15 +538,94 @@ if (channelDashboard.value.dataTypes.length > 0) {
 
             <!-- Profile -->
             <div v-else class="flex flex-col gap-4">
-                <div ref="profileSection" class="flex flex-wrap items-center gap-3">
-                    <UiSelect
-                        v-model="selectedProfileUID"
-                        :options="profileOptions"
-                        :placeholder="t('layout.shell.coolingPage.selectProfile')"
-                    />
+                <div
+                    ref="profileSection"
+                    class="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-lg border border-border-one p-3"
+                >
+                    <div class="flex flex-col gap-1">
+                        <span class="text-xs text-text-color-secondary">
+                            {{ t('layout.shell.coolingPage.chain.profile') }}
+                        </span>
+                        <UiSelect
+                            v-model="selectedProfileUID"
+                            :options="profileOptions"
+                            :placeholder="t('layout.shell.coolingPage.selectProfile')"
+                        />
+                    </div>
+                    <template v-if="editedProfile != null">
+                        <div
+                            v-if="editedProfile.p_type === ProfileType.Graph"
+                            ref="tempSection"
+                            class="flex flex-col gap-1"
+                        >
+                            <span class="text-xs text-text-color-secondary">
+                                {{ t('layout.shell.coolingPage.chain.tempSource') }}
+                            </span>
+                            <UiSelect
+                                v-model="selectedTempValue"
+                                :options="tempSourceOptions"
+                                :placeholder="t('layout.shell.coolingPage.selectTempSource')"
+                            />
+                        </div>
+                        <div
+                            v-if="editedProfile.p_type === ProfileType.Mix"
+                            class="flex flex-col gap-1"
+                        >
+                            <span class="text-xs text-text-color-secondary">
+                                {{ t('layout.shell.coolingPage.mixFunction') }}
+                            </span>
+                            <UiSelect
+                                :model-value="editedProfile.mix_function_type"
+                                :options="mixFunctionOptions"
+                                @update:model-value="
+                                    (mixType: string | undefined) =>
+                                        (editedProfile!.mix_function_type =
+                                            mixType as ProfileMixFunctionType)
+                                "
+                            />
+                        </div>
+                        <div
+                            v-if="editedProfile.p_type === ProfileType.Overlay"
+                            class="flex flex-col gap-1"
+                        >
+                            <span class="text-xs text-text-color-secondary">
+                                {{ t('layout.shell.coolingPage.overlayBase') }}
+                            </span>
+                            <UiSelect
+                                v-model="overlayBaseUID"
+                                :options="overlayBaseOptions"
+                                :placeholder="t('layout.shell.coolingPage.selectProfile')"
+                            />
+                        </div>
+                        <div ref="functionSection" class="flex flex-col gap-1">
+                            <span class="text-xs text-text-color-secondary">
+                                {{ t('layout.shell.coolingPage.chain.function') }}
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <UiSelect
+                                    :model-value="editedProfile.function_uid"
+                                    :options="functionOptions"
+                                    @update:model-value="
+                                        (uid: string | undefined) =>
+                                            (editedProfile!.function_uid = uid ?? '0')
+                                    "
+                                />
+                                <RouterLink
+                                    v-if="editedProfile.function_uid !== '0'"
+                                    :to="{
+                                        name: 'functions',
+                                        params: { functionUID: editedProfile.function_uid },
+                                    }"
+                                    class="text-sm text-accent outline-none hover:underline"
+                                >
+                                    {{ t('layout.shell.coolingPage.editFunction') }}
+                                </RouterLink>
+                            </div>
+                        </div>
+                    </template>
                     <div
                         v-if="sharedChannels.length > 0"
-                        class="inline-flex items-center gap-1.5 rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-xs text-text-color-secondary"
+                        class="inline-flex items-center gap-1.5 self-center rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-xs text-text-color-secondary"
                         :title="t('layout.shell.coolingPage.sharedTooltip')"
                     >
                         <svg-icon type="mdi" :path="mdiShareVariantOutline" :size="13" />
@@ -572,39 +651,24 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     <!-- Fixed -->
                     <div
                         v-if="editedProfile.p_type === ProfileType.Fixed"
-                        class="flex flex-col gap-4"
+                        class="flex items-center gap-4"
                     >
-                        <div class="flex items-center gap-4">
-                            <UiSlider
-                                :model-value="editedProfile.speed_fixed ?? 50"
-                                :min="speedOptions?.min_duty ?? 0"
-                                :max="speedOptions?.max_duty ?? 100"
-                                class="max-w-md"
-                                @update:model-value="
-                                    (duty: number) => (editedProfile!.speed_fixed = duty)
-                                "
-                            />
-                            <span class="w-12 text-right tabular-nums text-text-color">
-                                {{ editedProfile.speed_fixed ?? 50 }}%
-                            </span>
-                        </div>
+                        <UiSlider
+                            :model-value="editedProfile.speed_fixed ?? 50"
+                            :min="speedOptions?.min_duty ?? 0"
+                            :max="speedOptions?.max_duty ?? 100"
+                            class="max-w-md"
+                            @update:model-value="
+                                (duty: number) => (editedProfile!.speed_fixed = duty)
+                            "
+                        />
+                        <span class="w-12 text-right tabular-nums text-text-color">
+                            {{ editedProfile.speed_fixed ?? 50 }}%
+                        </span>
                     </div>
 
                     <!-- Graph -->
-                    <div
-                        v-else-if="editedProfile.p_type === ProfileType.Graph"
-                        class="flex flex-col gap-3"
-                    >
-                        <div ref="tempSection" class="flex flex-wrap items-center gap-3">
-                            <span class="text-sm text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.chain.tempSource') }}
-                            </span>
-                            <UiSelect
-                                v-model="selectedTempValue"
-                                :options="tempSourceOptions"
-                                :placeholder="t('layout.shell.coolingPage.selectTempSource')"
-                            />
-                        </div>
+                    <template v-else-if="editedProfile.p_type === ProfileType.Graph">
                         <GraphProfileEditor
                             v-if="graphTempSource != null"
                             :points="editedProfile.speed_profile"
@@ -618,43 +682,33 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         <p v-else class="text-sm text-text-color-secondary">
                             {{ t('layout.shell.coolingPage.selectTempSourceHint') }}
                         </p>
-                    </div>
+                    </template>
 
                     <!-- Mix -->
-                    <div
-                        v-else-if="editedProfile.p_type === ProfileType.Mix"
-                        class="flex flex-col gap-3"
-                    >
-                        <div class="flex flex-wrap items-center gap-3">
-                            <span class="text-sm text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.mixFunction') }}
+                    <template v-else-if="editedProfile.p_type === ProfileType.Mix">
+                        <div class="flex flex-col gap-1">
+                            <span class="text-xs text-text-color-secondary">
+                                {{ t('layout.shell.coolingPage.memberProfiles') }}
                             </span>
-                            <UiSelect
-                                :model-value="editedProfile.mix_function_type"
-                                :options="mixFunctionOptions"
-                                @update:model-value="
-                                    (mixType: string | undefined) =>
-                                        (editedProfile!.mix_function_type =
-                                            mixType as ProfileMixFunctionType)
-                                "
-                            />
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <label
-                                v-for="candidate in memberCandidates"
-                                :key="candidate.uid"
-                                class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-one bg-bg-two px-2.5 py-1 text-sm text-text-color hover:bg-surface-hover"
-                            >
-                                <input
-                                    type="checkbox"
-                                    :checked="
-                                        editedProfile.member_profile_uids.includes(candidate.uid)
-                                    "
-                                    class="accent-accent"
-                                    @change="toggleMember(candidate.uid)"
-                                />
-                                {{ candidate.name }}
-                            </label>
+                            <div class="flex flex-wrap gap-2">
+                                <label
+                                    v-for="candidate in memberCandidates"
+                                    :key="candidate.uid"
+                                    class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border-one bg-bg-two px-2.5 py-1 text-sm text-text-color hover:bg-surface-hover"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        :checked="
+                                            editedProfile.member_profile_uids.includes(
+                                                candidate.uid,
+                                            )
+                                        "
+                                        class="accent-accent"
+                                        @change="toggleMember(candidate.uid)"
+                                    />
+                                    {{ candidate.name }}
+                                </label>
+                            </div>
                         </div>
                         <MixProfileEditorChart
                             v-if="
@@ -663,52 +717,14 @@ if (channelDashboard.value.dataTypes.length > 0) {
                             :profiles="memberProfiles"
                             :mix-function-type="editedProfile.mix_function_type"
                         />
-                    </div>
+                    </template>
 
                     <!-- Overlay -->
-                    <div
+                    <OverlayProfileEditorChart
                         v-else-if="editedProfile.p_type === ProfileType.Overlay"
-                        class="flex flex-col gap-3"
-                    >
-                        <div class="flex flex-wrap items-center gap-3">
-                            <span class="text-sm text-text-color-secondary">
-                                {{ t('layout.shell.coolingPage.overlayBase') }}
-                            </span>
-                            <UiSelect
-                                v-model="overlayBaseUID"
-                                :options="overlayBaseOptions"
-                                :placeholder="t('layout.shell.coolingPage.selectProfile')"
-                            />
-                        </div>
-                        <OverlayProfileEditorChart
-                            :profile-u-i-d="editedProfile.uid"
-                            @changed="onOverlayChanged"
-                        />
-                    </div>
-
-                    <div ref="functionSection" class="flex flex-wrap items-center gap-3">
-                        <span class="text-sm text-text-color-secondary">
-                            {{ t('layout.shell.coolingPage.chain.function') }}
-                        </span>
-                        <UiSelect
-                            :model-value="editedProfile.function_uid"
-                            :options="functionOptions"
-                            @update:model-value="
-                                (uid: string | undefined) =>
-                                    (editedProfile!.function_uid = uid ?? '0')
-                            "
-                        />
-                        <RouterLink
-                            v-if="editedProfile.function_uid !== '0'"
-                            :to="{
-                                name: 'functions',
-                                params: { functionUID: editedProfile.function_uid },
-                            }"
-                            class="text-sm text-accent outline-none hover:underline"
-                        >
-                            {{ t('layout.shell.coolingPage.editFunction') }}
-                        </RouterLink>
-                    </div>
+                        :profile-u-i-d="editedProfile.uid"
+                        @changed="onOverlayChanged"
+                    />
                 </template>
             </div>
         </template>

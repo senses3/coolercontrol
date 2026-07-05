@@ -145,6 +145,7 @@ export default {
                 updateAll: 'All {count} channels',
                 forkForFan: 'A copy for this fan only',
                 mixFunction: 'Mix function',
+                memberProfiles: 'Member profiles',
                 overlayBase: 'Base profile',
                 addPoint: 'Add point',
                 removePoint: 'Remove point',
@@ -570,7 +571,7 @@ export default {
             filterSensors: 'Filter Sensors',
             showControls: 'Show Controls',
             mouseActions:
-                'Dashboard Mouse actions:\n- Highlight selection to zoom.\n- Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.\n- Ctrl+click or middle-click to show all sensors in tooltip.',
+                'Dashboard Mouse actions:\n- Highlight selection to zoom.\n- Ctrl+Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.\n- Ctrl+click or middle-click to show all sensors in tooltip.',
             fullPage: 'Full Page',
             filterTags: 'Filter Tags',
             filterByTag: 'Filter by Tag',
@@ -726,7 +727,7 @@ export default {
             function: 'Function',
             functionToApply: 'Function to apply',
             graphProfileMouseActions:
-                'Graph Profile Mouse actions:\n- Scroll to zoom.\n- Left-click on line to add point.\n- Right-click on point to remove.\n- Drag point to move.',
+                'Graph Profile Mouse actions:\n- Ctrl+Scroll to zoom.\n- Left-click on line to add point.\n- Right-click on point to remove.\n- Drag point to move.',
             unsavedChanges: 'There are unsaved changes made to this Profile.',
             unsavedChangesHeader: 'Unsaved Changes',
             appliedFunction: 'Applied Function',
@@ -905,7 +906,7 @@ export default {
         singleDashboard: {
             minutes: 'min',
             chartMouseActions:
-                'Dashboard Mouse actions:\n- Highlight to zoom.\n- Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.',
+                'Dashboard Mouse actions:\n- Highlight to zoom.\n- Ctrl+Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.',
             timeRange: 'Time Range',
             chartType: 'Chart Type',
         },
