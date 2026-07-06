@@ -41,8 +41,10 @@ const props = withDefaults(
 )
 
 const clamp = (value: number): number => Math.min(props.max, Math.max(props.min, value))
+// Strip binary float noise (0.1 + 0.2 style) from step arithmetic.
+const round = (value: number): number => Number.parseFloat(value.toFixed(10))
 const stepBy = (direction: number): void => {
-    model.value = clamp((model.value ?? 0) + direction * props.step)
+    model.value = round(clamp((model.value ?? 0) + direction * props.step))
 }
 const onInput = (event: Event): void => {
     const value = Number((event.target as HTMLInputElement).value)
