@@ -21,7 +21,6 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiKeyOutline,
-    mdiLockOpenVariantOutline,
     mdiLockOutline,
     mdiLogin,
     mdiLogout,
@@ -103,7 +102,7 @@ const itemClass =
                 >
                     <svg-icon
                         type="mdi"
-                        :path="deviceStore.loggedIn ? mdiLockOpenVariantOutline : mdiLockOutline"
+                        :path="mdiLockOutline"
                         :size="deviceStore.getREMSize(1.25)"
                         :class="deviceStore.loggedIn ? 'text-accent' : ''"
                     />
