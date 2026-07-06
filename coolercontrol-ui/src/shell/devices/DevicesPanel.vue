@@ -22,12 +22,12 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiAlert, mdiLightbulbOutline, mdiTelevision } from '@mdi/js'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { type Color, DeviceType, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
+import { type Color, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { deviceChannelLinks, hardwareDevices } from '@/shell/devices/devices.ts'
+import { DEVICE_TYPE_ORDER, deviceChannelLinks, hardwareDevices } from '@/shell/devices/devices.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -36,16 +36,8 @@ const colorStore = useThemeColorsStore()
 
 const devices = computed(() => hardwareDevices(deviceStore.allDevices()))
 
-// Ordered type sections: CPU, GPU, Hwmon, Liquidctl, Service Plugin.
-const TYPE_ORDER: DeviceType[] = [
-    DeviceType.CPU,
-    DeviceType.GPU,
-    DeviceType.HWMON,
-    DeviceType.LIQUIDCTL,
-    DeviceType.SERVICE_PLUGIN,
-]
 const typeGroups = computed(() =>
-    TYPE_ORDER.map((type) => ({
+    DEVICE_TYPE_ORDER.map((type) => ({
         type,
         devices: devices.value.filter((device) => device.type === type),
     })).filter((group) => group.devices.length > 0),

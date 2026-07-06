@@ -18,6 +18,20 @@
 
 import { type Device, DeviceType, type UID } from '@/models/Device.ts'
 
+// Canonical device-type ordering for the Devices section (panel and landing).
+export const DEVICE_TYPE_ORDER: DeviceType[] = [
+    DeviceType.CPU,
+    DeviceType.GPU,
+    DeviceType.HWMON,
+    DeviceType.LIQUIDCTL,
+    DeviceType.SERVICE_PLUGIN,
+]
+
+export function deviceTypeRank(type: DeviceType): number {
+    const index = DEVICE_TYPE_ORDER.indexOf(type)
+    return index >= 0 ? index : DEVICE_TYPE_ORDER.length
+}
+
 // The Devices section lists hardware devices; custom sensors are Monitoring's.
 export function hardwareDevices(devices: Iterable<Device>): Device[] {
     return [...devices].filter((device) => device.type !== DeviceType.CUSTOM_SENSORS)

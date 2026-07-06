@@ -26,13 +26,17 @@ import type { Device, UID } from '@/models/Device.ts'
 import { getDeviceTypeDisplayName } from '@/models/Device.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { deviceChannelLinks, hardwareDevices } from '@/shell/devices/devices.ts'
+import { deviceChannelLinks, deviceTypeRank, hardwareDevices } from '@/shell/devices/devices.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
-const devices = computed(() => hardwareDevices(deviceStore.allDevices()))
+const devices = computed(() =>
+    hardwareDevices(deviceStore.allDevices()).sort(
+        (a, b) => deviceTypeRank(a.type) - deviceTypeRank(b.type),
+    ),
+)
 
 const disabledDevices = computed(() =>
     [...settingsStore.ccDeviceSettings.values()].filter((setting) => setting.disable),
