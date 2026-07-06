@@ -544,21 +544,23 @@ onUnmounted(() => {
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
                             {{ t('views.lcd.brightness') }}<br />
                         </small>
-                        <UiNumberInput
-                            v-model="selectedBrightness"
-                            :min="0"
-                            :max="100"
-                            :step="1"
-                            v-tooltip.top="t('views.lcd.brightnessPercent')"
-                            :suffix="t('common.percentUnit')"
-                        />
-                        <UiSlider
-                            v-model="selectedBrightness"
-                            class="!w-[23.25rem] ml-1.5"
-                            :step="1"
-                            :min="0"
-                            :max="100"
-                        />
+                        <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                            <UiNumberInput
+                                v-model="selectedBrightness"
+                                :min="0"
+                                :max="100"
+                                :step="1"
+                                v-tooltip.top="t('views.lcd.brightnessPercent')"
+                                :suffix="t('common.percentUnit')"
+                            />
+                            <UiSlider
+                                v-model="selectedBrightness"
+                                class="mt-3 !w-full px-1"
+                                :step="1"
+                                :min="0"
+                                :max="100"
+                            />
+                        </div>
                     </div>
                     <div
                         v-if="selectedLcdMode.orientation"
@@ -567,21 +569,23 @@ onUnmounted(() => {
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
                             {{ t('views.lcd.orientation') }}<br />
                         </small>
-                        <UiNumberInput
-                            v-model="selectedOrientation"
-                            :min="0"
-                            :max="270"
-                            :step="90"
-                            v-tooltip.top="t('views.lcd.orientationDegrees')"
-                            suffix="°"
-                        />
-                        <UiSlider
-                            v-model="selectedOrientation"
-                            class="!w-[23.25rem] ml-1.5"
-                            :step="90"
-                            :min="0"
-                            :max="270"
-                        />
+                        <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                            <UiNumberInput
+                                v-model="selectedOrientation"
+                                :min="0"
+                                :max="270"
+                                :step="90"
+                                v-tooltip.top="t('views.lcd.orientationDegrees')"
+                                suffix="°"
+                            />
+                            <UiSlider
+                                v-model="selectedOrientation"
+                                class="mt-3 !w-full px-1"
+                                :step="90"
+                                :min="0"
+                                :max="270"
+                            />
+                        </div>
                     </div>
                     <div v-if="selectedLcdMode.image" class="mt-8 mr-4 w-96 border-border-one">
                         <div

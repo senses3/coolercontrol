@@ -344,23 +344,25 @@ onMounted(() => {
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
                             {{ t('views.lighting.numberOfColors') }}<br />
                         </small>
-                        <UiNumberInput
-                            v-model="selectedNumberOfColors"
-                            class="mt-0.5"
-                            :min="selectedMode.min_colors"
-                            :max="selectedMode.max_colors"
-                            :step="1"
-                            v-tooltip.top="t('views.lighting.numberOfColorsTooltip')"
-                            :disabled="selectedMode.min_colors == selectedMode.max_colors"
-                        />
-                        <UiSlider
-                            v-model="selectedNumberOfColors"
-                            class="!w-[23.25rem] ml-1.5"
-                            :step="1"
-                            :min="selectedMode.min_colors"
-                            :max="selectedMode.max_colors"
-                            :disabled="selectedMode.min_colors == selectedMode.max_colors"
-                        />
+                        <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                            <UiNumberInput
+                                v-model="selectedNumberOfColors"
+                                class="mt-0.5"
+                                :min="selectedMode.min_colors"
+                                :max="selectedMode.max_colors"
+                                :step="1"
+                                v-tooltip.top="t('views.lighting.numberOfColorsTooltip')"
+                                :disabled="selectedMode.min_colors == selectedMode.max_colors"
+                            />
+                            <UiSlider
+                                v-model="selectedNumberOfColors"
+                                class="mt-3 !w-full px-1"
+                                :step="1"
+                                :min="selectedMode.min_colors"
+                                :max="selectedMode.max_colors"
+                                :disabled="selectedMode.min_colors == selectedMode.max_colors"
+                            />
+                        </div>
                     </div>
                 </div>
                 <div
