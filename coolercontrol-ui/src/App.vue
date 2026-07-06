@@ -20,6 +20,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { StartupPage } from '@/models/UISettings.ts'
 import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
@@ -46,6 +47,7 @@ const loaded: Ref<boolean> = ref(false)
 const initSuccessful = ref(true)
 const deviceStore = useDeviceStore()
 const router = useRouter()
+const { openCalibrationWizard } = useToolWizards()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const daemonState = useDaemonState()
@@ -330,10 +332,10 @@ onMounted(async () => {
     loaded.value = true
     loading.close()
     // Reopen the calibration wizard to show live progress once the layout
-    // (and its `calibrate-fans` listener) has mounted.
+    // has mounted.
     if (calibrationBatchResumed) {
         await nextTick()
-        emitter.emit('calibrate-fans')
+        openCalibrationWizard()
     }
     await deviceStore.loadLogs()
     // Some other dialogs, like the password dialog, will wait until Onboarding has closed

@@ -29,9 +29,9 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import { inject, nextTick, ref, watch, type Ref } from 'vue'
-import { Emitter, EventType } from 'mitt'
 import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
 import { useI18n } from 'vue-i18n'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useToast } from 'primevue/usetoast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -54,7 +54,7 @@ const { t } = useI18n()
 const toast = useToast()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+const { openCalibrationWizard } = useToolWizards()
 
 const step: Ref<number> = ref(1)
 
@@ -108,7 +108,7 @@ const calibrateFansFirst = async (): Promise<void> => {
         .map((row) => ({ deviceUID: row.deviceUID, channelName: row.channelName }))
     closeDialog()
     await nextTick()
-    emitter.emit('calibrate-fans', { preselect: preselect.length > 0 ? preselect : undefined })
+    openCalibrationWizard(preselect.length > 0 ? preselect : undefined)
 }
 
 // The shared Select preset positions the clear (X) icon at right-12, which leaves it stranded
