@@ -324,88 +324,6 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
             </div>
         </div>
 
-        <template v-for="group in groups" :key="group.deviceUID">
-            <div
-                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
-                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
-                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
-            >
-                {{ deviceLabel(group.deviceUID) }}
-            </div>
-            <div
-                v-for="sensor in group.sensors"
-                :key="sensor.channelName"
-                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
-            >
-                <RouterLink
-                    :to="sensorRoute(sensor, false)"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
-                    exact-active-class="!text-accent"
-                >
-                    <span
-                        class="h-2 w-2 shrink-0 rounded-full"
-                        :style="{
-                            backgroundColor: sensorColor(sensor.deviceUID, sensor.channelName),
-                        }"
-                    />
-                    <span class="truncate">
-                        {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
-                    </span>
-                    <svg-icon
-                        v-if="isUnhealthy(sensor.deviceUID, sensor.channelName)"
-                        type="mdi"
-                        :path="mdiAlert"
-                        :size="14"
-                        class="shrink-0 text-warning"
-                    />
-                    <span
-                        class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
-                        :class="{
-                            '!hidden': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
-                        }"
-                    >
-                        {{ liveValue(sensor) }}
-                    </span>
-                </RouterLink>
-                <div
-                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
-                    :class="{
-                        '!flex': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
-                    }"
-                >
-                    <CCColorPicker
-                        :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
-                        :size="1.25"
-                        @update:model-value="(c: Color) => setSensorColor(sensor, c)"
-                    />
-                    <TagPopover
-                        :device-u-i-d="sensor.deviceUID"
-                        :channel-name="sensor.channelName"
-                        @open="
-                            (open: boolean) =>
-                                onTagOpen(`${sensor.deviceUID}-${sensor.channelName}`, open)
-                        "
-                    />
-                    <button
-                        type="button"
-                        class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                        :title="
-                            isPinned(sensor)
-                                ? t('layout.shell.coolingPanel.unpin')
-                                : t('layout.shell.coolingPanel.pin')
-                        "
-                        @click.prevent="togglePin(sensor)"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="isPinned(sensor) ? mdiPinOff : mdiPinOutline"
-                            :size="16"
-                        />
-                    </button>
-                </div>
-            </div>
-        </template>
-
         <UiSeparator class="my-1" />
         <div class="flex items-center justify-between px-2 pb-1 pt-2">
             <span class="text-xs uppercase text-text-color-secondary">
@@ -532,5 +450,88 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
             />
             <span class="truncate">{{ alert.name }}</span>
         </RouterLink>
+
+        <UiSeparator class="my-1" />
+        <template v-for="group in groups" :key="group.deviceUID">
+            <div
+                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
+                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
+                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
+            >
+                {{ deviceLabel(group.deviceUID) }}
+            </div>
+            <div
+                v-for="sensor in group.sensors"
+                :key="sensor.channelName"
+                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+            >
+                <RouterLink
+                    :to="sensorRoute(sensor, false)"
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
+                    exact-active-class="!text-accent"
+                >
+                    <span
+                        class="h-2 w-2 shrink-0 rounded-full"
+                        :style="{
+                            backgroundColor: sensorColor(sensor.deviceUID, sensor.channelName),
+                        }"
+                    />
+                    <span class="truncate">
+                        {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
+                    </span>
+                    <svg-icon
+                        v-if="isUnhealthy(sensor.deviceUID, sensor.channelName)"
+                        type="mdi"
+                        :path="mdiAlert"
+                        :size="14"
+                        class="shrink-0 text-warning"
+                    />
+                    <span
+                        class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
+                        :class="{
+                            '!hidden': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
+                        }"
+                    >
+                        {{ liveValue(sensor) }}
+                    </span>
+                </RouterLink>
+                <div
+                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                    :class="{
+                        '!flex': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
+                    }"
+                >
+                    <CCColorPicker
+                        :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                        :size="1.25"
+                        @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                    />
+                    <TagPopover
+                        :device-u-i-d="sensor.deviceUID"
+                        :channel-name="sensor.channelName"
+                        @open="
+                            (open: boolean) =>
+                                onTagOpen(`${sensor.deviceUID}-${sensor.channelName}`, open)
+                        "
+                    />
+                    <button
+                        type="button"
+                        class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                        :title="
+                            isPinned(sensor)
+                                ? t('layout.shell.coolingPanel.unpin')
+                                : t('layout.shell.coolingPanel.pin')
+                        "
+                        @click.prevent="togglePin(sensor)"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="isPinned(sensor) ? mdiPinOff : mdiPinOutline"
+                            :size="16"
+                        />
+                    </button>
+                </div>
+            </div>
+        </template>
     </div>
 </template>

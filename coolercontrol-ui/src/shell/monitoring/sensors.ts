@@ -29,8 +29,8 @@ export interface MonitoringDeviceGroup {
     sensors: MonitoringSensor[]
 }
 
-// The Monitoring sensor tree: temps plus non-fan channels (load, freq, power).
-// Fan/pump channels belong to Cooling (speed_options), lighting/LCD to Devices.
+// The Monitoring sensor tree: temps plus all value-bearing channels including
+// fans (duty/rpm are monitored too); lighting/LCD belong to Devices.
 // Custom sensors get their own group via customSensors() below.
 export function monitoringSensors(devices: Iterable<Device>): MonitoringDeviceGroup[] {
     const groups: MonitoringDeviceGroup[] = []
@@ -41,11 +41,7 @@ export function monitoringSensors(devices: Iterable<Device>): MonitoringDeviceGr
             sensors.push({ deviceUID: device.uid, channelName: tempName, isTemp: true })
         }
         for (const [channelName, channelInfo] of device.info.channels.entries()) {
-            if (
-                channelInfo.speed_options != null ||
-                channelInfo.lighting_modes.length > 0 ||
-                channelInfo.lcd_info != null
-            ) {
+            if (channelInfo.lighting_modes.length > 0 || channelInfo.lcd_info != null) {
                 continue
             }
             sensors.push({ deviceUID: device.uid, channelName, isTemp: false })

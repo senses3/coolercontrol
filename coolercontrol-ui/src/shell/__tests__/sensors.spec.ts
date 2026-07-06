@@ -50,7 +50,7 @@ function fakeDevice(
 }
 
 describe('monitoringSensors', () => {
-    it('includes temps and non-fan channels, excludes fans and lighting/lcd', () => {
+    it('includes temps, fans and value channels, excludes lighting/lcd', () => {
         const device = fakeDevice('d1', DeviceType.HWMON, ['temp1'], {
             fan1: { speed_options: { fixed_enabled: true } },
             'CPU Load': {},
@@ -60,18 +60,23 @@ describe('monitoringSensors', () => {
         })
         const groups = monitoringSensors([device])
         expect(groups).toHaveLength(1)
-        expect(groups[0].sensors.map((s) => s.channelName)).toEqual(['temp1', 'CPU Load', 'freq1'])
+        expect(groups[0].sensors.map((s) => s.channelName)).toEqual([
+            'temp1',
+            'fan1',
+            'CPU Load',
+            'freq1',
+        ])
         expect(groups[0].sensors[0].isTemp).toBe(true)
         expect(groups[0].sensors[1].isTemp).toBe(false)
     })
 
     it('excludes custom-sensor devices and devices without sensors', () => {
         const custom = fakeDevice('c1', DeviceType.CUSTOM_SENSORS, ['sensor1'], {})
-        const fansOnly = fakeDevice('d1', DeviceType.HWMON, [], {
-            fan1: { speed_options: {} },
+        const lightingOnly = fakeDevice('d1', DeviceType.HWMON, [], {
+            led1: { lighting_modes: [{}] },
         })
         const noInfo = { uid: 'd2', type: DeviceType.HWMON, info: null } as unknown as Device
-        expect(monitoringSensors([custom, fansOnly, noInfo])).toEqual([])
+        expect(monitoringSensors([custom, lightingOnly, noInfo])).toEqual([])
     })
 })
 
