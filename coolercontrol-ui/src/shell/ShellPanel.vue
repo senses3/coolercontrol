@@ -22,6 +22,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { sectionById, type SectionId } from '@/shell/sections.ts'
 import CoolingPanel from '@/shell/cooling/CoolingPanel.vue'
+import HomePanel from '@/shell/home/HomePanel.vue'
 import MonitoringPanel from '@/shell/monitoring/MonitoringPanel.vue'
 import DevicesPanel from '@/shell/devices/DevicesPanel.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
@@ -43,7 +44,8 @@ const section = computed(() => {
             </div>
             <UiSeparator />
             <UiScrollArea>
-                <CoolingPanel v-if="section.id === 'cooling'" />
+                <HomePanel v-if="section.id === 'home'" />
+                <CoolingPanel v-else-if="section.id === 'cooling'" />
                 <MonitoringPanel v-else-if="section.id === 'monitoring'" />
                 <DevicesPanel v-else-if="section.id === 'devices'" />
                 <div v-else-if="section.id === 'settings'" />

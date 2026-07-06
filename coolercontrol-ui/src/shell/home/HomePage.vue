@@ -1,0 +1,469 @@
+<!--
+  - CoolerControl - monitor and control your cooling and other devices
+  - Copyright (c) 2021-2025  Guy Boldon and contributors
+  -
+  - This program is free software: you can redistribute it and/or modify
+  - it under the terms of the GNU General Public License as published by
+  - the Free Software Foundation, either version 3 of the License, or
+  - (at your option) any later version.
+  -
+  - This program is distributed in the hope that it will be useful,
+  - but WITHOUT ANY WARRANTY; without even the implied warranty of
+  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  - GNU General Public License for more details.
+  -
+  - You should have received a copy of the GNU General Public License
+  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import {
+    mdiBellOutline,
+    mdiBookmarkCheck,
+    mdiChartMultiple,
+    mdiCircle,
+    mdiCompassOutline,
+    mdiFan,
+    mdiOpenInNew,
+    mdiSpeedometer,
+    mdiTextBoxOutline,
+} from '@mdi/js'
+import { computed, inject } from 'vue'
+import { useI18n } from 'vue-i18n'
+import type { Emitter, EventType } from 'mitt'
+import type { RouteLocationRaw } from 'vue-router'
+import { $enum } from 'ts-enum-util'
+import { DeviceType } from '@/models/Device.ts'
+import {
+    type FailsafeRef,
+    HealthEntityType,
+    type SourceRef,
+    failsafeKey,
+    sourceKey,
+    sourceTempDisplayName,
+} from '@/models/DeviceHealth.ts'
+import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
+import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
+import { features } from '@/features'
+import StressTestsCard from '@/components/StressTestsCard.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+
+const appVersion = import.meta.env.PACKAGE_VERSION
+const deviceStore = useDeviceStore()
+const daemonState = useDaemonState()
+const settingsStore = useSettingsStore()
+const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+const { t } = useI18n({ useScope: 'global' })
+const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
+
+const healthCheck = await deviceStore.health()
+
+const badgeColor = computed((): string => {
+    switch (daemonState.status) {
+        case DaemonStatus.OK:
+            return 'text-success'
+        case DaemonStatus.WARN:
+            return 'text-warning'
+        case DaemonStatus.ERROR:
+            return 'text-error'
+        default:
+            return 'text-error'
+    }
+})
+const getDaemonStatusTranslationKey = (daemonStatus: DaemonStatus) =>
+    $enum.visitValue(daemonStatus).with<string>({
+        [DaemonStatus.OK]: () => 'ok',
+        [DaemonStatus.WARN]: () => 'hasWarnings',
+        [DaemonStatus.ERROR]: () => 'hasErrors',
+    })
+
+const statusRows = computed(
+    (): Array<[string, string]> => [
+        [t('views.appInfo.host'), healthCheck.system.name],
+        [t('views.appInfo.uptime'), healthCheck.details.uptime],
+        [t('views.appInfo.version'), healthCheck.details.version],
+        [t('views.appInfo.processId'), String(healthCheck.details.pid)],
+        [t('views.appInfo.memoryUsage'), `${healthCheck.details.memory_mb} MB`],
+        [
+            t('views.appInfo.liquidctl'),
+            healthCheck.details.liquidctl_connected
+                ? t('views.appInfo.connected')
+                : t('views.appInfo.disconnected'),
+        ],
+    ],
+)
+
+// Device health rows, ported from AppInfoView with new-shell route targets.
+interface HealthRow {
+    key: string
+    label: string
+    detail: string
+    to: RouteLocationRaw
+}
+
+const failsafeRoute = (ref: FailsafeRef): RouteLocationRaw => {
+    for (const device of deviceStore.allDevices()) {
+        if (device.uid !== ref.device_uid) continue
+        if (device.type === DeviceType.CUSTOM_SENSORS) {
+            return { name: 'monitoring-custom-sensor', params: { customSensorID: ref.name } }
+        }
+        if (device.info?.channels.get(ref.name)?.speed_options != null) {
+            return {
+                name: 'cooling-channel',
+                params: { deviceUID: ref.device_uid, channelName: ref.name },
+            }
+        }
+        break
+    }
+    return {
+        name: 'monitoring-sensor',
+        params: { deviceUID: ref.device_uid, channelName: ref.name },
+    }
+}
+
+const sourceRoute = (ref: SourceRef): RouteLocationRaw => {
+    switch (ref.entity_type) {
+        case HealthEntityType.CustomSensor:
+            return { name: 'monitoring-custom-sensor', params: { customSensorID: ref.entity_uid } }
+        case HealthEntityType.Profile:
+            return { name: 'profiles', params: { profileUID: ref.entity_uid } }
+        case HealthEntityType.Lcd:
+            return {
+                name: 'device-lcd',
+                params: { deviceUID: ref.entity_uid, channelName: ref.channel_name },
+            }
+    }
+}
+
+const entityTypeLabel = (type: HealthEntityType): string => {
+    switch (type) {
+        case HealthEntityType.CustomSensor:
+            return t('layout.add.customSensor')
+        case HealthEntityType.Profile:
+            return t('layout.add.profile')
+        case HealthEntityType.Lcd:
+            return t('models.channelType.lcd')
+    }
+}
+
+const customSensorsDeviceUID = computed((): string | undefined => {
+    for (const device of deviceStore.allDevices()) {
+        if (device.type === DeviceType.CUSTOM_SENSORS) return device.uid
+    }
+    return undefined
+})
+
+const customSensorLabel = (sensorId: string): string => {
+    if (customSensorsDeviceUID.value == null) return sensorId
+    return (
+        settingsStore.allUIDeviceSettings
+            .get(customSensorsDeviceUID.value)
+            ?.sensorsAndChannels.get(sensorId)?.name ?? sensorId
+    )
+}
+
+const sourceEntityLabel = (ref: SourceRef): string => {
+    switch (ref.entity_type) {
+        case HealthEntityType.CustomSensor:
+            return customSensorLabel(ref.entity_uid)
+        case HealthEntityType.Lcd: {
+            const deviceSettings = settingsStore.allUIDeviceSettings.get(ref.entity_uid)
+            const channelName =
+                deviceSettings?.sensorsAndChannels.get(ref.channel_name ?? '')?.name ??
+                ref.channel_name
+            return `${deviceSettings?.name ?? ref.entity_name} | ${channelName}`
+        }
+        default:
+            return ref.entity_name
+    }
+}
+
+const sourceTempLabel = (ref: SourceRef): string =>
+    sourceTempDisplayName(ref, settingsStore.allUIDeviceSettings)
+
+const failsafeDetail = (ref: FailsafeRef): string =>
+    ref.reason
+        ? `${t('views.appInfo.failsafeActive')}: ${ref.reason}`
+        : t('views.appInfo.failsafeActive')
+
+const healthRows = computed((): Array<HealthRow> => {
+    const rows: Array<HealthRow> = []
+    const failsafedCustomSensors = new Set<string>()
+    for (const ref of settingsStore.healthFailsafe) {
+        const deviceSettings = settingsStore.allUIDeviceSettings.get(ref.device_uid)
+        const channelName = deviceSettings?.sensorsAndChannels.get(ref.name)?.name ?? ref.name
+        if (customSensorsDeviceUID.value === ref.device_uid) {
+            failsafedCustomSensors.add(ref.name)
+        }
+        rows.push({
+            key: `failsafe/${failsafeKey(ref)}`,
+            label: `${deviceSettings?.name ?? ref.device_uid} | ${channelName}`,
+            detail: failsafeDetail(ref),
+            to: failsafeRoute(ref),
+        })
+    }
+    for (const ref of settingsStore.healthMissing) {
+        // A custom sensor with a missing source is also failsafed with that source in
+        // its reason, and both rows link to the same editor, so skip the duplicate.
+        if (
+            ref.entity_type === HealthEntityType.CustomSensor &&
+            failsafedCustomSensors.has(ref.entity_uid)
+        ) {
+            continue
+        }
+        rows.push({
+            key: `missing/${sourceKey(ref)}`,
+            label: `${entityTypeLabel(ref.entity_type)}: ${sourceEntityLabel(ref)}`,
+            detail: `${t('views.appInfo.missingTempSource')}: ${sourceTempLabel(ref)}`,
+            to: sourceRoute(ref),
+        })
+    }
+    for (const ref of settingsStore.healthStaleSource) {
+        rows.push({
+            key: `stale-source/${sourceKey(ref)}`,
+            label: `${entityTypeLabel(ref.entity_type)}: ${sourceEntityLabel(ref)}`,
+            detail: `${t('views.appInfo.staleTempSource')}: ${sourceTempLabel(ref)}`,
+            to: sourceRoute(ref),
+        })
+    }
+    return rows
+})
+
+const activeMode = computed(() =>
+    settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent),
+)
+const activeAlerts = computed(() =>
+    settingsStore.alerts.filter((alert) => settingsStore.alertsActive.includes(alert.uid)),
+)
+
+const startTour = (): void => {
+    emitter.emit('start-tour')
+}
+
+const cardClasses = 'rounded-lg border border-border-one bg-bg-two p-4'
+const cardTitleClasses = 'pb-3 text-lg font-medium text-text-color'
+const shortcutClasses =
+    'flex items-center gap-2 rounded-lg px-2 py-1.5 text-base text-accent outline-none ' +
+    'hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent cursor-pointer'
+</script>
+
+<template>
+    <div class="flex h-full flex-col overflow-y-auto p-4">
+        <div class="flex items-baseline gap-3">
+            <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.home') }}</h1>
+            <span class="text-base text-text-color-secondary">{{ healthCheck.system.name }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2">
+            <!-- Daemon status -->
+            <div :class="cardClasses">
+                <div class="flex items-center justify-between pb-3">
+                    <span class="text-lg font-medium text-text-color">
+                        {{ t('views.appInfo.daemonStatus') }}
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <UiButton
+                            size="sm"
+                            variant="outline"
+                            :disabled="daemonState.status === DaemonStatus.OK"
+                            @click="daemonState.acknowledgeLogIssues()"
+                        >
+                            {{ t('views.appInfo.acknowledgeIssues') }}
+                        </UiButton>
+                        <RouterLink :to="{ name: 'home-logs' }">
+                            <UiButton size="sm" variant="outline">
+                                {{ t('layout.shell.homePage.viewLogs') }}
+                            </UiButton>
+                        </RouterLink>
+                    </div>
+                </div>
+                <div class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-base">
+                    <span class="text-text-color-secondary">
+                        {{ t('views.appInfo.status') }}
+                    </span>
+                    <span class="flex items-center gap-2 text-text-color">
+                        <svg-icon type="mdi" :path="mdiCircle" :size="12" :class="badgeColor" />
+                        {{
+                            daemonState.connected
+                                ? t(
+                                      `daemon.status.${getDaemonStatusTranslationKey(daemonState.status)}`,
+                                  )
+                                : t('views.appInfo.disconnected')
+                        }}
+                    </span>
+                    <template v-for="[label, value] in statusRows" :key="label">
+                        <span class="text-text-color-secondary">{{ label }}</span>
+                        <span class="text-text-color">{{ value }}</span>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Device health -->
+            <div :class="cardClasses">
+                <span :class="cardTitleClasses">{{ t('views.appInfo.deviceHealth') }}</span>
+                <div
+                    v-if="healthRows.length === 0"
+                    class="pt-3 text-base text-text-color-secondary"
+                >
+                    {{ t('views.appInfo.deviceHealthOk') }}
+                </div>
+                <div v-else class="flex flex-col gap-1 pt-3">
+                    <RouterLink
+                        v-for="row in healthRows"
+                        :key="row.key"
+                        :to="row.to"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="flex items-center gap-2 text-base text-text-color">
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiCircle"
+                                :size="10"
+                                class="text-warning"
+                            />
+                            {{ row.label }}
+                        </span>
+                        <span class="block pl-5 text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </RouterLink>
+                </div>
+            </div>
+
+            <!-- Mode and alerts -->
+            <div :class="cardClasses">
+                <span :class="cardTitleClasses">{{
+                    t('layout.shell.homePage.modeAndAlerts')
+                }}</span>
+                <div class="flex flex-col gap-1 pt-3">
+                    <RouterLink
+                        v-if="activeMode != null"
+                        :to="{ name: 'modes', params: { modeUID: activeMode.uid } }"
+                        :class="shortcutClasses"
+                    >
+                        <svg-icon type="mdi" :path="mdiBookmarkCheck" :size="18" />
+                        <span class="text-text-color">{{ activeMode.name }}</span>
+                        <span class="text-sm text-text-color-secondary">
+                            {{ t('layout.shell.coolingPage.activeMode') }}
+                        </span>
+                    </RouterLink>
+                    <RouterLink v-else :to="{ name: 'cooling-modes' }" :class="shortcutClasses">
+                        <svg-icon type="mdi" :path="mdiBookmarkCheck" :size="18" />
+                        {{ t('layout.shell.homePage.noActiveMode') }}
+                    </RouterLink>
+                    <RouterLink
+                        v-for="alert in activeAlerts"
+                        :key="alert.uid"
+                        :to="{ name: 'monitoring-alert', params: { alertUID: alert.uid } }"
+                        :class="shortcutClasses"
+                    >
+                        <svg-icon type="mdi" :path="mdiBellOutline" :size="18" class="text-error" />
+                        <span class="text-text-color">{{ alert.name }}</span>
+                        <span class="text-sm text-error">{{ t('models.alertState.active') }}</span>
+                    </RouterLink>
+                    <RouterLink :to="{ name: 'monitoring-alerts' }" :class="shortcutClasses">
+                        <svg-icon type="mdi" :path="mdiBellOutline" :size="18" />
+                        {{ t('views.alerts.alertsOverview') }}
+                    </RouterLink>
+                </div>
+            </div>
+
+            <!-- Shortcuts -->
+            <div :class="cardClasses">
+                <span :class="cardTitleClasses">{{ t('views.appInfo.helpfulLinks') }}</span>
+                <div class="flex flex-col gap-1 pt-3">
+                    <RouterLink :to="{ name: 'section-cooling' }" :class="shortcutClasses">
+                        <svg-icon type="mdi" :path="mdiFan" :size="18" />
+                        {{ t('layout.shell.homePage.setUpCooling') }}
+                    </RouterLink>
+                    <button
+                        v-if="features.coolingWizard"
+                        type="button"
+                        :class="shortcutClasses"
+                        @click="openGenerateWizard()"
+                    >
+                        <svg-icon type="mdi" :path="mdiChartMultiple" :size="18" />
+                        {{ t('views.appInfo.gettingStartedAutoCreateLink') }}
+                    </button>
+                    <button type="button" :class="shortcutClasses" @click="openCalibrationWizard()">
+                        <svg-icon type="mdi" :path="mdiSpeedometer" :size="18" />
+                        {{ t('views.appInfo.calibrateFansLink') }}
+                    </button>
+                    <button type="button" :class="shortcutClasses" @click="startTour">
+                        <svg-icon type="mdi" :path="mdiCompassOutline" :size="18" />
+                        {{ t('views.appInfo.uiTour') }}
+                    </button>
+                    <a
+                        href="https://docs.coolercontrol.org/getting-started.html"
+                        target="_blank"
+                        :class="shortcutClasses"
+                    >
+                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                        {{ t('views.appInfo.gettingStarted') }}
+                    </a>
+                    <a
+                        href="https://docs.coolercontrol.org/hardware-support.html"
+                        target="_blank"
+                        :class="shortcutClasses"
+                    >
+                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                        {{ t('views.appInfo.hardwareSupport') }}
+                    </a>
+                    <a
+                        href="https://gitlab.com/coolercontrol/coolercontrol/-/releases"
+                        target="_blank"
+                        :class="shortcutClasses"
+                    >
+                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                        {{ t('views.appInfo.whatsNew') }}
+                    </a>
+                    <a
+                        href="https://discord.gg/MbcgUFAfhV"
+                        target="_blank"
+                        :class="shortcutClasses"
+                    >
+                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                        Discord
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stress tests -->
+            <StressTestsCard />
+
+            <!-- Logs teaser / version footer -->
+            <div :class="cardClasses" class="flex flex-col justify-between">
+                <div>
+                    <span :class="cardTitleClasses">
+                        {{ t('views.appInfo.logsAndDiagnostics') }}
+                    </span>
+                    <RouterLink :to="{ name: 'home-logs' }" :class="shortcutClasses" class="mt-3">
+                        <svg-icon type="mdi" :path="mdiTextBoxOutline" :size="18" />
+                        {{ t('layout.shell.homePage.viewLogs') }}
+                    </RouterLink>
+                </div>
+                <div class="pt-4 text-sm text-text-color-secondary">
+                    <a
+                        href="https://gitlab.com/coolercontrol/coolercontrol/-/releases"
+                        target="_blank"
+                        class="text-accent"
+                    >
+                        CoolerControl v{{ appVersion }}
+                    </a>
+                    <span class="block">{{ t('views.appInfo.noWarranty') }}</span>
+                    <RouterLink
+                        :to="{ name: 'settings', params: { tabNumber: '0' } }"
+                        class="text-accent"
+                    >
+                        {{ t('views.appInfo.changeStartupPage') }}
+                    </RouterLink>
+                </div>
+            </div>
+        </div>
+        <div class="pb-8" />
+    </div>
+</template>

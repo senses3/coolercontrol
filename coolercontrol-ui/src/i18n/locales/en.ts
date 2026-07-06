@@ -132,6 +132,16 @@ export default {
             devicesPanel: {
                 disabled: 'Disabled',
             },
+            homePanel: {
+                overview: 'Overview',
+                logs: 'Logs',
+            },
+            homePage: {
+                viewLogs: 'View Logs',
+                modeAndAlerts: 'Mode & Alerts',
+                noActiveMode: 'No active mode',
+                setUpCooling: 'Set up cooling',
+            },
             devicesPage: {
                 landingHint: 'Select a device to view its details and settings.',
                 temps: 'temps',

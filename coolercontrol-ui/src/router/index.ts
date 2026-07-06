@@ -26,8 +26,13 @@ const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'home',
         name: 'section-home',
-        component: () => import('@/shell/SectionPage.vue'),
-        props: { sectionId: 'home' },
+        component: () => import('@/shell/home/HomePage.vue'),
+        meta: { section: 'home' },
+    },
+    {
+        path: 'home/logs',
+        name: 'home-logs',
+        component: () => import('@/shell/home/LogsPage.vue'),
         meta: { section: 'home' },
     },
     {
@@ -155,8 +160,7 @@ const router = createRouter({
                 {
                     path: 'app-info',
                     name: 'app-info',
-                    component: () => import('@/views/AppInfoView.vue'),
-                    props: false,
+                    redirect: { name: 'section-home' },
                 },
                 {
                     path: '/settings/:tabNumber?',
