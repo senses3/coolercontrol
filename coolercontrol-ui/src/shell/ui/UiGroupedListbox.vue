@@ -104,6 +104,7 @@ const toggle = (value: string): void => {
         <div class="min-h-0 flex-1 overflow-y-auto p-1">
             <template v-for="group in visibleGroups" :key="group.label">
                 <div
+                    v-if="group.label !== ''"
                     class="flex items-center gap-2 px-2 py-1.5 text-sm font-semibold text-text-color"
                 >
                     <slot name="group" :group="group">
@@ -116,8 +117,11 @@ const toggle = (value: string): void => {
                     :key="option.value"
                     type="button"
                     :disabled="option.disabled"
-                    class="flex w-full items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
-                    :class="{ 'bg-surface-hover': isSelected(option.value) }"
+                    class="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
+                    :class="[
+                        group.label === '' ? 'pl-2' : 'pl-6',
+                        { 'bg-surface-hover': isSelected(option.value) },
+                    ]"
                     @click="toggle(option.value)"
                 >
                     <svg-icon

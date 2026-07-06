@@ -19,10 +19,6 @@
 <script setup lang="ts">
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { computed, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import Select from 'primevue/select'
-import MultiSelect from 'primevue/multiselect'
 import type { Color, UID } from '@/models/Device.ts'
 import {
     ChartType,
@@ -44,7 +40,6 @@ import {
     mdiHome,
     mdiHomeOutline,
     mdiInformationSlabCircleOutline,
-    mdiMemory,
     mdiOverscan,
     mdiRestart,
     mdiTrashCanOutline,
@@ -57,6 +52,10 @@ import { component as Fullscreen } from 'vue-fullscreen'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
 
@@ -285,6 +284,42 @@ const fillChosenSensorSources = (): void => {
 }
 fillChosenSensorSources()
 
+const sensorKey = (sensor: AvailableSensor): string => `${sensor.deviceUID}/${sensor.name}`
+const sensorGroups = computed(() =>
+    filteredSensorSources.value.map((source) => ({
+        label: source.deviceName,
+        options: source.sensors.map((sensor) => ({
+            label: sensor.label,
+            value: sensorKey(sensor),
+            color: sensor.color,
+        })),
+    })),
+)
+const chosenSensorKeys = computed<string[]>({
+    get: () => chosenSensorSources.value.map(sensorKey),
+    set: (keys) => {
+        const all = sensorSources.value.flatMap((source) => source.sensors)
+        chosenSensorSources.value = keys
+            .map((key) => all.find((sensor) => sensorKey(sensor) === key))
+            .filter((sensor): sensor is AvailableSensor => sensor != null)
+        updateDashboardSensorsFilter(chosenSensorSources.value)
+    },
+})
+const tagGroups = computed(() => [
+    {
+        label: '',
+        options: tagOptions.value.map((tag) => ({
+            label: tag.name,
+            value: tag.name,
+            color: tag.color,
+        })),
+    },
+])
+const dataTypeGroups = computed(() => [
+    { label: '', options: dataTypes.map((entry) => ({ label: entry.text, value: entry.value })) },
+])
+const chartTypeOptions = chartTypes.map((entry) => ({ label: entry.text, value: entry.value }))
+
 const updateDashboardSensorsFilter = (sensorSources: Array<AvailableSensor>): void => {
     const newSensorsFilter: Array<DashboardDeviceChannel> = []
     sensorSources.forEach((sensor: AvailableSensor) => {
@@ -509,147 +544,70 @@ onUnmounted(() => {
                 </div>
             </template>
             <div v-if="!sensorMode && settingsStore.tags.size > 0" class="p-2 pr-0 flex flex-row">
-                <MultiSelect
-                    v-model="dashboard.selectedTags"
-                    :options="tagOptions"
-                    class="w-36 h-[2.375rem]"
-                    :placeholder="t('views.dashboard.filterTags')"
-                    :dropdown-icon="
-                        dashboard.selectedTags.length > 0 ? 'pi pi-filter' : 'pi pi-filter-slash'
-                    "
-                    option-label="name"
-                    option-value="name"
-                    scroll-height="16rem"
-                    v-tooltip.top="t('views.dashboard.filterByTag')"
-                >
-                    <template #option="slotProps">
-                        <div class="flex items-center gap-x-2">
-                            <span
-                                class="w-3 h-3 rounded-full inline-block"
-                                :style="{ backgroundColor: slotProps.option.color }"
-                            />
-                            {{ slotProps.option.name }}
-                        </div>
-                    </template>
-                    <template #value="slotProps">
-                        <span v-if="slotProps.value?.length > 0">
-                            {{ slotProps.value.join(', ') }}
-                        </span>
-                        <span v-else>
-                            {{ slotProps.placeholder }}
-                        </span>
-                    </template>
-                </MultiSelect>
+                <span v-tooltip.top="t('views.dashboard.filterByTag')">
+                    <UiMultiSelect
+                        v-model="dashboard.selectedTags"
+                        :groups="tagGroups"
+                        class="w-36"
+                        :placeholder="t('views.dashboard.filterTags')"
+                    />
+                </span>
             </div>
             <div v-if="!sensorMode" class="p-2 pr-0 flex flex-row">
-                <MultiSelect
-                    v-model="chosenSensorSources"
-                    :options="filteredSensorSources"
-                    class="w-36 h-[2.375rem]"
-                    :placeholder="t('views.dashboard.filterSensors')"
-                    :filter-placeholder="t('common.search')"
-                    filter
-                    :dropdown-icon="
-                        chosenSensorSources.length > 0 ? 'pi pi-filter' : 'pi pi-filter-slash'
-                    "
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="sensors"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.dashboard.filterBySensor')"
-                    @update:model-value="updateDashboardSensorsFilter"
-                >
-                    <template #optiongroup="slotProps">
-                        <div class="flex items-center">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMemory"
-                                :size="deviceStore.getREMSize(1.3)"
-                                class="mr-2"
-                            />
-                            <div>{{ slotProps.option.deviceName }}</div>
-                        </div>
-                    </template>
-                    <template #option="slotProps">
-                        <div class="flex items-center">
-                            <span
-                                class="pi pi-minus mr-2 ml-1"
-                                :style="{ color: slotProps.option.color }"
-                            />
-                            {{ slotProps.option.label }}
-                        </div>
-                    </template>
-                </MultiSelect>
-                <MultiSelect
-                    v-model="dashboard.dataTypes"
-                    :options="dataTypes"
-                    class="ml-3 w-36 h-[2.375rem]"
-                    :placeholder="t('views.dashboard.filterTypes')"
-                    :dropdown-icon="
-                        dashboard.dataTypes.length > 0 ? 'pi pi-filter' : 'pi pi-filter-slash'
-                    "
-                    scroll-height="16rem"
-                    option-label="text"
-                    option-value="value"
-                    v-tooltip.top="t('views.dashboard.filterByDataType')"
-                />
+                <span v-tooltip.top="t('views.dashboard.filterBySensor')">
+                    <UiMultiSelect
+                        v-model="chosenSensorKeys"
+                        :groups="sensorGroups"
+                        class="w-36"
+                        filter
+                        :filter-placeholder="t('common.search')"
+                        :placeholder="t('views.dashboard.filterSensors')"
+                    />
+                </span>
+                <span class="ml-3" v-tooltip.top="t('views.dashboard.filterByDataType')">
+                    <UiMultiSelect
+                        v-model="dashboard.dataTypes"
+                        :groups="dataTypeGroups"
+                        class="w-36"
+                        :placeholder="t('views.dashboard.filterTypes')"
+                    />
+                </span>
             </div>
             <div
                 v-if="dashboard.chartType == ChartType.TIME_CHART"
                 class="p-2 pr-0 flex flex-row bg-bg-one"
             >
-                <InputNumber
-                    :placeholder="t('views.dashboard.minutes')"
-                    input-id="chart-minutes"
+                <UiNumberInput
                     v-model="chartMinutes"
-                    class="h-[2.375rem] chart-minutes"
-                    :suffix="` ${t('views.dashboard.minutes').toLowerCase()}`"
-                    show-buttons
-                    :use-grouping="false"
-                    :step="1"
                     :min="chartMinutesMin"
                     :max="chartMinutesMax"
-                    button-layout="horizontal"
-                    :allow-empty="false"
-                    :input-style="{ width: '5rem' }"
+                    :step="1"
+                    :suffix="t('common.minuteAbbr')"
                     v-tooltip.top="t('views.dashboard.timeRange')"
-                >
-                    <template #incrementbuttonicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementbuttonicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
+                />
                 <axis-options class="h-[2.375rem] ml-3" :dashboard="dashboard" />
             </div>
             <div
                 v-if="dashboard.chartType == ChartType.TABLE"
                 class="p-2 pr-0 flex leading-none items-center bg-bg-one"
             >
-                <Button
-                    outlined
-                    class="h-[2.375rem] px-3"
+                <UiButton
+                    variant="outline"
                     @click="sensorTableRef?.resetStats()"
                     v-tooltip.top="t('components.sensorTable.resetStatsTooltip')"
                 >
                     <svg-icon type="mdi" :path="mdiRestart" :size="deviceStore.getREMSize(1.1)" />
                     <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
-                </Button>
+                </UiButton>
             </div>
             <div class="p-2 bg-bg-one">
-                <Select
-                    v-model="dashboard.chartType"
-                    :options="chartTypes"
-                    :placeholder="t('views.dashboard.selectChartType')"
-                    class="w-32 h-[2.375rem]"
-                    checkmark
-                    dropdown-icon="pi pi-chart-bar"
-                    scroll-height="400px"
-                    option-label="text"
-                    option-value="value"
-                    v-tooltip.top="t('views.dashboard.chartType')"
-                />
+                <span v-tooltip.top="t('views.dashboard.chartType')">
+                    <UiSelect
+                        v-model="dashboard.chartType"
+                        :options="chartTypeOptions"
+                        class="w-32"
+                    />
+                </span>
             </div>
         </div>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
