@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiBookmarkCheck, mdiBookmarkMultipleOutline } from '@mdi/js'
+import { mdiBookmarkCheck, mdiBookmarkMinusOutline, mdiBookmarkMultipleOutline } from '@mdi/js'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
@@ -53,7 +53,9 @@ const activate = async (modeUID: string): Promise<void> => {
                     :path="
                         mode.uid === settingsStore.modeActiveCurrent
                             ? mdiBookmarkCheck
-                            : mdiBookmarkMultipleOutline
+                            : mode.uid === settingsStore.modeActivePrevious
+                              ? mdiBookmarkMinusOutline
+                              : mdiBookmarkMultipleOutline
                     "
                     :size="18"
                     :class="
@@ -73,6 +75,12 @@ const activate = async (modeUID: string): Promise<void> => {
                     class="text-sm text-accent"
                 >
                     {{ t('layout.shell.coolingPage.activeMode') }}
+                </span>
+                <span
+                    v-else-if="mode.uid === settingsStore.modeActivePrevious"
+                    class="text-sm text-text-color-secondary"
+                >
+                    {{ t('layout.shell.coolingPage.previousMode') }}
                 </span>
                 <UiButton
                     v-if="mode.uid !== settingsStore.modeActiveCurrent"

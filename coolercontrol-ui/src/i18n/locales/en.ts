@@ -178,6 +178,7 @@ export default {
                     'This channel reports its speed but cannot be controlled by CoolerControl.',
                 advanced: 'Advanced',
                 activeMode: 'Active',
+                previousMode: 'Previous',
                 activate: 'Activate',
                 noModes:
                     'No modes saved yet. Modes snapshot all channel settings for quick switching.',
