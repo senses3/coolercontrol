@@ -38,6 +38,8 @@ import { useConfirm } from 'primevue/useconfirm'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiListbox from '@/shell/ui/UiListbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
+import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -537,282 +539,174 @@ onUnmounted(() => {
             >
                 {{ t('views.functions.emaDeprecatedWarning') }}
             </div>
-            <table class="mt-4 bg-bg-two rounded-lg">
-                <tbody>
-                    <tr>
-                        <th
-                            colspan="2"
-                            class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-b-2"
-                        >
-                            {{ t('views.functions.stepSizeTitle') }}
-                        </th>
-                    </tr>
-                    <tr v-tooltip.top="t('views.functions.fixedStepSizeTooltip')">
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t-2"
-                        >
-                            {{ t('views.functions.fixedStepSize') }}
-                        </td>
-                        <td
-                            class="py-2 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                        >
-                            <UiSwitch
-                                v-model="chosenFixedStepSize"
-                                @update:model-value="updateFixedStepSize"
-                            />
-                        </td>
-                    </tr>
-                    <tr v-tooltip.top="t('views.functions.asymmetricTooltip')">
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{ t('views.functions.asymmetric') }}
-                        </td>
-                        <td
-                            class="py-2 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiSwitch
-                                v-model="chosenAsymmetric"
-                                @update:model-value="updateSymmetricStepSize"
-                            />
-                        </td>
-                    </tr>
-                    <tr
-                        v-tooltip.top="
-                            chosenFixedStepSize
-                                ? chosenAsymmetric
-                                    ? t('views.functions.stepSizeFixedIncreasingTooltip')
-                                    : t('views.functions.stepSizeFixedTooltip')
-                                : chosenAsymmetric
-                                  ? t('views.functions.stepSizeMinIncreasingTooltip')
-                                  : t('views.functions.stepSizeMinTooltip')
-                        "
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{
-                                chosenFixedStepSize
-                                    ? chosenAsymmetric
-                                        ? t('views.functions.stepSizeFixedIncreasing')
-                                        : t('views.functions.stepSizeFixed')
-                                    : chosenAsymmetric
-                                      ? t('views.functions.stepSizeMinIncreasing')
-                                      : t('views.functions.stepSizeMin')
-                            }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiNumberInput
-                                v-model="chosenStepDutyMinimum"
-                                :min="dutyMin"
-                                :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
-                                :suffix="t('common.percentUnit')"
-                            />
-                        </td>
-                    </tr>
-                    <tr
-                        v-if="!chosenFixedStepSize"
-                        v-tooltip.top="
-                            chosenAsymmetric
-                                ? t('views.functions.stepSizeMaxIncreasingTooltip')
-                                : t('views.functions.stepSizeMaxTooltip')
-                        "
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{
-                                chosenAsymmetric
-                                    ? t('views.functions.stepSizeMaxIncreasing')
-                                    : t('views.functions.stepSizeMax')
-                            }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiNumberInput
-                                v-model="chosenStepDutyMaximum"
-                                :min="chosenStepDutyMinimum"
-                                :max="dutyMax"
-                                :suffix="t('common.percentUnit')"
-                            />
-                        </td>
-                    </tr>
-                    <tr
-                        v-if="chosenAsymmetric"
-                        v-tooltip.top="
-                            chosenFixedStepSize
-                                ? t('views.functions.stepSizeFixedDecreasingTooltip')
-                                : t('views.functions.stepSizeMinDecreasingTooltip')
-                        "
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{
-                                chosenFixedStepSize
-                                    ? t('views.functions.stepSizeFixedDecreasing')
-                                    : t('views.functions.stepSizeMinDecreasing')
-                            }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiNumberInput
-                                v-model="chosenStepSizeMinDecreasing"
-                                :min="dutyMin"
-                                :max="chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing"
-                                :suffix="t('common.percentUnit')"
-                            />
-                        </td>
-                    </tr>
-                    <tr
-                        v-if="chosenAsymmetric && !chosenFixedStepSize"
-                        v-tooltip.top="t('views.functions.stepSizeMaxDecreasingTooltip')"
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{ t('views.functions.stepSizeMaxDecreasing') }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiNumberInput
-                                v-model="chosenStepSizeMaxDecreasing"
-                                :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
-                                :max="dutyMax"
-                                :suffix="t('common.percentUnit')"
-                            />
-                        </td>
-                    </tr>
-                    <tr>
-                        <th
-                            colspan="2"
-                            class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
-                        >
-                            {{ t('views.functions.stepOverrides') }}
-                        </th>
-                    </tr>
-                    <tr v-tooltip.top="t('views.functions.thresholdHoppingTooltip')">
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t-2"
-                        >
-                            {{ t('views.functions.thresholdHopping') }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                        >
-                            <UiSwitch v-model="chosenThresholdHopping" />
-                        </td>
-                    </tr>
-                    <tr v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')">
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{ t('views.functions.bypassMinAtExtremes') }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiSwitch v-model="chosenBypassMinAtExtremes" />
-                        </td>
-                    </tr>
-                    <tr v-if="selectedType === FunctionType.Standard">
-                        <th
-                            colspan="2"
-                            class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
-                        >
-                            {{ t('views.functions.hysteresis') }}
-                        </th>
-                    </tr>
-                    <tr
-                        v-if="selectedType === FunctionType.Standard"
-                        v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t-2"
-                        >
-                            {{ t('views.functions.hysteresisThreshold') }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                        >
-                            <UiNumberInput
-                                v-model="chosenDeviance"
-                                :min="devianceMin"
-                                :max="devianceMax"
-                                :step="0.1"
-                                :suffix="t('common.tempUnit')"
-                            />
-                        </td>
-                    </tr>
-                    <tr
-                        v-if="selectedType === FunctionType.Standard"
-                        v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{ t('views.functions.hysteresisDelay') }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiNumberInput
-                                v-model="chosenDelay"
-                                :min="delayMin"
-                                :max="delayMax"
-                                :suffix="t('common.secondAbbr')"
-                            />
-                        </td>
-                    </tr>
-                    <tr
-                        v-if="selectedType === FunctionType.Standard"
-                        v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t"
-                        >
-                            {{ t('views.functions.onlyDownward') }}
-                        </td>
-                        <td
-                            class="py-2 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
-                        >
-                            <UiSwitch v-model="chosenOnlyDownward" />
-                        </td>
-                    </tr>
-                    <tr v-if="selectedType === FunctionType.ExponentialMovingAvg">
-                        <th
-                            colspan="2"
-                            class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
-                        >
-                            {{ t('views.functions.general') }}
-                        </th>
-                    </tr>
-                    <tr
-                        v-if="selectedType === FunctionType.ExponentialMovingAvg"
-                        v-tooltip.top="t('views.functions.windowSizeTooltip')"
-                    >
-                        <td
-                            class="py-4 px-4 w-48 text-right items-center border-border-one border-r-2 border-t-2"
-                        >
-                            {{ t('views.functions.windowSize') }}
-                        </td>
-                        <td
-                            class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                        >
-                            <UiNumberInput
-                                v-model="chosenWindowSize"
-                                :min="windowSizeMin"
-                                :max="windowSizeMax"
-                            />
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <UiSettingsCard class="mt-4 w-96" :title="t('views.functions.stepSizeTitle')">
+                <UiSettingRow
+                    v-tooltip.top="t('views.functions.fixedStepSizeTooltip')"
+                    :label="t('views.functions.fixedStepSize')"
+                >
+                    <UiSwitch
+                        v-model="chosenFixedStepSize"
+                        @update:model-value="updateFixedStepSize"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-tooltip.top="t('views.functions.asymmetricTooltip')"
+                    :label="t('views.functions.asymmetric')"
+                >
+                    <UiSwitch
+                        v-model="chosenAsymmetric"
+                        @update:model-value="updateSymmetricStepSize"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-tooltip.top="
+                        chosenFixedStepSize
+                            ? chosenAsymmetric
+                                ? t('views.functions.stepSizeFixedIncreasingTooltip')
+                                : t('views.functions.stepSizeFixedTooltip')
+                            : chosenAsymmetric
+                              ? t('views.functions.stepSizeMinIncreasingTooltip')
+                              : t('views.functions.stepSizeMinTooltip')
+                    "
+                    :label="
+                        chosenFixedStepSize
+                            ? chosenAsymmetric
+                                ? t('views.functions.stepSizeFixedIncreasing')
+                                : t('views.functions.stepSizeFixed')
+                            : chosenAsymmetric
+                              ? t('views.functions.stepSizeMinIncreasing')
+                              : t('views.functions.stepSizeMin')
+                    "
+                >
+                    <UiNumberInput
+                        v-model="chosenStepDutyMinimum"
+                        :min="dutyMin"
+                        :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
+                        :suffix="t('common.percentUnit')"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-if="!chosenFixedStepSize"
+                    v-tooltip.top="
+                        chosenAsymmetric
+                            ? t('views.functions.stepSizeMaxIncreasingTooltip')
+                            : t('views.functions.stepSizeMaxTooltip')
+                    "
+                    :label="
+                        chosenAsymmetric
+                            ? t('views.functions.stepSizeMaxIncreasing')
+                            : t('views.functions.stepSizeMax')
+                    "
+                >
+                    <UiNumberInput
+                        v-model="chosenStepDutyMaximum"
+                        :min="chosenStepDutyMinimum"
+                        :max="dutyMax"
+                        :suffix="t('common.percentUnit')"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-if="chosenAsymmetric"
+                    v-tooltip.top="
+                        chosenFixedStepSize
+                            ? t('views.functions.stepSizeFixedDecreasingTooltip')
+                            : t('views.functions.stepSizeMinDecreasingTooltip')
+                    "
+                    :label="
+                        chosenFixedStepSize
+                            ? t('views.functions.stepSizeFixedDecreasing')
+                            : t('views.functions.stepSizeMinDecreasing')
+                    "
+                >
+                    <UiNumberInput
+                        v-model="chosenStepSizeMinDecreasing"
+                        :min="dutyMin"
+                        :max="chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing"
+                        :suffix="t('common.percentUnit')"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-if="chosenAsymmetric && !chosenFixedStepSize"
+                    v-tooltip.top="t('views.functions.stepSizeMaxDecreasingTooltip')"
+                    :label="t('views.functions.stepSizeMaxDecreasing')"
+                >
+                    <UiNumberInput
+                        v-model="chosenStepSizeMaxDecreasing"
+                        :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
+                        :max="dutyMax"
+                        :suffix="t('common.percentUnit')"
+                    />
+                </UiSettingRow>
+            </UiSettingsCard>
+            <UiSettingsCard class="mt-4 w-96" :title="t('views.functions.stepOverrides')">
+                <UiSettingRow
+                    v-tooltip.top="t('views.functions.thresholdHoppingTooltip')"
+                    :label="t('views.functions.thresholdHopping')"
+                >
+                    <UiSwitch v-model="chosenThresholdHopping" />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')"
+                    :label="t('views.functions.bypassMinAtExtremes')"
+                >
+                    <UiSwitch v-model="chosenBypassMinAtExtremes" />
+                </UiSettingRow>
+            </UiSettingsCard>
+            <UiSettingsCard
+                class="mt-4 w-96"
+                v-if="selectedType === FunctionType.Standard"
+                :title="t('views.functions.hysteresis')"
+            >
+                <UiSettingRow
+                    v-if="selectedType === FunctionType.Standard"
+                    v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
+                    :label="t('views.functions.hysteresisThreshold')"
+                >
+                    <UiNumberInput
+                        v-model="chosenDeviance"
+                        :min="devianceMin"
+                        :max="devianceMax"
+                        :step="0.1"
+                        :suffix="t('common.tempUnit')"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-if="selectedType === FunctionType.Standard"
+                    v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
+                    :label="t('views.functions.hysteresisDelay')"
+                >
+                    <UiNumberInput
+                        v-model="chosenDelay"
+                        :min="delayMin"
+                        :max="delayMax"
+                        :suffix="t('common.secondAbbr')"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-if="selectedType === FunctionType.Standard"
+                    v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
+                    :label="t('views.functions.onlyDownward')"
+                >
+                    <UiSwitch v-model="chosenOnlyDownward" />
+                </UiSettingRow>
+            </UiSettingsCard>
+            <UiSettingsCard
+                class="mt-4 w-96"
+                v-if="selectedType === FunctionType.ExponentialMovingAvg"
+                :title="t('views.functions.general')"
+            >
+                <UiSettingRow
+                    v-if="selectedType === FunctionType.ExponentialMovingAvg"
+                    v-tooltip.top="t('views.functions.windowSizeTooltip')"
+                    :label="t('views.functions.windowSize')"
+                >
+                    <UiNumberInput
+                        v-model="chosenWindowSize"
+                        :min="windowSizeMin"
+                        :max="windowSizeMax"
+                    />
+                </UiSettingRow>
+            </UiSettingsCard>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar
             class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"

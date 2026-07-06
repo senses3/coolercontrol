@@ -34,6 +34,8 @@ import { Alert } from '@/models/Alert.ts'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
+import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 
 interface Props {
@@ -477,177 +479,135 @@ onMounted(async () => {
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.triggerConditions') }}
                     </small>
-                    <table class="bg-bg-two rounded-lg mb-4">
-                        <tbody>
-                            <tr v-tooltip.top="t('views.alerts.maxValueTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.greaterThan') }}
-                                    </div>
-                                </td>
-                                <td class="py-4 px-4 w-60 leading-none items-center text-center">
-                                    <UiNumberInput
-                                        v-model="chosenMax"
-                                        :min="
-                                            chosenMin +
-                                            (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                                ? 1
-                                                : 100)
-                                        "
-                                        :max="valueMax(chosenChannelSource?.metric)"
-                                        :step="stepSize(chosenChannelSource?.metric)"
-                                        :suffix="valueSuffix(chosenChannelSource?.metric)"
-                                        :disabled="chosenChannelSource == null"
-                                    />
-                                    <UiSlider
-                                        v-model="chosenMax"
-                                        class="!w-48 ml-1"
-                                        :step="stepSize(chosenChannelSource?.metric)"
-                                        :min="
-                                            chosenMin +
-                                            (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                                ? 1
-                                                : 100)
-                                        "
-                                        :max="valueMax(chosenChannelSource?.metric)"
-                                        :disabled="chosenChannelSource == null"
-                                    />
-                                </td>
-                            </tr>
-                            <tr v-tooltip.top="t('views.alerts.minValueTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.lessThan') }}
-                                    </div>
-                                </td>
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
-                                >
-                                    <UiNumberInput
-                                        v-model="chosenMin"
-                                        :min="0"
-                                        :max="
-                                            chosenMax -
-                                            (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                                ? 1
-                                                : 100)
-                                        "
-                                        :step="stepSize(chosenChannelSource?.metric)"
-                                        :suffix="valueSuffix(chosenChannelSource?.metric)"
-                                        :disabled="chosenChannelSource == null"
-                                    />
-                                    <UiSlider
-                                        v-model="chosenMin"
-                                        class="!w-48 ml-1"
-                                        :step="stepSize(chosenChannelSource?.metric)"
-                                        :min="0"
-                                        :max="
-                                            chosenMax -
-                                            (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                                ? 1
-                                                : 100)
-                                        "
-                                        :disabled="chosenChannelSource == null"
-                                    />
-                                </td>
-                            </tr>
-                            <tr v-tooltip.top="t('views.alerts.warmupDurationTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.warmupGreaterThan') }}
-                                    </div>
-                                </td>
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
-                                >
-                                    <UiNumberInput
-                                        v-model="chosenWarmupDuration"
-                                        :min="0"
-                                        :max="60"
-                                        :step="0.5"
-                                        :suffix="' s'"
-                                        :disabled="chosenChannelSource == null"
-                                    />
-                                    <UiSlider
-                                        v-model="chosenWarmupDuration"
-                                        class="!w-48 ml-1"
-                                        :step="0.5"
-                                        :min="0"
-                                        :max="60"
-                                        :disabled="chosenChannelSource == null"
-                                    />
-                                </td>
-                            </tr>
-                            <tr v-tooltip.top="t('views.alerts.desktopNotifyTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.desktopNotify') }}
-                                    </div>
-                                </td>
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
-                                >
-                                    <UiSwitch v-model="chosenDesktopNotification" />
-                                </td>
-                            </tr>
-                            <tr v-tooltip.top="t('views.alerts.desktopNotifyRecoveryTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.desktopNotifyRecovery') }}
-                                    </div>
-                                </td>
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
-                                >
-                                    <UiSwitch
-                                        v-model="chosenDesktopNotificationRecovery"
-                                        :disabled="!chosenDesktopNotification"
-                                    />
-                                </td>
-                            </tr>
-                            <tr v-tooltip.top="t('views.alerts.desktopNotifyAudioTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.desktopNotifyAudio') }}
-                                    </div>
-                                </td>
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
-                                >
-                                    <UiSwitch
-                                        v-model="chosenDesktopNotificationAudio"
-                                        :disabled="!chosenDesktopNotification"
-                                    />
-                                </td>
-                            </tr>
-                            <tr v-tooltip.top="t('views.alerts.shutdownOnActivationTooltip')">
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
-                                >
-                                    <div class="text-right float-right">
-                                        {{ t('views.alerts.shutdownOnActivation') }}
-                                    </div>
-                                </td>
-                                <td
-                                    class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
-                                >
-                                    <UiSwitch v-model="chosenShutdownOnActivation" />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <UiSettingsCard class="mb-4">
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.maxValueTooltip')"
+                            :label="t('views.alerts.greaterThan')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiNumberInput
+                                    v-model="chosenMax"
+                                    :min="
+                                        chosenMin +
+                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
+                                            ? 1
+                                            : 100)
+                                    "
+                                    :max="valueMax(chosenChannelSource?.metric)"
+                                    :step="stepSize(chosenChannelSource?.metric)"
+                                    :suffix="valueSuffix(chosenChannelSource?.metric)"
+                                    :disabled="chosenChannelSource == null"
+                                />
+                                <UiSlider
+                                    v-model="chosenMax"
+                                    class="!w-48"
+                                    :step="stepSize(chosenChannelSource?.metric)"
+                                    :min="
+                                        chosenMin +
+                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
+                                            ? 1
+                                            : 100)
+                                    "
+                                    :max="valueMax(chosenChannelSource?.metric)"
+                                    :disabled="chosenChannelSource == null"
+                                />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.minValueTooltip')"
+                            :label="t('views.alerts.lessThan')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiNumberInput
+                                    v-model="chosenMin"
+                                    :min="0"
+                                    :max="
+                                        chosenMax -
+                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
+                                            ? 1
+                                            : 100)
+                                    "
+                                    :step="stepSize(chosenChannelSource?.metric)"
+                                    :suffix="valueSuffix(chosenChannelSource?.metric)"
+                                    :disabled="chosenChannelSource == null"
+                                />
+                                <UiSlider
+                                    v-model="chosenMin"
+                                    class="!w-48"
+                                    :step="stepSize(chosenChannelSource?.metric)"
+                                    :min="0"
+                                    :max="
+                                        chosenMax -
+                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
+                                            ? 1
+                                            : 100)
+                                    "
+                                    :disabled="chosenChannelSource == null"
+                                />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.warmupDurationTooltip')"
+                            :label="t('views.alerts.warmupGreaterThan')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiNumberInput
+                                    v-model="chosenWarmupDuration"
+                                    :min="0"
+                                    :max="60"
+                                    :step="0.5"
+                                    :suffix="' s'"
+                                    :disabled="chosenChannelSource == null"
+                                />
+                                <UiSlider
+                                    v-model="chosenWarmupDuration"
+                                    class="!w-48"
+                                    :step="0.5"
+                                    :min="0"
+                                    :max="60"
+                                    :disabled="chosenChannelSource == null"
+                                />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.desktopNotifyTooltip')"
+                            :label="t('views.alerts.desktopNotify')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiSwitch v-model="chosenDesktopNotification" />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.desktopNotifyRecoveryTooltip')"
+                            :label="t('views.alerts.desktopNotifyRecovery')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiSwitch
+                                    v-model="chosenDesktopNotificationRecovery"
+                                    :disabled="!chosenDesktopNotification"
+                                />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.desktopNotifyAudioTooltip')"
+                            :label="t('views.alerts.desktopNotifyAudio')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiSwitch
+                                    v-model="chosenDesktopNotificationAudio"
+                                    :disabled="!chosenDesktopNotification"
+                                />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.shutdownOnActivationTooltip')"
+                            :label="t('views.alerts.shutdownOnActivation')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiSwitch v-model="chosenShutdownOnActivation" />
+                            </div>
+                        </UiSettingRow>
+                    </UiSettingsCard>
                 </div>
             </div>
         </ScrollAreaViewport>
