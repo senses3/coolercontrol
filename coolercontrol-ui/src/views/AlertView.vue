@@ -475,7 +475,7 @@ onMounted(async () => {
                         @update:model-value="changeChannelSource"
                     />
                 </div>
-                <div class="mt-0 w-96">
+                <div class="flex w-96 flex-col">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.triggerConditions') }}
                     </small>
