@@ -27,7 +27,12 @@ import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watc
 import { $enum } from 'ts-enum-util'
 import { useToast } from 'primevue/usetoast'
 import InputNumber from 'primevue/inputnumber'
-import { mdiContentDuplicate, mdiContentSaveOutline, mdiDeleteOutline } from '@mdi/js'
+import {
+    mdiContentDuplicate,
+    mdiContentSaveOutline,
+    mdiDeleteOutline,
+    mdiExportVariant,
+} from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
@@ -35,6 +40,7 @@ import { ElSwitch } from 'element-plus'
 import 'element-plus/es/components/switch/style/css'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
@@ -392,6 +398,15 @@ const deleteFunction = (): void => {
     })
 }
 
+const { openFunctionApplyWizard } = useToolWizards()
+
+// Profiles currently using this function (where-used).
+const usedByProfiles = computed((): string[] =>
+    settingsStore.profiles
+        .filter((profile) => profile.function_uid === currentFunction.value.uid)
+        .map((profile) => profile.name),
+)
+
 onMounted(async () => {
     addScrollEventListeners()
     // re-add some scroll event listeners for elements that are rendered on Type change
@@ -427,12 +442,23 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex border-b-4 border-border-one items-center justify-between">
+    <div class="flex flex-wrap border-b-4 border-border-one items-center justify-between">
         <entity-title-rename
             :current-name="currentFunction.name"
             :save-name-function="saveNameFunction"
         />
         <div class="flex flex-wrap gap-x-1 justify-end">
+            <div
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('components.wizards.functionApply.applyFunction')"
+                @click="openFunctionApplyWizard(currentFunction.uid)"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiExportVariant"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </div>
             <div
                 class="p-2 flex leading-none items-center cursor-pointer"
                 v-tooltip.top="t('layout.menu.tooltips.duplicate')"
@@ -472,6 +498,12 @@ onUnmounted(() => {
                     />
                 </Button>
             </div>
+        </div>
+        <div
+            v-if="usedByProfiles.length > 0"
+            class="w-full mx-4 mb-2 text-sm text-text-color-secondary"
+        >
+            {{ t('views.functions.usedBy') }}: {{ usedByProfiles.join(', ') }}
         </div>
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">

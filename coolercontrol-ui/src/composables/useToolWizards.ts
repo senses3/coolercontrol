@@ -32,6 +32,13 @@ const calibrationWizard = defineAsyncComponent(
 const generateWizard = defineAsyncComponent(
     () => import('@/components/wizards/generate/GenerateWizard.vue'),
 )
+const modeWizard = defineAsyncComponent(() => import('@/components/wizards/mode/Wizard.vue'))
+const profileApplyWizard = defineAsyncComponent(
+    () => import('@/components/wizards/profile-apply/Wizard.vue'),
+)
+const functionApplyWizard = defineAsyncComponent(
+    () => import('@/components/wizards/function-apply/Wizard.vue'),
+)
 
 export interface CalibrationPreselect {
     deviceUID: UID
@@ -63,5 +70,44 @@ export function useToolWizards() {
             data: {},
         })
     }
-    return { openCalibrationWizard, openGenerateWizard }
+    const openModeWizard = (): void => {
+        dialog.open(modeWizard, {
+            props: {
+                header: t('views.modes.createMode'),
+                position: 'center',
+                modal: true,
+                dismissableMask: true,
+            },
+            data: {},
+        })
+    }
+    const openProfileApplyWizard = (profileUID: UID): void => {
+        dialog.open(profileApplyWizard, {
+            props: {
+                header: t('components.wizards.profileApply.applyProfile'),
+                position: 'center',
+                modal: true,
+                dismissableMask: true,
+            },
+            data: { profileUID },
+        })
+    }
+    const openFunctionApplyWizard = (functionUID: UID): void => {
+        dialog.open(functionApplyWizard, {
+            props: {
+                header: t('components.wizards.functionApply.applyFunction'),
+                position: 'center',
+                modal: true,
+                dismissableMask: true,
+            },
+            data: { functionUID },
+        })
+    }
+    return {
+        openCalibrationWizard,
+        openGenerateWizard,
+        openModeWizard,
+        openProfileApplyWizard,
+        openFunctionApplyWizard,
+    }
 }

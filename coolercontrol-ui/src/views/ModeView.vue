@@ -19,7 +19,14 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiBookmarkCheckOutline, mdiInformationSlabCircleOutline, mdiMemory } from '@mdi/js'
+import {
+    mdiBookmarkCheckOutline,
+    mdiContentDuplicate,
+    mdiDeleteOutline,
+    mdiInformationSlabCircleOutline,
+    mdiMemory,
+    mdiUpdate,
+} from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { computed, inject, onMounted, type Ref, ref, watch } from 'vue'
 import DataTable from 'primevue/datatable'
@@ -31,6 +38,8 @@ import { DeviceSettingReadDTO } from '@/models/DaemonSettings.ts'
 import { getProfileDisplayName } from '@/models/Profile.ts'
 import Button from 'primevue/button'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useConfirm } from 'primevue/useconfirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 
@@ -171,6 +180,39 @@ onMounted(async () => {
         initTableData()
     })
 })
+
+const router = useRouter()
+const confirm = useConfirm()
+
+const updateModeWithCurrentSettings = (): void => {
+    confirm.require({
+        message: t('views.modes.updateModeConfirm', { name: currentMode.value.name }),
+        header: t('views.modes.editMode'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            await settingsStore.updateModeSettings(currentMode.value.uid)
+        },
+    })
+}
+
+const duplicateMode = async (): Promise<void> => {
+    const newMode = await settingsStore.duplicateMode(currentMode.value.uid)
+    if (newMode != null) {
+        await router.push({ name: 'modes', params: { modeUID: newMode.uid } })
+    }
+}
+
+const deleteMode = (): void => {
+    confirm.require({
+        message: t('views.modes.deleteModeConfirm', { name: currentMode.value.name }),
+        header: t('views.modes.deleteMode'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            await settingsStore.deleteMode(currentMode.value.uid)
+            await router.push({ name: 'cooling-modes' })
+        },
+    })
+}
 </script>
 
 <template>
@@ -191,24 +233,55 @@ onMounted(async () => {
                 />
             </div>
         </div>
-        <div
-            class="p-2"
-            v-tooltip.top="{ value: t('views.mode.currentlyActive'), disabled: !isActivated }"
-        >
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
-                label="Save"
-                v-tooltip.top="t('views.mode.activateMode')"
-                :disabled="isActivated"
-                @click="activateMode"
+        <div class="flex flex-row items-center">
+            <div
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('views.modes.editMode')"
+                @click="updateModeWithCurrentSettings"
+            >
+                <svg-icon type="mdi" :path="mdiUpdate" :size="deviceStore.getREMSize(1.25)" />
+            </div>
+            <div
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('views.modes.duplicateMode')"
+                @click="duplicateMode"
             >
                 <svg-icon
-                    class="outline-0"
                     type="mdi"
-                    :path="mdiBookmarkCheckOutline"
-                    :size="deviceStore.getREMSize(1.5)"
+                    :path="mdiContentDuplicate"
+                    :size="deviceStore.getREMSize(1.25)"
                 />
-            </Button>
+            </div>
+            <div
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('views.modes.deleteMode')"
+                @click="deleteMode"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiDeleteOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </div>
+            <div
+                class="p-2"
+                v-tooltip.top="{ value: t('views.mode.currentlyActive'), disabled: !isActivated }"
+            >
+                <Button
+                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
+                    label="Save"
+                    v-tooltip.top="t('views.mode.activateMode')"
+                    :disabled="isActivated"
+                    @click="activateMode"
+                >
+                    <svg-icon
+                        class="outline-0"
+                        type="mdi"
+                        :path="mdiBookmarkCheckOutline"
+                        :size="deviceStore.getREMSize(1.5)"
+                    />
+                </Button>
+            </div>
         </div>
     </div>
     <div class="h-full pb-14">

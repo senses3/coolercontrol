@@ -22,10 +22,12 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiBookmarkCheck, mdiBookmarkMultipleOutline } from '@mdi/js'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
+const { openModeWizard } = useToolWizards()
 
 const activate = async (modeUID: string): Promise<void> => {
     await settingsStore.activateMode(modeUID)
@@ -34,7 +36,12 @@ const activate = async (modeUID: string): Promise<void> => {
 
 <template>
     <div class="flex h-full flex-col overflow-y-auto p-4">
-        <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.modes') }}</h1>
+        <div class="flex items-center justify-between">
+            <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.modes') }}</h1>
+            <UiButton size="sm" variant="outline" @click="openModeWizard()">
+                {{ t('views.modes.createMode') }}
+            </UiButton>
+        </div>
         <div v-if="settingsStore.modes.length > 0" class="mt-4 flex flex-col gap-2">
             <div
                 v-for="mode in settingsStore.modes"

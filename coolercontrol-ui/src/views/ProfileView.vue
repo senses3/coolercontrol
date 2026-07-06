@@ -23,6 +23,7 @@ import {
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiDeleteOutline,
+    mdiExportVariant,
     mdiInformationSlabCircleOutline,
     mdiMemory,
 } from '@mdi/js'
@@ -76,6 +77,7 @@ import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
 import Select from 'primevue/select'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vue'
@@ -1918,6 +1920,25 @@ const deleteProfile = (): void => {
     })
 }
 
+const { openProfileApplyWizard } = useToolWizards()
+
+// Channels currently driven by this profile (where-used).
+const usedByChannels = computed((): string[] => {
+    const labels: string[] = []
+    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+        for (const channelSetting of setting.settings.values()) {
+            if (channelSetting.profile_uid === currentProfile.value.uid) {
+                labels.push(
+                    settingsStore.allUIDeviceSettings
+                        .get(deviceUID)!
+                        .sensorsAndChannels.get(channelSetting.channel_name)!.name,
+                )
+            }
+        }
+    }
+    return labels
+})
+
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
     const controlPanel = document.getElementById('control-panel')
@@ -2091,6 +2112,17 @@ defineExpose({ saveProfileState, contextIsDirty })
         />
         <div class="flex flex-wrap gap-x-1 justify-end">
             <template v-if="!hideSave">
+                <div
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('components.wizards.profileApply.applyProfile')"
+                    @click="openProfileApplyWizard(currentProfile.uid)"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiExportVariant"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
                 <div
                     class="p-2 flex leading-none items-center cursor-pointer"
                     v-tooltip.top="t('layout.menu.tooltips.duplicate')"
@@ -2319,6 +2351,12 @@ defineExpose({ saveProfileState, contextIsDirty })
             </div>
         </div>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
+        <div
+            v-if="!hideSave && usedByChannels.length > 0"
+            class="w-full mx-4 mb-2 text-sm text-text-color-secondary"
+        >
+            {{ t('views.profiles.usedBy') }}: {{ usedByChannels.join(', ') }}
+        </div>
         <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
     </div>
     <!-- The UI Display: -->
