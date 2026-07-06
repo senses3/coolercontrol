@@ -446,43 +446,44 @@ const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(d
                     </div>
                 </div>
             </template>
-            <!-- Sensors enable/disable -->
-            <div class="flex items-center gap-3 pb-2 pt-6">
-                <h2 class="text-xs uppercase text-text-color-secondary">
-                    {{ t('layout.shell.devicesPage.sensors') }}
-                </h2>
-                <UiButton v-if="sensorsDirty" size="sm" @click="applySensors">
-                    {{ t('common.apply') }}
-                </UiButton>
-            </div>
-            <div
-                class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
-            >
-                <button
-                    v-for="tog in toggles"
-                    :key="tog.channelName"
-                    type="button"
-                    class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                    @click="toggleSensor(tog.channelName)"
+            <!-- Sensors enable/disable (custom sensors manage via add/delete instead) -->
+            <template v-if="!isCustomSensors">
+                <div class="flex items-center gap-3 pb-2 pt-6">
+                    <h2 class="text-xs uppercase text-text-color-secondary">
+                        {{ t('layout.shell.devicesPage.sensors') }}
+                    </h2>
+                    <UiButton v-if="sensorsDirty" size="sm" @click="applySensors">
+                        {{ t('common.apply') }}
+                    </UiButton>
+                </div>
+                <div
+                    class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
                 >
-                    <svg-icon
-                        type="mdi"
-                        :path="
-                            (sensorState.get(tog.channelName) ?? true)
-                                ? mdiCheckboxMarked
-                                : mdiCheckboxBlankOutline
-                        "
-                        :size="18"
-                        :class="
-                            (sensorState.get(tog.channelName) ?? true)
-                                ? 'text-accent'
-                                : 'text-text-color-secondary'
-                        "
-                    />
-                    <span class="truncate">{{ sensorLabel(tog.channelName) }}</span>
-                </button>
-            </div>
-
+                    <button
+                        v-for="tog in toggles"
+                        :key="tog.channelName"
+                        type="button"
+                        class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                        @click="toggleSensor(tog.channelName)"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="
+                                (sensorState.get(tog.channelName) ?? true)
+                                    ? mdiCheckboxMarked
+                                    : mdiCheckboxBlankOutline
+                            "
+                            :size="18"
+                            :class="
+                                (sensorState.get(tog.channelName) ?? true)
+                                    ? 'text-accent'
+                                    : 'text-text-color-secondary'
+                            "
+                        />
+                        <span class="truncate">{{ sensorLabel(tog.channelName) }}</span>
+                    </button>
+                </div>
+            </template>
             <!-- Lighting and LCD channels -->
             <template v-if="channelLinks.length > 0">
                 <h2 class="pb-2 pt-6 text-xs uppercase text-text-color-secondary">

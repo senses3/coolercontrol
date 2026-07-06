@@ -170,6 +170,22 @@ const persistFunctionOrder = (): void => {
 const { openProfileWizard, openFunctionWizard } = useLibraryWizards()
 
 // A profile is unhealthy when the daemon reports a missing or stale temp source for it.
+const failsafeTooltip = (deviceUID: UID, channelName?: string): string => {
+    const ref = settingsStore.healthFailsafe.find(
+        (entry) =>
+            entry.device_uid === deviceUID && (channelName == null || entry.name === channelName),
+    )
+    const base = t('views.appInfo.failsafeActive')
+    return ref?.reason ? `${base}: ${ref.reason}` : base
+}
+
+const profileTooltip = (profileUID: string): string =>
+    settingsStore.healthMissing.some(
+        (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
+    )
+        ? t('views.appInfo.missingTempSource')
+        : t('views.appInfo.staleTempSource')
+
 const isProfileUnhealthy = (profileUID: string): boolean =>
     settingsStore.healthMissing.some(
         (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
@@ -223,13 +239,17 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(channel.deviceUID) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                         <span
                             class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
                         >
@@ -315,13 +335,17 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate">
                             {{ channelLabel(channel.deviceUID, channel.channelName) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                         <span
                             class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
                         >
@@ -409,13 +433,12 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     class="shrink-0 text-text-color-secondary"
                 />
                 <span class="truncate">{{ profile.name }}</span>
-                <svg-icon
+                <UiTooltip
                     v-if="isProfileUnhealthy(profile.uid)"
-                    type="mdi"
-                    :path="mdiAlert"
-                    :size="14"
-                    class="shrink-0 text-warning"
-                />
+                    :text="profileTooltip(profile.uid)"
+                >
+                    <svg-icon type="mdi" :path="mdiAlert" :size="14" class="shrink-0 text-error" />
+                </UiTooltip>
                 <span
                     class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >

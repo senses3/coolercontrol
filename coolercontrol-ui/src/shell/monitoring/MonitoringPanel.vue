@@ -49,6 +49,7 @@ import {
 } from '@/shell/panelOrder.ts'
 import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sensors.ts'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
@@ -111,6 +112,15 @@ const liveValue = (sensor: MonitoringSensor): string => {
     if (values.duty != null) return `${values.duty} ${t('common.percentUnit')}`
     if (values.rpm != null) return `${values.rpm} ${t('common.rpmAbbr')}`
     return ''
+}
+
+const failsafeTooltip = (deviceUID: UID, channelName?: string): string => {
+    const ref = settingsStore.healthFailsafe.find(
+        (entry) =>
+            entry.device_uid === deviceUID && (channelName == null || entry.name === channelName),
+    )
+    const base = t('views.appInfo.failsafeActive')
+    return ref?.reason ? `${base}: ${ref.reason}` : base
 }
 
 const isUnhealthy = (deviceUID: UID, channelName: string): boolean =>
@@ -512,13 +522,17 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="truncate">
                             {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(sensor.deviceUID, sensor.channelName)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(sensor.deviceUID, sensor.channelName)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                         <span
                             class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
                             :class="{
