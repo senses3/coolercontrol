@@ -25,7 +25,7 @@ import {
     mdiLinkVariant,
     mdiPowerPlugOutline,
 } from '@mdi/js'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import DataTable, { DataTableRowSelectEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'

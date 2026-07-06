@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiBellPlusOutline } from '@mdi/js'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import DataTable, { DataTableRowSelectEvent } from 'primevue/datatable'
 import Column from 'primevue/column'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'

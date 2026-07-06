@@ -33,7 +33,7 @@ import {
     StatsResponseDTO,
     defaultStatsResponse,
 } from '@/models/Stats'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useI18n } from 'vue-i18n'
 
 const deviceStore = useDeviceStore()

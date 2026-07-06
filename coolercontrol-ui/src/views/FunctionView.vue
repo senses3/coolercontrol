@@ -33,7 +33,7 @@ import {
     mdiDeleteOutline,
     mdiExportVariant,
 } from '@mdi/js'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'

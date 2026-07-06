@@ -21,7 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { mdiAlertOutline, mdiCogs, mdiInformationSlabCircleOutline } from '@mdi/js'
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'radix-vue'
+import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChannelCalibrationPanel from '@/components/ChannelCalibrationPanel.vue'
 import { computed, nextTick, ref, Ref } from 'vue'
