@@ -19,10 +19,10 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiContentSaveOutline, mdiMemory } from '@mdi/js'
+import { mdiContentSaveOutline, mdiMemory, mdiTrashCanOutline } from '@mdi/js'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
-import { inject, onMounted, ref, toRaw, type Ref, watch } from 'vue'
+import { onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
@@ -32,7 +32,6 @@ import { useConfirm } from 'primevue/useconfirm'
 import { Alert } from '@/models/Alert.ts'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import Slider from 'primevue/slider'
-import { Emitter, EventType } from 'mitt'
 import { useI18n } from 'vue-i18n'
 import { ElSwitch } from 'element-plus'
 import 'element-plus/es/components/switch/style/css'
@@ -60,7 +59,6 @@ interface AvailableChannelSources {
 }
 
 const props = defineProps<Props>()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 const deviceStore = useDeviceStore()
 // We need to use the raw state to watch for changes, as the pinia reactive proxy isn't properly
 // reacting to changes from Vue's shallowRef & triggerRef anymore.
@@ -192,14 +190,28 @@ const saveAlert = async (): Promise<void> => {
         const successful = await settingsStore.createAlert(alert)
         if (successful) {
             await settingsStore.loadAlertsAndLogs()
-            emitter.emit('alert-add-menu', { alertUID: alert.uid })
             contextIsDirty.value = false
-            await router.push({ name: 'alerts', params: { alertUID: alert.uid } })
+            await router.push({ name: 'monitoring-alert', params: { alertUID: alert.uid } })
         }
     } else {
         const successful = await settingsStore.updateAlert(alert.uid)
         if (successful) contextIsDirty.value = false
     }
+}
+
+const deleteAlert = (): void => {
+    confirm.require({
+        message: t('views.alerts.deleteAlertConfirm', { name: alert.name }),
+        header: t('views.alerts.deleteAlert'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            const successful = await settingsStore.deleteAlert(alert.uid)
+            if (successful) {
+                contextIsDirty.value = false
+                await router.push({ name: 'monitoring-alerts' })
+            }
+        },
+    })
 }
 
 const saveNameFunction = async (newName: string): Promise<boolean> => {
@@ -209,7 +221,6 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
         if (successful) {
             const isAlreadyDirty = contextIsDirty.value
             chosenName.value = newName
-            emitter.emit('alert-name-update', { alertUID: alert.uid, name: newName })
             if (!isAlreadyDirty) {
                 setTimeout(() => (contextIsDirty.value = false))
             }
@@ -392,6 +403,21 @@ onMounted(async () => {
     <div class="flex border-b-4 border-border-one items-center justify-between">
         <entity-title-rename :current-name="chosenName" :save-name-function="saveNameFunction" />
         <div class="flex flex-wrap gap-x-1 justify-end">
+            <div v-if="!shouldCreateAlert" class="p-2 pr-0">
+                <Button
+                    outlined
+                    class="h-[2.375rem] px-3"
+                    v-tooltip.top="t('views.alerts.deleteAlert')"
+                    @click="deleteAlert"
+                >
+                    <svg-icon
+                        class="outline-0"
+                        type="mdi"
+                        :path="mdiTrashCanOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </Button>
+            </div>
             <div class="p-2">
                 <Button
                     class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"

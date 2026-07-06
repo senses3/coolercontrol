@@ -1,0 +1,83 @@
+<!--
+  - CoolerControl - monitor and control your cooling and other devices
+  - Copyright (c) 2021-2025  Guy Boldon and contributors
+  -
+  - This program is free software: you can redistribute it and/or modify
+  - it under the terms of the GNU General Public License as published by
+  - the Free Software Foundation, either version 3 of the License, or
+  - (at your option) any later version.
+  -
+  - This program is distributed in the hope that it will be useful,
+  - but WITHOUT ANY WARRANTY; without even the implied warranty of
+  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  - GNU General Public License for more details.
+  -
+  - You should have received a copy of the GNU General Public License
+  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiCheck, mdiUnfoldMoreHorizontal } from '@mdi/js'
+import {
+    SelectContent,
+    SelectItem,
+    SelectItemIndicator,
+    SelectItemText,
+    SelectPortal,
+    SelectRoot,
+    SelectTrigger,
+    SelectValue,
+    SelectViewport,
+} from 'reka-ui'
+
+export interface UiSelectOption {
+    label: string
+    value: string
+    disabled?: boolean
+}
+
+const model = defineModel<string | undefined>()
+withDefaults(
+    defineProps<{
+        options: UiSelectOption[]
+        placeholder?: string
+        disabled?: boolean
+    }>(),
+    { placeholder: '', disabled: false },
+)
+</script>
+
+<template>
+    <SelectRoot v-model="model" :disabled="disabled">
+        <SelectTrigger
+            class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border-one bg-bg-two px-3 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+        >
+            <SelectValue :placeholder="placeholder" class="truncate" />
+            <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" />
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectContent
+                position="popper"
+                :side-offset="4"
+                class="z-50 max-h-80 min-w-40 overflow-hidden rounded-lg border border-border-one bg-bg-two shadow-md"
+            >
+                <SelectViewport class="p-1">
+                    <SelectItem
+                        v-for="option in options"
+                        :key="option.value"
+                        :value="option.value"
+                        :disabled="option.disabled"
+                        class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    >
+                        <SelectItemText>{{ option.label }}</SelectItemText>
+                        <SelectItemIndicator>
+                            <svg-icon type="mdi" :path="mdiCheck" :size="14" />
+                        </SelectItemIndicator>
+                    </SelectItem>
+                </SelectViewport>
+            </SelectContent>
+        </SelectPortal>
+    </SelectRoot>
+</template>

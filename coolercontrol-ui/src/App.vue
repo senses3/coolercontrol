@@ -18,6 +18,9 @@
 
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
+import { StartupPage } from '@/models/UISettings.ts'
+import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
@@ -31,7 +34,7 @@ import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import { ElLoading, ElSwitch } from 'element-plus'
 import 'element-plus/es/components/loading/style/css'
-import { StartupPage, ThemeMode } from '@/models/UISettings.ts'
+import { ThemeMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
@@ -43,10 +46,11 @@ const { t, locale } = useI18n({ useScope: 'global' })
 const loaded: Ref<boolean> = ref(false)
 const initSuccessful = ref(true)
 const deviceStore = useDeviceStore()
+const router = useRouter()
+const { openCalibrationWizard } = useToolWizards()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const daemonState = useDaemonState()
-const router = useRouter()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 const daemonPort: Ref<number> = ref(deviceStore.getDaemonPort())
@@ -299,22 +303,27 @@ onMounted(async () => {
         return
     }
     await settingsStore.initializeSettings(deviceStore.allDevices())
-    // Prime the calibration cache before `loaded` flips below: the Controls
-    // Overview can be the configured startup page, and its FanChannelNode
-    // buttons read `statusFor` on first paint.
+    // Apply the persisted panel order (devices, channels, profiles, functions);
+    // the old tree menu did this on build, the shell applies it once at boot.
+    deviceStore.reSortDevicesByMenuOrder()
+    sortEntitiesByGroup(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
+    sortEntitiesByGroup(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
+    // Prime the calibration cache before `loaded` flips below: the cooling
+    // channel page reads `statusFor` on first paint.
     await calibrationStore.refreshAllStatuses()
     // Re-attach to a calibration batch the daemon is still driving after a
     // reload (the daemon owns the queue, so it survived the suspend/reload).
     const calibrationBatchResumed = await calibrationStore.ensureBatchPolling()
     // Honor the configured startup page, but only when the user landed on the
-    // default root route (no deep link). The empty path's component is
-    // AppInfoView, so AppInfo needs no redirect; Controls and HomeDashboard do.
-    if (router.currentRoute.value.name === 'startup-page') {
+    // default root route (no deep link). Targets remap to the new shell:
+    // AppInfo -> Home (its content lives there now), Controls -> Cooling,
+    // HomeDashboard -> Monitoring (home dashboard).
+    if (router.currentRoute.value.name === 'section-home') {
         const startup = settingsStore.startupPage
         if (startup === StartupPage.Controls) {
-            await router.replace({ name: 'system-controls' })
+            await router.replace({ name: 'section-cooling' })
         } else if (startup === StartupPage.HomeDashboard) {
-            await router.replace({ name: 'dashboards' })
+            await router.replace({ name: 'section-monitoring' })
         }
     }
     applyCustomTheme()
@@ -323,10 +332,10 @@ onMounted(async () => {
     loaded.value = true
     loading.close()
     // Reopen the calibration wizard to show live progress once the layout
-    // (and its `calibrate-fans` listener) has mounted.
+    // has mounted.
     if (calibrationBatchResumed) {
         await nextTick()
-        emitter.emit('calibrate-fans')
+        openCalibrationWizard()
     }
     await deviceStore.loadLogs()
     // Some other dialogs, like the password dialog, will wait until Onboarding has closed

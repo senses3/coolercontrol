@@ -24,7 +24,6 @@ import {
     mdiContentCopy,
     mdiDnsOutline,
     mdiExport,
-    mdiFormatListBulleted,
     mdiImport,
     mdiMonitor,
     mdiRestart,
@@ -34,6 +33,7 @@ import { computed, inject, onMounted, onUnmounted, type Ref, ref, watch } from '
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useConfirm } from 'primevue/useconfirm'
+import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { useToast } from 'primevue/usetoast'
 import {
     CustomThemeSettings,
@@ -62,7 +62,6 @@ import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 import { useI18n } from 'vue-i18n'
 import { api as fullscreenApi } from 'vue-fullscreen'
 import _ from 'lodash'
-import AppSettingsDevices from '@/layout/AppSettingsDevices.vue'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 
@@ -70,6 +69,7 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const colorStore = useThemeColorsStore()
 const confirm = useConfirm()
+const { openShortcutsDialog } = useShortcutsDialog()
 const toast = useToast()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
@@ -83,7 +83,7 @@ const tabValue = ref(props.tabNumber != null && props.tabNumber ? props.tabNumbe
 const { t } = useI18n()
 
 const tabStyle = computed(() => {
-    let tabCount = 3
+    let tabCount = 2
     if (deviceStore.isQtApp()) {
         tabCount += 1
     }
@@ -168,10 +168,12 @@ const lineThicknessOptions = ref([
     { optionSize: 4, value: 2.0 },
     { optionSize: 6, value: 3.0 },
 ])
+// Enum values are kept for config compatibility; targets remap to the new
+// shell sections (AppInfo -> Home, Controls -> Cooling, dashboards -> Monitoring).
 const startupPageOptions = computed(() => [
-    { value: StartupPage.AppInfo, label: t('models.startupPage.appInfo') },
+    { value: StartupPage.AppInfo, label: t('layout.shell.home') },
+    { value: StartupPage.Controls, label: t('layout.shell.cooling') },
     { value: StartupPage.HomeDashboard, label: t('models.startupPage.homeDashboard') },
-    { value: StartupPage.Controls, label: t('models.startupPage.controls') },
 ])
 const customThemeAccent: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.accent))
 const customThemeBgOne: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.bgOne))
@@ -257,24 +259,6 @@ const applyGenericDaemonChange = _.debounce(
         }),
     2000,
 )
-
-const daemonPort: Ref<number> = ref(deviceStore.getDaemonPort())
-// commented out for now but can be reused in the near future.
-// See https://gitlab.com/coolercontrol/coolercontrol/-/issues/506
-// const daemonAddress: Ref<string> = ref(deviceStore.getDaemonAddress())
-// const daemonSslEnabled: Ref<boolean> = ref(deviceStore.getDaemonSslEnabled())
-// const saveDaemonSettings = () => {
-//     deviceStore.setDaemonAddress(daemonAddress.value)
-//     deviceStore.setDaemonPort(daemonPort.value)
-//     deviceStore.setDaemonSslEnabled(daemonSslEnabled.value)
-//     deviceStore.reloadUI()
-// }
-// const resetDaemonSettings = () => {
-//     deviceStore.clearDaemonAddress()
-//     deviceStore.clearDaemonPort()
-//     deviceStore.clearDaemonSslEnabled()
-//     deviceStore.reloadUI()
-// }
 
 const pollRate: Ref<number> = ref(settingsStore.ccSettings.poll_rate)
 watch(pollRate, () => {
@@ -485,22 +469,7 @@ const getUploadedJson = (fileInput: any) => {
     })
 }
 
-const portScrolled = (event: WheelEvent): void => {
-    if (daemonPort.value == null) return
-    if (event.deltaY < 0) {
-        if (daemonPort.value < 65525) daemonPort.value += 10
-    } else {
-        if (daemonPort.value > 90) daemonPort.value -= 10
-    }
-}
-const addScrollEventListeners = (): void => {
-    // @ts-ignore
-    document?.querySelector('#port-input')?.addEventListener('wheel', portScrolled)
-}
-
 onMounted(() => {
-    addScrollEventListeners()
-
     // Listen for language change events
     window.addEventListener('language-changed', () => {
         // When language changes, the computed property will automatically update, no need to manually assign value
@@ -539,19 +508,6 @@ onUnmounted(() => {
                             :size="deviceStore.getREMSize(1.5)"
                         />
                         {{ t('layout.settings.userInterface') }}
-                    </Tab>
-                    <Tab
-                        value="4"
-                        as="div"
-                        class="flex justify-center items-center gap-2"
-                        :style="tabStyle"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiFormatListBulleted"
-                            :size="deviceStore.getREMSize(1.5)"
-                        />
-                        {{ t('layout.settings.device') }}
                     </Tab>
                     <Tab
                         value="1"
@@ -602,6 +558,23 @@ onUnmounted(() => {
                                             :label="t('layout.settings.startTour')"
                                             class="bg-accent/80 hover:!bg-accent w-full h-[2.375rem]"
                                             @click="emitter.emit('start-tour')"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td
+                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                    >
+                                        {{ t('views.shortcuts.shortcuts') }}
+                                    </td>
+                                    <td
+                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                    >
+                                        <Button
+                                            :label="t('views.shortcuts.shortcuts')"
+                                            class="w-full h-[2.375rem]"
+                                            outlined
+                                            @click="openShortcutsDialog()"
                                         />
                                     </td>
                                 </tr>
@@ -1459,122 +1432,6 @@ onUnmounted(() => {
                                 </tr>
                             </tbody>
                         </table>
-                        <!--                        Might use again in the future-->
-                        <!--                        <table class="lg:ml-4 h-full bg-bg-two rounded-lg">-->
-                        <!--                            <tbody>-->
-                        <!--                                <tr-->
-                        <!--                                    v-tooltip.top="{-->
-                        <!--                                        escape: false,-->
-                        <!--                                        value: t('layout.settings.tooltips.daemonAddress'),-->
-                        <!--                                    }"-->
-                        <!--                                >-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"-->
-                        <!--                                    >-->
-                        <!--                                        {{ t('common.address') }}-->
-                        <!--                                    </td>-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"-->
-                        <!--                                    >-->
-                        <!--                                        <InputText-->
-                        <!--                                            v-model="daemonAddress"-->
-                        <!--                                            class="min-w-48 w-full text-center"-->
-                        <!--                                            placeholder="localhost"-->
-                        <!--                                        />-->
-                        <!--                                    </td>-->
-                        <!--                                </tr>-->
-                        <!--                                <tr-->
-                        <!--                                    v-tooltip.top="{-->
-                        <!--                                        escape: false,-->
-                        <!--                                        value: t('layout.settings.tooltips.daemonPort'),-->
-                        <!--                                    }"-->
-                        <!--                                >-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"-->
-                        <!--                                    >-->
-                        <!--                                        {{ t('common.port') }}-->
-                        <!--                                    </td>-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"-->
-                        <!--                                    >-->
-                        <!--                                        <InputNumber-->
-                        <!--                                            id="port-input"-->
-                        <!--                                            v-model="daemonPort"-->
-                        <!--                                            show-buttons-->
-                        <!--                                            :min="80"-->
-                        <!--                                            :max="65535"-->
-                        <!--                                            :useGrouping="false"-->
-                        <!--                                            button-layout="horizontal"-->
-                        <!--                                            :input-style="{ width: '6rem' }"-->
-                        <!--                                        >-->
-                        <!--                                            <template #incrementicon>-->
-                        <!--                                                <span class="pi pi-plus" />-->
-                        <!--                                            </template>-->
-                        <!--                                            <template #decrementicon>-->
-                        <!--                                                <span class="pi pi-minus" />-->
-                        <!--                                            </template>-->
-                        <!--                                        </InputNumber>-->
-                        <!--                                    </td>-->
-                        <!--                                </tr>-->
-                        <!--                                <tr-->
-                        <!--                                    v-tooltip.top="{-->
-                        <!--                                        escape: false,-->
-                        <!--                                        value: t('layout.settings.tooltips.sslTls'),-->
-                        <!--                                    }"-->
-                        <!--                                >-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"-->
-                        <!--                                    >-->
-                        <!--                                        {{ t('common.sslTls') }}-->
-                        <!--                                    </td>-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"-->
-                        <!--                                    >-->
-                        <!--                                        <el-switch v-model="daemonSslEnabled" size="large" />-->
-                        <!--                                    </td>-->
-                        <!--                                </tr>-->
-                        <!--                                <tr>-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"-->
-                        <!--                                    >-->
-                        <!--                                        <div-->
-                        <!--                                            class="float-left py-2"-->
-                        <!--                                            v-tooltip.top="-->
-                        <!--                                                t('layout.settings.tooltips.triggersUIRestart')-->
-                        <!--                                            "-->
-                        <!--                                        >-->
-                        <!--                                            <svg-icon-->
-                        <!--                                                type="mdi"-->
-                        <!--                                                :path="mdiRestart"-->
-                        <!--                                                :size="deviceStore.getREMSize(1.0)"-->
-                        <!--                                            />-->
-                        <!--                                        </div>-->
-                        <!--                                        <div class="float-right">-->
-                        <!--                                            <Button-->
-                        <!--                                                :label="t('common.defaults')"-->
-                        <!--                                                class="h-[2.375rem]"-->
-                        <!--                                                @click="resetDaemonSettings"-->
-                        <!--                                                v-tooltip.top="-->
-                        <!--                                                    t('layout.settings.tooltips.resetToDefaults')-->
-                        <!--                                                "-->
-                        <!--                                            />-->
-                        <!--                                        </div>-->
-                        <!--                                    </td>-->
-                        <!--                                    <td-->
-                        <!--                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"-->
-                        <!--                                    >-->
-                        <!--                                        <Button-->
-                        <!--                                            :label="t('common.apply')"-->
-                        <!--                                            class="bg-accent/80 hover:!bg-accent w-full h-[2.375rem]"-->
-                        <!--                                            @click="saveDaemonSettings"-->
-                        <!--                                            v-tooltip.top="-->
-                        <!--                                                t('layout.settings.tooltips.saveAndReload')-->
-                        <!--                                            "-->
-                        <!--                                        />-->
-                        <!--                                    </td>-->
-                        <!--                                </tr>-->
-                        <!--                            </tbody>-->
-                        <!--                        </table>-->
                     </TabPanel>
                     <TabPanel value="2">
                         <!--Desktop Settings-->
@@ -1688,9 +1545,6 @@ onUnmounted(() => {
                                 </tr>
                             </tbody>
                         </table>
-                    </TabPanel>
-                    <TabPanel value="4" class="flex flex-col lg:flex-row">
-                        <AppSettingsDevices />
                     </TabPanel>
                 </TabPanels>
             </Tabs>

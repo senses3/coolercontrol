@@ -17,6 +17,7 @@
  */
 
 import { defineStore } from 'pinia'
+import { appendLogChunk, type LogLine } from '@/stores/logLines.ts'
 import { Device, DeviceType, type UID } from '@/models/Device'
 import DaemonClient from '@/stores/DaemonClient'
 import { ChannelInfo } from '@/models/ChannelInfo'
@@ -95,7 +96,8 @@ export const useDeviceStore = defineStore('device', () => {
     const loggedIn: Ref<boolean> = ref(false)
     const isDefaultPasswd: Ref<boolean> = ref(true)
     const accessDenied: Ref<boolean> = ref(false)
-    const logs: Ref<string> = ref('')
+    // Capped, pre-highlighted log lines (see logLines.ts).
+    const logLines: Ref<LogLine[]> = ref([])
     const plugins: Ref<PluginDto[]> = ref([])
     const pluginUiInfo: Ref<Map<string, HasUiDto>> = ref(new Map())
 
@@ -667,7 +669,7 @@ export const useDeviceStore = defineStore('device', () => {
     }
 
     async function loadLogs(): Promise<void> {
-        logs.value = await daemonClient.logs()
+        logLines.value = appendLogChunk([], await daemonClient.logs())
     }
 
     async function acknowledgeIssues(): Promise<void> {
@@ -990,7 +992,7 @@ export const useDeviceStore = defineStore('device', () => {
                 async onmessage(event) {
                     if (event.data.length === 0) return // keep-alive message
                     const newLog = event.data
-                    logs.value = `${logs.value}${newLog}`
+                    logLines.value = appendLogChunk(logLines.value, newLog)
                     if (newLog.includes('ERROR')) {
                         await daemonState.setStatus(DaemonStatus.ERROR)
                     } else if (newLog.includes('WARN')) {
@@ -1274,7 +1276,7 @@ export const useDeviceStore = defineStore('device', () => {
         logout,
         handleSessionExpired,
         health,
-        logs,
+        logLines,
         acknowledgeIssues,
         loadLogs,
         setPasswd,

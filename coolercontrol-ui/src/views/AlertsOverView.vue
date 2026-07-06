@@ -28,8 +28,7 @@ import { AlertState, getAlertStateDisplayName, getAlertStateIcon } from '@/model
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { computed, inject, ref } from 'vue'
-import { Emitter, EventType } from 'mitt'
+import { computed, ref } from 'vue'
 import { FilterMatchMode } from '@primevue/core/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -39,7 +38,6 @@ const settingsStore = useSettingsStore()
 const { getREMSize } = useDeviceStore()
 const router = useRouter()
 const { t } = useI18n()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 const alertsList = computed(() => {
     const alerts = []
@@ -60,7 +58,7 @@ const logFilters = ref({
     global: { value: null, matchMode: FilterMatchMode.CONTAINS },
 })
 const onRowSelect = (event: DataTableRowSelectEvent) => {
-    router.push({ name: 'alerts', params: { alertUID: event.data.uid } })
+    router.push({ name: 'monitoring-alert', params: { alertUID: event.data.uid } })
 }
 </script>
 
@@ -79,7 +77,7 @@ const onRowSelect = (event: DataTableRowSelectEvent) => {
                         <Button
                             class="h-8 my-2"
                             v-tooltip.top="{ value: t('layout.menu.tooltips.addAlert') }"
-                            @click="emitter.emit('alert-add')"
+                            @click="router.push({ name: 'monitoring-alert-new' })"
                         >
                             <svg-icon
                                 class="outline-0"

@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { FunctionType, getFunctionTypeDisplayName } from '@/models/Profile'
+import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile'
 import Button from 'primevue/button'
 import { type UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -27,14 +27,20 @@ import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watc
 import { $enum } from 'ts-enum-util'
 import { useToast } from 'primevue/usetoast'
 import InputNumber from 'primevue/inputnumber'
-import { mdiContentSaveOutline } from '@mdi/js'
+import {
+    mdiContentDuplicate,
+    mdiContentSaveOutline,
+    mdiDeleteOutline,
+    mdiExportVariant,
+} from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
 import { ElSwitch } from 'element-plus'
 import 'element-plus/es/components/switch/style/css'
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
@@ -333,6 +339,74 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
     })
 }
 
+const router = useRouter()
+
+const duplicateFunction = async (): Promise<void> => {
+    const source = currentFunction.value
+    const newFunction = new Function(
+        `${source.name} ${t('common.copy')}`,
+        source.f_type,
+        source.duty_minimum,
+        source.duty_maximum,
+        source.response_delay,
+        source.deviance,
+        source.only_downward,
+        source.sample_window,
+    )
+    settingsStore.functions.push(newFunction)
+    await settingsStore.saveFunction(newFunction.uid)
+    toast.add({
+        severity: 'success',
+        summary: t('common.success'),
+        detail: t('views.functions.functionDuplicated'),
+        life: 3000,
+    })
+    await router.push({ name: 'functions', params: { functionUID: newFunction.uid } })
+}
+
+const deleteFunction = (): void => {
+    if (currentFunction.value.uid === '0') return // can't delete default
+    const associatedProfiles = settingsStore.profiles.filter(
+        (p) => p.function_uid === currentFunction.value.uid,
+    )
+    const deleteMessage: string =
+        associatedProfiles.length === 0
+            ? t('views.functions.deleteFunctionConfirm', { name: currentFunction.value.name })
+            : t('views.functions.deleteFunctionWithProfilesConfirm', {
+                  name: currentFunction.value.name,
+                  profiles: associatedProfiles.map((p) => p.name).join(', '),
+              })
+    confirm.require({
+        message: deleteMessage,
+        header: t('views.functions.deleteFunction'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            contextIsDirty.value = false
+            const functionIndex = settingsStore.functions.findIndex(
+                (fun) => fun.uid === currentFunction.value.uid,
+            )
+            await settingsStore.deleteFunction(currentFunction.value.uid)
+            if (functionIndex !== -1) settingsStore.functions.splice(functionIndex, 1)
+            toast.add({
+                severity: 'success',
+                summary: t('common.success'),
+                detail: t('views.functions.functionDeleted'),
+                life: 3000,
+            })
+            await router.push({ name: 'section-cooling' })
+        },
+    })
+}
+
+const { openFunctionApplyWizard } = useToolWizards()
+
+// Profiles currently using this function (where-used).
+const usedByProfiles = computed((): string[] =>
+    settingsStore.profiles
+        .filter((profile) => profile.function_uid === currentFunction.value.uid)
+        .map((profile) => profile.name),
+)
+
 onMounted(async () => {
     addScrollEventListeners()
     // re-add some scroll event listeners for elements that are rendered on Type change
@@ -368,12 +442,46 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex border-b-4 border-border-one items-center justify-between">
+    <div class="flex flex-wrap border-b-4 border-border-one items-center justify-between">
         <entity-title-rename
             :current-name="currentFunction.name"
             :save-name-function="saveNameFunction"
         />
         <div class="flex flex-wrap gap-x-1 justify-end">
+            <div
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('components.wizards.functionApply.applyFunction')"
+                @click="openFunctionApplyWizard(currentFunction.uid)"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiExportVariant"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </div>
+            <div
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('layout.menu.tooltips.duplicate')"
+                @click="duplicateFunction"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiContentDuplicate"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </div>
+            <div
+                v-if="currentFunction.uid !== '0'"
+                class="p-2 flex leading-none items-center cursor-pointer"
+                v-tooltip.top="t('views.functions.deleteFunction')"
+                @click="deleteFunction"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiDeleteOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </div>
             <div class="p-2">
                 <Button
                     class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
@@ -390,6 +498,12 @@ onUnmounted(() => {
                     />
                 </Button>
             </div>
+        </div>
+        <div
+            v-if="usedByProfiles.length > 0"
+            class="w-full mx-4 mb-2 text-sm text-text-color-secondary"
+        >
+            {{ t('views.functions.usedBy') }}: {{ usedByProfiles.join(', ') }}
         </div>
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">

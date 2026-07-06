@@ -206,10 +206,10 @@ const option = {
     xAxis: {
         name: t('views.profiles.profileOutputDuty'),
         nameLocation: 'middle',
-        nameGap: deviceStore.getREMSize(2.0),
+        nameGap: deviceStore.getREMSize(1.0),
         nameTextStyle: {
-            color: colors.themeColors.text_color,
-            fontSize: deviceStore.getREMSize(1.25),
+            color: colors.themeColors.text_color_secondary,
+            fontSize: deviceStore.getREMSize(0.85),
         },
         min: dutyMin,
         max: dutyMax,
@@ -238,10 +238,10 @@ const option = {
     yAxis: {
         name: t('views.profiles.offsetDuty'),
         nameLocation: 'middle',
-        nameGap: deviceStore.getREMSize(3.25),
+        nameGap: deviceStore.getREMSize(2.0),
         nameTextStyle: {
-            color: colors.themeColors.text_color,
-            fontSize: deviceStore.getREMSize(1.25),
+            color: colors.themeColors.text_color_secondary,
+            fontSize: deviceStore.getREMSize(0.85),
         },
         min: offsetMin,
         max: offsetMax,
@@ -276,6 +276,8 @@ const option = {
             yAxisIndex: 0,
             filterMode: 'none',
             preventDefaultMouseMove: false,
+            zoomOnMouseWheel: 'ctrl',
+            moveOnMouseWheel: false,
             minValueSpan: 20,
             throttle: 25,
         },
@@ -718,11 +720,6 @@ const MIN_DUTY_SEPARATION = 1
 type TablePosition = 'top-left' | 'bottom-right'
 const tablePosition: Ref<TablePosition> = ref('top-left')
 
-const tablePositionClasses = computed(() => ({
-    'top-14 left-[7.5rem]': tablePosition.value === 'top-left',
-    'bottom-36 right-[6.5rem]': tablePosition.value === 'bottom-right',
-}))
-
 const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
 }
@@ -1060,6 +1057,15 @@ const updatePosition = (): void => {
         })),
     })
 }
+
+// Static anchors inside the plot, like the Graph editor's table. Values were
+// measured against the rendered grid; insets are constant (fixed tick format,
+// rem-scaled fonts and paddings).
+const tablePositionClasses = computed(() => ({
+    'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',
+    'bottom-[6rem] right-[5.5rem]': tablePosition.value === 'bottom-right',
+}))
+
 //----------------------------------------------------------------------------------------------------------------------
 
 const addScrollEventListeners = (): void => {
@@ -1138,195 +1144,205 @@ onUnmounted(() => {
         </div>
     </div>
     <div id="profile-display" class="flex flex-col h-full relative">
-        <v-chart
-            id="control-graph"
-            class="pt-6 pr-11 pl-4 pb-6"
-            ref="controlGraph"
-            :option="option"
-            :autoresize="true"
-            :manual-update="true"
-            @contextmenu="deletePointFromLine"
-            @zr:click="addPointToLine"
-            @zr:contextmenu="deletePointFromLine"
-        />
-        <!-- Points Table Overlay -->
-        <div
-            class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
-            :class="tablePositionClasses"
-        >
+        <div class="relative">
+            <v-chart
+                id="control-graph"
+                class="pt-6 pr-11 pl-4 pb-6"
+                ref="controlGraph"
+                :option="option"
+                :autoresize="true"
+                :manual-update="true"
+                @contextmenu="deletePointFromLine"
+                @zr:click="addPointToLine"
+                @zr:contextmenu="deletePointFromLine"
+            />
+            <!-- Points Table Overlay -->
             <div
-                class="flex justify-between items-center px-2 py-1 border-b border-border-one sticky top-0 bg-bg-two/95"
+                class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
+                :class="tablePositionClasses"
             >
-                <span class="font-semibold text-text-color cursor-default">{{
-                    t('views.profiles.points')
-                }}</span>
-                <Button
-                    @click="cycleTablePosition"
-                    icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                    text
-                    rounded
-                    class="!w-7 !h-7 !p-0"
-                    v-tooltip.top="t('views.profiles.moveTable')"
-                />
+                <div
+                    class="flex justify-between items-center px-2 py-1 border-b border-border-one sticky top-0 bg-bg-two/95"
+                >
+                    <span class="font-semibold text-text-color cursor-default">{{
+                        t('views.profiles.points')
+                    }}</span>
+                    <Button
+                        @click="cycleTablePosition"
+                        icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
+                        text
+                        rounded
+                        class="!w-7 !h-7 !p-0"
+                        v-tooltip.top="t('views.profiles.moveTable')"
+                    />
+                </div>
+                <table class="w-full">
+                    <thead class="sticky top-7 bg-bg-two/95 cursor-default">
+                        <tr class="text-text-color-secondary">
+                            <th class="px-2 py-1 text-left">#</th>
+                            <th class="px-1 py-1 text-center">{{ t('common.duty') }}</th>
+                            <th class="px-1 py-1 text-center">{{ t('common.offset') }}</th>
+                            <th class="px-1 py-1 w-6"></th>
+                        </tr>
+                    </thead>
+                    <tbody :key="tableDataKey">
+                        <tr
+                            v-for="(point, idx) in data"
+                            :key="`${tableDataKey}-${idx}`"
+                            class="group cursor-pointer"
+                            :class="{
+                                'bg-accent/30': idx === selectedPointIndex,
+                                'hover:bg-bg-one/20': idx !== selectedPointIndex,
+                            }"
+                            @click="selectPointFromTable(idx)"
+                        >
+                            <!-- Point Index -->
+                            <td class="px-2 py-0.5 text-text-color-secondary">
+                                {{ idx + 1 }}
+                            </td>
+
+                            <!-- Duty Cell with +/- buttons -->
+                            <td class="pr-2 py-1">
+                                <div
+                                    class="flex items-center justify-center gap-0.5"
+                                    @wheel.prevent="
+                                        idx !== 0 &&
+                                        idx !== data.length - 1 &&
+                                        handleDutyTableScroll($event, idx)
+                                    "
+                                >
+                                    <Button
+                                        icon="pi pi-minus"
+                                        text
+                                        size="small"
+                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                        :disabled="
+                                            idx === 0 ||
+                                            idx === data.length - 1 ||
+                                            data[idx].value[0] <= getPointDutyMin(idx)
+                                        "
+                                        @pointerdown.stop="
+                                            startRepeat(() => decrementPointDuty(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    />
+                                    <InputNumber
+                                        :modelValue="point.value[0]"
+                                        @update:modelValue="handleDutyTableInput(idx, $event)"
+                                        @focus="selectPointFromTable(idx)"
+                                        mode="decimal"
+                                        :minFractionDigits="0"
+                                        :maxFractionDigits="0"
+                                        :min="getPointDutyMin(idx)"
+                                        :max="getPointDutyMax(idx)"
+                                        :suffix="t('common.percentUnit')"
+                                        :disabled="idx === 0 || idx === data.length - 1"
+                                        :inputStyle="{
+                                            width: '3rem',
+                                            textAlign: 'center',
+                                            padding: '0.125rem',
+                                        }"
+                                        class="table-input"
+                                    />
+                                    <Button
+                                        icon="pi pi-plus"
+                                        text
+                                        size="small"
+                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                        :disabled="
+                                            idx === 0 ||
+                                            idx === data.length - 1 ||
+                                            data[idx].value[0] >= getPointDutyMax(idx)
+                                        "
+                                        @pointerdown.stop="
+                                            startRepeat(() => incrementPointDuty(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    />
+                                </div>
+                            </td>
+
+                            <!-- Offset Cell with +/- buttons -->
+                            <td class="pr-2 py-1">
+                                <div
+                                    class="flex items-center justify-center gap-0.5"
+                                    @wheel.prevent="handleOffsetTableScroll($event, idx)"
+                                >
+                                    <Button
+                                        icon="pi pi-minus"
+                                        text
+                                        size="small"
+                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                        :disabled="data[idx].value[1] <= offsetMin"
+                                        @pointerdown.stop="
+                                            startRepeat(() => decrementPointOffset(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    />
+                                    <InputNumber
+                                        :modelValue="Math.round(point.value[1]) || 0"
+                                        @update:modelValue="handleOffsetTableInput(idx, $event)"
+                                        @focus="selectPointFromTable(idx)"
+                                        mode="decimal"
+                                        :minFractionDigits="0"
+                                        :maxFractionDigits="0"
+                                        :min="offsetMin"
+                                        :max="offsetMax"
+                                        :suffix="t('common.percentUnit')"
+                                        :inputStyle="{
+                                            width: '3.5rem',
+                                            textAlign: 'center',
+                                            padding: '0.125rem',
+                                        }"
+                                        class="table-input"
+                                    />
+                                    <Button
+                                        icon="pi pi-plus"
+                                        text
+                                        size="small"
+                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                        :disabled="data[idx].value[1] >= offsetMax"
+                                        @pointerdown.stop="
+                                            startRepeat(() => incrementPointOffset(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    />
+                                </div>
+                            </td>
+
+                            <!-- Action buttons (add/remove) -->
+                            <td class="px-1 py-0.5">
+                                <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
+                                    <Button
+                                        v-if="canAddPointAfter(idx)"
+                                        icon="pi pi-plus-circle"
+                                        text
+                                        severity="success"
+                                        size="small"
+                                        class="!w-6 !h-6 !p-0"
+                                        v-tooltip.top="t('views.profiles.addPointAfter')"
+                                        @click.stop="addPointFromTable(idx)"
+                                    />
+                                    <Button
+                                        v-if="canRemovePoint(idx)"
+                                        icon="pi pi-trash"
+                                        text
+                                        severity="danger"
+                                        size="small"
+                                        class="!w-6 !h-6 !p-0"
+                                        v-tooltip.top="t('views.profiles.removePoint')"
+                                        @click.stop="removePointFromTable(idx)"
+                                    />
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            <table class="w-full">
-                <thead class="sticky top-7 bg-bg-two/95 cursor-default">
-                    <tr class="text-text-color-secondary">
-                        <th class="px-2 py-1 text-left">#</th>
-                        <th class="px-1 py-1 text-center">{{ t('common.duty') }}</th>
-                        <th class="px-1 py-1 text-center">{{ t('common.offset') }}</th>
-                        <th class="px-1 py-1 w-6"></th>
-                    </tr>
-                </thead>
-                <tbody :key="tableDataKey">
-                    <tr
-                        v-for="(point, idx) in data"
-                        :key="`${tableDataKey}-${idx}`"
-                        class="group cursor-pointer"
-                        :class="{
-                            'bg-accent/30': idx === selectedPointIndex,
-                            'hover:bg-bg-one/20': idx !== selectedPointIndex,
-                        }"
-                        @click="selectPointFromTable(idx)"
-                    >
-                        <!-- Point Index -->
-                        <td class="px-2 py-0.5 text-text-color-secondary">
-                            {{ idx + 1 }}
-                        </td>
-
-                        <!-- Duty Cell with +/- buttons -->
-                        <td class="pr-2 py-1">
-                            <div
-                                class="flex items-center justify-center gap-0.5"
-                                @wheel.prevent="
-                                    idx !== 0 &&
-                                    idx !== data.length - 1 &&
-                                    handleDutyTableScroll($event, idx)
-                                "
-                            >
-                                <Button
-                                    icon="pi pi-minus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="
-                                        idx === 0 ||
-                                        idx === data.length - 1 ||
-                                        data[idx].value[0] <= getPointDutyMin(idx)
-                                    "
-                                    @pointerdown.stop="startRepeat(() => decrementPointDuty(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                                <InputNumber
-                                    :modelValue="point.value[0]"
-                                    @update:modelValue="handleDutyTableInput(idx, $event)"
-                                    @focus="selectPointFromTable(idx)"
-                                    mode="decimal"
-                                    :minFractionDigits="0"
-                                    :maxFractionDigits="0"
-                                    :min="getPointDutyMin(idx)"
-                                    :max="getPointDutyMax(idx)"
-                                    :suffix="t('common.percentUnit')"
-                                    :disabled="idx === 0 || idx === data.length - 1"
-                                    :inputStyle="{
-                                        width: '3rem',
-                                        textAlign: 'center',
-                                        padding: '0.125rem',
-                                    }"
-                                    class="table-input"
-                                />
-                                <Button
-                                    icon="pi pi-plus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="
-                                        idx === 0 ||
-                                        idx === data.length - 1 ||
-                                        data[idx].value[0] >= getPointDutyMax(idx)
-                                    "
-                                    @pointerdown.stop="startRepeat(() => incrementPointDuty(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                            </div>
-                        </td>
-
-                        <!-- Offset Cell with +/- buttons -->
-                        <td class="pr-2 py-1">
-                            <div
-                                class="flex items-center justify-center gap-0.5"
-                                @wheel.prevent="handleOffsetTableScroll($event, idx)"
-                            >
-                                <Button
-                                    icon="pi pi-minus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="data[idx].value[1] <= offsetMin"
-                                    @pointerdown.stop="startRepeat(() => decrementPointOffset(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                                <InputNumber
-                                    :modelValue="Math.round(point.value[1]) || 0"
-                                    @update:modelValue="handleOffsetTableInput(idx, $event)"
-                                    @focus="selectPointFromTable(idx)"
-                                    mode="decimal"
-                                    :minFractionDigits="0"
-                                    :maxFractionDigits="0"
-                                    :min="offsetMin"
-                                    :max="offsetMax"
-                                    :suffix="t('common.percentUnit')"
-                                    :inputStyle="{
-                                        width: '3.5rem',
-                                        textAlign: 'center',
-                                        padding: '0.125rem',
-                                    }"
-                                    class="table-input"
-                                />
-                                <Button
-                                    icon="pi pi-plus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="data[idx].value[1] >= offsetMax"
-                                    @pointerdown.stop="startRepeat(() => incrementPointOffset(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                            </div>
-                        </td>
-
-                        <!-- Action buttons (add/remove) -->
-                        <td class="px-1 py-0.5">
-                            <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                                <Button
-                                    v-if="canAddPointAfter(idx)"
-                                    icon="pi pi-plus-circle"
-                                    text
-                                    severity="success"
-                                    size="small"
-                                    class="!w-6 !h-6 !p-0"
-                                    v-tooltip.top="t('views.profiles.addPointAfter')"
-                                    @click.stop="addPointFromTable(idx)"
-                                />
-                                <Button
-                                    v-if="canRemovePoint(idx)"
-                                    icon="pi pi-trash"
-                                    text
-                                    severity="danger"
-                                    size="small"
-                                    class="!w-6 !h-6 !p-0"
-                                    v-tooltip.top="t('views.profiles.removePoint')"
-                                    @click.stop="removePointFromTable(idx)"
-                                />
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
         </div>
     </div>
 </template>

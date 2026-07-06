@@ -349,7 +349,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .control-graph {
-    height: min(calc(100vw - 20rem), calc(90vh));
+    height: var(--gauge-height, min(calc(100vw - 20rem), calc(90vh)));
     width: 100%;
 }
 </style>

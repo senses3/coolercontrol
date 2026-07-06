@@ -25,8 +25,6 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
 import Button from 'primevue/button'
-import { Emitter, EventType } from 'mitt'
-import { inject } from 'vue'
 import { v4 as uuidV4 } from 'uuid'
 import { useToast } from 'primevue/usetoast'
 import { useRouter } from 'vue-router'
@@ -40,7 +38,6 @@ const emit = defineEmits<{
     (e: 'nextStep', step: number): void
     (e: 'close'): void
 }>()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -65,7 +62,6 @@ const saveFunction = async (): Promise<void> => {
     settingsStore.functions.push(props.newFunction)
     const functionSuccess = await settingsStore.saveFunction(props.newFunction.uid)
     if (functionSuccess) {
-        emitter.emit('function-add-menu', { functionUID: props.newFunction.uid })
     } else {
         removeLocallyCreatedFunction()
         console.error('Function could not be saved.')

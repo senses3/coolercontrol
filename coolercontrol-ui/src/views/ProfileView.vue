@@ -19,7 +19,14 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiContentSaveOutline, mdiInformationSlabCircleOutline, mdiMemory } from '@mdi/js'
+import {
+    mdiContentDuplicate,
+    mdiContentSaveOutline,
+    mdiDeleteOutline,
+    mdiExportVariant,
+    mdiInformationSlabCircleOutline,
+    mdiMemory,
+} from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import {
     Function,
@@ -68,8 +75,9 @@ import { useToast } from 'primevue/usetoast'
 import { $enum } from 'ts-enum-util'
 import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
 import Select from 'primevue/select'
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vue'
@@ -93,6 +101,11 @@ echarts.use([
 
 interface Props {
     profileUID: string
+    // Fixed graph height when embedded (e.g. '26rem'); viewport-based when absent.
+    graphHeight?: string
+    // Hides the internal save button; the host page saves via the exposed
+    // saveProfileState (e.g. the channel page's Apply button).
+    hideSave?: boolean
 }
 
 const props = defineProps<Props>()
@@ -545,6 +558,8 @@ const option = {
             xAxisIndex: 0,
             filterMode: 'none',
             preventDefaultMouseMove: false,
+            zoomOnMouseWheel: 'ctrl',
+            moveOnMouseWheel: false,
             throttle: 25,
         },
     ],
@@ -1838,17 +1853,104 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         })
     })
 }
+const router = useRouter()
+
+const duplicateProfile = async (): Promise<void> => {
+    const source = currentProfile.value
+    const newProfile = new Profile(
+        `${source.name} ${t('common.copy')}`,
+        source.p_type,
+        source.speed_fixed,
+        source.temp_source,
+        source.speed_profile,
+        source.member_profile_uids,
+        source.mix_function_type,
+    )
+    newProfile.function_uid = source.function_uid
+    newProfile.temp_max = source.temp_max
+    newProfile.temp_min = source.temp_min
+    newProfile.offset_profile = source.offset_profile
+    settingsStore.profiles.push(newProfile)
+    await settingsStore.saveProfile(newProfile.uid)
+    toast.add({
+        severity: 'success',
+        summary: t('common.success'),
+        detail: t('views.profiles.profileDuplicated'),
+        life: 3000,
+    })
+    await router.push({ name: 'profiles', params: { profileUID: newProfile.uid } })
+}
+
+const deleteProfile = (): void => {
+    if (currentProfile.value.uid === '0') return // can't delete default
+    const associatedChannelSettings: Array<string> = []
+    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+        for (const channelSetting of setting.settings.values()) {
+            if (channelSetting.profile_uid === currentProfile.value.uid) {
+                associatedChannelSettings.push(
+                    settingsStore.allUIDeviceSettings
+                        .get(deviceUID)!
+                        .sensorsAndChannels.get(channelSetting.channel_name)!.name,
+                )
+            }
+        }
+    }
+    const deleteMessage: string =
+        associatedChannelSettings.length === 0
+            ? t('views.profiles.deleteProfileConfirm', { name: currentProfile.value.name })
+            : t('views.profiles.deleteProfileWithChannelsConfirm', {
+                  name: currentProfile.value.name,
+                  channels: associatedChannelSettings.join(', '),
+              })
+    confirm.require({
+        message: deleteMessage,
+        header: t('views.profiles.deleteProfile'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: async () => {
+            contextIsDirty.value = false
+            await settingsStore.deleteProfile(currentProfile.value.uid)
+            toast.add({
+                severity: 'success',
+                summary: t('common.success'),
+                detail: t('views.profiles.profileDeleted'),
+                life: 3000,
+            })
+            await router.push({ name: 'section-cooling' })
+        },
+    })
+}
+
+const { openProfileApplyWizard } = useToolWizards()
+
+// Channels currently driven by this profile (where-used).
+const usedByChannels = computed((): string[] => {
+    const labels: string[] = []
+    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+        for (const channelSetting of setting.settings.values()) {
+            if (channelSetting.profile_uid === currentProfile.value.uid) {
+                labels.push(
+                    settingsStore.allUIDeviceSettings
+                        .get(deviceUID)!
+                        .sensorsAndChannels.get(channelSetting.channel_name)!.name,
+                )
+            }
+        }
+    }
+    return labels
+})
+
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
     const controlPanel = document.getElementById('control-panel')
+    if (graphEl != null && props.graphHeight != null) {
+        graphEl.style.height = props.graphHeight
+        return
+    }
     if (graphEl != null && controlPanel != null) {
-        const panelHeight = controlPanel.getBoundingClientRect().height
-        if (panelHeight > 56) {
-            graphEl.style.height = `max(calc(100vh - (${panelHeight}px + 4.5rem)), 20rem)`
-        } else {
-            // 4rem panel height + 4rem for duty/temp bar
-            graphEl.style.height = 'max(calc(100vh - 8rem), 20rem)'
-        }
+        // Fill the viewport from wherever the graph starts (works inside the
+        // shell content area), leaving room for the duty/temp bar below it.
+        const top = Math.ceil(graphEl.getBoundingClientRect().top)
+        graphEl.style.height = `max(calc(100vh - ${top}px - 4.75rem), 20rem)`
     }
 }
 const updatePosition = (): void => {
@@ -1994,6 +2096,9 @@ function onKnobMouseup(e: MouseEvent) {
     if (e.button === 3) window.history.back()
     else if (e.button === 4) window.history.forward()
 }
+
+// For host pages that embed this editor and drive saving themselves.
+defineExpose({ saveProfileState, contextIsDirty })
 </script>
 
 <template>
@@ -2006,6 +2111,59 @@ function onKnobMouseup(e: MouseEvent) {
             :save-name-function="saveNameFunction"
         />
         <div class="flex flex-wrap gap-x-1 justify-end">
+            <template v-if="!hideSave">
+                <div
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('components.wizards.profileApply.applyProfile')"
+                    @click="openProfileApplyWizard(currentProfile.uid)"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiExportVariant"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+                <div
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('layout.menu.tooltips.duplicate')"
+                    @click="duplicateProfile"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentDuplicate"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+                <div
+                    v-if="currentProfile.uid !== '0'"
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('views.profiles.deleteProfile')"
+                    @click="deleteProfile"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDeleteOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+            </template>
+            <div class="p-2 pr-0">
+                <Select
+                    v-model="selectedType"
+                    :options="profileTypeOptions"
+                    option-label="label"
+                    option-value="value"
+                    :placeholder="t('views.profiles.profileType')"
+                    class="w-[6.5rem] h-[2.375rem]"
+                    dropdown-icon="pi pi-chart-line"
+                    scroll-height="400px"
+                    checkmark
+                    v-tooltip.top="{
+                        escape: false,
+                        value: t('views.profiles.tooltip.profileType'),
+                    }"
+                />
+            </div>
             <div v-if="selectedType === ProfileType.Mix" class="p-2 pr-0 flex flex-row">
                 <Select
                     v-model="chosenProfileMixFunction"
@@ -2084,19 +2242,6 @@ function onKnobMouseup(e: MouseEvent) {
             <div v-else-if="selectedType === ProfileType.Graph" class="flex flex-wrap justify-end">
                 <div class="p-2 pr-1">
                     <Select
-                        v-model="chosenFunction"
-                        :options="settingsStore.functions"
-                        option-label="name"
-                        :placeholder="t('views.profiles.function')"
-                        class="w-44 h-[2.375rem]"
-                        checkmark
-                        dropdown-icon="pi pi-directions"
-                        scroll-height="40rem"
-                        v-tooltip.top="t('views.profiles.functionToApply')"
-                    />
-                </div>
-                <div class="p-2 pr-0">
-                    <Select
                         v-model="chosenTemp"
                         :options="tempSources"
                         class="w-44 h-[2.375rem]"
@@ -2148,6 +2293,19 @@ function onKnobMouseup(e: MouseEvent) {
                         </template>
                     </Select>
                 </div>
+                <div class="p-2 pr-0">
+                    <Select
+                        v-model="chosenFunction"
+                        :options="settingsStore.functions"
+                        option-label="name"
+                        :placeholder="t('views.profiles.function')"
+                        class="w-44 h-[2.375rem]"
+                        checkmark
+                        dropdown-icon="pi pi-directions"
+                        scroll-height="40rem"
+                        v-tooltip.top="t('views.profiles.functionToApply')"
+                    />
+                </div>
             </div>
             <div v-else-if="selectedType === ProfileType.Fixed" class="p-2 pr-0">
                 <InputNumber
@@ -2175,22 +2333,7 @@ function onKnobMouseup(e: MouseEvent) {
                     </template>
                 </InputNumber>
             </div>
-            <div class="p-2">
-                <Select
-                    v-model="selectedType"
-                    :options="profileTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.profileType')"
-                    class="w-[6.5rem] h-[2.375rem] mr-3"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('views.profiles.tooltip.profileType'),
-                    }"
-                />
+            <div v-if="!hideSave" class="p-2">
                 <Button
                     class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
@@ -2208,6 +2351,12 @@ function onKnobMouseup(e: MouseEvent) {
             </div>
         </div>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
+        <div
+            v-if="!hideSave && usedByChannels.length > 0"
+            class="w-full mx-4 mb-2 text-sm text-text-color-secondary"
+        >
+            {{ t('views.profiles.usedBy') }}: {{ usedByChannels.join(', ') }}
+        </div>
         <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
     </div>
     <!-- The UI Display: -->

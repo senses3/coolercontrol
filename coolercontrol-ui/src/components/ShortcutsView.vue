@@ -17,201 +17,61 @@
   -->
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useDeviceStore } from '@/stores/DeviceStore.ts'
 
 const { t } = useI18n()
+const deviceStore = useDeviceStore()
+
+const ctrl = computed(() => t('views.shortcuts.ctrl'))
+const rows = computed((): Array<{ label: string; keys: string[] }> => {
+    const entries = [
+        { label: t('views.shortcuts.viewShortcuts'), keys: [ctrl.value, '/'] },
+        { label: t('layout.shell.home'), keys: [ctrl.value, '1'] },
+        { label: t('layout.shell.cooling'), keys: [ctrl.value, '2'] },
+        { label: t('layout.shell.monitoring'), keys: [ctrl.value, '3'] },
+        { label: t('layout.shell.devices'), keys: [ctrl.value, '4'] },
+        { label: t('layout.shell.settings'), keys: [ctrl.value, '5'] },
+    ]
+    if (deviceStore.plugins.length > 0) {
+        entries.push({ label: t('layout.shell.plugins'), keys: [ctrl.value, '6'] })
+    }
+    entries.push({
+        label: t('views.shortcuts.settings'),
+        keys: [ctrl.value, t('views.shortcuts.comma')],
+    })
+    return entries
+})
 </script>
 
 <template>
     <div class="text-text-color">
         <table class="w-[26rem]">
             <tbody>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.viewShortcuts') }}
-                    </td>
-                    <td class="table-data font-bold w-[12rem]">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.slash')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.home') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.h')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.settings') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.comma')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.info') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.i')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.dashboardOne') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.alt')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.one')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.dashboardTwo') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.alt')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.two')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.dashboardThree') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.alt')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.three')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.dashboardFour') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.alt')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.four')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.alerts') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.a')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.controls') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.c')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.sideMenuCollapse') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.left')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.sideMenuExpand') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.ctrl')
-                        }}</span>
-                        <span class="border-border-one border-2 rounded-lg p-0.5 ml-1">{{
-                            t('views.shortcuts.right')
-                        }}</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="table-data text-end">
-                        {{ t('views.shortcuts.fullScreen') }}
-                    </td>
-                    <td class="table-data font-bold">
-                        <span class="border-border-one border-2 rounded-lg p-0.5">{{
-                            t('views.shortcuts.f11')
-                        }}</span>
+                <tr v-for="row in rows" :key="row.label">
+                    <td class="table-data text-end">{{ row.label }}</td>
+                    <td class="table-data w-[12rem] font-bold">
+                        <span
+                            v-for="(key, index) in row.keys"
+                            :key="key"
+                            class="border-border-one border-2 rounded-lg p-0.5"
+                            :class="{ 'ml-1': index > 0 }"
+                        >
+                            {{ key }}
+                        </span>
                     </td>
                 </tr>
             </tbody>
         </table>
+        <p class="mt-3 text-sm text-text-color-secondary">
+            {{ t('views.shortcuts.browserHint') }}
+        </p>
     </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 .table-data {
     padding: 0.5rem;
-    border: 1px solid rgb(var(--colors-border-one));
 }
 </style>

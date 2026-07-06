@@ -18,7 +18,7 @@
 
 <script setup lang="ts">
 import { useSettingsStore } from '@/stores/SettingsStore'
-import { computed, inject, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
@@ -39,31 +39,79 @@ import { TempInfo } from '@/models/TempInfo.ts'
 import { ChannelInfo } from '@/models/ChannelInfo.ts'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiInformationSlabCircleOutline, mdiMemory, mdiOverscan, mdiRestart } from '@mdi/js'
+import {
+    mdiContentCopy,
+    mdiHome,
+    mdiHomeOutline,
+    mdiInformationSlabCircleOutline,
+    mdiMemory,
+    mdiOverscan,
+    mdiRestart,
+    mdiTrashCanOutline,
+} from '@mdi/js'
 import SensorTable from '@/components/SensorTable.vue'
 import TimeChart from '@/components/TimeChart.vue'
 import { v4 as uuidV4 } from 'uuid'
 import _ from 'lodash'
 import { component as Fullscreen } from 'vue-fullscreen'
 import { useI18n } from 'vue-i18n'
-import { Emitter, EventType } from 'mitt'
+import { useRouter } from 'vue-router'
+import { useConfirm } from 'primevue/useconfirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import HealthWarning from '@/components/HealthWarning.vue'
 
 interface Props {
     dashboardUID?: UID
+    // When both are set, the view renders the channel's private quick-chart
+    // dashboard (channelDashboard) with the filter controls hidden.
+    deviceUID?: UID
+    channelName?: string
 }
 
 const props = defineProps<Props>()
 const { t } = useI18n()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+const router = useRouter()
+const confirm = useConfirm()
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
+const sensorMode: boolean = props.deviceUID != null && props.channelName != null
+
+const channelLabel = ref(
+    sensorMode
+        ? (settingsStore.allUIDeviceSettings
+              .get(props.deviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.name ?? props.channelName!)
+        : '',
+)
+const createChannelDashboard = (): Dashboard => {
+    const dash = new Dashboard(channelLabel.value)
+    dash.timeRangeSeconds = 300
+    // needed due to reduced default data type range:
+    dash.dataTypes = []
+    dash.deviceChannelNames.push(new DashboardDeviceChannel(props.deviceUID!, props.channelName!))
+    settingsStore.allUIDeviceSettings
+        .get(props.deviceUID!)!
+        .sensorsAndChannels.get(props.channelName!)!.channelDashboard = dash
+    return dash
+}
+
 const saveNameFunction = async (newName: string): Promise<boolean> => {
+    if (sensorMode) {
+        // User names are persisted as daemon name overrides. An empty name
+        // removes the override and reloads the UI.
+        const success = await settingsStore.saveChannelName(
+            props.deviceUID!,
+            props.channelName!,
+            newName,
+        )
+        if (!success) return false
+        if (newName.length > 0) channelLabel.value = newName
+        return true
+    }
     if (newName.length > 0) {
         dashboard.name = newName
-        emitter.emit('dashboard-name-update', { dashboardUID: dashboard.uid, name: newName })
     }
     return false
 }
@@ -71,14 +119,64 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
 const homeDashboard: Dashboard =
     settingsStore.dashboards.find((dashboard) => dashboard.uid === settingsStore.homeDashboard) ??
     settingsStore.dashboards[0] // show first dashboard if no Home Dashboard set
-const dashboard: Dashboard =
-    props.dashboardUID != null
-        ? (settingsStore.dashboards.find((d) => d.uid === props.dashboardUID) ?? homeDashboard)
-        : homeDashboard
+const dashboard: Dashboard = sensorMode
+    ? (settingsStore.allUIDeviceSettings
+          .get(props.deviceUID!)!
+          .sensorsAndChannels.get(props.channelName!)!.channelDashboard ?? createChannelDashboard())
+    : props.dashboardUID != null
+      ? (settingsStore.dashboards.find((d) => d.uid === props.dashboardUID) ?? homeDashboard)
+      : homeDashboard
 
 // Migrate removed Controls chart type to Time Chart
 if ((dashboard.chartType as string) === 'Controls') {
     dashboard.chartType = ChartType.TIME_CHART
+}
+// A saved types filter on a channel dashboard would annoyingly hide some
+// metrics like i.e. RPMs.
+if (sensorMode && dashboard.dataTypes.length > 0) {
+    dashboard.dataTypes = []
+}
+
+const isHome = computed(() => settingsStore.homeDashboard === dashboard.uid)
+const setHome = (): void => {
+    settingsStore.homeDashboard = dashboard.uid
+}
+const duplicateDashboard = (): void => {
+    const copy = new Dashboard(`${dashboard.name} (copy)`)
+    copy.chartType = dashboard.chartType
+    copy.timeRangeSeconds = dashboard.timeRangeSeconds
+    copy.autoScaleDegree = dashboard.autoScaleDegree
+    copy.autoScaleFrequency = dashboard.autoScaleFrequency
+    copy.autoScaleWatts = dashboard.autoScaleWatts
+    copy.degreeMax = dashboard.degreeMax
+    copy.degreeMin = dashboard.degreeMin
+    copy.frequencyMax = dashboard.frequencyMax
+    copy.frequencyMin = dashboard.frequencyMin
+    copy.wattsMax = dashboard.wattsMax
+    copy.wattsMin = dashboard.wattsMin
+    copy.dataTypes = [...dashboard.dataTypes]
+    copy.selectedTags = [...dashboard.selectedTags]
+    copy.deviceChannelNames = dashboard.deviceChannelNames.map(
+        (ch) => new DashboardDeviceChannel(ch.deviceUID, ch.channelName),
+    )
+    settingsStore.dashboards.push(copy)
+    router.push({ name: 'monitoring-dashboard', params: { dashboardUID: copy.uid } })
+}
+const deleteDashboard = (): void => {
+    confirm.require({
+        message: t('views.dashboard.deleteDashboardConfirm', { name: dashboard.name }),
+        header: t('views.dashboard.deleteDashboard'),
+        icon: 'pi pi-exclamation-triangle',
+        accept: () => {
+            const index = settingsStore.dashboards.findIndex((d) => d.uid === dashboard.uid)
+            if (index === -1) return
+            settingsStore.dashboards.splice(index, 1)
+            if (settingsStore.homeDashboard === dashboard.uid) {
+                settingsStore.homeDashboard = undefined
+            }
+            router.push({ name: 'section-monitoring' })
+        },
+    })
 }
 
 const chartTypes = [...$enum(ChartType).values()].map((type) => ({
@@ -288,19 +386,15 @@ const addScrollEventListener = (): void => {
 }
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('u-plot-chart')
-    const controlPanel = document.getElementById('control-panel')
-    if (graphEl != null && controlPanel != null) {
+    if (graphEl != null) {
         if (fullPage.value) {
             graphEl.style.height = 'calc(100vh - 1rem)'
             return
         }
-        const panelHeight = controlPanel.getBoundingClientRect().height
-        if (panelHeight > 77) {
-            // 5.5rem
-            graphEl.style.height = `calc(100vh - (${panelHeight}px + 2rem))`
-        } else {
-            graphEl.style.height = 'calc(100vh - 5.75rem)'
-        }
+        // Fill the viewport from wherever the chart starts; works both at the
+        // page top and inside the shell content area.
+        const top = Math.ceil(graphEl.getBoundingClientRect().top)
+        graphEl.style.height = `calc(100vh - ${top + 12}px)`
     }
 }
 
@@ -350,9 +444,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div id="control-panel" class="flex border-b-4 border-border-one items-center justify-between">
+    <div
+        id="control-panel"
+        class="flex flex-wrap border-b-4 border-border-one items-center justify-between"
+    >
         <entity-title-rename
-            :current-name="dashboard.name"
+            :current-name="sensorMode ? channelLabel : dashboard.name"
             :save-name-function="saveNameFunction"
         />
         <div class="flex flex-wrap gap-x-1 justify-end">
@@ -367,14 +464,51 @@ onUnmounted(() => {
                     :size="deviceStore.getREMSize(1.25)"
                 />
             </div>
-            <div
-                class="p-2 flex leading-none items-center"
-                v-tooltip.top="t('views.dashboard.fullPage')"
-                @click="toggleFullPage"
-            >
-                <svg-icon type="mdi" :path="mdiOverscan" :size="deviceStore.getREMSize(1.25)" />
-            </div>
-            <div v-if="settingsStore.tags.size > 0" class="p-2 pr-0 flex flex-row">
+            <template v-if="!sensorMode">
+                <div
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    :class="{ 'text-accent': isHome }"
+                    v-tooltip.top="t('views.dashboard.setAsHome')"
+                    @click="setHome"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="isHome ? mdiHome : mdiHomeOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+                <div
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('views.dashboard.duplicateDashboard')"
+                    @click="duplicateDashboard"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentCopy"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+                <div
+                    v-if="settingsStore.dashboards.length > 1"
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('views.dashboard.deleteDashboard')"
+                    @click="deleteDashboard"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiTrashCanOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+                <div
+                    class="p-2 flex leading-none items-center cursor-pointer"
+                    v-tooltip.top="t('views.dashboard.fullPage')"
+                    @click="toggleFullPage"
+                >
+                    <svg-icon type="mdi" :path="mdiOverscan" :size="deviceStore.getREMSize(1.25)" />
+                </div>
+            </template>
+            <div v-if="!sensorMode && settingsStore.tags.size > 0" class="p-2 pr-0 flex flex-row">
                 <MultiSelect
                     v-model="dashboard.selectedTags"
                     :options="tagOptions"
@@ -407,7 +541,7 @@ onUnmounted(() => {
                     </template>
                 </MultiSelect>
             </div>
-            <div class="p-2 pr-0 flex flex-row">
+            <div v-if="!sensorMode" class="p-2 pr-0 flex flex-row">
                 <MultiSelect
                     v-model="chosenSensorSources"
                     :options="filteredSensorSources"
@@ -518,6 +652,14 @@ onUnmounted(() => {
                 />
             </div>
         </div>
+        <!-- Inside #control-panel so the chart-height observer accounts for it. -->
+        <health-warning
+            v-if="sensorMode"
+            kind="channel"
+            :device-uid="props.deviceUID!"
+            :channel-name="props.channelName!"
+            class="w-full mx-2 mb-2"
+        />
     </div>
     <Fullscreen v-model="fullPage" :teleport="true" :page-only="true">
         <div :class="{ 'full-page-wrapper': fullPage }">

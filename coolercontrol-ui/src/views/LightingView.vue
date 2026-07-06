@@ -41,7 +41,7 @@ import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 
 interface Props {
-    deviceId: UID
+    deviceUID: UID
     channelName: string
 }
 
@@ -55,8 +55,9 @@ const settingsStore = useSettingsStore()
 const confirm = useConfirm()
 
 const channelLabel = ref(
-    settingsStore.allUIDeviceSettings.get(props.deviceId)?.sensorsAndChannels.get(props.channelName)
-        ?.name ?? props.channelName,
+    settingsStore.allUIDeviceSettings
+        .get(props.deviceUID)
+        ?.sensorsAndChannels.get(props.channelName)?.name ?? props.channelName,
 )
 const contextIsDirty: Ref<boolean> = ref(false)
 const lightingModes: Array<LightingMode> = []
@@ -64,7 +65,7 @@ const noneLightingMode = new LightingMode('none', 'None', 0, 0, false, false, Li
 lightingModes.push(noneLightingMode)
 const lightingSpeeds: Array<string> = []
 for (const device of deviceStore.allDevices()) {
-    if (device.uid != props.deviceId) {
+    if (device.uid != props.deviceUID) {
         continue
     }
     for (const mode of device.info?.channels.get(props.channelName)?.lighting_modes ?? []) {
@@ -88,7 +89,7 @@ let startingBackwardEnabled = false
 let startingNumberOfColors: number = 0
 let colorsUI: Array<Ref<string>> = []
 const startingDeviceSetting: DeviceSettingReadDTO | undefined =
-    settingsStore.allDaemonDeviceSettings.get(props.deviceId)?.settings.get(props.channelName)
+    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName)
 if (startingDeviceSetting?.lighting != null) {
     startingMode =
         lightingModes.find(
@@ -147,7 +148,7 @@ const parseRgbString = (rgbColor: string): [number, number, number] => {
 
 const saveLighting = async (): Promise<void> => {
     if (selectedMode.value.type === LightingModeType.NONE) {
-        await settingsStore.saveDaemonDeviceSettingReset(props.deviceId, props.channelName)
+        await settingsStore.saveDaemonDeviceSettingReset(props.deviceUID, props.channelName)
         contextIsDirty.value = false
         return
     }
@@ -163,20 +164,20 @@ const saveLighting = async (): Promise<void> => {
             setting.colors.push(parseRgbString(colorsUI[i].value))
         }
     }
-    await settingsStore.saveDaemonDeviceSettingLighting(props.deviceId, props.channelName, setting)
+    await settingsStore.saveDaemonDeviceSettingLighting(props.deviceUID, props.channelName, setting)
     contextIsDirty.value = false
 }
 const saveNameFunction = async (newName: string): Promise<boolean> => {
     // User names are persisted as daemon name overrides. An empty name
     // removes the override and reloads the UI.
-    const success = await settingsStore.saveChannelName(props.deviceId, props.channelName, newName)
+    const success = await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
     if (!success) {
         return false
     }
     if (newName.length > 0) {
         channelLabel.value = newName
         emitter.emit('device-sensor-name-update', {
-            deviceUID: props.deviceId,
+            deviceUID: props.deviceUID,
             sensorId: props.channelName,
             name: newName,
         })

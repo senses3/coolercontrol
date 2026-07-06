@@ -105,6 +105,90 @@ export default {
         },
     },
     layout: {
+        shell: {
+            home: 'Home',
+            cooling: 'Cooling',
+            monitoring: 'Monitoring',
+            devices: 'Devices',
+            settings: 'Settings',
+            plugins: 'Plugins',
+            modes: 'Modes',
+            sectionPlaceholder: 'This section arrives in phase {phase} of the UI redesign.',
+            panelPlaceholder: 'Section content arrives in phase {phase}.',
+            laterPhase: 'Moves here in a later phase',
+            manageModes: 'Manage modes',
+            access: 'Access',
+            power: 'Power',
+            noModes: 'No modes saved',
+            coolingPanel: {
+                pinned: 'Pinned',
+                pin: 'Pin',
+                unpin: 'Unpin',
+                library: 'Profiles & Functions',
+                profiles: 'Profiles',
+                functions: 'Functions',
+            },
+            monitoringPanel: {
+                newDashboard: 'New Dashboard',
+            },
+            devicesPanel: {
+                disabled: 'Disabled',
+            },
+            homePanel: {
+                overview: 'Overview',
+                logs: 'Logs',
+            },
+            homePage: {
+                viewLogs: 'View Logs',
+                modeAndAlerts: 'Mode & Alerts',
+                noActiveMode: 'No active mode',
+                setUpCooling: 'Set up cooling',
+            },
+            devicesPage: {
+                landingHint: 'Select a device to view its details and settings.',
+                temps: 'temps',
+                fans: 'fans',
+                lighting: 'lighting',
+                lcd: 'LCD',
+                deviceDisabled: 'This device is disabled.',
+                enableDevice: 'Enable Device',
+                disableDevice: 'Disable this device',
+                disable: 'Disable',
+                sensors: 'Sensors',
+                lightingLcd: 'Lighting & LCD',
+            },
+            coolingPage: {
+                landingHint: 'Select a fan or pump to view and adjust its cooling.',
+                noChannels: 'No controllable fan or pump channels were detected.',
+                guidedSetup: 'Guided Setup',
+                manualAt: 'Manual {duty}%',
+                manualDuty: 'Manual duty',
+                modeProfile: 'Profile',
+                modeManual: 'Manual',
+                modeUnmanaged: 'Unmanaged',
+                unmanagedHint:
+                    'The device or its firmware controls this channel. CoolerControl will not send any speed commands.',
+                apply: 'Apply',
+                saveAndApply: 'Save & Apply',
+                selectProfile: 'Select a profile',
+                sharedWith: 'Shared with {count} more',
+                sharedTooltip: 'This profile also drives other channels.',
+                forkForFan: 'Fork for this fan',
+                notControllable:
+                    'This channel reports its speed but cannot be controlled by CoolerControl.',
+                advanced: 'Advanced',
+                activeMode: 'Active',
+                previousMode: 'Previous',
+                activate: 'Activate',
+                noModes:
+                    'No modes saved yet. Modes snapshot all channel settings for quick switching.',
+                chain: {
+                    tempSource: 'Temperature source',
+                    profile: 'Profile',
+                    function: 'Function',
+                },
+            },
+        },
         topbar: {
             login: 'Login',
             logout: 'Logout',
@@ -512,7 +596,7 @@ export default {
             filterSensors: 'Filter Sensors',
             showControls: 'Show Controls',
             mouseActions:
-                'Dashboard Mouse actions:\n- Highlight selection to zoom.\n- Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.\n- Ctrl+click or middle-click to show all sensors in tooltip.',
+                'Dashboard Mouse actions:\n- Highlight selection to zoom.\n- Ctrl+Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.\n- Ctrl+click or middle-click to show all sensors in tooltip.',
             fullPage: 'Full Page',
             filterTags: 'Filter Tags',
             filterByTag: 'Filter by Tag',
@@ -668,7 +752,7 @@ export default {
             function: 'Function',
             functionToApply: 'Function to apply',
             graphProfileMouseActions:
-                'Graph Profile Mouse actions:\n- Scroll to zoom.\n- Left-click on line to add point.\n- Right-click on point to remove.\n- Drag point to move.',
+                'Graph Profile Mouse actions:\n- Ctrl+Scroll to zoom.\n- Left-click on line to add point.\n- Right-click on point to remove.\n- Drag point to move.',
             unsavedChanges: 'There are unsaved changes made to this Profile.',
             unsavedChangesHeader: 'Unsaved Changes',
             appliedFunction: 'Applied Function',
@@ -679,6 +763,7 @@ export default {
             },
             profileDeleted: 'Profile Deleted',
             profileDuplicated: 'Profile Duplicated',
+            usedBy: 'Used by',
             deleteProfileConfirm: 'Are you sure you want to delete: "{name}"?',
             deleteProfileWithChannelsConfirm:
                 '"{name}" is currently being used by: {channels}.\nDeleting this Profile will reset those channels\' settings.\nAre you sure you want to delete "{name}"?',
@@ -808,6 +893,7 @@ export default {
             newFunction: 'New Function',
             functionDeleted: 'Function Deleted',
             functionDuplicated: 'Function Duplicated',
+            usedBy: 'Used by',
             deleteFunctionConfirm: 'Are you sure you want to delete "{name}"?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" is currently being used by the Profiles: {profiles}.\nDeleting this Function will reset those Profiles\' Functions.\nAre you sure you want to delete "{name}"?',
@@ -847,7 +933,7 @@ export default {
         singleDashboard: {
             minutes: 'min',
             chartMouseActions:
-                'Dashboard Mouse actions:\n- Highlight to zoom.\n- Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.',
+                'Dashboard Mouse actions:\n- Highlight to zoom.\n- Ctrl+Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.',
             timeRange: 'Time Range',
             chartType: 'Chart Type',
         },
@@ -894,6 +980,8 @@ export default {
             notImageType: 'Image does not register as an image type',
         },
         shortcuts: {
+            browserHint:
+                'In a web browser, use Ctrl+Alt+number instead (browsers reserve Ctrl+number for tab switching).',
             shortcuts: 'Keyboard Shortcuts',
             ctrl: 'Ctrl',
             alt: 'Alt',

@@ -69,7 +69,7 @@ function reflectMetadataPlugin(): Plugin {
 // branch cannot be detected) leaves it off, so main and release builds stay
 // clean. Consumed at runtime via src/features.ts.
 const FEATURE_BRANCHES: Record<string, string[]> = {
-    coolingWizard: ['cooling-wizard', 'compio-base'],
+    coolingWizard: ['cooling-wizard', 'compio-base', 'feat/ui-shell', 'dev'],
 }
 
 function currentGitBranch(): string {

@@ -66,7 +66,7 @@ import { Emitter, EventType } from 'mitt'
 import HealthWarning from '@/components/HealthWarning.vue'
 
 interface Props {
-    deviceId: UID
+    deviceUID: UID
     channelName: string
 }
 
@@ -97,14 +97,15 @@ const toast = useToast()
 const confirm = useConfirm()
 
 const channelLabel = ref(
-    settingsStore.allUIDeviceSettings.get(props.deviceId)?.sensorsAndChannels.get(props.channelName)
-        ?.name ?? props.channelName,
+    settingsStore.allUIDeviceSettings
+        .get(props.deviceUID)
+        ?.sensorsAndChannels.get(props.channelName)?.name ?? props.channelName,
 )
 const contextIsDirty: Ref<boolean> = ref(false)
 let imageWidth: number = 320
 let imageSizeMaxBytes: number = 10_000_000
 for (const device of deviceStore.allDevices()) {
-    if (device.uid === props.deviceId && device.info != null) {
+    if (device.uid === props.deviceUID && device.info != null) {
         const channelInfo = device.info.channels.get(props.channelName)
         if (channelInfo != null && channelInfo.lcd_info != null) {
             imageWidth = channelInfo.lcd_info.screen_width
@@ -116,7 +117,7 @@ const lcdModes: Array<LcdMode> = []
 const noneLcdMode = new LcdMode('none', 'None', false, false, false, 0, 0, LcdModeType.NONE)
 lcdModes.push(noneLcdMode)
 for (const device of deviceStore.allDevices()) {
-    if (device.uid != props.deviceId) {
+    if (device.uid != props.deviceUID) {
         continue
     }
     for (const mode of device.info?.channels.get(props.channelName)?.lcd_modes ?? []) {
@@ -161,7 +162,7 @@ let startingImagePath: string | undefined = undefined
 let startingImagesPath: string = ''
 let startingInterval: number = 10
 const startingDeviceSetting: DeviceSettingReadDTO | undefined =
-    settingsStore.allDaemonDeviceSettings.get(props.deviceId)?.settings.get(props.channelName)
+    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName)
 if (startingDeviceSetting?.lcd != null) {
     startingLcdMode =
         lcdModes.find((lcdMode: LcdMode) => lcdMode.name === startingDeviceSetting.lcd?.mode) ??
@@ -221,7 +222,7 @@ const filesChosen = async (event: FileUploadUploaderEvent): Promise<void> => {
         svg: svgLoader,
     })
     const response: File | ErrorResponse = await deviceStore.daemonClient.processLcdImageFiles(
-        props.deviceId,
+        props.deviceUID,
         props.channelName,
         event.files,
     )
@@ -268,7 +269,7 @@ const validateFileType = (file: File): void => {
 
 const saveLCDSetting = async () => {
     if (selectedLcdMode.value.type === LcdModeType.NONE) {
-        await settingsStore.saveDaemonDeviceSettingReset(props.deviceId, props.channelName)
+        await settingsStore.saveDaemonDeviceSettingReset(props.deviceUID, props.channelName)
         contextIsDirty.value = false
         return
     }
@@ -297,13 +298,13 @@ const saveLCDSetting = async () => {
     })
     if (setting.mode === 'image' && files.length > 0) {
         await settingsStore.saveDaemonDeviceSettingLcdImages(
-            props.deviceId,
+            props.deviceUID,
             props.channelName,
             setting,
             files,
         )
     } else {
-        await settingsStore.saveDaemonDeviceSettingLcd(props.deviceId, props.channelName, setting)
+        await settingsStore.saveDaemonDeviceSettingLcd(props.deviceUID, props.channelName, setting)
     }
     uploading.close()
     contextIsDirty.value = false
@@ -311,14 +312,14 @@ const saveLCDSetting = async () => {
 const saveNameFunction = async (newName: string): Promise<boolean> => {
     // User names are persisted as daemon name overrides. An empty name
     // removes the override and reloads the UI.
-    const success = await settingsStore.saveChannelName(props.deviceId, props.channelName, newName)
+    const success = await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
     if (!success) {
         return false
     }
     if (newName.length > 0) {
         channelLabel.value = newName
         emitter.emit('device-sensor-name-update', {
-            deviceUID: props.deviceId,
+            deviceUID: props.deviceUID,
             sensorId: props.channelName,
             name: newName,
         })
@@ -424,7 +425,7 @@ onMounted(async () => {
     if (startingLcdMode.name === 'image' && startingImagePath != null) {
         const response: File | ErrorResponse =
             await deviceStore.daemonClient.getDeviceSettingLcdImage(
-                props.deviceId,
+                props.deviceUID,
                 props.channelName,
             )
         if (response instanceof ErrorResponse) {
@@ -495,7 +496,7 @@ onUnmounted(() => {
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
             <health-warning
                 kind="lcd"
-                :device-uid="props.deviceId"
+                :device-uid="props.deviceUID"
                 :channel-name="props.channelName"
                 class="mb-4"
             />
