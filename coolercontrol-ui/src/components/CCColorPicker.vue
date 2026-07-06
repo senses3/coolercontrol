@@ -23,9 +23,9 @@ import { mdiPalette } from '@mdi/js'
 import { Color } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { ChromePicker, CompactPicker } from 'vue-color'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import Popover from 'primevue/popover'
+import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiInput from '@/shell/ui/UiInput.vue'
 import { computed, nextTick, ref, Ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -71,8 +71,7 @@ const iconSize = computed(() => deviceStore.getREMSize(props.size ? props.size *
 
 // We store all colors as hex internally (text input, etc)
 const currentColor: Ref<Color> = ref(colorStore.rgbToHex(colorModel.value))
-const popRef = ref()
-const saveButton = ref()
+const popoverOpen = ref(false)
 // used to help determine closing behavior, whether closed by OK or clicking away/cancel.
 let newColorApplied: boolean = false
 
@@ -81,18 +80,25 @@ const closeAndReset = (): void => {
     currentColor.value = colorStore.rgbToHex(props.defaultColor)
     newColorApplied = true
     colorModel.value = props.defaultColor
-    popRef.value.hide()
+    popoverOpen.value = false
 }
-const clickSaveButton = (): void => saveButton.value.$el.click()
 const closeAndSave = (): void => {
+    if (!colorStore.isValidHex(currentColor.value)) return
     newColorApplied = true
     colorModel.value =
         colorFormat.value === ColorFormat.HEX
             ? currentColor.value
             : colorStore.hexToRgbString(currentColor.value)
     // note: the color model is updated with a reactive delay, so logging is error-prone
-    popRef.value.hide()
+    popoverOpen.value = false
 }
+watch(popoverOpen, (open) => {
+    if (open) {
+        emit('open', true)
+    } else {
+        popoverClose()
+    }
+})
 
 const popoverClose = (): void => {
     // hide from the above buttons also triggers this:
@@ -120,22 +126,25 @@ const handleRedIssue = (newColor: Color): void => {
 </script>
 
 <template>
-    <div v-tooltip.top="{ value: t('layout.menu.tooltips.chooseColor') }">
-        <div
-            class="rounded-lg border-none p-0 text-text-color-secondary outline-0 text-center justify-center items-center flex hover:text-text-color hover:bg-surface-hover cursor-pointer"
-            :class="{ 'w-10 h-10': !size }"
-            :style="triggerStyle"
-            @click.stop.prevent="(event) => popRef.toggle(event)"
-        >
-            <svg-icon
-                class="outline-0"
-                type="mdi"
-                :path="mdiPalette"
-                :size="iconSize"
-                :style="{ color: currentColor }"
-            />
-        </div>
-        <Popover ref="popRef" @show="emit('open', true)" @hide="popoverClose">
+    <PopoverRoot v-model:open="popoverOpen">
+        <PopoverTrigger as-child>
+            <div
+                v-tooltip.top="{ value: t('layout.menu.tooltips.chooseColor') }"
+                class="rounded-lg border-none p-0 text-text-color-secondary outline-0 text-center justify-center items-center flex hover:text-text-color hover:bg-surface-hover cursor-pointer"
+                :class="{ 'w-10 h-10': !size }"
+                :style="triggerStyle"
+                @click.stop
+            >
+                <svg-icon
+                    class="outline-0"
+                    type="mdi"
+                    :path="mdiPalette"
+                    :size="iconSize"
+                    :style="{ color: currentColor }"
+                />
+            </div>
+        </PopoverTrigger>
+        <PopoverContent side="bottom" align="start" class="z-50" @click.stop>
             <div
                 class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color"
                 @click.stop
@@ -157,33 +166,28 @@ const handleRedIssue = (newColor: Color): void => {
                     />
                 </div>
                 <div class="flex flex-row justify-between mt-4 w-full">
-                    <InputText
-                        ref="inputArea"
+                    <UiInput
                         id="property-color"
-                        class="w-20rem"
-                        :invalid="!colorStore.isValidHex(currentColor)"
                         v-model="currentColor"
-                        @keydown.enter.prevent="clickSaveButton"
-                        autofocus
+                        class="w-32"
+                        :class="{ '!border-error': !colorStore.isValidHex(currentColor) }"
+                        @keydown.enter.prevent="closeAndSave"
                     />
                     <div class="text-right justify-end">
-                        <Button class="mr-4" label="Reset" @click.stop="closeAndReset">
+                        <UiButton variant="outline" class="mr-4" @click.stop="closeAndReset">
                             {{ t('common.reset') }}
-                        </Button>
-                        <Button
-                            ref="saveButton"
-                            class="!bg-accent/80 hover:!bg-accent/100"
-                            label="Save"
-                            @click.stop="closeAndSave"
+                        </UiButton>
+                        <UiButton
                             :disabled="!colorStore.isValidHex(currentColor)"
+                            @click.stop="closeAndSave"
                         >
                             {{ t('common.save') }}
-                        </Button>
+                        </UiButton>
                     </div>
                 </div>
             </div>
-        </Popover>
-    </div>
+        </PopoverContent>
+    </PopoverRoot>
 </template>
 
 <style lang="scss">

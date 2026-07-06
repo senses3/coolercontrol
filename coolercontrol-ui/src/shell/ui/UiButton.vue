@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-type Variant = 'solid' | 'ghost' | 'outline'
+type Variant = 'solid' | 'ghost' | 'outline' | 'danger'
 type Size = 'sm' | 'md' | 'icon'
 
 const props = withDefaults(
@@ -39,6 +39,7 @@ const variants: Record<Variant, string> = {
     solid: 'bg-accent text-bg-one hover:bg-accent/80',
     ghost: 'text-text-color hover:bg-surface-hover',
     outline: 'border border-border-one text-text-color hover:bg-surface-hover',
+    danger: 'bg-error text-bg-one hover:bg-error/80',
 }
 
 const sizes: Record<Size, string> = {

@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiMinus, mdiPlus } from '@mdi/js'
-import { computed } from 'vue'
+import { computed, onBeforeUnmount } from 'vue'
 
 const model = defineModel<number>({ required: true })
 const props = withDefaults(
@@ -41,8 +41,34 @@ const props = withDefaults(
 )
 
 const clamp = (value: number): number => Math.min(props.max, Math.max(props.min, value))
+// Strip binary float noise (0.1 + 0.2 style) from step arithmetic.
+const round = (value: number): number => Number.parseFloat(value.toFixed(10))
 const stepBy = (direction: number): void => {
-    model.value = clamp((model.value ?? 0) + direction * props.step)
+    model.value = round(clamp((model.value ?? 0) + direction * props.step))
+}
+
+// Press-and-hold repeats the step: one step on press, then auto-repeat.
+let holdDelay: ReturnType<typeof setTimeout> | undefined
+let holdRepeat: ReturnType<typeof setInterval> | undefined
+const stopHold = (): void => {
+    clearTimeout(holdDelay)
+    clearInterval(holdRepeat)
+    window.removeEventListener('pointerup', stopHold)
+}
+const startHold = (direction: number): void => {
+    stopHold()
+    stepBy(direction)
+    window.addEventListener('pointerup', stopHold)
+    holdDelay = setTimeout(() => {
+        holdRepeat = setInterval(() => stepBy(direction), 75)
+    }, 400)
+}
+onBeforeUnmount(stopHold)
+
+// Keyboard activation arrives as a click with detail 0; pointer presses are
+// handled by startHold and must not double-step through click.
+const keyboardStep = (event: MouseEvent, direction: number): void => {
+    if (event.detail === 0) stepBy(direction)
 }
 const onInput = (event: Event): void => {
     const value = Number((event.target as HTMLInputElement).value)
@@ -61,7 +87,9 @@ const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 
             type="button"
             class="px-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
             :disabled="disabled"
-            @click="stepBy(-1)"
+            @pointerdown.prevent="startHold(-1)"
+            @pointerleave="stopHold"
+            @click="keyboardStep($event, -1)"
         >
             <svg-icon type="mdi" :path="mdiMinus" :size="14" />
         </button>
@@ -85,7 +113,9 @@ const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 
             type="button"
             class="px-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
             :disabled="disabled"
-            @click="stepBy(1)"
+            @pointerdown.prevent="startHold(1)"
+            @pointerleave="stopHold"
+            @click="keyboardStep($event, 1)"
         >
             <svg-icon type="mdi" :path="mdiPlus" :size="14" />
         </button>

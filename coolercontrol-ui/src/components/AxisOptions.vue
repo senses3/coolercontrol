@@ -21,7 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
-import InputNumber from 'primevue/inputnumber'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { mdiAxisArrow, mdiAxisXArrow, mdiAxisYArrow } from '@mdi/js'
 import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -150,81 +150,37 @@ const isPopupOpen = ref(false)
                                     {{ t('components.axisOptions.max') }}
                                 </td>
                                 <td class="w-24 px-2 border-r border-border-one">
-                                    <InputNumber
-                                        :placeholder="t('components.axisOptions.max')"
+                                    <UiNumberInput
                                         v-model="dashboard.degreeMax"
-                                        class="my-1"
-                                        show-buttons
-                                        :use-grouping="false"
-                                        :step="10"
                                         :min="dashboard.degreeMin + 10"
                                         :max="200"
-                                        button-layout="horizontal"
-                                        :allow-empty="false"
-                                        :input-style="{ width: '3rem' }"
+                                        :step="10"
                                         :disabled="dashboard.autoScaleDegree"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
+                                    />
                                 </td>
                                 <td class="w-24 text-end px-2 border-r border-border-one">
                                     {{ t('components.axisOptions.max') }}
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <InputNumber
-                                        :placeholder="t('components.axisOptions.max')"
+                                    <UiNumberInput
                                         v-model="freqScaledMax"
-                                        class="my-1"
-                                        show-buttons
-                                        :use-grouping="true"
-                                        :step="freqStepSize"
                                         :min="freqScaledMin + freqStepSize"
                                         :max="freqMaxLimit"
-                                        :min-fraction-digits="freqIsMhz ? 0 : 1"
-                                        button-layout="horizontal"
-                                        :allow-empty="false"
-                                        :input-style="{ width: '5rem' }"
+                                        :step="freqStepSize"
                                         :disabled="dashboard.autoScaleFrequency"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
+                                    />
                                 </td>
                                 <td class="w-24 text-end px-2 border-x border-border-one">
                                     {{ t('components.axisOptions.max') }}
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <InputNumber
-                                        :placeholder="t('components.axisOptions.max')"
+                                    <UiNumberInput
                                         v-model="dashboard.wattsMax"
-                                        class="my-1"
-                                        show-buttons
-                                        :use-grouping="true"
-                                        :step="dashboard.wattsMax >= 10 ? 10 : 1"
                                         :min="dashboard.wattsMin + 1"
                                         :max="800"
-                                        :min-fraction-digits="0"
-                                        button-layout="horizontal"
-                                        :allow-empty="false"
-                                        :input-style="{ width: '3rem' }"
+                                        :step="dashboard.wattsMax >= 10 ? 10 : 1"
                                         :disabled="dashboard.autoScaleWatts"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
+                                    />
                                 </td>
                             </tr>
                             <tr>
@@ -232,81 +188,37 @@ const isPopupOpen = ref(false)
                                     {{ t('components.axisOptions.min') }}
                                 </td>
                                 <td class="w-24 px-2 border-r border-border-one">
-                                    <InputNumber
-                                        :placeholder="t('components.axisOptions.min')"
+                                    <UiNumberInput
                                         v-model="dashboard.degreeMin"
-                                        class="my-1"
-                                        show-buttons
-                                        :use-grouping="false"
-                                        :step="10"
                                         :min="0"
                                         :max="dashboard.degreeMax - 10"
-                                        button-layout="horizontal"
-                                        :allow-empty="false"
-                                        :input-style="{ width: '3rem' }"
+                                        :step="10"
                                         :disabled="dashboard.autoScaleDegree"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
+                                    />
                                 </td>
                                 <td class="w-24 text-end px-2 border-r border-border-one">
                                     {{ t('components.axisOptions.min') }}
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <InputNumber
-                                        :placeholder="t('components.axisOptions.min')"
+                                    <UiNumberInput
                                         v-model="freqScaledMin"
-                                        class="my-1"
-                                        show-buttons
-                                        :use-grouping="true"
-                                        :step="freqStepSize"
                                         :min="0"
                                         :max="freqScaledMax - freqStepSize"
-                                        :min-fraction-digits="freqIsMhz ? 0 : 1"
-                                        button-layout="horizontal"
-                                        :allow-empty="false"
-                                        :input-style="{ width: '5rem' }"
+                                        :step="freqStepSize"
                                         :disabled="dashboard.autoScaleFrequency"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
+                                    />
                                 </td>
                                 <td class="w-24 text-end px-2 border-x border-border-one">
                                     {{ t('components.axisOptions.min') }}
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <InputNumber
-                                        :placeholder="t('components.axisOptions.min')"
+                                    <UiNumberInput
                                         v-model="dashboard.wattsMin"
-                                        class="my-1"
-                                        show-buttons
-                                        :use-grouping="true"
-                                        :step="dashboard.wattsMax >= 10 ? 10 : 1"
                                         :min="0"
                                         :max="dashboard.wattsMax - 1"
-                                        :min-fraction-digits="0"
-                                        button-layout="horizontal"
-                                        :allow-empty="false"
-                                        :input-style="{ width: '3rem' }"
+                                        :step="dashboard.wattsMax >= 10 ? 10 : 1"
                                         :disabled="dashboard.autoScaleWatts"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
+                                    />
                                 </td>
                             </tr>
                         </tbody>

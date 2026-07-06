@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiCheck, mdiUnfoldMoreHorizontal } from '@mdi/js'
+import { computed } from 'vue'
 import {
     SelectContent,
     SelectItem,
@@ -39,7 +40,7 @@ export interface UiSelectOption {
 }
 
 const model = defineModel<string | undefined>()
-withDefaults(
+const props = withDefaults(
     defineProps<{
         options: UiSelectOption[]
         placeholder?: string
@@ -47,14 +48,27 @@ withDefaults(
     }>(),
     { placeholder: '', disabled: false },
 )
+
+// Render the selected label directly instead of relying on SelectValue
+// mirroring the selected item: items re-mount into the portal on open, which
+// briefly empties the mirrored value and collapses the trigger width.
+const selectedLabel = computed(
+    () => props.options.find((option) => option.value === model.value)?.label,
+)
+
+defineOptions({ inheritAttrs: false })
 </script>
 
 <template>
     <SelectRoot v-model="model" :disabled="disabled">
         <SelectTrigger
+            v-bind="$attrs"
             class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border-one bg-bg-two px-3 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
         >
-            <SelectValue :placeholder="placeholder" class="truncate" />
+            <SelectValue class="truncate">
+                <span v-if="selectedLabel">{{ selectedLabel }}</span>
+                <span v-else class="text-text-color-secondary">{{ placeholder }}</span>
+            </SelectValue>
             <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" />
         </SelectTrigger>
         <SelectPortal>
