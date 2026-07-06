@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiDnsOutline, mdiMonitor, mdiViewQuiltOutline } from '@mdi/js'
+import { mdiDnsOutline, mdiMonitor, mdiPaletteOutline, mdiTuneVariant } from '@mdi/js'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -29,20 +29,26 @@ const { t } = useI18n()
 const route = useRoute()
 const deviceStore = useDeviceStore()
 
-// Tab values match AppSettings' TabPanel values.
+// Anchor params match AppSettings' card group ids (single scrolling page).
 const tabs = computed(() => {
     const entries = [
-        { tab: '0', labelKey: 'layout.settings.userInterface', icon: mdiViewQuiltOutline },
-        { tab: '1', labelKey: 'views.daemon.title', icon: mdiDnsOutline },
+        { tab: 'general', labelKey: 'layout.settings.general', icon: mdiTuneVariant },
+        { tab: 'appearance', labelKey: 'layout.settings.appearance', icon: mdiPaletteOutline },
+        { tab: 'daemon', labelKey: 'views.daemon.title', icon: mdiDnsOutline },
     ]
     if (deviceStore.isQtApp()) {
-        entries.push({ tab: '2', labelKey: 'layout.settings.desktop', icon: mdiMonitor })
+        entries.push({ tab: 'desktop', labelKey: 'layout.settings.desktop', icon: mdiMonitor })
     }
     return entries
 })
 
-const isActive = (tab: string): boolean =>
-    route.name === 'settings' && (route.params.tabNumber ?? '0') === tab
+// Legacy numeric params still arrive from old links (startup page etc.).
+const NUMERIC_ALIASES: Record<string, string> = { '0': 'general', '1': 'daemon', '2': 'desktop' }
+const isActive = (tab: string): boolean => {
+    if (route.name !== 'settings') return false
+    const param = (route.params.tabNumber as string) ?? 'general'
+    return (NUMERIC_ALIASES[param] ?? param) === tab
+}
 </script>
 
 <template>
