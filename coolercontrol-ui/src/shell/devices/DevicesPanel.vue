@@ -19,8 +19,9 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiLightbulbOutline, mdiTelevision } from '@mdi/js'
-import { computed } from 'vue'
+import { mdiAlert, mdiDragVertical, mdiLightbulbOutline, mdiTelevision } from '@mdi/js'
+import { VueDraggable } from 'vue-draggable-plus'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { type Color, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
@@ -28,6 +29,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
+import { setTopLevelOrder } from '@/shell/panelOrder.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -36,7 +38,19 @@ const colorStore = useThemeColorsStore()
 
 const devices = computed(() => hardwareDevices(deviceStore.allDevices()))
 
-const typeGroups = computed(() => deviceTypeGroups(devices.value))
+// Mutable copy so device rows are drag-sortable within their type group.
+const typeGroups = ref<ReturnType<typeof deviceTypeGroups>>([])
+watchEffect(() => {
+    typeGroups.value = deviceTypeGroups(devices.value)
+})
+
+const persistDeviceOrder = (): void => {
+    const orderedUids = typeGroups.value.flatMap((group) =>
+        group.devices.map((device) => device.uid),
+    )
+    settingsStore.menuOrder = setTopLevelOrder(settingsStore.menuOrder, orderedUids)
+    deviceStore.reSortDevicesByMenuOrder()
+}
 
 const disabledDevices = computed(() =>
     [...settingsStore.ccDeviceSettings.values()].filter((setting) => setting.disable),
@@ -75,59 +89,74 @@ const setDeviceColor = (deviceUID: UID, newColor: Color): void => {
             <div class="px-2 pb-1 pt-2 text-xs uppercase text-text-color-secondary">
                 {{ getDeviceTypeDisplayName(group.type) }}
             </div>
-            <template v-for="device in group.devices" :key="device.uid">
+            <VueDraggable
+                v-model="group.devices"
+                handle=".drag-handle"
+                :animation="150"
+                class="flex flex-col gap-0.5"
+                @end="persistDeviceOrder"
+            >
                 <div
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    v-for="device in group.devices"
+                    :key="device.uid"
+                    class="flex flex-col gap-0.5"
                 >
-                    <RouterLink
-                        :to="{ name: 'devices-device', params: { deviceUID: device.uid } }"
-                        class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
-                        exact-active-class="!text-accent"
-                    >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
-                            :style="{ backgroundColor: dotColor(device.uid) }"
-                        />
-                        <span class="truncate">{{ deviceLabel(device.uid) }}</span>
-                        <svg-icon
-                            v-if="isUnhealthy(device.uid)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
-                    </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
                     >
-                        <CCColorPicker
-                            :model-value="pickerColor(device.uid)"
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
-                        />
+                        <RouterLink
+                            :to="{ name: 'devices-device', params: { deviceUID: device.uid } }"
+                            class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
+                            exact-active-class="!text-accent"
+                        >
+                            <span
+                                class="h-2 w-2 shrink-0 rounded-full"
+                                :style="{ backgroundColor: dotColor(device.uid) }"
+                            />
+                            <span class="truncate">{{ deviceLabel(device.uid) }}</span>
+                            <svg-icon
+                                v-if="isUnhealthy(device.uid)"
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-warning"
+                            />
+                        </RouterLink>
+                        <div
+                            class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        >
+                            <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                                <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                            </span>
+                            <CCColorPicker
+                                :model-value="pickerColor(device.uid)"
+                                :size="1.25"
+                                @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
+                            />
+                        </div>
                     </div>
+                    <RouterLink
+                        v-for="link in deviceChannelLinks(device)"
+                        :key="`${link.kind}-${link.channelName}`"
+                        :to="{
+                            name: link.kind === 'lighting' ? 'device-lighting' : 'device-lcd',
+                            params: { deviceUID: link.deviceUID, channelName: link.channelName },
+                        }"
+                        class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                        exact-active-class="bg-surface-hover !text-accent"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="link.kind === 'lighting' ? mdiLightbulbOutline : mdiTelevision"
+                            :size="14"
+                            class="shrink-0 text-text-color-secondary"
+                        />
+                        <span class="truncate">{{
+                            channelLabel(link.deviceUID, link.channelName)
+                        }}</span>
+                    </RouterLink>
                 </div>
-                <RouterLink
-                    v-for="link in deviceChannelLinks(device)"
-                    :key="`${link.kind}-${link.channelName}`"
-                    :to="{
-                        name: link.kind === 'lighting' ? 'device-lighting' : 'device-lcd',
-                        params: { deviceUID: link.deviceUID, channelName: link.channelName },
-                    }"
-                    class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
-                    exact-active-class="bg-surface-hover !text-accent"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="link.kind === 'lighting' ? mdiLightbulbOutline : mdiTelevision"
-                        :size="14"
-                        class="shrink-0 text-text-color-secondary"
-                    />
-                    <span class="truncate">{{
-                        channelLabel(link.deviceUID, link.channelName)
-                    }}</span>
-                </RouterLink>
-            </template>
+            </VueDraggable>
         </template>
 
         <template v-if="disabledDevices.length > 0">

@@ -19,15 +19,22 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiHomeOutline, mdiTextBoxOutline, mdiViewDashboardOutline } from '@mdi/js'
+import {
+    mdiDragVertical,
+    mdiHomeOutline,
+    mdiTextBoxOutline,
+    mdiViewDashboardOutline,
+} from '@mdi/js'
+import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels, pinId } from '@/shell/cooling/channels.ts'
+import { reorderSubset } from '@/shell/panelOrder.ts'
 import { customSensors, monitoringSensors } from '@/shell/monitoring/sensors.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
@@ -74,7 +81,7 @@ const liveValue = (deviceUID: UID, channelName: string): string => {
     return ''
 }
 
-const pinnedRows = computed((): PinnedRow[] => {
+const buildPinnedRows = (): PinnedRow[] => {
     const rows: PinnedRow[] = []
     const seen = new Set<string>()
     const dashboardsByUid = new Map<string, Dashboard>(
@@ -136,7 +143,17 @@ const pinnedRows = computed((): PinnedRow[] => {
         }
     }
     return rows
+}
+const pinnedRows = ref<PinnedRow[]>([])
+watchEffect(() => {
+    pinnedRows.value = buildPinnedRows()
 })
+const persistPinnedOrder = (): void => {
+    settingsStore.pinnedIds = reorderSubset(
+        settingsStore.pinnedIds,
+        pinnedRows.value.map((row) => row.key),
+    )
+}
 </script>
 
 <template>
@@ -173,36 +190,49 @@ const pinnedRows = computed((): PinnedRow[] => {
             <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
                 {{ t('layout.menu.pinned') }}
             </div>
-            <RouterLink
-                v-for="row in pinnedRows"
-                :key="row.key"
-                :to="row.to"
-                class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
-                exact-active-class="!text-accent"
+            <VueDraggable
+                v-model="pinnedRows"
+                handle=".drag-handle"
+                :animation="150"
+                class="flex flex-col gap-0.5"
+                @end="persistPinnedOrder"
             >
-                <span
-                    v-if="row.color"
-                    class="h-2 w-2 shrink-0 rounded-full"
-                    :style="{ backgroundColor: row.color }"
-                />
-                <svg-icon
-                    v-else
-                    type="mdi"
-                    :path="mdiViewDashboardOutline"
-                    :size="14"
-                    class="shrink-0 text-text-color-secondary"
-                />
-                <span class="truncate">{{ row.label }}</span>
-                <span v-if="row.sublabel" class="truncate text-xs text-text-color-secondary">
-                    {{ row.sublabel }}
-                </span>
-                <span
-                    v-if="row.value"
-                    class="ml-auto whitespace-nowrap tabular-nums text-text-color"
+                <RouterLink
+                    v-for="row in pinnedRows"
+                    :key="row.key"
+                    :to="row.to"
+                    class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                    exact-active-class="!text-accent"
                 >
-                    {{ row.value }}
-                </span>
-            </RouterLink>
+                    <span
+                        v-if="row.color"
+                        class="h-2 w-2 shrink-0 rounded-full"
+                        :style="{ backgroundColor: row.color }"
+                    />
+                    <svg-icon
+                        v-else
+                        type="mdi"
+                        :path="mdiViewDashboardOutline"
+                        :size="14"
+                        class="shrink-0 text-text-color-secondary"
+                    />
+                    <span class="truncate">{{ row.label }}</span>
+                    <span v-if="row.sublabel" class="truncate text-xs text-text-color-secondary">
+                        {{ row.sublabel }}
+                    </span>
+                    <span
+                        v-if="row.value"
+                        class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden"
+                    >
+                        {{ row.value }}
+                    </span>
+                    <span
+                        class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
+                    >
+                        <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
+                    </span>
+                </RouterLink>
+            </VueDraggable>
         </template>
     </div>
 </template>

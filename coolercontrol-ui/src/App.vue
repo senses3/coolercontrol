@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
 import { StartupPage } from '@/models/UISettings.ts'
+import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
@@ -300,6 +301,11 @@ onMounted(async () => {
         return
     }
     await settingsStore.initializeSettings(deviceStore.allDevices())
+    // Apply the persisted panel order (devices, channels, profiles, functions);
+    // the old tree menu did this on build, the shell applies it once at boot.
+    deviceStore.reSortDevicesByMenuOrder()
+    sortEntitiesByGroup(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
+    sortEntitiesByGroup(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
     // Prime the calibration cache before `loaded` flips below: the cooling
     // channel page reads `statusFor` on first paint.
     await calibrationStore.refreshAllStatuses()
