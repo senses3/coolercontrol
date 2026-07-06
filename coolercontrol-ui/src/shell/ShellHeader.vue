@@ -60,9 +60,16 @@ const itemClass =
 <template>
     <header class="flex h-12 shrink-0 items-center gap-2.5 px-3">
         <UiTooltip :text="daemonState.status">
-            <span class="h-2.5 w-2.5 rounded-full" :class="statusColor" />
+            <RouterLink
+                :to="{ name: 'section-home' }"
+                class="flex items-center gap-2.5 rounded-lg px-1 py-0.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            >
+                <span class="h-2.5 w-2.5 rounded-full" :class="statusColor" />
+                <span class="text-base text-text-color-secondary">
+                    {{ daemonState.systemName }}
+                </span>
+            </RouterLink>
         </UiTooltip>
-        <span class="text-base text-text-color-secondary">{{ daemonState.systemName }}</span>
         <div class="flex-1" />
         <UiDropdownMenu>
             <template #trigger>

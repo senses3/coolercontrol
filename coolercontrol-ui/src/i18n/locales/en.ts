@@ -140,6 +140,10 @@ export default {
             },
             homePage: {
                 viewLogs: 'View Logs',
+                logsAll: 'All',
+                logsWarnings: 'Warnings+',
+                logsErrors: 'Errors',
+                logsNoMatches: 'No matching log lines.',
                 modeAndAlerts: 'Mode & Alerts',
                 noActiveMode: 'No active mode',
                 setUpCooling: 'Set up cooling',

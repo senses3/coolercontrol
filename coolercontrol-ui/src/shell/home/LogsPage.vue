@@ -18,12 +18,38 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
 
 const deviceStore = useDeviceStore()
+const route = useRoute()
 const { t } = useI18n({ useScope: 'global' })
+
+// Level filter; ?level=warn|error pre-selects (the Home status row deep-links
+// to warnings when the daemon status is degraded).
+type LogLevelFilter = 'all' | 'warn' | 'error'
+const levelFilter = ref<LogLevelFilter>(
+    route.query.level === 'warn' || route.query.level === 'error'
+        ? (route.query.level as LogLevelFilter)
+        : 'all',
+)
+const levelOptions = computed(() => [
+    { value: 'all', label: t('layout.shell.homePage.logsAll') },
+    { value: 'warn', label: t('layout.shell.homePage.logsWarnings') },
+    { value: 'error', label: t('layout.shell.homePage.logsErrors') },
+])
+const visibleLines = computed(() => {
+    if (levelFilter.value === 'all') return deviceStore.logLines
+    if (levelFilter.value === 'error') {
+        return deviceStore.logLines.filter((line) => line.raw.includes('ERROR'))
+    }
+    return deviceStore.logLines.filter(
+        (line) => line.raw.includes('ERROR') || line.raw.includes('WARN'),
+    )
+})
 
 const logContainer = ref<HTMLElement | null>(null)
 const isUserScrolledUp = ref(false)
@@ -69,11 +95,14 @@ onMounted(() => {
             <h1 class="text-xl font-semibold text-text-color">
                 {{ t('views.appInfo.logsAndDiagnostics') }}
             </h1>
-            <a :href="downloadLogHref" :download="downloadLogFileName">
-                <UiButton size="sm" variant="outline">
-                    {{ t('views.appInfo.downloadCurrentLog') }}
-                </UiButton>
-            </a>
+            <span class="flex items-center gap-3">
+                <UiToggleGroup v-model="levelFilter" :options="levelOptions" />
+                <a :href="downloadLogHref" :download="downloadLogFileName">
+                    <UiButton size="sm" variant="outline">
+                        {{ t('views.appInfo.downloadCurrentLog') }}
+                    </UiButton>
+                </a>
+            </span>
         </div>
         <div
             ref="logContainer"
@@ -82,11 +111,17 @@ onMounted(() => {
         >
             <!-- Lines are escaped and highlighted once on arrival (logLines.ts). -->
             <div
-                v-for="(line, index) in deviceStore.logLines"
+                v-for="(line, index) in visibleLines"
                 :key="index"
                 class="whitespace-pre-wrap break-all"
                 v-html="line.html"
             />
+            <div
+                v-if="visibleLines.length === 0"
+                class="py-8 text-center text-text-color-secondary"
+            >
+                {{ t('layout.shell.homePage.logsNoMatches') }}
+            </div>
         </div>
     </div>
 </template>

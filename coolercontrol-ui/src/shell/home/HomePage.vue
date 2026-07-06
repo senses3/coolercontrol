@@ -305,7 +305,14 @@ const shortcutClasses =
                     <span class="text-text-color-secondary">
                         {{ t('views.appInfo.status') }}
                     </span>
-                    <span class="flex items-center gap-2 text-text-color">
+                    <RouterLink
+                        :to="{
+                            name: 'home-logs',
+                            query: daemonState.status === DaemonStatus.OK ? {} : { level: 'warn' },
+                        }"
+                        class="flex w-fit items-center gap-2 rounded text-text-color outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent"
+                        :title="t('layout.shell.homePage.viewLogs')"
+                    >
                         <svg-icon type="mdi" :path="mdiCircle" :size="12" :class="badgeColor" />
                         {{
                             daemonState.connected
@@ -314,7 +321,7 @@ const shortcutClasses =
                                   )
                                 : t('views.appInfo.disconnected')
                         }}
-                    </span>
+                    </RouterLink>
                     <template v-for="[label, value] in statusRows" :key="label">
                         <span class="text-text-color-secondary">{{ label }}</span>
                         <span class="text-text-color">{{ value }}</span>
