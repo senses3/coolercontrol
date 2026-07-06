@@ -39,6 +39,7 @@ import {
     type UID,
 } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -342,9 +343,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
         </VueDraggable>
 
         <template v-if="disabledDevices.length > 0">
-            <div class="px-2 pb-1 pt-3 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.shell.devicesPanel.disabled') }}
-            </div>
+            <PanelHeader :label="t('layout.shell.devicesPanel.disabled')" />
             <RouterLink
                 v-for="setting in disabledDevices"
                 :key="`disabled-${setting.uid}`"

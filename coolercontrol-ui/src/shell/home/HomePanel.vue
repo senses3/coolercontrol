@@ -31,6 +31,7 @@ import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels, pinId } from '@/shell/cooling/channels.ts'
@@ -177,9 +178,7 @@ const persistPinnedOrder = (): void => {
 
         <template v-if="pinnedRows.length > 0">
             <UiSeparator class="my-1" />
-            <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.pinned') }}
-            </div>
+            <PanelHeader :label="t('layout.menu.pinned')" />
             <VueDraggable
                 v-model="pinnedRows"
                 handle=".drag-handle"

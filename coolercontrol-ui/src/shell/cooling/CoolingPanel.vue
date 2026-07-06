@@ -28,6 +28,8 @@ import {
     mdiPinOutline,
     mdiPlus,
 } from '@mdi/js'
+import PanelHeader from '@/shell/PanelHeader.vue'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
 import { ref, watchEffect } from 'vue'
@@ -198,9 +200,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
 <template>
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <template v-if="pinnedChannels.length > 0">
-            <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.shell.coolingPanel.pinned') }}
-            </div>
+            <PanelHeader :label="t('layout.shell.coolingPanel.pinned')" />
             <VueDraggable
                 v-model="pinnedChannels"
                 handle=".drag-handle"
@@ -293,13 +293,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
         </template>
 
         <template v-for="group in groups" :key="group.deviceUID">
-            <div
-                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
-                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
-                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
-            >
-                {{ deviceLabel(group.deviceUID) }}
-            </div>
+            <PanelHeader
+                :label="deviceLabel(group.deviceUID)"
+                :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
+            />
             <VueDraggable
                 v-model="group.channels"
                 handle=".drag-handle"
@@ -396,9 +393,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
         </template>
 
         <UiSeparator class="my-1" />
-        <div class="truncate px-2 pb-1 pt-3 text-xs uppercase text-text-color-secondary">
-            {{ t('layout.shell.coolingPanel.library') }}
-        </div>
+        <PanelHeader :label="t('layout.shell.coolingPanel.library')" />
         <div class="flex items-center justify-between px-3 pb-1 pt-1">
             <span class="text-xs uppercase text-text-color-secondary opacity-70">
                 {{ t('layout.shell.coolingPanel.profiles') }}

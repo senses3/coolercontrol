@@ -48,6 +48,7 @@ import {
     setGroupOrder,
 } from '@/shell/panelOrder.ts'
 import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sensors.ts'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
@@ -254,9 +255,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
 <template>
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <template v-if="pinnedDashboards.length > 0 || pinnedSensors.length > 0">
-            <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.pinned') }}
-            </div>
+            <PanelHeader :label="t('layout.menu.pinned')" />
             <VueDraggable
                 v-model="pinnedDashboards"
                 handle=".drag-handle"
@@ -357,10 +356,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             <UiSeparator class="my-1" />
         </template>
 
-        <div class="flex items-center justify-between px-2 pb-1 pt-2">
-            <span class="text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.dashboards') }}
-            </span>
+        <PanelHeader :label="t('layout.menu.dashboards')">
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -369,7 +365,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
             </button>
-        </div>
+        </PanelHeader>
         <VueDraggable
             v-model="orderedDashboards"
             handle=".drag-handle"
@@ -429,8 +425,8 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             </div>
         </VueDraggable>
         <UiSeparator class="my-1" />
-        <div class="flex items-center justify-between px-2 pb-1 pt-2">
-            <span class="flex items-center gap-1.5 text-xs uppercase text-text-color-secondary">
+        <PanelHeader>
+            <template #label>
                 {{ t('layout.menu.alerts') }}
                 <span
                     v-if="activeAlertCount > 0"
@@ -438,7 +434,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 >
                     {{ activeAlertCount }}
                 </span>
-            </span>
+            </template>
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -447,7 +443,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
             </button>
-        </div>
+        </PanelHeader>
         <RouterLink
             :to="{ name: 'monitoring-alerts' }"
             class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
@@ -489,13 +485,10 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
         </VueDraggable>
         <UiSeparator class="my-1" />
         <template v-for="group in groups" :key="group.deviceUID">
-            <div
-                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
-                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
-                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
-            >
-                {{ deviceLabel(group.deviceUID) }}
-            </div>
+            <PanelHeader
+                :label="deviceLabel(group.deviceUID)"
+                :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
+            />
             <VueDraggable
                 v-model="group.sensors"
                 handle=".drag-handle"
