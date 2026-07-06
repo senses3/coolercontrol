@@ -18,7 +18,6 @@
 
 <script setup lang="ts">
 import { type Ref, ref, computed } from 'vue'
-import InputText from 'primevue/inputtext'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 
@@ -73,12 +72,13 @@ const handleBlur = (): void => {
 
 <template>
     <div class="flex pl-4 py-2 text-2xl overflow-hidden items-center">
-        <InputText
+        <input
             v-if="isEditingName"
             ref="nameInputRef"
             id="alert-name-input"
             v-model="nameInput"
-            class="font-bold mt-[1px] !border-none !p-0 text-text-color-secondary"
+            type="text"
+            class="mt-[1px] bg-transparent font-bold text-text-color-secondary outline-none"
             :style="{ width: inputWidth }"
             @keydown.enter="saveNameInline"
             @keydown.esc="cancelEditName"

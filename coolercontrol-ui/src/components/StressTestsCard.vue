@@ -23,11 +23,11 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiCircle } from '@mdi/js'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import Select from 'primevue/select'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -61,7 +61,7 @@ const gpuLoading = ref(false)
 const ramLoading = ref(false)
 const driveLoading = ref(false)
 const availableDrives = ref<Array<{ device_path: string; model?: string; size_bytes: number }>>([])
-const selectedDrive = ref<string | null>(null)
+const selectedDrive = ref<string | undefined>(undefined)
 let statusPollInterval: ReturnType<typeof setInterval> | null = null
 
 const pollStatus = async () => {
@@ -189,6 +189,12 @@ const stopRamStress = async () => {
     ramActive.value = false
 }
 
+const driveOptions = computed(() =>
+    availableDrives.value.map((drive) => ({
+        label: driveLabel(drive),
+        value: drive.device_path,
+    })),
+)
 const driveLabel = (drive: { device_path: string; model?: string }) =>
     drive.model ? `${drive.model} (${drive.device_path})` : drive.device_path
 
@@ -262,12 +268,12 @@ onMounted(async () => {
                     }}</span>
                     <help-tooltip-icon :tooltip="t('views.appInfo.stressTestTooltip')" />
                 </div>
-                <Button
-                    :label="t('views.appInfo.stopAll')"
-                    class="bg-red-600/80 hover:!bg-red-600 h-[2.375rem]"
+                <UiButton
+                    variant="danger"
                     :disabled="!cpuActive && !gpuActive && !ramActive && !driveActive"
                     @click="stopAllStress"
-                />
+                    >{{ t('views.appInfo.stopAll') }}</UiButton
+                >
             </div>
             <table class="border-separate border-spacing-y-2">
                 <tbody>
@@ -279,41 +285,25 @@ onMounted(async () => {
                             }}</span>
                         </td>
                         <td class="pr-4">
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="cpuDuration"
-                                show-buttons
-                                button-layout="horizontal"
                                 :min="15"
                                 :max="600"
                                 :step="15"
-                                suffix=" s"
-                                class="w-32"
                                 :disabled="cpuActive"
-                                :input-style="{ width: '3.5rem' }"
-                                input-class="!p-1.5 !text-sm"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                suffix="s"
+                            />
                         </td>
                         <td class="pr-4">
-                            <Button
+                            <UiButton
                                 v-if="!cpuActive"
-                                :label="t('views.appInfo.start')"
-                                class="bg-accent/80 hover:!bg-accent h-[2.375rem]"
                                 :disabled="ramActive"
                                 @click="startCpuStress"
-                            />
-                            <Button
-                                v-else
-                                :label="t('views.appInfo.stop')"
-                                class="bg-red-600/80 hover:!bg-red-600 h-[2.375rem]"
-                                @click="stopCpuStress"
-                            />
+                                >{{ t('views.appInfo.start') }}</UiButton
+                            >
+                            <UiButton v-else variant="danger" @click="stopCpuStress">{{
+                                t('views.appInfo.stop')
+                            }}</UiButton>
                         </td>
                         <td>
                             <div class="flex items-center gap-2">
@@ -352,40 +342,22 @@ onMounted(async () => {
                             />
                         </td>
                         <td class="pr-4">
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="gpuDuration"
-                                show-buttons
-                                button-layout="horizontal"
                                 :min="15"
                                 :max="600"
                                 :step="15"
-                                suffix=" s"
-                                class="w-32"
                                 :disabled="gpuActive"
-                                :input-style="{ width: '3.5rem' }"
-                                input-class="!p-1.5 !text-sm"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                suffix="s"
+                            />
                         </td>
                         <td class="pr-4">
-                            <Button
-                                v-if="!gpuActive"
-                                :label="t('views.appInfo.start')"
-                                class="bg-accent/80 hover:!bg-accent h-[2.375rem]"
-                                @click="startGpuStress"
-                            />
-                            <Button
-                                v-else
-                                :label="t('views.appInfo.stop')"
-                                class="bg-red-600/80 hover:!bg-red-600 h-[2.375rem]"
-                                @click="stopGpuStress"
-                            />
+                            <UiButton v-if="!gpuActive" @click="startGpuStress">{{
+                                t('views.appInfo.start')
+                            }}</UiButton>
+                            <UiButton v-else variant="danger" @click="stopGpuStress">{{
+                                t('views.appInfo.stop')
+                            }}</UiButton>
                         </td>
                         <td>
                             <div class="flex items-center gap-2">
@@ -423,41 +395,25 @@ onMounted(async () => {
                             }}</span>
                         </td>
                         <td class="pr-4">
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="ramDuration"
-                                show-buttons
-                                button-layout="horizontal"
                                 :min="15"
                                 :max="600"
                                 :step="15"
-                                suffix=" s"
-                                class="w-32"
                                 :disabled="ramActive"
-                                :input-style="{ width: '3.5rem' }"
-                                input-class="!p-1.5 !text-sm"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                suffix="s"
+                            />
                         </td>
                         <td class="pr-4">
-                            <Button
+                            <UiButton
                                 v-if="!ramActive"
-                                :label="t('views.appInfo.start')"
-                                class="bg-accent/80 hover:!bg-accent h-[2.375rem]"
                                 :disabled="cpuActive"
                                 @click="startRamStress"
-                            />
-                            <Button
-                                v-else
-                                :label="t('views.appInfo.stop')"
-                                class="bg-red-600/80 hover:!bg-red-600 h-[2.375rem]"
-                                @click="stopRamStress"
-                            />
+                                >{{ t('views.appInfo.start') }}</UiButton
+                            >
+                            <UiButton v-else variant="danger" @click="stopRamStress">{{
+                                t('views.appInfo.stop')
+                            }}</UiButton>
                         </td>
                         <td>
                             <div class="flex items-center gap-2">
@@ -497,31 +453,17 @@ onMounted(async () => {
                         </td>
                         <td class="pr-4">
                             <div class="flex items-center gap-2">
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="driveDuration"
-                                    show-buttons
-                                    button-layout="horizontal"
                                     :min="15"
                                     :max="600"
                                     :step="15"
-                                    suffix=" s"
-                                    class="w-32"
                                     :disabled="driveActive"
-                                    :input-style="{ width: '3.5rem' }"
-                                    input-class="!p-1.5 !text-sm"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
-                                <Select
+                                    suffix="s"
+                                />
+                                <UiSelect
                                     v-model="selectedDrive"
-                                    :options="availableDrives"
-                                    option-value="device_path"
-                                    :option-label="driveLabel"
+                                    :options="driveOptions"
                                     :placeholder="t('views.appInfo.selectDrive')"
                                     class="w-64"
                                     :disabled="driveActive || availableDrives.length === 0"
@@ -529,19 +471,15 @@ onMounted(async () => {
                             </div>
                         </td>
                         <td class="pr-4">
-                            <Button
+                            <UiButton
                                 v-if="!driveActive"
-                                :label="t('views.appInfo.start')"
-                                class="bg-accent/80 hover:!bg-accent h-[2.375rem]"
                                 :disabled="!selectedDrive || availableDrives.length === 0"
                                 @click="startDriveStress"
-                            />
-                            <Button
-                                v-else
-                                :label="t('views.appInfo.stop')"
-                                class="bg-red-600/80 hover:!bg-red-600 h-[2.375rem]"
-                                @click="stopDriveStress"
-                            />
+                                >{{ t('views.appInfo.start') }}</UiButton
+                            >
+                            <UiButton v-else variant="danger" @click="stopDriveStress">{{
+                                t('views.appInfo.stop')
+                            }}</UiButton>
                         </td>
                         <td>
                             <div class="flex items-center gap-2">
