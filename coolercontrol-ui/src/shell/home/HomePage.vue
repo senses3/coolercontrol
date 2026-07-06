@@ -250,7 +250,8 @@ const cardClasses = 'rounded-lg border border-border-one bg-bg-two p-4'
 const cardTitleClasses = 'pb-3 text-lg font-medium text-text-color'
 const shortcutClasses =
     'flex items-center gap-2 rounded-lg px-2 py-1.5 text-base text-accent outline-none ' +
-    'hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent cursor-pointer'
+    'hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent cursor-pointer ' +
+    '[&>svg]:shrink-0 min-w-0'
 </script>
 
 <template>
