@@ -24,6 +24,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { PLUGINS_SECTION, SHELL_SECTIONS, type SectionId } from '@/shell/sections.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
@@ -31,15 +32,24 @@ import UiTooltip from '@/shell/ui/UiTooltip.vue'
 const route = useRoute()
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
+const settingsStore = useSettingsStore()
 
 const railSections = computed(() =>
     deviceStore.plugins.length > 0 ? [...SHELL_SECTIONS, PLUGINS_SECTION] : SHELL_SECTIONS,
 )
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
+const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.gif' : '/logo.svg'))
 </script>
 
 <template>
     <nav class="flex h-full w-20 flex-col items-center gap-1 py-2">
+        <RouterLink
+            id="logo"
+            :to="{ name: 'section-home' }"
+            class="mb-1 mt-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+            <img :src="logoUrl" alt="CoolerControl" class="h-10 w-10" />
+        </RouterLink>
         <RouterLink
             v-for="section in railSections"
             :key="section.id"

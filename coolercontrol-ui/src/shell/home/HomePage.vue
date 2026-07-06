@@ -28,7 +28,6 @@ import {
     mdiFan,
     mdiOpenInNew,
     mdiSpeedometer,
-    mdiTextBoxOutline,
 } from '@mdi/js'
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -253,9 +252,27 @@ const shortcutClasses =
 
 <template>
     <div class="flex h-full flex-col overflow-y-auto p-4">
-        <div class="flex items-baseline gap-3">
+        <div class="flex flex-wrap items-baseline gap-3">
             <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.home') }}</h1>
             <span class="text-base text-text-color-secondary">{{ healthCheck.system.name }}</span>
+            <span class="ml-auto flex flex-wrap items-baseline gap-3 text-sm">
+                <a
+                    href="https://gitlab.com/coolercontrol/coolercontrol/-/releases"
+                    target="_blank"
+                    class="text-accent"
+                >
+                    CoolerControl v{{ appVersion }}
+                </a>
+                <RouterLink
+                    :to="{ name: 'settings', params: { tabNumber: '0' } }"
+                    class="text-accent"
+                >
+                    {{ t('views.appInfo.changeStartupPage') }}
+                </RouterLink>
+                <span class="text-text-color-secondary">
+                    {{ t('views.appInfo.noWarranty') }}
+                </span>
+            </span>
         </div>
 
         <div class="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2">
@@ -434,35 +451,6 @@ const shortcutClasses =
 
             <!-- Stress tests -->
             <StressTestsCard />
-
-            <!-- Logs teaser / version footer -->
-            <div :class="cardClasses" class="flex flex-col justify-between">
-                <div>
-                    <span :class="cardTitleClasses">
-                        {{ t('views.appInfo.logsAndDiagnostics') }}
-                    </span>
-                    <RouterLink :to="{ name: 'home-logs' }" :class="shortcutClasses" class="mt-3">
-                        <svg-icon type="mdi" :path="mdiTextBoxOutline" :size="18" />
-                        {{ t('layout.shell.homePage.viewLogs') }}
-                    </RouterLink>
-                </div>
-                <div class="pt-4 text-sm text-text-color-secondary">
-                    <a
-                        href="https://gitlab.com/coolercontrol/coolercontrol/-/releases"
-                        target="_blank"
-                        class="text-accent"
-                    >
-                        CoolerControl v{{ appVersion }}
-                    </a>
-                    <span class="block">{{ t('views.appInfo.noWarranty') }}</span>
-                    <RouterLink
-                        :to="{ name: 'settings', params: { tabNumber: '0' } }"
-                        class="text-accent"
-                    >
-                        {{ t('views.appInfo.changeStartupPage') }}
-                    </RouterLink>
-                </div>
-            </div>
         </div>
         <div class="pb-8" />
     </div>
