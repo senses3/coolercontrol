@@ -36,13 +36,12 @@ import {
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { Emitter, EventType } from 'mitt'
 
 interface Props {
@@ -528,7 +527,7 @@ onUnmounted(() => {
                             '<br/>&nbsp;&nbsp;' +
                             t('views.functions.emaCustomSensorAvailableNote'),
                     }"
-                    @change="changeFunctionType"
+                    @update:model-value="changeFunctionType"
                 />
             </div>
             <!--
@@ -563,10 +562,9 @@ onUnmounted(() => {
                         <td
                             class="py-2 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                         >
-                            <el-switch
+                            <UiSwitch
                                 v-model="chosenFixedStepSize"
-                                size="large"
-                                @change="updateFixedStepSize"
+                                @update:model-value="updateFixedStepSize"
                             />
                         </td>
                     </tr>
@@ -579,10 +577,9 @@ onUnmounted(() => {
                         <td
                             class="py-2 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <el-switch
+                            <UiSwitch
                                 v-model="chosenAsymmetric"
-                                size="large"
-                                @change="updateSymmetricStepSize"
+                                @update:model-value="updateSymmetricStepSize"
                             />
                         </td>
                     </tr>
@@ -758,7 +755,7 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                         >
-                            <el-switch v-model="chosenThresholdHopping" size="large" />
+                            <UiSwitch v-model="chosenThresholdHopping" />
                         </td>
                     </tr>
                     <tr v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')">
@@ -770,7 +767,7 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <el-switch v-model="chosenBypassMinAtExtremes" size="large" />
+                            <UiSwitch v-model="chosenBypassMinAtExtremes" />
                         </td>
                     </tr>
                     <tr v-if="selectedType === FunctionType.Standard">
@@ -858,7 +855,7 @@ onUnmounted(() => {
                         <td
                             class="py-2 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <el-switch v-model="chosenOnlyDownward" size="large" />
+                            <UiSwitch v-model="chosenOnlyDownward" />
                         </td>
                     </tr>
                     <tr v-if="selectedType === FunctionType.ExponentialMovingAvg">
@@ -913,14 +910,4 @@ onUnmounted(() => {
     </ScrollAreaRoot>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-    // switch active text color:
-    --el-color-primary: rgb(var(--colors-text-color));
-    // switch inactive text color:
-    --el-text-color-primary: rgb(var(--colors-text-color));
-}
-</style>
+<style scoped lang="scss"></style>

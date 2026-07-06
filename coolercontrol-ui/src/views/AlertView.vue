@@ -33,9 +33,8 @@ import { Alert } from '@/models/Alert.ts'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import Slider from 'primevue/slider'
 import { useI18n } from 'vue-i18n'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 
 interface Props {
     alertUID?: string
@@ -457,7 +456,7 @@ onMounted(async () => {
                         list-style="max-height: 100%"
                         :invalid="chosenChannelSource == null"
                         v-tooltip.top="t('views.alerts.channelSourceTooltip')"
-                        @change="changeChannelSource"
+                        @update:model-value="changeChannelSource"
                     >
                         <template #optiongroup="slotProps">
                             <div class="flex items-center">
@@ -654,7 +653,7 @@ onMounted(async () => {
                                 <td
                                     class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
                                 >
-                                    <el-switch v-model="chosenDesktopNotification" size="large" />
+                                    <UiSwitch v-model="chosenDesktopNotification" />
                                 </td>
                             </tr>
                             <tr v-tooltip.top="t('views.alerts.desktopNotifyRecoveryTooltip')">
@@ -668,10 +667,9 @@ onMounted(async () => {
                                 <td
                                     class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
                                 >
-                                    <el-switch
+                                    <UiSwitch
                                         v-model="chosenDesktopNotificationRecovery"
                                         :disabled="!chosenDesktopNotification"
-                                        size="large"
                                     />
                                 </td>
                             </tr>
@@ -686,10 +684,9 @@ onMounted(async () => {
                                 <td
                                     class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
                                 >
-                                    <el-switch
+                                    <UiSwitch
                                         v-model="chosenDesktopNotificationAudio"
                                         :disabled="!chosenDesktopNotification"
-                                        size="large"
                                     />
                                 </td>
                             </tr>
@@ -704,7 +701,7 @@ onMounted(async () => {
                                 <td
                                     class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
                                 >
-                                    <el-switch v-model="chosenShutdownOnActivation" size="large" />
+                                    <UiSwitch v-model="chosenShutdownOnActivation" />
                                 </td>
                             </tr>
                         </tbody>
@@ -723,14 +720,4 @@ onMounted(async () => {
     </ScrollAreaRoot>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-    // switch active text color:
-    --el-color-primary: rgb(var(--colors-text-color));
-    // switch inactive text color:
-    --el-text-color-primary: rgb(var(--colors-text-color));
-}
-</style>
+<style scoped lang="scss"></style>

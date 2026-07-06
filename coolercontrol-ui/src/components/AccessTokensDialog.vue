@@ -25,6 +25,7 @@ import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
 import { ErrorResponse } from '@/models/ErrorResponse'
 import type { AccessTokenInfo, CreateTokenResponse } from '@/models/AccessToken'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import DataTable from 'primevue/datatable'
@@ -33,8 +34,6 @@ import Tag from 'primevue/tag'
 import FloatLabel from 'primevue/floatlabel'
 import DatePicker from 'primevue/datepicker'
 import Message from 'primevue/message'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
@@ -209,7 +208,7 @@ onMounted(loadTokens)
             <label for="token-write-access" class="whitespace-nowrap">
                 {{ t('auth.writeAccess') }}
             </label>
-            <el-switch v-model="newWriteAccess" size="large" input-id="token-write-access" />
+            <UiSwitch v-model="newWriteAccess" input-id="token-write-access" />
         </div>
         <Button
             class="!bg-accent/80 hover:!bg-accent/100 h-12"
@@ -221,13 +220,7 @@ onMounted(loadTokens)
     </div>
 
     <!-- Token list -->
-    <DataTable
-        :value="tokens"
-        :loading="loading"
-        striped-rows
-        size="small"
-        :empty-message="t('auth.noTokens')"
-    >
+    <DataTable :value="tokens" :loading="loading" striped-rows :empty-message="t('auth.noTokens')">
         <Column field="label" :header="t('auth.label')" />
         <Column field="created_at" :header="t('auth.created')">
             <template #body="{ data }">{{ formatDate(data.created_at) }}</template>
@@ -268,10 +261,4 @@ onMounted(loadTokens)
     </DataTable>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>

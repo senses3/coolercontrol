@@ -26,7 +26,6 @@ import { DeviceSettingReadDTO, DeviceSettingWriteLightingDTO } from '@/models/Da
 import { LightingMode, LightingModeType } from '@/models/LightingMode'
 import { computed, inject, nextTick, onMounted, ref, type Ref, watch } from 'vue'
 import InputNumber from 'primevue/inputnumber'
-import { ElSwitch } from 'element-plus'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import Button from 'primevue/button'
 import { mdiContentSaveOutline } from '@mdi/js'
@@ -38,6 +37,7 @@ import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { Emitter, EventType } from 'mitt'
 
 interface Props {
@@ -295,7 +295,6 @@ onMounted(() => {
                             scroll-height="40rem"
                             v-tooltip.top="t('views.lighting.lightingMode')"
                             filter
-                            size="large"
                             variant="filled"
                         >
                             <template #option="slotProps">
@@ -318,7 +317,7 @@ onMounted(() => {
                             placeholder="Speed"
                             list-style="max-height: 100%"
                             v-tooltip.top="t('views.lighting.speed')"
-                            @change="changeLightingSpeed"
+                            @update:model-value="changeLightingSpeed"
                         />
                     </div>
                     <div v-if="selectedMode.backward_enabled" class="mt-4 mr-4 w-96">
@@ -328,13 +327,11 @@ onMounted(() => {
                         <div
                             class="bg-bg-two border border-border-one p-1 rounded-lg text-center items-center"
                         >
-                            <el-switch
-                                v-model="selectedBackwardEnabled"
-                                size="large"
-                                :active-text="t('views.lighting.backward')"
-                                :inactive-text="t('views.lighting.forward')"
-                                style="--el-switch-off-color: rgb(var(--colors-accent))"
-                            />
+                            <span class="inline-flex items-center justify-center gap-2 p-2">
+                                <span>{{ t('views.lighting.forward') }}</span>
+                                <UiSwitch v-model="selectedBackwardEnabled" two-sided />
+                                <span>{{ t('views.lighting.backward') }}</span>
+                            </span>
                         </div>
                     </div>
                     <div
@@ -409,16 +406,6 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-    // switch active text color:
-    --el-color-primary: rgb(var(--colors-text-color));
-    // switch inactive text color:
-    --el-text-color-primary: rgb(var(--colors-text-color));
-}
-
 .color-wrapper {
     display: flex;
     flex-wrap: wrap;

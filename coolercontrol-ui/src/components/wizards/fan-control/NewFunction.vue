@@ -24,13 +24,12 @@ import Button from 'primevue/button'
 import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { DEFAULT_NAME_STRING_LENGTH, useDeviceStore } from '@/stores/DeviceStore.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { computed, ref, type Ref } from 'vue'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import { $enum } from 'ts-enum-util'
 import InputNumber from 'primevue/inputnumber'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 
 interface Props {
     profileName?: string
@@ -243,10 +242,9 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <el-switch
+                                <UiSwitch
                                     v-model="chosenFixedStepSize"
-                                    size="large"
-                                    @change="updateFixedStepSize"
+                                    @update:model-value="updateFixedStepSize"
                                 />
                             </td>
                         </tr>
@@ -259,10 +257,9 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <el-switch
+                                <UiSwitch
                                     v-model="chosenAsymmetric"
-                                    size="large"
-                                    @change="updateSymmetricStepSize"
+                                    @update:model-value="updateSymmetricStepSize"
                                 />
                             </td>
                         </tr>
@@ -441,7 +438,7 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
                             >
-                                <el-switch v-model="chosenThresholdHopping" size="large" />
+                                <UiSwitch v-model="chosenThresholdHopping" />
                             </td>
                         </tr>
                         <tr v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')">
@@ -453,7 +450,7 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <el-switch v-model="chosenBypassMinAtExtremes" size="large" />
+                                <UiSwitch v-model="chosenBypassMinAtExtremes" />
                             </td>
                         </tr>
                         <tr v-if="selectedType === FunctionType.Standard">
@@ -541,7 +538,7 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <el-switch v-model="chosenOnlyDownward" size="large" />
+                                <UiSwitch v-model="chosenOnlyDownward" />
                             </td>
                         </tr>
                         <tr v-if="selectedType === FunctionType.ExponentialMovingAvg">
@@ -611,10 +608,4 @@ const updateSymmetricStepSize = () => {
     </div>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>

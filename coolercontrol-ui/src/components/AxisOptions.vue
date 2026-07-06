@@ -19,14 +19,13 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import InputNumber from 'primevue/inputnumber'
 import { mdiAxisArrow, mdiAxisXArrow, mdiAxisYArrow } from '@mdi/js'
 import { PopoverContent, PopoverRoot, PopoverTrigger } from 'radix-vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { ref, Ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -131,22 +130,19 @@ const isPopupOpen = ref(false)
                                     {{ t('components.axisOptions.autoScale') }}
                                 </td>
                                 <td class="w-24 px-2 border-r border-border-one text-center">
-                                    <el-switch v-model="dashboard.autoScaleDegree" size="large" />
+                                    <UiSwitch v-model="dashboard.autoScaleDegree" />
                                 </td>
                                 <td class="w-24 text-end px-2 border-r border-border-one">
                                     {{ t('components.axisOptions.autoScale') }}
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <el-switch
-                                        v-model="dashboard.autoScaleFrequency"
-                                        size="large"
-                                    />
+                                    <UiSwitch v-model="dashboard.autoScaleFrequency" />
                                 </td>
                                 <td class="w-24 text-end px-2 border-x border-border-one">
                                     {{ t('components.axisOptions.autoScale') }}
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <el-switch v-model="dashboard.autoScaleWatts" size="large" />
+                                    <UiSwitch v-model="dashboard.autoScaleWatts" />
                                 </td>
                             </tr>
                             <tr>
@@ -321,10 +317,4 @@ const isPopupOpen = ref(false)
     </div>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>

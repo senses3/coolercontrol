@@ -58,8 +58,7 @@ import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import InputText from 'primevue/inputtext'
-import { ElLoading } from 'element-plus'
-import { svgLoader, svgLoaderViewBox } from '@/models/Loader.ts'
+import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
@@ -212,14 +211,10 @@ const filesChosen = async (event: FileUploadUploaderEvent): Promise<void> => {
         validateFileSize(chosenFile)
         validateFileType(chosenFile)
     }
-    const processing = ElLoading.service({
+    const processing = showLoadingOverlay({
         target: '#lcd-control-pane',
-        lock: true,
-        fullscreen: false,
         text: t('views.lcd.processing'),
         background: 'rgba(var(--colors-bg-one) / 0.8)',
-        svgViewBox: svgLoaderViewBox,
-        svg: svgLoader,
     })
     const response: File | ErrorResponse = await deviceStore.daemonClient.processLcdImageFiles(
         props.deviceUID,
@@ -287,14 +282,10 @@ const saveLCDSetting = async () => {
         setting.carousel = new LcdCarouselSettings(imagesDelayInterval.value, imagesPath.value)
     }
 
-    const uploading = ElLoading.service({
+    const uploading = showLoadingOverlay({
         target: '#lcd-control-pane',
-        lock: true,
-        fullscreen: false,
         text: t('views.lcd.applying'),
         background: 'rgba(var(--colors-bg-one) / 0.8)',
-        svgViewBox: svgLoaderViewBox,
-        svg: svgLoader,
     })
     if (setting.mode === 'image' && files.length > 0) {
         await settingsStore.saveDaemonDeviceSettingLcdImages(
