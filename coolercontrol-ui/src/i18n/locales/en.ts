@@ -117,6 +117,8 @@ export default {
             panelPlaceholder: 'Section content arrives in phase {phase}.',
             laterPhase: 'Moves here in a later phase',
             manageModes: 'Manage modes',
+            access: 'Access',
+            power: 'Power',
             noModes: 'No modes saved',
             coolingPanel: {
                 pinned: 'Pinned',

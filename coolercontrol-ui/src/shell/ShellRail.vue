@@ -37,7 +37,6 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useSystemActions } from '@/composables/useSystemActions.ts'
 import { PLUGINS_SECTION, SHELL_SECTIONS, type SectionId } from '@/shell/sections.ts'
-import UiButton from '@/shell/ui/UiButton.vue'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 
 const route = useRoute()
@@ -93,20 +92,21 @@ const itemClass =
         <div class="flex-1" />
         <UiDropdownMenu>
             <template #trigger>
-                <UiButton
-                    variant="ghost"
-                    size="icon"
-                    :title="
-                        deviceStore.loggedIn ? t('layout.topbar.logout') : t('layout.topbar.login')
-                    "
+                <button
+                    id="access"
+                    type="button"
+                    class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                 >
                     <svg-icon
                         type="mdi"
                         :path="mdiLockOutline"
-                        :size="deviceStore.getREMSize(1.25)"
+                        :size="deviceStore.getREMSize(1.5)"
                         :class="deviceStore.loggedIn ? 'text-accent' : ''"
                     />
-                </UiButton>
+                    <span class="text-[0.8125rem] leading-tight">
+                        {{ t('layout.shell.access') }}
+                    </span>
+                </button>
             </template>
             <DropdownMenuItem
                 v-if="!deviceStore.loggedIn"
@@ -133,9 +133,16 @@ const itemClass =
         </UiDropdownMenu>
         <UiDropdownMenu>
             <template #trigger>
-                <UiButton variant="ghost" size="icon" :title="t('layout.topbar.restartUI')">
-                    <svg-icon type="mdi" :path="mdiPower" :size="deviceStore.getREMSize(1.25)" />
-                </UiButton>
+                <button
+                    id="restart"
+                    type="button"
+                    class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    <svg-icon type="mdi" :path="mdiPower" :size="deviceStore.getREMSize(1.5)" />
+                    <span class="text-[0.8125rem] leading-tight">
+                        {{ t('layout.shell.power') }}
+                    </span>
+                </button>
             </template>
             <DropdownMenuItem :class="itemClass" @select="deviceStore.reloadUI()">
                 <svg-icon type="mdi" :path="mdiRefresh" :size="15" />

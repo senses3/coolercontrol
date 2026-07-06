@@ -23,7 +23,10 @@ import type { UID } from '@/models/Device.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels } from '@/shell/cooling/channels.ts'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
+import { features } from '@/features'
 import ChannelCard from '@/shell/cooling/ChannelCard.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -36,14 +39,29 @@ const deviceLabel = (deviceUID: UID): string =>
 
 const deviceColor = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor ?? ''
+
+const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
 </script>
 
 <template>
     <div class="flex h-full flex-col overflow-y-auto">
-        <div class="flex items-center gap-3 px-4 pt-4">
+        <div class="flex flex-wrap items-center gap-3 px-4 pt-4">
             <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.cooling') }}</h1>
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.coolingPage.landingHint') }}
+            </span>
+            <span class="ml-auto flex items-center gap-2">
+                <UiButton
+                    v-if="features.coolingWizard"
+                    size="sm"
+                    variant="outline"
+                    @click="openGenerateWizard()"
+                >
+                    {{ t('views.appInfo.gettingStartedAutoCreateLink') }}
+                </UiButton>
+                <UiButton size="sm" variant="outline" @click="openCalibrationWizard()">
+                    {{ t('components.wizards.calibration.title') }}
+                </UiButton>
             </span>
         </div>
         <template v-if="groups.length > 0">

@@ -26,6 +26,7 @@ import HomePanel from '@/shell/home/HomePanel.vue'
 import MonitoringPanel from '@/shell/monitoring/MonitoringPanel.vue'
 import DevicesPanel from '@/shell/devices/DevicesPanel.vue'
 import PluginsPanel from '@/shell/plugins/PluginsPanel.vue'
+import SettingsPanel from '@/shell/settings/SettingsPanel.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
@@ -50,6 +51,7 @@ const section = computed(() => {
                 <MonitoringPanel v-else-if="section.id === 'monitoring'" />
                 <DevicesPanel v-else-if="section.id === 'devices'" />
                 <PluginsPanel v-else-if="section.id === 'plugins'" />
+                <SettingsPanel v-else-if="section.id === 'settings'" />
                 <div v-else />
             </UiScrollArea>
         </template>
