@@ -25,6 +25,7 @@ import CoolingPanel from '@/shell/cooling/CoolingPanel.vue'
 import HomePanel from '@/shell/home/HomePanel.vue'
 import MonitoringPanel from '@/shell/monitoring/MonitoringPanel.vue'
 import DevicesPanel from '@/shell/devices/DevicesPanel.vue'
+import PluginsPanel from '@/shell/plugins/PluginsPanel.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
@@ -48,10 +49,8 @@ const section = computed(() => {
                 <CoolingPanel v-else-if="section.id === 'cooling'" />
                 <MonitoringPanel v-else-if="section.id === 'monitoring'" />
                 <DevicesPanel v-else-if="section.id === 'devices'" />
-                <div v-else-if="section.id === 'settings'" />
-                <div v-else class="p-3 text-base text-text-color-secondary">
-                    {{ t('layout.shell.panelPlaceholder', { phase: section.phase }) }}
-                </div>
+                <PluginsPanel v-else-if="section.id === 'plugins'" />
+                <div v-else />
             </UiScrollArea>
         </template>
     </div>

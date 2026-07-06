@@ -25,46 +25,39 @@ export interface ShellSection {
     labelKey: string
     icon: string
     routeName: string
-    // Redesign phase in which this section gets its real content.
-    phase: number
 }
 
-// Rail order. Settings reuses the existing settings route until phase 3.
+// Rail order.
 export const SHELL_SECTIONS: readonly ShellSection[] = Object.freeze([
     {
         id: 'home',
         labelKey: 'layout.shell.home',
         icon: mdiHomeOutline,
         routeName: 'section-home',
-        phase: 4,
     },
     {
         id: 'cooling',
         labelKey: 'layout.shell.cooling',
         icon: mdiFan,
         routeName: 'section-cooling',
-        phase: 1,
     },
     {
         id: 'monitoring',
         labelKey: 'layout.shell.monitoring',
         icon: mdiChartLine,
         routeName: 'section-monitoring',
-        phase: 2,
     },
     {
         id: 'devices',
         labelKey: 'layout.shell.devices',
         icon: mdiMemory,
         routeName: 'section-devices',
-        phase: 3,
     },
     {
         id: 'settings',
         labelKey: 'layout.shell.settings',
         icon: mdiCog,
         routeName: 'settings',
-        phase: 3,
     },
 ])
 
@@ -74,7 +67,6 @@ export const PLUGINS_SECTION: ShellSection = Object.freeze({
     labelKey: 'layout.shell.plugins',
     icon: mdiPowerPlug,
     routeName: 'plugins-overview',
-    phase: 5,
 })
 
 export function sectionById(id: SectionId): ShellSection | undefined {
