@@ -459,14 +459,14 @@ onMounted(async () => {
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <div class="flex flex-col-reverse lg:flex-row mt-0 w-full">
-                <div class="w-96 mr-4">
+            <div class="flex flex-col-reverse items-start lg:flex-row mt-0 w-full">
+                <div class="flex w-96 flex-col self-stretch mr-4">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.channelSource') }}
                     </small>
                     <UiGroupedListbox
                         :model-value="chosenChannelKey"
-                        class="w-full mt-1 mb-6 max-h-[28rem]"
+                        class="mt-1 min-h-0 flex-1 basis-0"
                         :groups="sourceGroups"
                         filter
                         :filter-placeholder="t('common.search')"
@@ -475,11 +475,11 @@ onMounted(async () => {
                         @update:model-value="changeChannelSource"
                     />
                 </div>
-                <div class="mt-1 w-96">
+                <div class="mt-0 w-96">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.triggerConditions') }}
                     </small>
-                    <UiSettingsCard class="mb-4">
+                    <UiSettingsCard class="mb-0 mt-1">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.maxValueTooltip')"
                             :label="t('views.alerts.greaterThan')"
