@@ -17,37 +17,20 @@
   -->
 
 <template>
-    <Select
+    <UiSelect
         v-model="currentLocale"
-        :options="localeOptions"
-        optionLabel="name"
-        optionValue="code"
-        @change="changeLocale"
-        class="w-full h-[2.375rem]"
-        :loading="isLoading"
-        :pt="{
-            input: { class: 'text-center' },
-            trigger: { class: 'flex justify-center items-center' },
-            label: { class: 'text-center w-full' },
-            panel: { class: 'border-2 border-border-one rounded-lg shadow-lg bg-bg-one' },
-        }"
-    >
-        <template #value="slotProps">
-            <div class="flex justify-center items-center w-full h-full">
-                {{
-                    slotProps.value
-                        ? localeOptions.find((option) => option.code === slotProps.value)?.name
-                        : t('layout.settings.selectLanguage')
-                }}
-            </div>
-        </template>
-    </Select>
+        :options="localeSelectOptions"
+        :placeholder="t('layout.settings.selectLanguage')"
+        :disabled="isLoading"
+        class="w-full"
+        @update:model-value="changeLocale"
+    />
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Select from 'primevue/select'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 
@@ -71,6 +54,10 @@ const localeOptions = [
     { name: 'हिन्दी', code: 'hi' },
     { name: '한국어', code: 'ko' },
 ]
+const localeSelectOptions = localeOptions.map((option) => ({
+    label: option.name,
+    value: option.code,
+}))
 
 // Ensure currentLocale matches locale when component is mounted
 onMounted(() => {
@@ -80,8 +67,9 @@ onMounted(() => {
     }
 })
 
-function changeLocale(event: { value: string }) {
-    const selectedLocale = event.value
+function changeLocale(value: string | undefined) {
+    if (value == null) return
+    const selectedLocale = value
 
     // We should actually compare the target language with the current locale value, not currentLocale
     if (selectedLocale === locale.value) {
