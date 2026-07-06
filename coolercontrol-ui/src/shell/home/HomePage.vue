@@ -111,7 +111,7 @@ const failsafeRoute = (ref: FailsafeRef): RouteLocationRaw => {
     for (const device of deviceStore.allDevices()) {
         if (device.uid !== ref.device_uid) continue
         if (device.type === DeviceType.CUSTOM_SENSORS) {
-            return { name: 'monitoring-custom-sensor', params: { customSensorID: ref.name } }
+            return { name: 'device-custom-sensor', params: { customSensorID: ref.name } }
         }
         if (device.info?.channels.get(ref.name)?.speed_options != null) {
             return {
@@ -130,7 +130,7 @@ const failsafeRoute = (ref: FailsafeRef): RouteLocationRaw => {
 const sourceRoute = (ref: SourceRef): RouteLocationRaw => {
     switch (ref.entity_type) {
         case HealthEntityType.CustomSensor:
-            return { name: 'monitoring-custom-sensor', params: { customSensorID: ref.entity_uid } }
+            return { name: 'device-custom-sensor', params: { customSensorID: ref.entity_uid } }
         case HealthEntityType.Profile:
             return { name: 'profiles', params: { profileUID: ref.entity_uid } }
         case HealthEntityType.Lcd:

@@ -19,16 +19,21 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiDragVertical, mdiLightbulbOutline, mdiTelevision } from '@mdi/js'
+import { mdiAlert, mdiDragVertical, mdiLightbulbOutline, mdiPlus, mdiTelevision } from '@mdi/js'
 import { VueDraggable } from 'vue-draggable-plus'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { type Color, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
+import { type Color, DeviceType, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
+import {
+    customSensorNames,
+    deviceChannelLinks,
+    deviceTypeGroups,
+    hardwareDevices,
+} from '@/shell/devices/devices.ts'
 import { setTopLevelOrder } from '@/shell/panelOrder.ts'
 
 const { t } = useI18n()
@@ -69,6 +74,10 @@ const dotColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || 'rgb(var(--colors-text-color))'
 const pickerColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || `rgb(${colorStore.themeColors.text_color})`
+
+const sensorDotColor = (deviceUID: UID, channelName: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.color ||
+    'rgb(var(--colors-text-color))'
 
 const channelLabel = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.name ??
@@ -154,6 +163,32 @@ const setDeviceColor = (deviceUID: UID, newColor: Color): void => {
                         <span class="truncate">{{
                             channelLabel(link.deviceUID, link.channelName)
                         }}</span>
+                    </RouterLink>
+                    <RouterLink
+                        v-for="sensorName in customSensorNames(device)"
+                        :key="`custom-${sensorName}`"
+                        :to="{
+                            name: 'device-custom-sensor',
+                            params: { customSensorID: sensorName },
+                        }"
+                        class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                        exact-active-class="bg-surface-hover !text-accent"
+                    >
+                        <span
+                            class="h-2 w-2 shrink-0 rounded-full"
+                            :style="{ backgroundColor: sensorDotColor(device.uid, sensorName) }"
+                        />
+                        <span class="truncate">{{ channelLabel(device.uid, sensorName) }}</span>
+                    </RouterLink>
+                    <RouterLink
+                        v-if="device.type === DeviceType.CUSTOM_SENSORS"
+                        :to="{ name: 'device-custom-sensor-new' }"
+                        class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus:ring-2 focus:ring-accent"
+                    >
+                        <svg-icon type="mdi" :path="mdiPlus" :size="14" class="shrink-0" />
+                        <span class="truncate">
+                            {{ t('layout.menu.tooltips.addCustomSensor') }}
+                        </span>
                     </RouterLink>
                 </div>
             </VueDraggable>

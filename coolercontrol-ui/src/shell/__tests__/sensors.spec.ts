@@ -20,7 +20,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { type Device, DeviceType } from '@/models/Device.ts'
-import { customSensors, monitoringSensors } from '../monitoring/sensors.ts'
+import { monitoringSensors } from '../monitoring/sensors.ts'
 
 interface FakeChannel {
     speed_options?: object
@@ -70,22 +70,19 @@ describe('monitoringSensors', () => {
         expect(groups[0].sensors[1].isTemp).toBe(false)
     })
 
-    it('excludes custom-sensor devices and devices without sensors', () => {
-        const custom = fakeDevice('c1', DeviceType.CUSTOM_SENSORS, ['sensor1'], {})
+    it('excludes devices without sensors', () => {
         const lightingOnly = fakeDevice('d1', DeviceType.HWMON, [], {
             led1: { lighting_modes: [{}] },
         })
         const noInfo = { uid: 'd2', type: DeviceType.HWMON, info: null } as unknown as Device
-        expect(monitoringSensors([custom, lightingOnly, noInfo])).toEqual([])
+        expect(monitoringSensors([lightingOnly, noInfo])).toEqual([])
     })
-})
 
-describe('customSensors', () => {
-    it('lists only the temps of custom-sensor devices', () => {
+    it('includes custom-sensor devices like any other device', () => {
         const custom = fakeDevice('c1', DeviceType.CUSTOM_SENSORS, ['sensor1', 'sensor2'], {})
-        const hwmon = fakeDevice('d1', DeviceType.HWMON, ['temp1'], {})
-        const sensors = customSensors([custom, hwmon])
-        expect(sensors.map((s) => s.channelName)).toEqual(['sensor1', 'sensor2'])
-        expect(sensors.every((s) => s.isTemp)).toBe(true)
+        const groups = monitoringSensors([custom])
+        expect(groups).toHaveLength(1)
+        expect(groups[0].sensors.map((s) => s.channelName)).toEqual(['sensor1', 'sensor2'])
+        expect(groups[0].sensors.every((s) => s.isTemp)).toBe(true)
     })
 })

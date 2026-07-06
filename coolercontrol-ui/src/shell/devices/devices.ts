@@ -25,6 +25,7 @@ export const DEVICE_TYPE_ORDER: DeviceType[] = [
     DeviceType.HWMON,
     DeviceType.LIQUIDCTL,
     DeviceType.SERVICE_PLUGIN,
+    DeviceType.CUSTOM_SENSORS,
 ]
 
 export function deviceTypeRank(type: DeviceType): number {
@@ -44,9 +45,16 @@ export function deviceTypeGroups(devices: Device[]): DeviceTypeGroup[] {
     })).filter((group) => group.devices.length > 0)
 }
 
-// The Devices section lists hardware devices; custom sensors are Monitoring's.
+// The Devices section lists all devices including the virtual CustomSensors
+// device; its sensors are created and edited here.
 export function hardwareDevices(devices: Iterable<Device>): Device[] {
-    return [...devices].filter((device) => device.type !== DeviceType.CUSTOM_SENSORS)
+    return [...devices]
+}
+
+// Sensor names of a CustomSensors device (editor child links).
+export function customSensorNames(device: Device): string[] {
+    if (device.type !== DeviceType.CUSTOM_SENSORS || device.info == null) return []
+    return [...device.info.temps.keys()]
 }
 
 export interface DeviceChannelLink {
