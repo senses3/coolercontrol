@@ -19,15 +19,27 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiLockOutline, mdiPower } from '@mdi/js'
+import {
+    mdiKeyOutline,
+    mdiLockOpenVariantOutline,
+    mdiLockOutline,
+    mdiLogin,
+    mdiLogout,
+    mdiPower,
+    mdiRefresh,
+    mdiShieldOutline,
+    mdiSync,
+} from '@mdi/js'
+import { DropdownMenuItem } from 'reka-ui'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { useSystemActions } from '@/composables/useSystemActions.ts'
 import { PLUGINS_SECTION, SHELL_SECTIONS, type SectionId } from '@/shell/sections.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
-import UiTooltip from '@/shell/ui/UiTooltip.vue'
+import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -39,6 +51,21 @@ const railSections = computed(() =>
 )
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.gif' : '/logo.svg'))
+const { restartDaemonAndUI } = useSystemActions()
+
+const logoutAndReload = async (): Promise<void> => {
+    await deviceStore.logout()
+    deviceStore.reloadUI()
+}
+
+const quitDesktopApp = (): void => {
+    // @ts-ignore
+    window.ipc.forceQuit()
+}
+
+const itemClass =
+    'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-base ' +
+    'text-text-color outline-none data-[highlighted]:bg-surface-hover'
 </script>
 
 <template>
@@ -65,23 +92,68 @@ const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.gif' : 
             <span class="text-[0.8125rem] leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
         <div class="flex-1" />
-        <UiTooltip :text="t('layout.shell.laterPhase')" side="right">
-            <span>
-                <UiButton variant="ghost" size="icon" disabled>
+        <UiDropdownMenu>
+            <template #trigger>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    :title="
+                        deviceStore.loggedIn ? t('layout.topbar.logout') : t('layout.topbar.login')
+                    "
+                >
                     <svg-icon
                         type="mdi"
-                        :path="mdiLockOutline"
+                        :path="deviceStore.loggedIn ? mdiLockOpenVariantOutline : mdiLockOutline"
                         :size="deviceStore.getREMSize(1.25)"
+                        :class="deviceStore.loggedIn ? 'text-accent' : ''"
                     />
                 </UiButton>
-            </span>
-        </UiTooltip>
-        <UiTooltip :text="t('layout.shell.laterPhase')" side="right">
-            <span>
-                <UiButton variant="ghost" size="icon" disabled>
+            </template>
+            <DropdownMenuItem
+                v-if="!deviceStore.loggedIn"
+                :class="itemClass"
+                @select="deviceStore.login()"
+            >
+                <svg-icon type="mdi" :path="mdiLogin" :size="15" />
+                {{ t('layout.topbar.login') }}
+            </DropdownMenuItem>
+            <template v-else>
+                <DropdownMenuItem :class="itemClass" @select="logoutAndReload">
+                    <svg-icon type="mdi" :path="mdiLogout" :size="15" />
+                    {{ t('layout.topbar.logout') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem :class="itemClass" @select="deviceStore.setPasswd()">
+                    <svg-icon type="mdi" :path="mdiShieldOutline" :size="15" />
+                    {{ t('layout.topbar.changePassword') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem :class="itemClass" @select="deviceStore.manageTokens()">
+                    <svg-icon type="mdi" :path="mdiKeyOutline" :size="15" />
+                    {{ t('layout.topbar.accessTokens') }}
+                </DropdownMenuItem>
+            </template>
+        </UiDropdownMenu>
+        <UiDropdownMenu>
+            <template #trigger>
+                <UiButton variant="ghost" size="icon" :title="t('layout.topbar.restartUI')">
                     <svg-icon type="mdi" :path="mdiPower" :size="deviceStore.getREMSize(1.25)" />
                 </UiButton>
-            </span>
-        </UiTooltip>
+            </template>
+            <DropdownMenuItem :class="itemClass" @select="deviceStore.reloadUI()">
+                <svg-icon type="mdi" :path="mdiRefresh" :size="15" />
+                {{ t('layout.topbar.restartUI') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem :class="itemClass" @select="restartDaemonAndUI">
+                <svg-icon type="mdi" :path="mdiSync" :size="15" />
+                {{ t('layout.topbar.restartDaemonAndUI') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                v-if="deviceStore.isQtApp()"
+                :class="itemClass"
+                @select="quitDesktopApp"
+            >
+                <svg-icon type="mdi" :path="mdiPower" :size="15" />
+                {{ t('layout.topbar.quitDesktopApp') }}
+            </DropdownMenuItem>
+        </UiDropdownMenu>
     </nav>
 </template>
