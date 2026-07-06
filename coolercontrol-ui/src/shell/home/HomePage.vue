@@ -250,7 +250,8 @@ const cardClasses = 'rounded-lg border border-border-one bg-bg-two p-4'
 const cardTitleClasses = 'pb-3 text-lg font-medium text-text-color'
 const shortcutClasses =
     'flex items-center gap-2 rounded-lg px-2 py-1.5 text-base text-accent outline-none ' +
-    'hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent cursor-pointer'
+    'hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent cursor-pointer ' +
+    '[&>svg]:shrink-0 min-w-0'
 </script>
 
 <template>
@@ -305,7 +306,14 @@ const shortcutClasses =
                     <span class="text-text-color-secondary">
                         {{ t('views.appInfo.status') }}
                     </span>
-                    <span class="flex items-center gap-2 text-text-color">
+                    <RouterLink
+                        :to="{
+                            name: 'home-logs',
+                            query: daemonState.status === DaemonStatus.OK ? {} : { level: 'warn' },
+                        }"
+                        class="flex w-fit items-center gap-2 rounded text-text-color outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent"
+                        :title="t('layout.shell.homePage.viewLogs')"
+                    >
                         <svg-icon type="mdi" :path="mdiCircle" :size="12" :class="badgeColor" />
                         {{
                             daemonState.connected
@@ -314,7 +322,7 @@ const shortcutClasses =
                                   )
                                 : t('views.appInfo.disconnected')
                         }}
-                    </span>
+                    </RouterLink>
                     <template v-for="[label, value] in statusRows" :key="label">
                         <span class="text-text-color-secondary">{{ label }}</span>
                         <span class="text-text-color">{{ value }}</span>
@@ -392,67 +400,90 @@ const shortcutClasses =
                 </div>
             </div>
 
-            <!-- Shortcuts -->
+            <!-- Shortcuts, grouped: tasks / learning / external resources -->
             <div :class="cardClasses">
                 <span :class="cardTitleClasses">{{ t('views.appInfo.helpfulLinks') }}</span>
-                <div class="flex flex-col gap-1 pt-3">
-                    <RouterLink :to="{ name: 'section-cooling' }" :class="shortcutClasses">
-                        <svg-icon type="mdi" :path="mdiFan" :size="18" />
-                        {{ t('layout.shell.homePage.setUpCooling') }}
-                    </RouterLink>
-                    <button
-                        v-if="features.coolingWizard"
-                        type="button"
-                        :class="shortcutClasses"
-                        @click="openGenerateWizard()"
-                    >
-                        <svg-icon type="mdi" :path="mdiChartMultiple" :size="18" />
-                        {{ t('views.appInfo.gettingStartedAutoCreateLink') }}
-                    </button>
-                    <button type="button" :class="shortcutClasses" @click="openCalibrationWizard()">
-                        <svg-icon type="mdi" :path="mdiSpeedometer" :size="18" />
-                        {{ t('views.appInfo.calibrateFansLink') }}
-                    </button>
-                    <button type="button" :class="shortcutClasses" @click="startTour">
-                        <svg-icon type="mdi" :path="mdiCompassOutline" :size="18" />
-                        {{ t('views.appInfo.uiTour') }}
-                    </button>
-                    <button type="button" :class="shortcutClasses" @click="openShortcutsDialog()">
-                        <svg-icon type="mdi" :path="mdiKeyboardOutline" :size="18" />
-                        {{ t('views.shortcuts.shortcuts') }}
-                    </button>
-                    <a
-                        href="https://docs.coolercontrol.org/getting-started.html"
-                        target="_blank"
-                        :class="shortcutClasses"
-                    >
-                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
-                        {{ t('views.appInfo.gettingStarted') }}
-                    </a>
-                    <a
-                        href="https://docs.coolercontrol.org/hardware-support.html"
-                        target="_blank"
-                        :class="shortcutClasses"
-                    >
-                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
-                        {{ t('views.appInfo.hardwareSupport') }}
-                    </a>
-                    <a
-                        href="https://gitlab.com/coolercontrol/coolercontrol/-/releases"
-                        target="_blank"
-                        :class="shortcutClasses"
-                    >
-                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
-                        {{ t('views.appInfo.whatsNew') }}
-                    </a>
-                    <a
-                        href="https://discord.gg/MbcgUFAfhV"
-                        target="_blank"
-                        :class="shortcutClasses"
-                    >
-                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
-                        Discord
-                    </a>
+                <div class="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-3">
+                    <div class="flex flex-col gap-1">
+                        <span class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
+                            {{ t('layout.shell.homePage.getStartedGroup') }}
+                        </span>
+                        <RouterLink :to="{ name: 'section-cooling' }" :class="shortcutClasses">
+                            <svg-icon type="mdi" :path="mdiFan" :size="18" />
+                            {{ t('layout.shell.homePage.setUpCooling') }}
+                        </RouterLink>
+                        <button
+                            v-if="features.coolingWizard"
+                            type="button"
+                            :class="shortcutClasses"
+                            @click="openGenerateWizard()"
+                        >
+                            <svg-icon type="mdi" :path="mdiChartMultiple" :size="18" />
+                            {{ t('views.appInfo.gettingStartedAutoCreateLink') }}
+                        </button>
+                        <button
+                            type="button"
+                            :class="shortcutClasses"
+                            @click="openCalibrationWizard()"
+                        >
+                            <svg-icon type="mdi" :path="mdiSpeedometer" :size="18" />
+                            {{ t('views.appInfo.calibrateFansLink') }}
+                        </button>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
+                            {{ t('layout.shell.homePage.learnGroup') }}
+                        </span>
+                        <button type="button" :class="shortcutClasses" @click="startTour">
+                            <svg-icon type="mdi" :path="mdiCompassOutline" :size="18" />
+                            {{ t('views.appInfo.uiTour') }}
+                        </button>
+                        <button
+                            type="button"
+                            :class="shortcutClasses"
+                            @click="openShortcutsDialog()"
+                        >
+                            <svg-icon type="mdi" :path="mdiKeyboardOutline" :size="18" />
+                            {{ t('views.shortcuts.shortcuts') }}
+                        </button>
+                        <a
+                            href="https://docs.coolercontrol.org/getting-started.html"
+                            target="_blank"
+                            :class="shortcutClasses"
+                        >
+                            <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                            {{ t('views.appInfo.gettingStarted') }}
+                        </a>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
+                            {{ t('layout.shell.homePage.resourcesGroup') }}
+                        </span>
+                        <a
+                            href="https://docs.coolercontrol.org/hardware-support.html"
+                            target="_blank"
+                            :class="shortcutClasses"
+                        >
+                            <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                            {{ t('views.appInfo.hardwareSupport') }}
+                        </a>
+                        <a
+                            href="https://gitlab.com/coolercontrol/coolercontrol/-/releases"
+                            target="_blank"
+                            :class="shortcutClasses"
+                        >
+                            <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                            {{ t('views.appInfo.whatsNew') }}
+                        </a>
+                        <a
+                            href="https://discord.gg/MbcgUFAfhV"
+                            target="_blank"
+                            :class="shortcutClasses"
+                        >
+                            <svg-icon type="mdi" :path="mdiOpenInNew" :size="18" />
+                            Discord
+                        </a>
+                    </div>
                 </div>
             </div>
 

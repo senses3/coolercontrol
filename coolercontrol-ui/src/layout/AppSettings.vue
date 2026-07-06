@@ -33,7 +33,14 @@ import { computed, inject, onMounted, onUnmounted, type Ref, ref, watch } from '
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useConfirm } from 'primevue/useconfirm'
+import { useRoute, useRouter } from 'vue-router'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
+import UiTabs from '@/shell/ui/UiTabs.vue'
+import UiTabPanel from '@/shell/ui/UiTabPanel.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useToast } from 'primevue/usetoast'
 import {
     CustomThemeSettings,
@@ -42,17 +49,7 @@ import {
     ThemeMode,
 } from '@/models/UISettings.ts'
 import { CoolerControlDeviceSettingsDTO } from '@/models/CCSettings.ts'
-import Tabs from 'primevue/tabs'
-import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
-import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
-import Select from 'primevue/select'
-import InputNumber from 'primevue/inputnumber'
-import InputText from 'primevue/inputtext'
-import Button from 'primevue/button'
 import { Color } from '@/models/Device.ts'
 import { Emitter, EventType } from 'mitt'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
@@ -68,6 +65,8 @@ const settingsStore = useSettingsStore()
 const colorStore = useThemeColorsStore()
 const confirm = useConfirm()
 const { openShortcutsDialog } = useShortcutsDialog()
+const route = useRoute()
+const router = useRouter()
 const toast = useToast()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
@@ -80,13 +79,21 @@ const tabValue = ref(props.tabNumber != null && props.tabNumber ? props.tabNumbe
 
 const { t } = useI18n()
 
-const tabStyle = computed(() => {
-    let tabCount = 2
+const settingsTabs = computed(() => {
+    const tabs = [
+        { value: '0', label: t('layout.settings.userInterface'), icon: mdiViewQuiltOutline },
+        { value: '1', label: t('views.daemon.title'), icon: mdiDnsOutline },
+    ]
     if (deviceStore.isQtApp()) {
-        tabCount += 1
+        tabs.push({ value: '2', label: t('layout.settings.desktop'), icon: mdiMonitor })
     }
-    const width = 100 / tabCount
-    return `width: ${width}%`
+    return tabs
+})
+// Keep the route param in sync so the panel highlight follows tab clicks.
+watch(tabValue, (tab) => {
+    if (route.name === 'settings' && (route.params.tabNumber ?? '0') !== tab) {
+        router.replace({ name: 'settings', params: { tabNumber: tab } })
+    }
 })
 
 const isFullScreen = ref(fullscreenApi.isFullscreen)
@@ -127,8 +134,8 @@ const themeModeOptions = computed(() => [
     },
     { value: ThemeMode.CUSTOM, label: t('layout.settings.themeMode.custom') },
 ])
-const changeThemeMode = async (event: ListboxChangeEvent) => {
-    if (event.value === null) {
+const changeThemeMode = async (value: ThemeMode) => {
+    if (value === null) {
         return // do not update on unselect
     }
 
@@ -136,7 +143,7 @@ const changeThemeMode = async (event: ListboxChangeEvent) => {
     const previousThemeMode = settingsStore.themeMode
 
     // Update the theme mode in settings store
-    settingsStore.themeMode = event.value
+    settingsStore.themeMode = value
 
     // Dynamically apply theme changes without page reload
     settingsStore.applyThemeMode()
@@ -154,7 +161,7 @@ const changeThemeMode = async (event: ListboxChangeEvent) => {
         new CustomEvent('theme-changed', {
             detail: {
                 previousTheme: previousThemeMode,
-                currentTheme: event.value,
+                currentTheme: value,
             },
         }),
     )
@@ -168,6 +175,20 @@ const lineThicknessOptions = ref([
 ])
 // Enum values are kept for config compatibility; targets remap to the new
 // shell sections (AppInfo -> Home, Controls -> Cooling, dashboards -> Monitoring).
+const chartLineValue = computed({
+    get: () => String(settingsStore.chartLineScale),
+    set: (value: string | undefined) => {
+        if (value != null) settingsStore.chartLineScale = Number(value)
+    },
+})
+const lineThicknessSelectOptions = computed(() =>
+    lineThicknessOptions.value.map((option) => ({
+        label: `${option.optionSize}px`,
+        value: String(option.value),
+        px: option.optionSize,
+    })),
+)
+
 const startupPageOptions = computed(() => [
     { value: StartupPage.AppInfo, label: t('layout.shell.home') },
     { value: StartupPage.Controls, label: t('layout.shell.cooling') },
@@ -502,1034 +523,851 @@ onUnmounted(() => {
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="pb-16 h-screen w-full">
-            <Tabs v-model:value="tabValue">
-                <TabList>
-                    <Tab
-                        value="0"
-                        as="div"
-                        class="flex justify-center items-center gap-2"
-                        :style="tabStyle"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiViewQuiltOutline"
-                            :size="deviceStore.getREMSize(1.5)"
-                        />
-                        {{ t('layout.settings.userInterface') }}
-                    </Tab>
-                    <Tab
-                        value="1"
-                        as="div"
-                        class="flex justify-center items-center gap-2"
-                        :style="tabStyle"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiDnsOutline"
-                            :size="deviceStore.getREMSize(1.5)"
-                        />
-                        {{ t('views.daemon.title', 'Daemon') }}
-                    </Tab>
-                    <Tab
-                        v-if="deviceStore.isQtApp()"
-                        value="2"
-                        as="div"
-                        class="flex justify-center items-center gap-2"
-                        :style="tabStyle"
-                        :disabled="!deviceStore.isQtApp()"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiMonitor"
-                            :size="deviceStore.getREMSize(1.5)"
-                        />
-                        {{ t('layout.settings.desktop', 'Desktop') }}
-                    </Tab>
-                </TabList>
-                <TabPanels class="mt-2">
-                    <TabPanel value="0" class="flex flex-col lg:flex-row">
-                        <!--UI Settings-->
-                        <table class="bg-bg-two rounded-lg">
-                            <tbody>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.introduction')">
-                                    <td
-                                        class="py-5 px-4 w-60 leading-none content-center items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        <div class="float-right">
-                                            {{ t('layout.settings.introduction') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <Button
-                                            :label="t('layout.settings.startTour')"
-                                            class="bg-accent/80 hover:!bg-accent w-full h-[2.375rem]"
-                                            @click="emitter.emit('start-tour')"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('views.shortcuts.shortcuts') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <Button
-                                            :label="t('views.shortcuts.shortcuts')"
-                                            class="w-full h-[2.375rem]"
-                                            outlined
-                                            @click="openShortcutsDialog()"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.startupPage')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.startupPage') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 leading-none border-border-one border-l-2 border-b-2"
-                                    >
-                                        <Select
-                                            v-model="settingsStore.startupPage"
-                                            :options="startupPageOptions"
-                                            option-label="label"
-                                            option-value="value"
-                                            class="w-full h-10"
-                                            scroll-height="100%"
-                                            :pt="{
-                                                input: { class: 'text-center' },
-                                                trigger: {
-                                                    class: 'flex justify-center items-center',
-                                                },
-                                                label: { class: 'text-center w-full' },
-                                                panel: {
-                                                    class: 'border-2 border-border-one rounded-lg shadow-lg bg-bg-one',
-                                                },
-                                            }"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.timeFormat')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.timeFormat') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <span class="inline-flex items-center justify-center gap-2">
-                                            <span>{{ t('layout.settings.time12h') }}</span>
-                                            <UiSwitch v-model="settingsStore.time24" two-sided />
-                                            <span>{{ t('layout.settings.time24h') }}</span>
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="t('layout.settings.tooltips.frequencyPrecision')"
+            <UiTabs v-model="tabValue" :tabs="settingsTabs">
+                <UiTabPanel value="0" class="flex flex-col lg:flex-row">
+                    <!--UI Settings-->
+                    <table class="bg-bg-two rounded-lg">
+                        <tbody>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.introduction')">
+                                <td
+                                    class="py-5 px-4 w-60 leading-none content-center items-center border-border-one border-r-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                    <div class="float-right">
+                                        {{ t('layout.settings.introduction') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <UiButton class="w-full" @click="emitter.emit('start-tour')">{{
+                                        t('layout.settings.startTour')
+                                    }}</UiButton>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    {{ t('views.shortcuts.shortcuts') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <UiButton
+                                        variant="outline"
+                                        class="w-full"
+                                        @click="openShortcutsDialog()"
+                                        >{{ t('views.shortcuts.shortcuts') }}</UiButton
                                     >
-                                        {{ t('layout.settings.frequencyPrecision') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.startupPage')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    {{ t('layout.settings.startupPage') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 leading-none border-border-one border-l-2 border-b-2"
+                                >
+                                    <UiSelect
+                                        v-model="settingsStore.startupPage"
+                                        :options="startupPageOptions"
+                                        class="w-full"
+                                    />
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.timeFormat')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    {{ t('layout.settings.timeFormat') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <span class="inline-flex items-center justify-center gap-2">
+                                        <span>{{ t('layout.settings.time12h') }}</span>
+                                        <UiSwitch v-model="settingsStore.time24" two-sided />
+                                        <span>{{ t('layout.settings.time24h') }}</span>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.frequencyPrecision')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.frequencyPrecision') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <span class="inline-flex items-center justify-center gap-2">
+                                        <span>{{ t('common.mhzAbbr') }}</span>
+                                        <UiSwitch v-model="frequencyGhz" two-sided />
+                                        <span>{{ t('common.ghzAbbr') }}</span>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.sidebarCollapse')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.sidebarToCollapse') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiSwitch v-model="settingsStore.hideMenuCollapseIcon" />
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.eyeCandy')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.eyeCandy') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiSwitch v-model="settingsStore.eyeCandy" />
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.fullScreen')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.fullScreen') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiSwitch
+                                        v-model="isFullScreen"
+                                        :disabled="!fullscreenApi.isEnabled"
+                                        @update:model-value="toggleFullScreen"
+                                    />
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.lineThickness')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.dashboardLineSize') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 leading-none border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiSelect
+                                        v-model="chartLineValue"
+                                        :options="lineThicknessSelectOptions"
+                                        class="w-full"
                                     >
-                                        <span class="inline-flex items-center justify-center gap-2">
-                                            <span>{{ t('common.mhzAbbr') }}</span>
-                                            <UiSwitch v-model="frequencyGhz" two-sided />
-                                            <span>{{ t('common.ghzAbbr') }}</span>
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.sidebarCollapse')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                        <template #option="{ option }">
+                                            <span class="flex w-full items-center gap-3">
+                                                <span
+                                                    class="block w-16 rounded bg-text-color"
+                                                    :style="{
+                                                        height: `${(option as any).px}px`,
+                                                    }"
+                                                />
+                                                {{ option.label }}
+                                            </span>
+                                        </template>
+                                    </UiSelect>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.appearance')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.themeStyle') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <div
+                                        class="flex min-w-[12rem] flex-col gap-0.5 rounded-lg border-2 border-border-one bg-bg-one p-1 text-left"
                                     >
-                                        {{ t('layout.settings.sidebarToCollapse') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch v-model="settingsStore.hideMenuCollapseIcon" />
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.eyeCandy')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.eyeCandy') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch v-model="settingsStore.eyeCandy" />
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.fullScreen')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.fullScreen') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="isFullScreen"
-                                            :disabled="!fullscreenApi.isEnabled"
-                                            @update:model-value="toggleFullScreen"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.lineThickness')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.dashboardLineSize') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 leading-none border-border-one border-l-2 border-t-2"
-                                    >
-                                        <Select
-                                            v-model="settingsStore.chartLineScale"
-                                            :options="lineThicknessOptions"
-                                            option-label="optionSize"
-                                            option-value="value"
-                                            class="w-full h-10"
-                                            scroll-height="100%"
-                                            :pt="{
-                                                // @ts-ignore
-                                                option: ({ context }) => ({
-                                                    class: [
-                                                        'py-2 px-5',
-                                                        'bg-bg-one',
-                                                        'hover:bg-surface-hover',
-                                                        'transition-shadow',
-                                                        'duration-200',
-                                                        { 'bg-surface-hover': context.selected },
-                                                    ],
-                                                }),
-                                                overlay: {
-                                                    class: [
-                                                        'border-2 border-border-one',
-                                                        'rounded-lg',
-                                                        'shadow-lg',
-                                                        'bg-bg-one',
-                                                    ],
-                                                },
-                                                // @ts-ignore
-                                                label: ({ props, parent }) => ({
-                                                    class: [
-                                                        'p-2',
-                                                        'flex-auto',
-                                                        'transition',
-                                                        'duration-200',
-                                                        'focus:outline-none focus:shadow-none',
-                                                        'cursor-pointer',
-                                                        'whitespace-nowrap',
-                                                        'appearance-none',
-                                                    ],
-                                                }),
+                                        <button
+                                            v-for="option in themeModeOptions"
+                                            :key="option.value"
+                                            type="button"
+                                            class="flex items-center gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                                            :class="{
+                                                'bg-surface-hover':
+                                                    settingsStore.themeMode === option.value,
                                             }"
+                                            @click="changeThemeMode(option.value)"
                                         >
-                                            <template #value="slotProps">
-                                                <div class="content-center h-full w-full">
-                                                    <div
-                                                        :style="`border-bottom: ${slotProps.value * 2}px solid rgb(var(--colors-text-color))`"
-                                                    />
-                                                </div>
-                                            </template>
-                                            <template #option="slotProps">
-                                                <div class="content-center h-6 w-full">
-                                                    <div
-                                                        :style="`border-bottom: ${slotProps.option.optionSize}px
-                                                    solid rgb(var(${slotProps.selected ? '--colors-text-color' : '--colors-text-color-secondary'}))`"
-                                                    />
-                                                </div>
-                                            </template>
-                                        </Select>
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.appearance')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.themeStyle') }}
+                                            <svg-icon
+                                                type="mdi"
+                                                :path="mdiCheck"
+                                                :size="14"
+                                                :class="
+                                                    settingsStore.themeMode === option.value
+                                                        ? 'text-accent'
+                                                        : 'invisible'
+                                                "
+                                            />
+                                            {{ option.label }}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.language')">
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.language') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <LanguageSwitcher />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <table
+                        v-if="settingsStore.themeMode === ThemeMode.CUSTOM"
+                        class="lg:ml-4 h-full bg-bg-two rounded-lg"
+                    >
+                        <tbody>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    {{ t('layout.settings.customTheme.accent') }}
+                                </td>
+                                <td
+                                    class="p-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <c-c-color-picker
+                                            v-model="customThemeAccent"
+                                            color-format="hex"
+                                            :default-color="
+                                                colorStore.rgbToHex(defaultCustomTheme.accent)
+                                            "
+                                            @update:model-value="setNewColorAccent"
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2"
+                                >
+                                    {{ t('layout.settings.customTheme.bgOne') }}
+                                </td>
+                                <td
+                                    class="p-4 w-48 text-center items-center border-border-one border-l-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <c-c-color-picker
+                                            v-model="customThemeBgOne"
+                                            color-format="hex"
+                                            :default-color="
+                                                colorStore.rgbToHex(defaultCustomTheme.bgOne)
+                                            "
+                                            @update:model-value="setNewColorBgOne"
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.customTheme.bgTwo') }}
+                                </td>
+                                <td
+                                    class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <div class="rounded-lg bg-bg-one">
+                                            <c-c-color-picker
+                                                v-model="customThemeBgTwo"
+                                                color-format="hex"
+                                                :default-color="
+                                                    colorStore.rgbToHex(defaultCustomTheme.bgTwo)
+                                                "
+                                                @update:model-value="setNewColorBgTwo"
+                                            />
                                         </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <Listbox
-                                            :model-value="settingsStore.themeMode"
-                                            :options="themeModeOptions"
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.customTheme.border') }}
+                                </td>
+                                <td
+                                    class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <c-c-color-picker
+                                            v-model="customThemeBorder"
+                                            color-format="hex"
+                                            :default-color="
+                                                colorStore.rgbToHex(defaultCustomTheme.borderOne)
+                                            "
+                                            @update:model-value="setNewColorBorder"
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.customTheme.text') }}
+                                </td>
+                                <td
+                                    class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <c-c-color-picker
+                                            v-model="customThemeText"
+                                            color-format="hex"
+                                            :default-color="
+                                                colorStore.rgbToHex(defaultCustomTheme.textColor)
+                                            "
+                                            @update:model-value="setNewColorText"
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.customTheme.textSecondary') }}
+                                </td>
+                                <td
+                                    class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <c-c-color-picker
+                                            v-model="customThemeTextSecondary"
+                                            color-format="hex"
+                                            :default-color="
+                                                colorStore.rgbToHex(
+                                                    defaultCustomTheme.textColorSecondary,
+                                                )
+                                            "
+                                            @update:model-value="setNewColorTextSecondary"
+                                        />
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.copyThemeCode')">
+                                <td colspan="2" class="py-3 px-4 border-border-one border-t-2">
+                                    <div class="flex items-center gap-2 w-full">
+                                        <div class="pr-4 text-right">
+                                            {{ t('layout.settings.customTheme.copyCode') }}
+                                        </div>
+                                        <UiInput
+                                            :model-value="themeCode"
+                                            readonly
+                                            class="flex-1 font-mono text-xs"
+                                            @focus="($event.target as HTMLInputElement).select()"
+                                        />
+                                        <UiButton size="icon" @click="copyThemeCode">
+                                            <svg-icon
+                                                class="shrink-0 outline-0"
+                                                type="mdi"
+                                                :path="justCopied ? mdiCheck : mdiContentCopy"
+                                                :size="deviceStore.getREMSize(1.25)"
+                                            />
+                                        </UiButton>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.pasteThemeCode')">
+                                <td colspan="2" class="py-3 px-4 border-border-one border-t-2">
+                                    <div class="flex items-center gap-2 w-full">
+                                        <div class="pr-4 text-right">
+                                            {{ t('layout.settings.customTheme.pasteCode') }}
+                                        </div>
+                                        <UiInput
+                                            v-model="pasteCodeInput"
+                                            class="flex-1 font-mono text-xs"
+                                            placeholder="cct1:..."
+                                            @keyup.enter="applyPastedThemeCode"
+                                        />
+                                        <UiButton
+                                            size="icon"
+                                            :disabled="pasteCodeInput.trim().length === 0"
+                                            @click="applyPastedThemeCode"
+                                        >
+                                            <svg-icon
+                                                class="shrink-0 outline-0"
+                                                type="mdi"
+                                                :path="mdiImport"
+                                                :size="deviceStore.getREMSize(1.5)"
+                                            />
+                                        </UiButton>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.exportThemeFile')">
+                                <td
+                                    class="py-5 px-4 w-60 leading-none content-center items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    <div class="float-right">
+                                        {{ t('layout.settings.customTheme.export') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <a
+                                            :href="downloadThemeHref"
+                                            :download="downloadThemeFileName"
+                                            :data-downloadurl="downloadThemeDatasetURL"
                                             class="w-full"
-                                            checkmark
-                                            list-style="max-height: 100%"
-                                            option-label="label"
-                                            option-value="value"
-                                            @update:model-value="changeThemeMode"
-                                            :pt="{
-                                                // @ts-ignore
-                                                root: ({ props }) => ({
-                                                    class: [
-                                                        'min-w-[12rem]',
-                                                        'rounded-lg',
-                                                        'bg-bg-one',
-                                                        'text-text-color',
-                                                        'border-2',
-                                                        { 'border-border-one': !props.invalid },
-                                                        { 'border-red': props.invalid },
-                                                    ],
-                                                }),
-                                            }"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.language')">
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.language') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <LanguageSwitcher />
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <table
-                            v-if="settingsStore.themeMode === ThemeMode.CUSTOM"
-                            class="lg:ml-4 h-full bg-bg-two rounded-lg"
-                        >
-                            <tbody>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.customTheme.accent') }}
-                                    </td>
-                                    <td
-                                        class="p-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
                                         >
-                                            <c-c-color-picker
-                                                v-model="customThemeAccent"
-                                                color-format="hex"
-                                                :default-color="
-                                                    colorStore.rgbToHex(defaultCustomTheme.accent)
-                                                "
-                                                @update:model-value="setNewColorAccent"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2"
-                                    >
-                                        {{ t('layout.settings.customTheme.bgOne') }}
-                                    </td>
-                                    <td
-                                        class="p-4 w-48 text-center items-center border-border-one border-l-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <c-c-color-picker
-                                                v-model="customThemeBgOne"
-                                                color-format="hex"
-                                                :default-color="
-                                                    colorStore.rgbToHex(defaultCustomTheme.bgOne)
-                                                "
-                                                @update:model-value="setNewColorBgOne"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.customTheme.bgTwo') }}
-                                    </td>
-                                    <td
-                                        class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <div class="rounded-lg bg-bg-one">
-                                                <c-c-color-picker
-                                                    v-model="customThemeBgTwo"
-                                                    color-format="hex"
-                                                    :default-color="
-                                                        colorStore.rgbToHex(
-                                                            defaultCustomTheme.bgTwo,
-                                                        )
-                                                    "
-                                                    @update:model-value="setNewColorBgTwo"
-                                                />
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.customTheme.border') }}
-                                    </td>
-                                    <td
-                                        class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <c-c-color-picker
-                                                v-model="customThemeBorder"
-                                                color-format="hex"
-                                                :default-color="
-                                                    colorStore.rgbToHex(
-                                                        defaultCustomTheme.borderOne,
-                                                    )
-                                                "
-                                                @update:model-value="setNewColorBorder"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.customTheme.text') }}
-                                    </td>
-                                    <td
-                                        class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <c-c-color-picker
-                                                v-model="customThemeText"
-                                                color-format="hex"
-                                                :default-color="
-                                                    colorStore.rgbToHex(
-                                                        defaultCustomTheme.textColor,
-                                                    )
-                                                "
-                                                @update:model-value="setNewColorText"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.customTheme.textSecondary') }}
-                                    </td>
-                                    <td
-                                        class="p-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <c-c-color-picker
-                                                v-model="customThemeTextSecondary"
-                                                color-format="hex"
-                                                :default-color="
-                                                    colorStore.rgbToHex(
-                                                        defaultCustomTheme.textColorSecondary,
-                                                    )
-                                                "
-                                                @update:model-value="setNewColorTextSecondary"
-                                            />
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.copyThemeCode')">
-                                    <td colspan="2" class="py-3 px-4 border-border-one border-t-2">
-                                        <div class="flex items-center gap-2 w-full">
-                                            <div class="pr-4 text-right">
-                                                {{ t('layout.settings.customTheme.copyCode') }}
-                                            </div>
-                                            <InputText
-                                                :model-value="themeCode"
-                                                readonly
-                                                class="flex-1 font-mono text-xs"
-                                                @focus="
-                                                    ($event.target as HTMLInputElement).select()
-                                                "
-                                            />
-                                            <Button
-                                                class="bg-accent/80 hover:!bg-accenth-[2.375rem] w-12"
-                                                @click="copyThemeCode"
-                                            >
-                                                <svg-icon
-                                                    class="outline-0 shrink-0"
-                                                    type="mdi"
-                                                    :path="justCopied ? mdiCheck : mdiContentCopy"
-                                                    :size="deviceStore.getREMSize(1.25)"
-                                                />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.pasteThemeCode')">
-                                    <td colspan="2" class="py-3 px-4 border-border-one border-t-2">
-                                        <div class="flex items-center gap-2 w-full">
-                                            <div class="pr-4 text-right">
-                                                {{ t('layout.settings.customTheme.pasteCode') }}
-                                            </div>
-                                            <InputText
-                                                v-model="pasteCodeInput"
-                                                class="flex-1 font-mono text-xs"
-                                                placeholder="cct1:..."
-                                                @keyup.enter="applyPastedThemeCode"
-                                            />
-                                            <Button
-                                                class="bg-accent/80 hover:!bg-accent h-[2.375rem] w-12"
-                                                :disabled="pasteCodeInput.trim().length === 0"
-                                                @click="applyPastedThemeCode"
-                                            >
-                                                <svg-icon
-                                                    class="outline-0 shrink-0"
-                                                    type="mdi"
-                                                    :path="mdiImport"
-                                                    :size="deviceStore.getREMSize(1.5)"
-                                                />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.exportThemeFile')">
-                                    <td
-                                        class="py-5 px-4 w-60 leading-none content-center items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        <div class="float-right">
-                                            {{ t('layout.settings.customTheme.export') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <a
-                                                :href="downloadThemeHref"
-                                                :download="downloadThemeFileName"
-                                                :data-downloadurl="downloadThemeDatasetURL"
-                                                class="w-full"
-                                            >
-                                                <Button
-                                                    class="bg-accent/80 hover:!bg-accent w-full h-[2.375rem]"
-                                                >
-                                                    <svg-icon
-                                                        class="outline-0"
-                                                        type="mdi"
-                                                        :path="mdiExport"
-                                                        :size="deviceStore.getREMSize(1.625)"
-                                                    />
-                                                </Button>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr v-tooltip.top="t('layout.settings.tooltips.importThemeFile')">
-                                    <td
-                                        class="py-5 px-4 w-60 leading-none content-center items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        <div class="float-right">
-                                            {{ t('layout.settings.customTheme.import') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <div
-                                            class="w-full h-full content-center flex justify-center"
-                                        >
-                                            <Button
-                                                class="bg-accent/80 hover:!bg-accent w-full h-[2.375rem]"
-                                                @click="createJsonUploader"
-                                            >
+                                            <UiButton class="w-full">
                                                 <svg-icon
                                                     class="outline-0"
                                                     type="mdi"
-                                                    :path="mdiImport"
+                                                    :path="mdiExport"
                                                     :size="deviceStore.getREMSize(1.625)"
                                                 />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </TabPanel>
-                    <TabPanel value="1" class="flex flex-col lg:flex-row">
-                        <!--Daemon Settings-->
-                        <table class="bg-bg-two rounded-lg mb-4">
-                            <tbody>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.applySettingsOnStartup'),
-                                    }"
+                                            </UiButton>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-tooltip.top="t('layout.settings.tooltips.importThemeFile')">
+                                <td
+                                    class="py-5 px-4 w-60 leading-none content-center items-center border-border-one border-r-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.applySettingsOnStartup') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="settingsStore.ccSettings.apply_on_boot"
-                                        />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.deviceDelayAtStartup'),
-                                    }"
+                                    <div class="float-right">
+                                        {{ t('layout.settings.customTheme.import') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.deviceDelayAtStartup') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <InputNumber
-                                            v-model="settingsStore.ccSettings.startup_delay"
-                                            show-buttons
-                                            :min="1"
-                                            :max="30"
-                                            :suffix="` ${t('common.secondAbbr')}`"
-                                            button-layout="horizontal"
-                                            :input-style="{ width: '5rem' }"
-                                        >
-                                            <template #incrementicon>
-                                                <span class="pi pi-plus" />
-                                            </template>
-                                            <template #decrementicon>
-                                                <span class="pi pi-minus" />
-                                            </template>
-                                        </InputNumber>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.pollingRate'),
-                                    }"
-                                >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        <div
-                                            class="float-left"
-                                            v-tooltip.top="
-                                                t('layout.settings.tooltips.triggersDaemonRestart')
-                                            "
-                                        >
+                                    <div class="w-full h-full content-center flex justify-center">
+                                        <UiButton class="w-full" @click="createJsonUploader">
                                             <svg-icon
+                                                class="outline-0"
                                                 type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.1)"
+                                                :path="mdiImport"
+                                                :size="deviceStore.getREMSize(1.625)"
                                             />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.pollingRate') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <InputNumber
-                                            v-model="pollRate"
-                                            show-buttons
-                                            :min="0.5"
-                                            :max="5.0"
-                                            :suffix="` ${t('common.secondAbbr')}`"
-                                            :step="0.5"
-                                            :min-fraction-digits="1"
-                                            button-layout="horizontal"
-                                            :input-style="{ width: '5rem' }"
-                                        >
-                                            <template #incrementicon>
-                                                <span class="pi pi-plus" />
-                                            </template>
-                                            <template #decrementicon>
-                                                <span class="pi pi-minus" />
-                                            </template>
-                                        </InputNumber>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.compressApiPayload'),
-                                    }"
+                                        </UiButton>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </UiTabPanel>
+                <UiTabPanel value="1" class="flex flex-col lg:flex-row">
+                    <!--Daemon Settings-->
+                    <table class="bg-bg-two rounded-lg mb-4">
+                        <tbody>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.applySettingsOnStartup'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-b-2"
+                                    {{ t('layout.settings.applySettingsOnStartup') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <UiSwitch v-model="settingsStore.ccSettings.apply_on_boot" />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.deviceDelayAtStartup'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    {{ t('layout.settings.deviceDelayAtStartup') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <UiNumberInput
+                                        v-model="settingsStore.ccSettings.startup_delay"
+                                        :min="1"
+                                        :max="30"
+                                        :suffix="t('common.secondAbbr')"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.pollingRate'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    <div
+                                        class="float-left"
+                                        v-tooltip.top="
+                                            t('layout.settings.tooltips.triggersDaemonRestart')
+                                        "
                                     >
-                                        <div
-                                            class="float-left"
-                                            v-tooltip.top="
-                                                t('layout.settings.tooltips.triggersDaemonRestart')
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.0)"
-                                            />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.compressApiPayload') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="settingsStore.ccSettings.compress"
-                                            @click="applyGenericDaemonChange"
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.1)"
                                         />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.sensorsAutoDetect'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.pollingRate') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
+                                    <UiNumberInput
+                                        v-model="pollRate"
+                                        :min="0.5"
+                                        :max="5.0"
+                                        :step="0.5"
+                                        :suffix="t('common.secondAbbr')"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.compressApiPayload'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    <div
+                                        class="float-left"
+                                        v-tooltip.top="
+                                            t('layout.settings.tooltips.triggersDaemonRestart')
+                                        "
                                     >
-                                        <div
-                                            class="float-left"
-                                            v-tooltip.top="
-                                                t('layout.settings.tooltips.triggersDaemonRestart')
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.0)"
-                                            />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.sensorsAutoDetect') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="settingsStore.ccSettings.sensors_auto_detect"
-                                            @update:model-value="applyGenericDaemonChange"
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.0)"
                                         />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.deviceListener'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.compressApiPayload') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-b-2 border-t-2"
+                                    <UiSwitch
+                                        v-model="settingsStore.ccSettings.compress"
+                                        @click="applyGenericDaemonChange"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.sensorsAutoDetect'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    <div
+                                        class="float-left"
+                                        v-tooltip.top="
+                                            t('layout.settings.tooltips.triggersDaemonRestart')
+                                        "
                                     >
-                                        <div
-                                            class="float-left"
-                                            v-tooltip.top="
-                                                t('layout.settings.tooltips.triggersDaemonRestart')
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.0)"
-                                            />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.deviceListener') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2 border-t-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="
-                                                settingsStore.ccSettings.device_listener_enabled
-                                            "
-                                            @update:model-value="applyGenericDaemonChange"
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.0)"
                                         />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.liquidctlIntegration'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.sensorsAutoDetect') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                    <UiSwitch
+                                        v-model="settingsStore.ccSettings.sensors_auto_detect"
+                                        @update:model-value="applyGenericDaemonChange"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.deviceListener'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-b-2 border-t-2"
+                                >
+                                    <div
+                                        class="float-left"
+                                        v-tooltip.top="
+                                            t('layout.settings.tooltips.triggersDaemonRestart')
+                                        "
                                     >
-                                        <div
-                                            class="float-left py-1"
-                                            v-tooltip.top="
-                                                t('layout.settings.tooltips.triggersDaemonRestart')
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.0)"
-                                            />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.liquidctlIntegration') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="settingsStore.ccSettings.liquidctl_integration"
-                                            @update:model-value="applyGenericDaemonChange"
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.0)"
                                         />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.liquidctlDeviceInit'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.deviceListener') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                    <UiSwitch
+                                        v-model="settingsStore.ccSettings.device_listener_enabled"
+                                        @update:model-value="applyGenericDaemonChange"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.liquidctlIntegration'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    <div
+                                        class="float-left py-1"
+                                        v-tooltip.top="
+                                            t('layout.settings.tooltips.triggersDaemonRestart')
+                                        "
                                     >
-                                        {{ t('layout.settings.liquidctlDeviceInit') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="liquidctlInit"
-                                            :disabled="
-                                                !settingsStore.ccSettings.liquidctl_integration
-                                            "
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.0)"
                                         />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.hideDuplicateDevices'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.liquidctlIntegration') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
+                                    <UiSwitch
+                                        v-model="settingsStore.ccSettings.liquidctl_integration"
+                                        @update:model-value="applyGenericDaemonChange"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.liquidctlDeviceInit'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                >
+                                    {{ t('layout.settings.liquidctlDeviceInit') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                >
+                                    <UiSwitch
+                                        v-model="liquidctlInit"
+                                        :disabled="!settingsStore.ccSettings.liquidctl_integration"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.hideDuplicateDevices'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    <div
+                                        class="float-left"
+                                        v-tooltip.top="
+                                            t('layout.settings.tooltips.triggersDaemonRestart')
+                                        "
                                     >
-                                        <div
-                                            class="float-left"
-                                            v-tooltip.top="
-                                                t('layout.settings.tooltips.triggersDaemonRestart')
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.0)"
-                                            />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.hideDuplicateDevices') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="
-                                                settingsStore.ccSettings.hide_duplicate_devices
-                                            "
-                                            :disabled="
-                                                !settingsStore.ccSettings.liquidctl_integration
-                                            "
-                                            @update:model-value="applyGenericDaemonChange"
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.0)"
                                         />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.drivePowerState'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.hideDuplicateDevices') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
+                                    <UiSwitch
+                                        v-model="settingsStore.ccSettings.hide_duplicate_devices"
+                                        :disabled="!settingsStore.ccSettings.liquidctl_integration"
+                                        @update:model-value="applyGenericDaemonChange"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.drivePowerState'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    <div
+                                        class="float-left"
+                                        v-tooltip.top="'Triggers an automatic daemon restart'"
                                     >
-                                        <div
-                                            class="float-left"
-                                            v-tooltip.top="'Triggers an automatic daemon restart'"
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                :path="mdiRestart"
-                                                :size="deviceStore.getREMSize(1.0)"
-                                            />
-                                        </div>
-                                        <div class="text-right float-right">
-                                            {{ t('layout.settings.drivePowerState') }}
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch
-                                            v-model="settingsStore.ccSettings.drivetemp_suspend"
-                                            @update:model-value="applyGenericDaemonChange"
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiRestart"
+                                            :size="deviceStore.getREMSize(1.0)"
                                         />
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </TabPanel>
-                    <TabPanel value="2">
-                        <!--Desktop Settings-->
-                        <table class="bg-bg-two rounded-lg">
-                            <tbody>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.startInTray'),
-                                    }"
+                                    </div>
+                                    <div class="text-right float-right">
+                                        {{ t('layout.settings.drivePowerState') }}
+                                    </div>
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-b-2"
-                                    >
-                                        {{ t('layout.settings.startInTray') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
-                                    >
-                                        <UiSwitch v-model="settingsStore.startInSystemTray" />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.closeToTray'),
-                                    }"
+                                    <UiSwitch
+                                        v-model="settingsStore.ccSettings.drivetemp_suspend"
+                                        @update:model-value="applyGenericDaemonChange"
+                                    />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </UiTabPanel>
+                <UiTabPanel value="2">
+                    <!--Desktop Settings-->
+                    <table class="bg-bg-two rounded-lg">
+                        <tbody>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.startInTray'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.closeToTray') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <UiSwitch v-model="settingsStore.closeToSystemTray" />
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.zoom'),
-                                    }"
+                                    {{ t('layout.settings.startInTray') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                 >
-                                    <td
-                                        class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.zoom') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <InputNumber
-                                            v-model="settingsStore.uiScale"
-                                            show-buttons
-                                            :min="50"
-                                            :max="400"
-                                            :suffix="` ${t('common.percentUnit')}`"
-                                            :step="10"
-                                            button-layout="horizontal"
-                                            :input-style="{ width: '5rem' }"
-                                        >
-                                            <template #incrementicon>
-                                                <span class="pi pi-plus" />
-                                            </template>
-                                            <template #decrementicon>
-                                                <span class="pi pi-minus" />
-                                            </template>
-                                        </InputNumber>
-                                    </td>
-                                </tr>
-                                <tr
-                                    v-tooltip.top="{
-                                        escape: false,
-                                        value: t('layout.settings.tooltips.desktopStartupDelay'),
-                                    }"
+                                    <UiSwitch v-model="settingsStore.startInSystemTray" />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.closeToTray'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-t-2"
                                 >
-                                    <td
-                                        class="py-4 px-4 w-60 leading-none text-right items-center border-border-one border-r-2 border-t-2"
-                                    >
-                                        {{ t('layout.settings.desktopStartupDelay') }}
-                                    </td>
-                                    <td
-                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
-                                    >
-                                        <InputNumber
-                                            v-model="settingsStore.desktopStartupDelay"
-                                            show-buttons
-                                            :min="0"
-                                            :max="10"
-                                            :suffix="` ${t('common.secondAbbr')}`"
-                                            :step="1"
-                                            button-layout="horizontal"
-                                            :input-style="{ width: '5rem' }"
-                                        >
-                                            <template #incrementicon>
-                                                <span class="pi pi-plus" />
-                                            </template>
-                                            <template #decrementicon>
-                                                <span class="pi pi-minus" />
-                                            </template>
-                                        </InputNumber>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </TabPanel>
-                </TabPanels>
-            </Tabs>
+                                    {{ t('layout.settings.closeToTray') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiSwitch v-model="settingsStore.closeToSystemTray" />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.zoom'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-2 w-60 text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.zoom') }}
+                                </td>
+                                <td
+                                    class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiNumberInput
+                                        v-model="settingsStore.uiScale"
+                                        :min="50"
+                                        :max="400"
+                                        :step="10"
+                                        :suffix="t('common.percentUnit')"
+                                    />
+                                </td>
+                            </tr>
+                            <tr
+                                v-tooltip.top="{
+                                    escape: false,
+                                    value: t('layout.settings.tooltips.desktopStartupDelay'),
+                                }"
+                            >
+                                <td
+                                    class="py-4 px-4 w-60 leading-none text-right items-center border-border-one border-r-2 border-t-2"
+                                >
+                                    {{ t('layout.settings.desktopStartupDelay') }}
+                                </td>
+                                <td
+                                    class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
+                                >
+                                    <UiNumberInput
+                                        v-model="settingsStore.desktopStartupDelay"
+                                        :min="0"
+                                        :max="10"
+                                        :step="1"
+                                        :suffix="t('common.secondAbbr')"
+                                    />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </UiTabPanel>
+            </UiTabs>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar
             class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"

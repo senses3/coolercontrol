@@ -71,7 +71,9 @@ withDefaults(
                         :disabled="option.disabled"
                         class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                     >
-                        <SelectItemText>{{ option.label }}</SelectItemText>
+                        <SelectItemText>
+                            <slot name="option" :option="option">{{ option.label }}</slot>
+                        </SelectItemText>
                         <SelectItemIndicator>
                             <svg-icon type="mdi" :path="mdiCheck" :size="14" />
                         </SelectItemIndicator>

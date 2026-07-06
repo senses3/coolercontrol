@@ -42,14 +42,14 @@ const groupModel = computed<string>({
     <ToggleGroupRoot
         v-model="groupModel"
         type="single"
-        class="inline-flex rounded-lg border border-border-one bg-bg-two p-0.5"
+        class="inline-flex h-10 items-center rounded-lg border border-border-one bg-bg-two p-0.5"
     >
         <ToggleGroupItem
             v-for="option in options"
             :key="option.value"
             :value="option.value"
             :disabled="option.disabled"
-            class="cursor-pointer rounded-md px-3 py-1.5 text-base text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:bg-accent data-[state=on]:text-bg-one data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            class="cursor-pointer rounded-md px-3 py-1 text-base text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:bg-accent data-[state=on]:text-bg-one data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
         >
             {{ option.label }}
         </ToggleGroupItem>
