@@ -520,7 +520,7 @@ onUnmounted(() => {
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="pb-16 h-screen w-full">
-            <div class="columns-1 gap-4 space-y-4 xl:columns-2 min-[1900px]:columns-3">
+            <div class="columns-1 gap-4 space-y-4 p-4 xl:columns-2 min-[1900px]:columns-3">
                 <UiSettingsCard
                     id="settings-general"
                     class="break-inside-avoid"
