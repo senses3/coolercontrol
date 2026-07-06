@@ -24,6 +24,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Device, UID } from '@/models/Device.ts'
 import { getDeviceTypeDisplayName } from '@/models/Device.ts'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
@@ -44,6 +45,12 @@ const deviceLabel = (deviceUID: UID): string =>
 // Devices without a custom color still show a dot in the theme text color.
 const deviceColor = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor || 'rgb(var(--colors-text-color))'
+
+const failsafeTooltip = (deviceUID: UID): string => {
+    const ref = settingsStore.healthFailsafe.find((entry) => entry.device_uid === deviceUID)
+    const base = t('views.appInfo.failsafeActive')
+    return ref?.reason ? `${base}: ${ref.reason}` : base
+}
 
 const isUnhealthy = (deviceUID: UID): boolean =>
     settingsStore.healthFailsafe.some((ref) => ref.device_uid === deviceUID)
@@ -102,13 +109,17 @@ const counts = (device: Device): string => {
                         <span class="truncate text-base font-medium">
                             {{ deviceLabel(device.uid) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(device.uid)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="16"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(device.uid)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="16"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                     </div>
                     <span class="truncate text-sm text-text-color-secondary">
                         {{ facts(device) }}

@@ -28,6 +28,8 @@ import {
     mdiPinOutline,
     mdiPlus,
 } from '@mdi/js'
+import PanelHeader from '@/shell/PanelHeader.vue'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
 import { ref, watchEffect } from 'vue'
@@ -170,6 +172,22 @@ const persistFunctionOrder = (): void => {
 const { openProfileWizard, openFunctionWizard } = useLibraryWizards()
 
 // A profile is unhealthy when the daemon reports a missing or stale temp source for it.
+const failsafeTooltip = (deviceUID: UID, channelName?: string): string => {
+    const ref = settingsStore.healthFailsafe.find(
+        (entry) =>
+            entry.device_uid === deviceUID && (channelName == null || entry.name === channelName),
+    )
+    const base = t('views.appInfo.failsafeActive')
+    return ref?.reason ? `${base}: ${ref.reason}` : base
+}
+
+const profileTooltip = (profileUID: string): string =>
+    settingsStore.healthMissing.some(
+        (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
+    )
+        ? t('views.appInfo.missingTempSource')
+        : t('views.appInfo.staleTempSource')
+
 const isProfileUnhealthy = (profileUID: string): boolean =>
     settingsStore.healthMissing.some(
         (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
@@ -182,9 +200,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
 <template>
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <template v-if="pinnedChannels.length > 0">
-            <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.shell.coolingPanel.pinned') }}
-            </div>
+            <PanelHeader :label="t('layout.shell.coolingPanel.pinned')" />
             <VueDraggable
                 v-model="pinnedChannels"
                 handle=".drag-handle"
@@ -223,13 +239,17 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(channel.deviceUID) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                         <span
                             class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
                         >
@@ -273,13 +293,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
         </template>
 
         <template v-for="group in groups" :key="group.deviceUID">
-            <div
-                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
-                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
-                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
-            >
-                {{ deviceLabel(group.deviceUID) }}
-            </div>
+            <PanelHeader
+                :label="deviceLabel(group.deviceUID)"
+                :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
+            />
             <VueDraggable
                 v-model="group.channels"
                 handle=".drag-handle"
@@ -315,13 +332,17 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate">
                             {{ channelLabel(channel.deviceUID, channel.channelName) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                         <span
                             class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
                         >
@@ -372,9 +393,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
         </template>
 
         <UiSeparator class="my-1" />
-        <div class="truncate px-2 pb-1 pt-3 text-xs uppercase text-text-color-secondary">
-            {{ t('layout.shell.coolingPanel.library') }}
-        </div>
+        <PanelHeader :label="t('layout.shell.coolingPanel.library')" />
         <div class="flex items-center justify-between px-3 pb-1 pt-1">
             <span class="text-xs uppercase text-text-color-secondary opacity-70">
                 {{ t('layout.shell.coolingPanel.profiles') }}
@@ -409,13 +428,12 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     class="shrink-0 text-text-color-secondary"
                 />
                 <span class="truncate">{{ profile.name }}</span>
-                <svg-icon
+                <UiTooltip
                     v-if="isProfileUnhealthy(profile.uid)"
-                    type="mdi"
-                    :path="mdiAlert"
-                    :size="14"
-                    class="shrink-0 text-warning"
-                />
+                    :text="profileTooltip(profile.uid)"
+                >
+                    <svg-icon type="mdi" :path="mdiAlert" :size="14" class="shrink-0 text-error" />
+                </UiTooltip>
                 <span
                     class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >

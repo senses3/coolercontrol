@@ -31,11 +31,12 @@ import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels, pinId } from '@/shell/cooling/channels.ts'
 import { reorderSubset } from '@/shell/panelOrder.ts'
-import { customSensors, monitoringSensors } from '@/shell/monitoring/sensors.ts'
+import { monitoringSensors } from '@/shell/monitoring/sensors.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
@@ -92,11 +93,6 @@ const buildPinnedRows = (): PinnedRow[] => {
             group.channels.map((channel) => pinId(channel.deviceUID, channel.channelName)),
         ),
     )
-    const customIds = new Set(
-        customSensors(deviceStore.allDevices()).map((sensor) =>
-            pinId(sensor.deviceUID, sensor.channelName),
-        ),
-    )
     const sensorIds = new Set(
         monitoringSensors(deviceStore.allDevices()).flatMap((group) =>
             group.sensors.map((sensor) => pinId(sensor.deviceUID, sensor.channelName)),
@@ -129,11 +125,6 @@ const buildPinnedRows = (): PinnedRow[] => {
             rows.push({
                 ...base,
                 to: { name: 'cooling-channel', params: { deviceUID, channelName } },
-            })
-        } else if (customIds.has(id)) {
-            rows.push({
-                ...base,
-                to: { name: 'monitoring-custom-sensor', params: { customSensorID: channelName } },
             })
         } else if (sensorIds.has(id)) {
             rows.push({
@@ -187,9 +178,7 @@ const persistPinnedOrder = (): void => {
 
         <template v-if="pinnedRows.length > 0">
             <UiSeparator class="my-1" />
-            <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.pinned') }}
-            </div>
+            <PanelHeader :label="t('layout.menu.pinned')" />
             <VueDraggable
                 v-model="pinnedRows"
                 handle=".drag-handle"

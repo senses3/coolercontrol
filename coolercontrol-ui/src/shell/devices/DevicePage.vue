@@ -24,6 +24,7 @@ import {
     mdiCheckboxMarked,
     mdiInformationSlabCircleOutline,
     mdiLightbulbOutline,
+    mdiPlus,
     mdiTelevision,
 } from '@mdi/js'
 import { computed, ref } from 'vue'
@@ -36,7 +37,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useDeviceActions } from '@/composables/useDeviceActions.ts'
-import { deviceChannelLinks, sensorToggles } from '@/shell/devices/devices.ts'
+import { customSensorNames, deviceChannelLinks, sensorToggles } from '@/shell/devices/devices.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -104,6 +105,11 @@ const infoRows = computed((): Array<[string, string]> => {
 
 // Hardware settings, ported from the extension-settings popover.
 const isLiquidctl = computed(() => device.value?.type === DeviceType.LIQUIDCTL)
+const isCustomSensors = computed(() => device.value?.type === DeviceType.CUSTOM_SENSORS)
+const sensorNames = computed(() => (device.value != null ? customSensorNames(device.value) : []))
+const sensorDotColor = (channelName: string): string =>
+    settingsStore.allUIDeviceSettings.get(props.deviceUID)?.sensorsAndChannels.get(channelName)
+        ?.color || 'rgb(var(--colors-text-color))'
 const hasHwmonDriver = computed(
     () => device.value?.info?.driver_info.locations.find((loc) => loc.includes('hwmon')) != null,
 )
@@ -241,34 +247,54 @@ const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(d
                 </div>
             </div>
 
-            <!-- Hardware settings -->
-            <h2 class="pb-2 pt-6 text-xs uppercase text-text-color-secondary">
-                {{ t('components.deviceExtensionSettings.title') }}
-            </h2>
-            <div class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two">
-                <div v-if="isLiquidctl" class="flex items-center justify-between gap-8 px-4 py-3">
-                    <span class="flex items-center gap-2 text-base text-text-color">
-                        <UiTooltip :text="t('components.deviceExtensionSettings.directAccessDesc')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiInformationSlabCircleOutline"
-                                :size="18"
-                                class="text-text-color-secondary"
-                            />
-                        </UiTooltip>
-                        {{ t('components.deviceExtensionSettings.directAccess') }}
-                    </span>
-                    <UiSwitch
-                        v-model="directAccess"
-                        :disabled="!hasHwmonDriver"
-                        @update:model-value="onDirectAccessChange"
-                    />
+            <!-- Custom sensors are created and edited from this device page. -->
+            <template v-if="isCustomSensors">
+                <h2 class="pb-2 pt-6 text-xs uppercase text-text-color-secondary">
+                    {{ t('layout.menu.customSensors') }}
+                </h2>
+                <div
+                    class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
+                >
+                    <RouterLink
+                        v-for="sensorName in sensorNames"
+                        :key="sensorName"
+                        :to="{
+                            name: 'device-custom-sensor',
+                            params: { customSensorID: sensorName },
+                        }"
+                        class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                    >
+                        <span
+                            class="h-2 w-2 shrink-0 rounded-full"
+                            :style="{ backgroundColor: sensorDotColor(sensorName) }"
+                        />
+                        <span class="truncate">{{ sensorLabel(sensorName) }}</span>
+                    </RouterLink>
+                    <RouterLink
+                        :to="{ name: 'device-custom-sensor-new' }"
+                        class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus:ring-2 focus:ring-accent"
+                    >
+                        <svg-icon type="mdi" :path="mdiPlus" :size="14" class="shrink-0" />
+                        {{ t('layout.menu.tooltips.addCustomSensor') }}
+                    </RouterLink>
                 </div>
-                <template v-if="isLiquidctl">
-                    <UiSeparator />
-                    <div class="flex items-center justify-between gap-8 px-4 py-3">
+            </template>
+            <!-- Hardware settings -->
+            <template v-if="!isCustomSensors">
+                <h2 class="pb-2 pt-6 text-xs uppercase text-text-color-secondary">
+                    {{ t('components.deviceExtensionSettings.title') }}
+                </h2>
+                <div
+                    class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two"
+                >
+                    <div
+                        v-if="isLiquidctl"
+                        class="flex items-center justify-between gap-8 px-4 py-3"
+                    >
                         <span class="flex items-center gap-2 text-base text-text-color">
-                            <UiTooltip :text="t('components.deviceExtensionSettings.useHwmonDesc')">
+                            <UiTooltip
+                                :text="t('components.deviceExtensionSettings.directAccessDesc')"
+                            >
                                 <svg-icon
                                     type="mdi"
                                     :path="mdiInformationSlabCircleOutline"
@@ -276,21 +302,116 @@ const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(d
                                     class="text-text-color-secondary"
                                 />
                             </UiTooltip>
-                            {{ t('components.deviceExtensionSettings.useHwmon') }}
+                            {{ t('components.deviceExtensionSettings.directAccess') }}
                         </span>
                         <UiSwitch
-                            v-model="useHwmon"
+                            v-model="directAccess"
                             :disabled="!hasHwmonDriver"
-                            @update:model-value="onUseHwmonChange"
+                            @update:model-value="onDirectAccessChange"
                         />
                     </div>
-                </template>
-                <template v-if="isAmdGpuWithOverdrive">
-                    <UiSeparator v-if="isLiquidctl" />
+                    <template v-if="isLiquidctl">
+                        <UiSeparator />
+                        <div class="flex items-center justify-between gap-8 px-4 py-3">
+                            <span class="flex items-center gap-2 text-base text-text-color">
+                                <UiTooltip
+                                    :text="t('components.deviceExtensionSettings.useHwmonDesc')"
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="18"
+                                        class="text-text-color-secondary"
+                                    />
+                                </UiTooltip>
+                                {{ t('components.deviceExtensionSettings.useHwmon') }}
+                            </span>
+                            <UiSwitch
+                                v-model="useHwmon"
+                                :disabled="!hasHwmonDriver"
+                                @update:model-value="onUseHwmonChange"
+                            />
+                        </div>
+                    </template>
+                    <template v-if="isAmdGpuWithOverdrive">
+                        <UiSeparator v-if="isLiquidctl" />
+                        <div class="flex items-center justify-between gap-8 px-4 py-3">
+                            <span class="flex items-center gap-2 text-base text-text-color">
+                                <UiTooltip
+                                    :text="t('components.deviceExtensionSettings.overdriveDesc')"
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="18"
+                                        class="text-text-color-secondary"
+                                    />
+                                </UiTooltip>
+                                {{ t('components.deviceExtensionSettings.overdrive') }}
+                            </span>
+                            <span v-if="amdOverdriveEnabled" class="text-base text-success">
+                                {{ t('components.deviceExtensionSettings.overdriveActive') }}
+                            </span>
+                            <UiButton
+                                v-else
+                                size="sm"
+                                variant="outline"
+                                :disabled="amdOverdriveEnabling"
+                                @click="onEnableOverdrive"
+                            >
+                                {{ t('components.deviceExtensionSettings.overdriveEnable') }}
+                            </UiButton>
+                        </div>
+                    </template>
+                    <template v-if="isThinkPad">
+                        <UiSeparator v-if="isLiquidctl || isAmdGpuWithOverdrive" />
+                        <div class="flex items-center justify-between gap-8 px-4 py-3">
+                            <span class="flex items-center gap-2 text-base text-text-color">
+                                <UiTooltip
+                                    :text="
+                                        t(
+                                            'components.deviceExtensionSettings.thinkPadFanControlDesc',
+                                        )
+                                    "
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="18"
+                                        class="text-text-color-secondary"
+                                    />
+                                </UiTooltip>
+                                {{ t('components.deviceExtensionSettings.thinkPadFanControl') }}
+                            </span>
+                            <UiSwitch v-model="thinkPadFanControl" />
+                        </div>
+                        <UiSeparator />
+                        <div class="flex items-center justify-between gap-8 px-4 py-3">
+                            <span class="flex items-center gap-2 text-base text-text-color">
+                                <UiTooltip
+                                    :text="
+                                        t(
+                                            'components.deviceExtensionSettings.thinkPadFullSpeedDesc',
+                                        )
+                                    "
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiInformationSlabCircleOutline"
+                                        :size="18"
+                                        class="text-text-color-secondary"
+                                    />
+                                </UiTooltip>
+                                {{ t('components.deviceExtensionSettings.thinkPadFullSpeed') }}
+                            </span>
+                            <UiSwitch v-model="thinkPadFullSpeed" />
+                        </div>
+                    </template>
+                    <UiSeparator v-if="isLiquidctl || isAmdGpuWithOverdrive || isThinkPad" />
                     <div class="flex items-center justify-between gap-8 px-4 py-3">
                         <span class="flex items-center gap-2 text-base text-text-color">
                             <UiTooltip
-                                :text="t('components.deviceExtensionSettings.overdriveDesc')"
+                                :text="t('components.deviceExtensionSettings.commandDelayDesc')"
                             >
                                 <svg-icon
                                     type="mdi"
@@ -299,136 +420,70 @@ const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(d
                                     class="text-text-color-secondary"
                                 />
                             </UiTooltip>
-                            {{ t('components.deviceExtensionSettings.overdrive') }}
+                            {{ t('components.deviceExtensionSettings.commandDelay') }}
                         </span>
-                        <span v-if="amdOverdriveEnabled" class="text-base text-success">
-                            {{ t('components.deviceExtensionSettings.overdriveActive') }}
+                        <span class="flex items-center gap-1.5">
+                            <input
+                                v-model.number="delayMillis"
+                                type="number"
+                                min="0"
+                                max="250"
+                                step="10"
+                                class="h-9 w-20 rounded-lg border border-border-one bg-bg-one px-2 text-right text-base text-text-color outline-none focus:ring-2 focus:ring-accent"
+                                @change="onDelayChange"
+                            />
+                            <span class="text-sm text-text-color-secondary">ms</span>
                         </span>
-                        <UiButton
-                            v-else
-                            size="sm"
-                            variant="outline"
-                            :disabled="amdOverdriveEnabling"
-                            @click="onEnableOverdrive"
-                        >
-                            {{ t('components.deviceExtensionSettings.overdriveEnable') }}
-                        </UiButton>
-                    </div>
-                </template>
-                <template v-if="isThinkPad">
-                    <UiSeparator v-if="isLiquidctl || isAmdGpuWithOverdrive" />
-                    <div class="flex items-center justify-between gap-8 px-4 py-3">
-                        <span class="flex items-center gap-2 text-base text-text-color">
-                            <UiTooltip
-                                :text="
-                                    t('components.deviceExtensionSettings.thinkPadFanControlDesc')
-                                "
-                            >
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiInformationSlabCircleOutline"
-                                    :size="18"
-                                    class="text-text-color-secondary"
-                                />
-                            </UiTooltip>
-                            {{ t('components.deviceExtensionSettings.thinkPadFanControl') }}
-                        </span>
-                        <UiSwitch v-model="thinkPadFanControl" />
                     </div>
                     <UiSeparator />
                     <div class="flex items-center justify-between gap-8 px-4 py-3">
-                        <span class="flex items-center gap-2 text-base text-text-color">
-                            <UiTooltip
-                                :text="
-                                    t('components.deviceExtensionSettings.thinkPadFullSpeedDesc')
-                                "
-                            >
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiInformationSlabCircleOutline"
-                                    :size="18"
-                                    class="text-text-color-secondary"
-                                />
-                            </UiTooltip>
-                            {{ t('components.deviceExtensionSettings.thinkPadFullSpeed') }}
+                        <span class="text-base text-text-color">
+                            {{ t('layout.shell.devicesPage.disableDevice') }}
                         </span>
-                        <UiSwitch v-model="thinkPadFullSpeed" />
+                        <UiButton size="sm" variant="outline" @click="disableDevice">
+                            {{ t('layout.shell.devicesPage.disable') }}
+                        </UiButton>
                     </div>
-                </template>
-                <UiSeparator v-if="isLiquidctl || isAmdGpuWithOverdrive || isThinkPad" />
-                <div class="flex items-center justify-between gap-8 px-4 py-3">
-                    <span class="flex items-center gap-2 text-base text-text-color">
-                        <UiTooltip :text="t('components.deviceExtensionSettings.commandDelayDesc')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiInformationSlabCircleOutline"
-                                :size="18"
-                                class="text-text-color-secondary"
-                            />
-                        </UiTooltip>
-                        {{ t('components.deviceExtensionSettings.commandDelay') }}
-                    </span>
-                    <span class="flex items-center gap-1.5">
-                        <input
-                            v-model.number="delayMillis"
-                            type="number"
-                            min="0"
-                            max="250"
-                            step="10"
-                            class="h-9 w-20 rounded-lg border border-border-one bg-bg-one px-2 text-right text-base text-text-color outline-none focus:ring-2 focus:ring-accent"
-                            @change="onDelayChange"
-                        />
-                        <span class="text-sm text-text-color-secondary">ms</span>
-                    </span>
                 </div>
-                <UiSeparator />
-                <div class="flex items-center justify-between gap-8 px-4 py-3">
-                    <span class="text-base text-text-color">
-                        {{ t('layout.shell.devicesPage.disableDevice') }}
-                    </span>
-                    <UiButton size="sm" variant="outline" @click="disableDevice">
-                        {{ t('layout.shell.devicesPage.disable') }}
+            </template>
+            <!-- Sensors enable/disable (custom sensors manage via add/delete instead) -->
+            <template v-if="!isCustomSensors">
+                <div class="flex items-center gap-3 pb-2 pt-6">
+                    <h2 class="text-xs uppercase text-text-color-secondary">
+                        {{ t('layout.shell.devicesPage.sensors') }}
+                    </h2>
+                    <UiButton v-if="sensorsDirty" size="sm" @click="applySensors">
+                        {{ t('common.apply') }}
                     </UiButton>
                 </div>
-            </div>
-
-            <!-- Sensors enable/disable -->
-            <div class="flex items-center gap-3 pb-2 pt-6">
-                <h2 class="text-xs uppercase text-text-color-secondary">
-                    {{ t('layout.shell.devicesPage.sensors') }}
-                </h2>
-                <UiButton v-if="sensorsDirty" size="sm" @click="applySensors">
-                    {{ t('common.apply') }}
-                </UiButton>
-            </div>
-            <div
-                class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
-            >
-                <button
-                    v-for="tog in toggles"
-                    :key="tog.channelName"
-                    type="button"
-                    class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                    @click="toggleSensor(tog.channelName)"
+                <div
+                    class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
                 >
-                    <svg-icon
-                        type="mdi"
-                        :path="
-                            (sensorState.get(tog.channelName) ?? true)
-                                ? mdiCheckboxMarked
-                                : mdiCheckboxBlankOutline
-                        "
-                        :size="18"
-                        :class="
-                            (sensorState.get(tog.channelName) ?? true)
-                                ? 'text-accent'
-                                : 'text-text-color-secondary'
-                        "
-                    />
-                    <span class="truncate">{{ sensorLabel(tog.channelName) }}</span>
-                </button>
-            </div>
-
+                    <button
+                        v-for="tog in toggles"
+                        :key="tog.channelName"
+                        type="button"
+                        class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                        @click="toggleSensor(tog.channelName)"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="
+                                (sensorState.get(tog.channelName) ?? true)
+                                    ? mdiCheckboxMarked
+                                    : mdiCheckboxBlankOutline
+                            "
+                            :size="18"
+                            :class="
+                                (sensorState.get(tog.channelName) ?? true)
+                                    ? 'text-accent'
+                                    : 'text-text-color-secondary'
+                            "
+                        />
+                        <span class="truncate">{{ sensorLabel(tog.channelName) }}</span>
+                    </button>
+                </div>
+            </template>
             <!-- Lighting and LCD channels -->
             <template v-if="channelLinks.length > 0">
                 <h2 class="pb-2 pt-6 text-xs uppercase text-text-color-secondary">

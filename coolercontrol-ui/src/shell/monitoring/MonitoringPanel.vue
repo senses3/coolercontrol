@@ -47,12 +47,10 @@ import {
     setDeviceChildrenSubset,
     setGroupOrder,
 } from '@/shell/panelOrder.ts'
-import {
-    customSensors,
-    monitoringSensors,
-    type MonitoringSensor,
-} from '@/shell/monitoring/sensors.ts'
+import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sensors.ts'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
@@ -66,10 +64,7 @@ const groups = ref<ReturnType<typeof monitoringSensors>>([])
 watchEffect(() => {
     groups.value = monitoringSensors(deviceStore.allDevices())
 })
-const customSensorList = ref<MonitoringSensor[]>([])
-watchEffect(() => {
-    customSensorList.value = customSensors(deviceStore.allDevices())
-})
+watchEffect(() => {})
 
 const allChannelIds = (deviceUID: UID): string[] => {
     const device = [...deviceStore.allDevices()].find((dev) => dev.uid === deviceUID)
@@ -85,14 +80,6 @@ const persistSensorOrder = (group: { deviceUID: UID; sensors: MonitoringSensor[]
         group.sensors.map((sensor) => pinId(sensor.deviceUID, sensor.channelName)),
         allChannelIds(group.deviceUID),
     )
-    deviceStore.reSortDevicesByMenuOrder()
-}
-
-const persistCustomSensorOrder = (): void => {
-    const first = customSensorList.value[0]
-    if (first == null) return
-    const ids = customSensorList.value.map((sensor) => pinId(sensor.deviceUID, sensor.channelName))
-    setDeviceChildrenSubset(settingsStore.menuOrder, first.deviceUID, ids, ids)
     deviceStore.reSortDevicesByMenuOrder()
 }
 
@@ -128,6 +115,15 @@ const liveValue = (sensor: MonitoringSensor): string => {
     return ''
 }
 
+const failsafeTooltip = (deviceUID: UID, channelName?: string): string => {
+    const ref = settingsStore.healthFailsafe.find(
+        (entry) =>
+            entry.device_uid === deviceUID && (channelName == null || entry.name === channelName),
+    )
+    const base = t('views.appInfo.failsafeActive')
+    return ref?.reason ? `${base}: ${ref.reason}` : base
+}
+
 const isUnhealthy = (deviceUID: UID, channelName: string): boolean =>
     settingsStore.healthFailsafe.some(
         (ref) => ref.device_uid === deviceUID && ref.name === channelName,
@@ -153,10 +149,9 @@ const toggleDashboardPin = (dashboard: Dashboard): void =>
 
 const pinnedSensors = ref<MonitoringSensor[]>([])
 watchEffect(() => {
-    const sensors = [
-        ...groups.value.flatMap((group) => group.sensors),
-        ...customSensorList.value,
-    ].filter((sensor) => isPinned(sensor))
+    const sensors = groups.value
+        .flatMap((group) => group.sensors)
+        .filter((sensor) => isPinned(sensor))
     const order = settingsStore.pinnedIds
     sensors.sort(
         (a, b) =>
@@ -251,21 +246,16 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
     openTagRow.value = open ? rowKey : null
 }
 
-const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
-    custom
-        ? { name: 'monitoring-custom-sensor', params: { customSensorID: sensor.channelName } }
-        : {
-              name: 'monitoring-sensor',
-              params: { deviceUID: sensor.deviceUID, channelName: sensor.channelName },
-          }
+const sensorRoute = (sensor: MonitoringSensor) => ({
+    name: 'monitoring-sensor',
+    params: { deviceUID: sensor.deviceUID, channelName: sensor.channelName },
+})
 </script>
 
 <template>
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <template v-if="pinnedDashboards.length > 0 || pinnedSensors.length > 0">
-            <div class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.pinned') }}
-            </div>
+            <PanelHeader :label="t('layout.menu.pinned')" />
             <VueDraggable
                 v-model="pinnedDashboards"
                 handle=".drag-handle"
@@ -324,16 +314,7 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
                     class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
                 >
                     <RouterLink
-                        :to="
-                            sensorRoute(
-                                sensor,
-                                customSensorList.some(
-                                    (cs) =>
-                                        cs.deviceUID === sensor.deviceUID &&
-                                        cs.channelName === sensor.channelName,
-                                ),
-                            )
-                        "
+                        :to="sensorRoute(sensor)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
@@ -375,10 +356,7 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
             <UiSeparator class="my-1" />
         </template>
 
-        <div class="flex items-center justify-between px-2 pb-1 pt-2">
-            <span class="text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.dashboards') }}
-            </span>
+        <PanelHeader :label="t('layout.menu.dashboards')">
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -387,7 +365,7 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
             </button>
-        </div>
+        </PanelHeader>
         <VueDraggable
             v-model="orderedDashboards"
             handle=".drag-handle"
@@ -447,98 +425,8 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
             </div>
         </VueDraggable>
         <UiSeparator class="my-1" />
-        <div class="flex items-center justify-between px-2 pb-1 pt-2">
-            <span class="text-xs uppercase text-text-color-secondary">
-                {{ t('layout.menu.customSensors') }}
-            </span>
-            <button
-                type="button"
-                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addCustomSensor')"
-                @click="router.push({ name: 'monitoring-custom-sensor-new' })"
-            >
-                <svg-icon type="mdi" :path="mdiPlus" :size="16" />
-            </button>
-        </div>
-        <VueDraggable
-            v-model="customSensorList"
-            handle=".drag-handle"
-            :animation="150"
-            class="flex flex-col gap-0.5"
-            @end="persistCustomSensorOrder"
-        >
-            <div
-                v-for="sensor in customSensorList"
-                :key="`custom-${sensor.channelName}`"
-                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
-            >
-                <RouterLink
-                    :to="sensorRoute(sensor, true)"
-                    class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
-                    exact-active-class="!text-accent"
-                >
-                    <span
-                        class="h-2 w-2 shrink-0 rounded-full"
-                        :style="{
-                            backgroundColor: sensorColor(sensor.deviceUID, sensor.channelName),
-                        }"
-                    />
-                    <span class="truncate">
-                        {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
-                    </span>
-                    <svg-icon
-                        v-if="isUnhealthy(sensor.deviceUID, sensor.channelName)"
-                        type="mdi"
-                        :path="mdiAlert"
-                        :size="14"
-                        class="shrink-0 text-warning"
-                    />
-                    <span
-                        class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
-                        :class="{ '!hidden': openTagRow === `custom-${sensor.channelName}` }"
-                    >
-                        {{ liveValue(sensor) }}
-                    </span>
-                </RouterLink>
-                <div
-                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
-                    :class="{ '!flex': openTagRow === `custom-${sensor.channelName}` }"
-                >
-                    <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                        <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                    </span>
-                    <CCColorPicker
-                        :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
-                        :size="1.25"
-                        @update:model-value="(c: Color) => setSensorColor(sensor, c)"
-                    />
-                    <TagPopover
-                        :device-u-i-d="sensor.deviceUID"
-                        :channel-name="sensor.channelName"
-                        @open="(open: boolean) => onTagOpen(`custom-${sensor.channelName}`, open)"
-                    />
-                    <button
-                        type="button"
-                        class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                        :title="
-                            isPinned(sensor)
-                                ? t('layout.shell.coolingPanel.unpin')
-                                : t('layout.shell.coolingPanel.pin')
-                        "
-                        @click.prevent="togglePin(sensor)"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="isPinned(sensor) ? mdiPinOff : mdiPinOutline"
-                            :size="16"
-                        />
-                    </button>
-                </div>
-            </div>
-        </VueDraggable>
-        <UiSeparator class="my-1" />
-        <div class="flex items-center justify-between px-2 pb-1 pt-2">
-            <span class="flex items-center gap-1.5 text-xs uppercase text-text-color-secondary">
+        <PanelHeader>
+            <template #label>
                 {{ t('layout.menu.alerts') }}
                 <span
                     v-if="activeAlertCount > 0"
@@ -546,7 +434,7 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
                 >
                     {{ activeAlertCount }}
                 </span>
-            </span>
+            </template>
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -555,7 +443,7 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
             </button>
-        </div>
+        </PanelHeader>
         <RouterLink
             :to="{ name: 'monitoring-alerts' }"
             class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
@@ -597,13 +485,10 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
         </VueDraggable>
         <UiSeparator class="my-1" />
         <template v-for="group in groups" :key="group.deviceUID">
-            <div
-                class="truncate px-2 pb-1 pt-2 text-xs uppercase"
-                :class="{ 'text-text-color-secondary': !deviceColor(group.deviceUID) }"
-                :style="deviceColor(group.deviceUID) ? { color: deviceColor(group.deviceUID) } : {}"
-            >
-                {{ deviceLabel(group.deviceUID) }}
-            </div>
+            <PanelHeader
+                :label="deviceLabel(group.deviceUID)"
+                :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
+            />
             <VueDraggable
                 v-model="group.sensors"
                 handle=".drag-handle"
@@ -617,7 +502,7 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
                     class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
                 >
                     <RouterLink
-                        :to="sensorRoute(sensor, false)"
+                        :to="sensorRoute(sensor)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
@@ -630,13 +515,17 @@ const sensorRoute = (sensor: MonitoringSensor, custom: boolean) =>
                         <span class="truncate">
                             {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
                         </span>
-                        <svg-icon
+                        <UiTooltip
                             v-if="isUnhealthy(sensor.deviceUID, sensor.channelName)"
-                            type="mdi"
-                            :path="mdiAlert"
-                            :size="14"
-                            class="shrink-0 text-warning"
-                        />
+                            :text="failsafeTooltip(sensor.deviceUID, sensor.channelName)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiAlert"
+                                :size="14"
+                                class="shrink-0 text-error"
+                            />
+                        </UiTooltip>
                         <span
                             class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
                             :class="{

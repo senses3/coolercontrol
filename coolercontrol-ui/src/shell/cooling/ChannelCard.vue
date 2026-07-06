@@ -23,6 +23,7 @@ import { mdiAlert, mdiAutoFix } from '@mdi/js'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useFanControlWizard } from '@/composables/useFanControlWizard.ts'
@@ -78,6 +79,16 @@ const assignedSummary = computed<string>(() => {
     return t('common.unmanaged')
 })
 
+const failsafeTooltip = computed((): string => {
+    const ref = settingsStore.healthFailsafe.find(
+        (entry) =>
+            entry.device_uid === props.channel.deviceUID &&
+            entry.name === props.channel.channelName,
+    )
+    const base = t('views.appInfo.failsafeActive')
+    return ref?.reason ? `${base}: ${ref.reason}` : base
+})
+
 const isUnhealthy = computed(() =>
     settingsStore.healthFailsafe.some(
         (ref) =>
@@ -110,13 +121,14 @@ const openWizard = (): void => {
             <div class="min-w-0">
                 <div class="flex items-center gap-1.5">
                     <span class="truncate font-medium text-text-color">{{ channelLabel }}</span>
-                    <svg-icon
-                        v-if="isUnhealthy"
-                        type="mdi"
-                        :path="mdiAlert"
-                        :size="14"
-                        class="shrink-0 text-warning"
-                    />
+                    <UiTooltip v-if="isUnhealthy" :text="failsafeTooltip">
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiAlert"
+                            :size="14"
+                            class="shrink-0 text-error"
+                        />
+                    </UiTooltip>
                 </div>
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>

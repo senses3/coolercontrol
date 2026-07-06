@@ -17,13 +17,21 @@
   -->
 
 <script setup lang="ts">
-import { TabsContent } from 'reka-ui'
-
-defineProps<{ value: string }>()
+// Card of UiSettingRow entries; the row group style shared by the settings
+// pages and entity editors.
+withDefaults(defineProps<{ title?: string }>(), { title: '' })
 </script>
 
 <template>
-    <TabsContent :value="value" class="outline-none">
-        <slot />
-    </TabsContent>
+    <div class="rounded-lg border border-border-one bg-bg-two">
+        <div
+            v-if="title || $slots.title"
+            class="border-b border-border-one px-4 py-3 text-base font-semibold text-text-color"
+        >
+            <slot name="title">{{ title }}</slot>
+        </div>
+        <div class="divide-y divide-border-one">
+            <slot />
+        </div>
+    </div>
 </template>

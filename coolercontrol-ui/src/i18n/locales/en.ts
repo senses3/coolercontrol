@@ -252,6 +252,7 @@ export default {
             dashboards: 'Dashboards',
             modes: 'Modes',
             appearance: 'Appearance',
+            general: 'General',
             language: 'Language',
             selectLanguage: 'Select Language',
             english: 'English',

@@ -95,17 +95,31 @@ const sectionRoutes: RouteRecordRaw[] = [
         meta: { section: 'monitoring' },
     },
     {
-        path: 'monitoring/custom-sensors/new',
-        name: 'monitoring-custom-sensor-new',
+        // Custom sensors are managed from the Devices section (the backend
+        // models them as a device); Monitoring only observes them.
+        path: 'devices/custom-sensors/new',
+        name: 'device-custom-sensor-new',
         component: () => import('@/views/CustomSensorView.vue'),
-        meta: { section: 'monitoring' },
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'devices/custom-sensors/:customSensorID',
+        name: 'device-custom-sensor',
+        component: () => import('@/views/CustomSensorView.vue'),
+        props: true,
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'monitoring/custom-sensors/new',
+        redirect: { name: 'device-custom-sensor-new' },
     },
     {
         path: 'monitoring/custom-sensors/:customSensorID',
         name: 'monitoring-custom-sensor',
-        component: () => import('@/views/CustomSensorView.vue'),
-        props: true,
-        meta: { section: 'monitoring' },
+        redirect: (to) => ({
+            name: 'device-custom-sensor',
+            params: { customSensorID: to.params.customSensorID },
+        }),
     },
     {
         path: 'devices',
@@ -220,10 +234,10 @@ const router = createRouter({
                     redirect: (to) =>
                         to.params.customSensorID
                             ? {
-                                  name: 'monitoring-custom-sensor',
+                                  name: 'device-custom-sensor',
                                   params: { customSensorID: to.params.customSensorID },
                               }
-                            : { name: 'monitoring-custom-sensor-new' },
+                            : { name: 'device-custom-sensor-new' },
                 },
                 {
                     path: '/dashboards/:deviceUID/:channelName',

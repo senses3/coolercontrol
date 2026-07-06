@@ -20,7 +20,12 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { type Device, DeviceType } from '@/models/Device.ts'
-import { deviceChannelLinks, hardwareDevices, sensorToggles } from '../devices/devices.ts'
+import {
+    customSensorNames,
+    deviceChannelLinks,
+    hardwareDevices,
+    sensorToggles,
+} from '../devices/devices.ts'
 
 interface FakeChannel {
     speed_options?: object
@@ -55,10 +60,12 @@ function fakeDevice(
 }
 
 describe('hardwareDevices', () => {
-    it('excludes custom-sensor devices', () => {
+    it('includes custom-sensor devices', () => {
         const hwmon = fakeDevice('d1', DeviceType.HWMON, [], {})
         const custom = fakeDevice('c1', DeviceType.CUSTOM_SENSORS, ['sensor1'], {})
-        expect(hardwareDevices([hwmon, custom]).map((d) => d.uid)).toEqual(['d1'])
+        expect(hardwareDevices([hwmon, custom]).map((d) => d.uid)).toEqual(['d1', 'c1'])
+        expect(customSensorNames(custom)).toEqual(['sensor1'])
+        expect(customSensorNames(hwmon)).toEqual([])
     })
 })
 

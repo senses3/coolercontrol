@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { type Device, DeviceType, type UID } from '@/models/Device.ts'
+import { type Device, type UID } from '@/models/Device.ts'
 
 export interface MonitoringSensor {
     deviceUID: UID
@@ -30,12 +30,12 @@ export interface MonitoringDeviceGroup {
 }
 
 // The Monitoring sensor tree: temps plus all value-bearing channels including
-// fans (duty/rpm are monitored too); lighting/LCD belong to Devices.
-// Custom sensors get their own group via customSensors() below.
+// fans (duty/rpm are monitored too); lighting/LCD belong to Devices. The
+// CustomSensors device is monitored like any other; editing lives in Devices.
 export function monitoringSensors(devices: Iterable<Device>): MonitoringDeviceGroup[] {
     const groups: MonitoringDeviceGroup[] = []
     for (const device of devices) {
-        if (device.info == null || device.type === DeviceType.CUSTOM_SENSORS) continue
+        if (device.info == null) continue
         const sensors: MonitoringSensor[] = []
         for (const tempName of device.info.temps.keys()) {
             sensors.push({ deviceUID: device.uid, channelName: tempName, isTemp: true })
@@ -51,16 +51,4 @@ export function monitoringSensors(devices: Iterable<Device>): MonitoringDeviceGr
         }
     }
     return groups
-}
-
-// Custom sensors are the temps of the CustomSensors device(s).
-export function customSensors(devices: Iterable<Device>): MonitoringSensor[] {
-    const sensors: MonitoringSensor[] = []
-    for (const device of devices) {
-        if (device.type !== DeviceType.CUSTOM_SENSORS || device.info == null) continue
-        for (const tempName of device.info.temps.keys()) {
-            sensors.push({ deviceUID: device.uid, channelName: tempName, isTemp: true })
-        }
-    }
-    return sensors
 }
