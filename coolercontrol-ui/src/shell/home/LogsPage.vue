@@ -98,7 +98,7 @@ onMounted(() => {
             <span class="flex items-center gap-3">
                 <UiToggleGroup v-model="levelFilter" :options="levelOptions" />
                 <a :href="downloadLogHref" :download="downloadLogFileName">
-                    <UiButton size="sm" variant="outline">
+                    <UiButton variant="outline">
                         {{ t('views.appInfo.downloadCurrentLog') }}
                     </UiButton>
                 </a>
