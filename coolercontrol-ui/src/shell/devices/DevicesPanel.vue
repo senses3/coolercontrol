@@ -27,7 +27,7 @@ import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { DEVICE_TYPE_ORDER, deviceChannelLinks, hardwareDevices } from '@/shell/devices/devices.ts'
+import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -36,12 +36,7 @@ const colorStore = useThemeColorsStore()
 
 const devices = computed(() => hardwareDevices(deviceStore.allDevices()))
 
-const typeGroups = computed(() =>
-    DEVICE_TYPE_ORDER.map((type) => ({
-        type,
-        devices: devices.value.filter((device) => device.type === type),
-    })).filter((group) => group.devices.length > 0),
-)
+const typeGroups = computed(() => deviceTypeGroups(devices.value))
 
 const disabledDevices = computed(() =>
     [...settingsStore.ccDeviceSettings.values()].filter((setting) => setting.disable),
@@ -53,8 +48,11 @@ const deviceLabel = (deviceUID: UID): string =>
 const deviceColor = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor ?? ''
 
-// The picker needs a valid color; devices without one fall back to the theme
-// text color, matching the old device color picker.
+// Devices without a custom color fall back to the theme text color. The dot
+// can use the CSS variable directly; the picker needs a concrete color value
+// (its conversion helpers cannot parse var() strings).
+const dotColor = (deviceUID: UID): string =>
+    deviceColor(deviceUID) || 'rgb(var(--colors-text-color))'
 const pickerColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || `rgb(${colorStore.themeColors.text_color})`
 
@@ -88,11 +86,7 @@ const setDeviceColor = (deviceUID: UID, newColor: Color): void => {
                     >
                         <span
                             class="h-2 w-2 shrink-0 rounded-full"
-                            :style="
-                                deviceColor(device.uid)
-                                    ? { backgroundColor: deviceColor(device.uid) }
-                                    : {}
-                            "
+                            :style="{ backgroundColor: dotColor(device.uid) }"
                         />
                         <span class="truncate">{{ deviceLabel(device.uid) }}</span>
                         <svg-icon

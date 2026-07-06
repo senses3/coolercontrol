@@ -26,17 +26,13 @@ import type { Device, UID } from '@/models/Device.ts'
 import { getDeviceTypeDisplayName } from '@/models/Device.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { deviceChannelLinks, deviceTypeRank, hardwareDevices } from '@/shell/devices/devices.ts'
+import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
-const devices = computed(() =>
-    hardwareDevices(deviceStore.allDevices()).sort(
-        (a, b) => deviceTypeRank(a.type) - deviceTypeRank(b.type),
-    ),
-)
+const typeGroups = computed(() => deviceTypeGroups(hardwareDevices(deviceStore.allDevices())))
 
 const disabledDevices = computed(() =>
     [...settingsStore.ccDeviceSettings.values()].filter((setting) => setting.disable),
@@ -45,8 +41,9 @@ const disabledDevices = computed(() =>
 const deviceLabel = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
 
+// Devices without a custom color still show a dot in the theme text color.
 const deviceColor = (deviceUID: UID): string =>
-    settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor ?? ''
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor || 'rgb(var(--colors-text-color))'
 
 const isUnhealthy = (deviceUID: UID): boolean =>
     settingsStore.healthFailsafe.some((ref) => ref.device_uid === deviceUID)
@@ -84,54 +81,66 @@ const counts = (device: Device): string => {
                 {{ t('layout.shell.devicesPage.landingHint') }}
             </span>
         </div>
-        <div class="grid grid-cols-1 gap-3 px-4 pt-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            <RouterLink
-                v-for="device in devices"
-                :key="device.uid"
-                :to="{ name: 'devices-device', params: { deviceUID: device.uid } }"
-                class="flex flex-col gap-1 rounded-lg border border-border-one bg-bg-two p-4 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+        <section v-for="group in typeGroups" :key="group.type" class="px-4 pt-4">
+            <h2
+                class="truncate pb-2 text-sm font-medium uppercase tracking-wide text-text-color-secondary"
             >
-                <div class="flex items-center gap-2">
-                    <span
-                        class="h-2.5 w-2.5 shrink-0 rounded-full"
-                        :style="
-                            deviceColor(device.uid)
-                                ? { backgroundColor: deviceColor(device.uid) }
-                                : {}
-                        "
-                    />
-                    <span class="truncate text-base font-medium">
-                        {{ deviceLabel(device.uid) }}
+                {{ getDeviceTypeDisplayName(group.type) }}
+            </h2>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <RouterLink
+                    v-for="device in group.devices"
+                    :key="device.uid"
+                    :to="{ name: 'devices-device', params: { deviceUID: device.uid } }"
+                    class="flex flex-col gap-1 rounded-lg border border-border-one bg-bg-two p-4 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    <div class="flex items-center gap-2">
+                        <span
+                            class="h-2.5 w-2.5 shrink-0 rounded-full"
+                            :style="{ backgroundColor: deviceColor(device.uid) }"
+                        />
+                        <span class="truncate text-base font-medium">
+                            {{ deviceLabel(device.uid) }}
+                        </span>
+                        <svg-icon
+                            v-if="isUnhealthy(device.uid)"
+                            type="mdi"
+                            :path="mdiAlert"
+                            :size="16"
+                            class="shrink-0 text-warning"
+                        />
+                    </div>
+                    <span class="truncate text-sm text-text-color-secondary">
+                        {{ facts(device) }}
                     </span>
-                    <svg-icon
-                        v-if="isUnhealthy(device.uid)"
-                        type="mdi"
-                        :path="mdiAlert"
-                        :size="16"
-                        class="shrink-0 text-warning"
-                    />
-                </div>
-                <span class="truncate text-sm text-text-color-secondary">
-                    {{ facts(device) }}
-                </span>
-                <span class="truncate text-sm text-text-color-secondary">
-                    {{ counts(device) }}
-                </span>
-            </RouterLink>
-            <RouterLink
-                v-for="setting in disabledDevices"
-                :key="`disabled-${setting.uid}`"
-                :to="{ name: 'devices-device', params: { deviceUID: setting.uid } }"
-                class="flex flex-col gap-1 rounded-lg border border-border-one bg-bg-two p-4 opacity-60 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    <span class="truncate text-sm text-text-color-secondary">
+                        {{ counts(device) }}
+                    </span>
+                </RouterLink>
+            </div>
+        </section>
+        <section v-if="disabledDevices.length > 0" class="px-4 pt-4">
+            <h2
+                class="truncate pb-2 text-sm font-medium uppercase tracking-wide text-text-color-secondary"
             >
-                <span class="truncate text-base font-medium text-text-color">
-                    {{ setting.name }}
-                </span>
-                <span class="text-sm text-text-color-secondary">
-                    {{ t('layout.shell.devicesPage.deviceDisabled') }}
-                </span>
-            </RouterLink>
-        </div>
+                {{ t('layout.shell.devicesPanel.disabled') }}
+            </h2>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <RouterLink
+                    v-for="setting in disabledDevices"
+                    :key="`disabled-${setting.uid}`"
+                    :to="{ name: 'devices-device', params: { deviceUID: setting.uid } }"
+                    class="flex flex-col gap-1 rounded-lg border border-border-one bg-bg-two p-4 opacity-60 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    <span class="truncate text-base font-medium text-text-color">
+                        {{ setting.name }}
+                    </span>
+                    <span class="text-sm text-text-color-secondary">
+                        {{ t('layout.shell.devicesPage.deviceDisabled') }}
+                    </span>
+                </RouterLink>
+            </div>
+        </section>
         <div class="pb-6" />
     </div>
 </template>

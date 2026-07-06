@@ -59,8 +59,9 @@ const uiSettings = computed(() => settingsStore.allUIDeviceSettings.get(props.de
 const deviceLabel = computed(
     () => uiSettings.value?.name ?? ccSetting.value?.name ?? props.deviceUID,
 )
+// The color picker needs a concrete color; var() strings are not parseable.
 const deviceColor = computed(
-    () => uiSettings.value?.userColor ?? `rgb(${colorStore.themeColors.text_color})`,
+    () => uiSettings.value?.userColor || `rgb(${colorStore.themeColors.text_color})`,
 )
 
 const saveNameFunction = async (newName: string): Promise<boolean> =>

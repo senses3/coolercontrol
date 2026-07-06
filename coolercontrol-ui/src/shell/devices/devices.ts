@@ -32,6 +32,18 @@ export function deviceTypeRank(type: DeviceType): number {
     return index >= 0 ? index : DEVICE_TYPE_ORDER.length
 }
 
+export interface DeviceTypeGroup {
+    type: DeviceType
+    devices: Device[]
+}
+
+export function deviceTypeGroups(devices: Device[]): DeviceTypeGroup[] {
+    return DEVICE_TYPE_ORDER.map((type) => ({
+        type,
+        devices: devices.filter((device) => device.type === type),
+    })).filter((group) => group.devices.length > 0)
+}
+
 // The Devices section lists hardware devices; custom sensors are Monitoring's.
 export function hardwareDevices(devices: Iterable<Device>): Device[] {
     return [...devices].filter((device) => device.type !== DeviceType.CUSTOM_SENSORS)
