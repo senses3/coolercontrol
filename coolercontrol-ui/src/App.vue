@@ -32,13 +32,12 @@ import Dialog from 'primevue/dialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import { ElLoading, ElSwitch } from 'element-plus'
-import 'element-plus/es/components/loading/style/css'
 import { ThemeMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
-import { svgLoader, svgLoaderBackground, svgLoaderViewBox } from '@/models/Loader.ts'
+import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import FloatLabel from 'primevue/floatlabel'
 import { useI18n } from 'vue-i18n'
 
@@ -288,13 +287,7 @@ onMounted(async () => {
     if (!loginSuccessful) {
         return
     }
-    const loading = ElLoading.service({
-        lock: true,
-        text: t('common.loading'),
-        background: svgLoaderBackground,
-        svg: svgLoader,
-        svgViewBox: svgLoaderViewBox,
-    })
+    const loading = showLoadingOverlay({ text: t('common.loading') })
 
     const deviceInitSuccessful = await deviceStore.initializeDevices()
     if (!deviceInitSuccessful) {
@@ -487,7 +480,7 @@ onMounted(async () => {
                     t('common.protocol')
                 }}</small>
                 <div class="flex flex-row items-center" v-tooltip.top="t('views.error.sslTooltip')">
-                    <el-switch v-model="daemonSslEnabled" size="large" />
+                    <UiSwitch v-model="daemonSslEnabled" />
                     <span class="ml-2 m-1">{{ t('common.sslTls') }}</span>
                 </div>
             </div>
@@ -729,7 +722,6 @@ onMounted(async () => {
 <style>
 :root {
     background-color: rgb(var(--colors-bg-one));
-    --el-color-primary: rgb(var(--colors-accent));
     --v-onboarding-overlay-z: 60;
     --v-onboarding-step-z: 70;
     --v-onboarding-overlay-opacity: 0.125;

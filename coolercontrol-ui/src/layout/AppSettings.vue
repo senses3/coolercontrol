@@ -48,9 +48,6 @@ import TabList from 'primevue/tablist'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
-import 'element-plus/es/components/tree/style/css'
 import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
 import Select from 'primevue/select'
 import InputNumber from 'primevue/inputnumber'
@@ -64,6 +61,7 @@ import { api as fullscreenApi } from 'vue-fullscreen'
 import _ from 'lodash'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
@@ -259,6 +257,16 @@ const applyGenericDaemonChange = _.debounce(
         }),
     2000,
 )
+
+// Boolean views over non-boolean settings for the kit switch.
+const frequencyGhz = computed({
+    get: () => settingsStore.frequencyPrecision === 1000,
+    set: (value: boolean) => (settingsStore.frequencyPrecision = value ? 1000 : 1),
+})
+const liquidctlInit = computed({
+    get: () => !settingsStore.ccSettings.no_init,
+    set: (value: boolean) => (settingsStore.ccSettings.no_init = !value),
+})
 
 const pollRate: Ref<number> = ref(settingsStore.ccSettings.poll_rate)
 watch(pollRate, () => {
@@ -616,13 +624,11 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                     >
-                                        <el-switch
-                                            v-model="settingsStore.time24"
-                                            size="large"
-                                            :active-text="t('layout.settings.time24h')"
-                                            :inactive-text="t('layout.settings.time12h')"
-                                            style="--el-switch-off-color: rgb(var(--colors-accent))"
-                                        />
+                                        <span class="inline-flex items-center justify-center gap-2">
+                                            <span>{{ t('layout.settings.time12h') }}</span>
+                                            <UiSwitch v-model="settingsStore.time24" two-sided />
+                                            <span>{{ t('layout.settings.time24h') }}</span>
+                                        </span>
                                     </td>
                                 </tr>
                                 <tr
@@ -636,15 +642,11 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
-                                            v-model="settingsStore.frequencyPrecision"
-                                            size="large"
-                                            :active-value="1000"
-                                            :active-text="t('common.ghzAbbr')"
-                                            :inactive-value="1"
-                                            :inactive-text="t('common.mhzAbbr')"
-                                            style="--el-switch-off-color: rgb(var(--colors-accent))"
-                                        />
+                                        <span class="inline-flex items-center justify-center gap-2">
+                                            <span>{{ t('common.mhzAbbr') }}</span>
+                                            <UiSwitch v-model="frequencyGhz" two-sided />
+                                            <span>{{ t('common.ghzAbbr') }}</span>
+                                        </span>
                                     </td>
                                 </tr>
                                 <tr v-tooltip.top="t('layout.settings.tooltips.sidebarCollapse')">
@@ -656,10 +658,7 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
-                                            v-model="settingsStore.hideMenuCollapseIcon"
-                                            size="large"
-                                        />
+                                        <UiSwitch v-model="settingsStore.hideMenuCollapseIcon" />
                                     </td>
                                 </tr>
                                 <tr v-tooltip.top="t('layout.settings.tooltips.eyeCandy')">
@@ -671,7 +670,7 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch v-model="settingsStore.eyeCandy" size="large" />
+                                        <UiSwitch v-model="settingsStore.eyeCandy" />
                                     </td>
                                 </tr>
                                 <tr v-tooltip.top="t('layout.settings.tooltips.fullScreen')">
@@ -683,11 +682,10 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="isFullScreen"
                                             :disabled="!fullscreenApi.isEnabled"
-                                            size="large"
-                                            @change="toggleFullScreen"
+                                            @update:model-value="toggleFullScreen"
                                         />
                                     </td>
                                 </tr>
@@ -779,7 +777,7 @@ onUnmounted(() => {
                                             list-style="max-height: 100%"
                                             option-label="label"
                                             option-value="value"
-                                            @change="changeThemeMode"
+                                            @update:model-value="changeThemeMode"
                                             :pt="{
                                                 // @ts-ignore
                                                 root: ({ props }) => ({
@@ -1104,9 +1102,8 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="settingsStore.ccSettings.apply_on_boot"
-                                            size="large"
                                         />
                                     </td>
                                 </tr>
@@ -1218,9 +1215,8 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="settingsStore.ccSettings.compress"
-                                            size="large"
                                             @click="applyGenericDaemonChange"
                                         />
                                     </td>
@@ -1253,10 +1249,9 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="settingsStore.ccSettings.sensors_auto_detect"
-                                            size="large"
-                                            @change="applyGenericDaemonChange"
+                                            @update:model-value="applyGenericDaemonChange"
                                         />
                                     </td>
                                 </tr>
@@ -1288,12 +1283,11 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2 border-t-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="
                                                 settingsStore.ccSettings.device_listener_enabled
                                             "
-                                            size="large"
-                                            @change="applyGenericDaemonChange"
+                                            @update:model-value="applyGenericDaemonChange"
                                         />
                                     </td>
                                 </tr>
@@ -1325,10 +1319,9 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="settingsStore.ccSettings.liquidctl_integration"
-                                            size="large"
-                                            @change="applyGenericDaemonChange"
+                                            @update:model-value="applyGenericDaemonChange"
                                         />
                                     </td>
                                 </tr>
@@ -1346,14 +1339,11 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                     >
-                                        <el-switch
-                                            v-model="settingsStore.ccSettings.no_init"
+                                        <UiSwitch
+                                            v-model="liquidctlInit"
                                             :disabled="
                                                 !settingsStore.ccSettings.liquidctl_integration
                                             "
-                                            :active-value="false"
-                                            :inactive-value="true"
-                                            size="large"
                                         />
                                     </td>
                                 </tr>
@@ -1385,15 +1375,14 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="
                                                 settingsStore.ccSettings.hide_duplicate_devices
                                             "
                                             :disabled="
                                                 !settingsStore.ccSettings.liquidctl_integration
                                             "
-                                            size="large"
-                                            @change="applyGenericDaemonChange"
+                                            @update:model-value="applyGenericDaemonChange"
                                         />
                                     </td>
                                 </tr>
@@ -1423,10 +1412,9 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
+                                        <UiSwitch
                                             v-model="settingsStore.ccSettings.drivetemp_suspend"
-                                            size="large"
-                                            @change="applyGenericDaemonChange"
+                                            @update:model-value="applyGenericDaemonChange"
                                         />
                                     </td>
                                 </tr>
@@ -1451,10 +1439,7 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-b-2"
                                     >
-                                        <el-switch
-                                            v-model="settingsStore.startInSystemTray"
-                                            size="large"
-                                        />
+                                        <UiSwitch v-model="settingsStore.startInSystemTray" />
                                     </td>
                                 </tr>
                                 <tr
@@ -1471,10 +1456,7 @@ onUnmounted(() => {
                                     <td
                                         class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                                     >
-                                        <el-switch
-                                            v-model="settingsStore.closeToSystemTray"
-                                            size="large"
-                                        />
+                                        <UiSwitch v-model="settingsStore.closeToSystemTray" />
                                     </td>
                                 </tr>
                                 <tr
@@ -1560,37 +1542,7 @@ onUnmounted(() => {
     </ScrollAreaRoot>
 </template>
 
-<style scoped lang="scss">
-.el-tree {
-    --el-fill-color-blank: rgb(var(--colors-bg-one));
-    --el-font-size-base: 1rem;
-    --el-tree-text-color: rgb(var(--colors-text-color));
-    --el-tree-node-content-height: 2.5rem;
-    --el-tree-node-hover-bg-color: rgb(var(--colors-bg-two));
-    --el-text-color-placeholder: rgb(var(--colors-text-color));
-    --el-color-primary-light-9: rgb(var(--colors-bg-two));
-}
-
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-    // switch active text color:
-    --el-color-primary: rgb(var(--colors-text-color));
-    // switch inactive text color:
-    --el-text-color-primary: rgb(var(--colors-text-color));
-}
-
-.tree-text {
-    // This is THE WAY to handle elements overflowing with white-space: nowrap
-    // same as tw line-clamp-1
-    overflow: hidden;
-    display: -webkit-box;
-    line-clamp: 1;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-}
-</style>
+<style scoped lang="scss"></style>
 
 <style lang="scss">
 .el-tree-node__content {

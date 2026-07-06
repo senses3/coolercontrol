@@ -31,8 +31,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { plainToInstance } from 'class-transformer'
 import { HealthCheck } from '@/models/HealthCheck.ts'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
-import { ElLoading } from 'element-plus'
-import { svgLoader, svgLoaderBackground, svgLoaderViewBox } from '@/models/Loader.ts'
+import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { AlertLog, AlertState } from '@/models/Alert.ts'
 import { DeviceHealthDTO, FailsafeDelta, SourceDelta } from '@/models/DeviceHealth.ts'
@@ -111,13 +110,7 @@ export const useDeviceStore = defineStore('device', () => {
     }
 
     async function waitAndReload(wait_secs: number = 3): Promise<void> {
-        ElLoading.service({
-            lock: true,
-            text: 'Restarting...',
-            background: svgLoaderBackground,
-            svg: svgLoader,
-            svgViewBox: svgLoaderViewBox,
-        })
+        showLoadingOverlay({ text: 'Restarting...' })
         let s = 0
         const daemonState = useDaemonState()
         while (s < 30) {

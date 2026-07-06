@@ -19,8 +19,6 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { mdiAlertOutline, mdiCogs, mdiInformationSlabCircleOutline } from '@mdi/js'
 import { PopoverContent, PopoverRoot, PopoverTrigger } from 'radix-vue'
@@ -33,6 +31,7 @@ import { ChannelExtensionNames } from '@/models/SpeedOptions.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
 import { CCChannelSettings, ChannelExtensions } from '@/models/CCSettings.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { useToast } from 'primevue/usetoast'
 
 const props = defineProps<{
@@ -235,11 +234,10 @@ defineExpose({
                                     </div>
                                 </td>
                                 <td class="w-24 px-2 text-center">
-                                    <el-switch
+                                    <UiSwitch
                                         v-model="hwFanCurve"
-                                        size="large"
                                         :disabled="!hwFanCurveIsApplicable"
-                                        @change="emit('change')"
+                                        @update:model-value="emit('change')"
                                     />
                                 </td>
                             </tr>
@@ -265,10 +263,4 @@ defineExpose({
     </div>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>
