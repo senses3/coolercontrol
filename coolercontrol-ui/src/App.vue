@@ -17,7 +17,8 @@
   -->
 
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterView, useRouter } from 'vue-router'
+import { StartupPage } from '@/models/UISettings.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
@@ -43,6 +44,7 @@ const { t, locale } = useI18n({ useScope: 'global' })
 const loaded: Ref<boolean> = ref(false)
 const initSuccessful = ref(true)
 const deviceStore = useDeviceStore()
+const router = useRouter()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const daemonState = useDaemonState()
@@ -304,6 +306,18 @@ onMounted(async () => {
     // Re-attach to a calibration batch the daemon is still driving after a
     // reload (the daemon owns the queue, so it survived the suspend/reload).
     const calibrationBatchResumed = await calibrationStore.ensureBatchPolling()
+    // Honor the configured startup page, but only when the user landed on the
+    // default root route (no deep link). Targets remap to the new shell:
+    // AppInfo -> Home (its content lives there now), Controls -> Cooling,
+    // HomeDashboard -> Monitoring (home dashboard).
+    if (router.currentRoute.value.name === 'section-home') {
+        const startup = settingsStore.startupPage
+        if (startup === StartupPage.Controls) {
+            await router.replace({ name: 'section-cooling' })
+        } else if (startup === StartupPage.HomeDashboard) {
+            await router.replace({ name: 'section-monitoring' })
+        }
+    }
     applyCustomTheme()
     await daemonState.init()
     await deviceStore.loadAllPlugins()

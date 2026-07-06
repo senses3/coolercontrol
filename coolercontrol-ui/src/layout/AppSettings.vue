@@ -33,6 +33,7 @@ import { computed, inject, onMounted, onUnmounted, type Ref, ref, watch } from '
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useConfirm } from 'primevue/useconfirm'
+import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { useToast } from 'primevue/usetoast'
 import {
     CustomThemeSettings,
@@ -68,6 +69,7 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const colorStore = useThemeColorsStore()
 const confirm = useConfirm()
+const { openShortcutsDialog } = useShortcutsDialog()
 const toast = useToast()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
@@ -166,10 +168,12 @@ const lineThicknessOptions = ref([
     { optionSize: 4, value: 2.0 },
     { optionSize: 6, value: 3.0 },
 ])
+// Enum values are kept for config compatibility; targets remap to the new
+// shell sections (AppInfo -> Home, Controls -> Cooling, dashboards -> Monitoring).
 const startupPageOptions = computed(() => [
-    { value: StartupPage.AppInfo, label: t('models.startupPage.appInfo') },
+    { value: StartupPage.AppInfo, label: t('layout.shell.home') },
+    { value: StartupPage.Controls, label: t('layout.shell.cooling') },
     { value: StartupPage.HomeDashboard, label: t('models.startupPage.homeDashboard') },
-    { value: StartupPage.Controls, label: t('models.startupPage.controls') },
 ])
 const customThemeAccent: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.accent))
 const customThemeBgOne: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.bgOne))
@@ -554,6 +558,23 @@ onUnmounted(() => {
                                             :label="t('layout.settings.startTour')"
                                             class="bg-accent/80 hover:!bg-accent w-full h-[2.375rem]"
                                             @click="emitter.emit('start-tour')"
+                                        />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td
+                                        class="py-4 px-4 w-60 text-right items-center border-border-one border-r-2 border-b-2"
+                                    >
+                                        {{ t('views.shortcuts.shortcuts') }}
+                                    </td>
+                                    <td
+                                        class="py-4 px-4 w-48 text-center items-center border-border-one border-l-2 border-b-2"
+                                    >
+                                        <Button
+                                            :label="t('views.shortcuts.shortcuts')"
+                                            class="w-full h-[2.375rem]"
+                                            outlined
+                                            @click="openShortcutsDialog()"
                                         />
                                     </td>
                                 </tr>

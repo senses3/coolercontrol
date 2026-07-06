@@ -18,7 +18,7 @@
 
 <script setup lang="ts">
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, onUnmounted } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -26,6 +26,9 @@ import ShellRail from '@/shell/ShellRail.vue'
 import ShellHeader from '@/shell/ShellHeader.vue'
 import ShellPanel from '@/shell/ShellPanel.vue'
 import ShellBottomNav from '@/shell/ShellBottomNav.vue'
+import hotkeys from 'hotkeys-js'
+import { useRouter } from 'vue-router'
+import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
@@ -58,6 +61,42 @@ onMounted(() => {
         // timeout needed as the auto-expand happens after onMounted code.
         setTimeout(() => panelRef.value?.collapse())
     }
+})
+
+// Section hotkeys. Browsers reserve Ctrl+number for tab switching, so the
+// Ctrl+Alt variants exist for web use; plain Ctrl+number works in the Qt app.
+const router = useRouter()
+const { openShortcutsDialog } = useShortcutsDialog()
+const SECTION_KEYS: Array<[string, string]> = [
+    ['1', 'section-home'],
+    ['2', 'section-cooling'],
+    ['3', 'section-monitoring'],
+    ['4', 'section-devices'],
+    ['5', 'settings'],
+    ['6', 'plugins-overview'],
+]
+const HOTKEY_SCOPES: string[] = []
+for (const [digit, routeName] of SECTION_KEYS) {
+    const combo = `ctrl+${digit},ctrl+alt+${digit}`
+    HOTKEY_SCOPES.push(combo)
+    hotkeys(combo, (event) => {
+        if (routeName === 'plugins-overview' && deviceStore.plugins.length === 0) return
+        event.preventDefault()
+        router.push({ name: routeName })
+    })
+}
+hotkeys('ctrl+,', (event) => {
+    event.preventDefault()
+    router.push({ name: 'settings' })
+})
+hotkeys('ctrl+/,ctrl+shift+/', (event) => {
+    event.preventDefault()
+    openShortcutsDialog()
+})
+onUnmounted(() => {
+    for (const combo of HOTKEY_SCOPES) hotkeys.unbind(combo)
+    hotkeys.unbind('ctrl+,')
+    hotkeys.unbind('ctrl+/,ctrl+shift+/')
 })
 </script>
 

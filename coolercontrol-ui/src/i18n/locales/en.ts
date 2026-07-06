@@ -760,6 +760,7 @@ export default {
             },
             profileDeleted: 'Profile Deleted',
             profileDuplicated: 'Profile Duplicated',
+            usedBy: 'Used by',
             deleteProfileConfirm: 'Are you sure you want to delete: "{name}"?',
             deleteProfileWithChannelsConfirm:
                 '"{name}" is currently being used by: {channels}.\nDeleting this Profile will reset those channels\' settings.\nAre you sure you want to delete "{name}"?',
@@ -889,6 +890,7 @@ export default {
             newFunction: 'New Function',
             functionDeleted: 'Function Deleted',
             functionDuplicated: 'Function Duplicated',
+            usedBy: 'Used by',
             deleteFunctionConfirm: 'Are you sure you want to delete "{name}"?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" is currently being used by the Profiles: {profiles}.\nDeleting this Function will reset those Profiles\' Functions.\nAre you sure you want to delete "{name}"?',
@@ -975,6 +977,8 @@ export default {
             notImageType: 'Image does not register as an image type',
         },
         shortcuts: {
+            browserHint:
+                'In a web browser, use Ctrl+Alt+number instead (browsers reserve Ctrl+number for tab switching).',
             shortcuts: 'Keyboard Shortcuts',
             ctrl: 'Ctrl',
             alt: 'Alt',

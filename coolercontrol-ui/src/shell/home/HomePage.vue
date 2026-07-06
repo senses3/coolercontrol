@@ -26,6 +26,7 @@ import {
     mdiCircle,
     mdiCompassOutline,
     mdiFan,
+    mdiKeyboardOutline,
     mdiOpenInNew,
     mdiSpeedometer,
 } from '@mdi/js'
@@ -47,6 +48,7 @@ import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
+import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -58,6 +60,7 @@ const settingsStore = useSettingsStore()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 const { t } = useI18n({ useScope: 'global' })
 const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
+const { openShortcutsDialog } = useShortcutsDialog()
 
 const healthCheck = await deviceStore.health()
 
@@ -413,6 +416,10 @@ const shortcutClasses =
                     <button type="button" :class="shortcutClasses" @click="startTour">
                         <svg-icon type="mdi" :path="mdiCompassOutline" :size="18" />
                         {{ t('views.appInfo.uiTour') }}
+                    </button>
+                    <button type="button" :class="shortcutClasses" @click="openShortcutsDialog()">
+                        <svg-icon type="mdi" :path="mdiKeyboardOutline" :size="18" />
+                        {{ t('views.shortcuts.shortcuts') }}
                     </button>
                     <a
                         href="https://docs.coolercontrol.org/getting-started.html"
