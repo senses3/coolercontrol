@@ -20,13 +20,11 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile'
-import Button from 'primevue/button'
 import { type UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
 import { $enum } from 'ts-enum-util'
 import { useToast } from 'primevue/usetoast'
-import InputNumber from 'primevue/inputnumber'
 import {
     mdiContentDuplicate,
     mdiContentSaveOutline,
@@ -35,9 +33,11 @@ import {
 } from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiListbox from '@/shell/ui/UiListbox.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -233,11 +233,11 @@ const delayScrolled = (event: WheelEvent) => {
     }
 }
 
-const changeFunctionType = (event: ListboxChangeEvent): void => {
-    if (event.value === null) {
+const changeFunctionType = (value: string | undefined): void => {
+    if (value == null) {
         return // do not update on unselect
     }
-    selectedType.value = event.value
+    selectedType.value = value as FunctionType
 }
 
 // const inputArea = ref()
@@ -482,10 +482,9 @@ onUnmounted(() => {
                 />
             </div>
             <div class="p-2">
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
+                <UiButton
+                    class="w-32"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    :label="t('common.save')"
                     v-tooltip.top="t('views.functions.saveFunction')"
                     @click="saveFunctionState"
                 >
@@ -495,7 +494,7 @@ onUnmounted(() => {
                         :path="mdiContentSaveOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
         <div
@@ -511,15 +510,10 @@ onUnmounted(() => {
                 <small class="ml-3 font-light text-sm text-text-color-secondary">
                     {{ t('views.functions.functionType') }}
                 </small>
-                <Listbox
+                <UiListbox
                     :model-value="selectedType"
                     :options="functionTypeOptions"
                     class="w-full"
-                    checkmark
-                    placeholder="Type"
-                    option-value="value"
-                    option-label="label"
-                    list-style="max-height: 100%"
                     v-tooltip.top="{
                         escape: false,
                         value:
@@ -610,23 +604,12 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenStepDutyMinimum"
-                                class="min-duty-input"
-                                show-buttons
                                 :min="dutyMin"
                                 :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
-                                :suffix="` ${t('common.percentUnit')}`"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                :suffix="t('common.percentUnit')"
+                            />
                         </td>
                     </tr>
                     <tr
@@ -649,23 +632,12 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenStepDutyMaximum"
-                                class="max-duty-input"
-                                show-buttons
                                 :min="chosenStepDutyMinimum"
                                 :max="dutyMax"
-                                :suffix="` ${t('common.percentUnit')}`"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                :suffix="t('common.percentUnit')"
+                            />
                         </td>
                     </tr>
                     <tr
@@ -688,23 +660,12 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenStepSizeMinDecreasing"
-                                class="step-min-decrease-input"
-                                show-buttons
                                 :min="dutyMin"
                                 :max="chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing"
-                                :suffix="` ${t('common.percentUnit')}`"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                :suffix="t('common.percentUnit')"
+                            />
                         </td>
                     </tr>
                     <tr
@@ -719,23 +680,12 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenStepSizeMaxDecreasing"
-                                class="step-max-decrease-input"
-                                show-buttons
                                 :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
                                 :max="dutyMax"
-                                :suffix="` ${t('common.percentUnit')}`"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                :suffix="t('common.percentUnit')"
+                            />
                         </td>
                     </tr>
                     <tr>
@@ -790,26 +740,13 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenDeviance"
-                                class="deviance-input"
-                                show-buttons
-                                :suffix="` ${t('common.tempUnit')}`"
-                                :step="0.1"
                                 :min="devianceMin"
                                 :max="devianceMax"
-                                :min-fraction-digits="1"
-                                :max-fraction-digits="1"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                :step="0.1"
+                                :suffix="t('common.tempUnit')"
+                            />
                         </td>
                     </tr>
                     <tr
@@ -824,23 +761,12 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenDelay"
-                                class="delay-input"
-                                show-buttons
-                                :suffix="` ${t('common.secondAbbr')}`"
                                 :min="delayMin"
                                 :max="delayMax"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                                :suffix="t('common.secondAbbr')"
+                            />
                         </td>
                     </tr>
                     <tr
@@ -878,22 +804,11 @@ onUnmounted(() => {
                         <td
                             class="py-4 px-2 w-48 text-center items-center border-border-one border-l-2 border-t-2"
                         >
-                            <InputNumber
+                            <UiNumberInput
                                 v-model="chosenWindowSize"
-                                class="window-size-input"
-                                show-buttons
                                 :min="windowSizeMin"
                                 :max="windowSizeMax"
-                                button-layout="horizontal"
-                                :input-style="{ width: '5rem' }"
-                            >
-                                <template #incrementicon>
-                                    <span class="pi pi-plus" />
-                                </template>
-                                <template #decrementicon>
-                                    <span class="pi pi-minus" />
-                                </template>
-                            </InputNumber>
+                            />
                         </td>
                     </tr>
                 </tbody>

@@ -19,19 +19,19 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiContentSaveOutline, mdiMemory, mdiTrashCanOutline } from '@mdi/js'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import { onMounted, ref, toRaw, type Ref, watch } from 'vue'
+import { mdiContentSaveOutline, mdiTrashCanOutline } from '@mdi/js'
+import { computed, onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiGroupedListbox from '@/shell/ui/UiGroupedListbox.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSlider from '@/shell/ui/UiSlider.vue'
 import { Alert } from '@/models/Alert.ts'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
-import Slider from 'primevue/slider'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -295,11 +295,31 @@ const valueMax = (metric: ChannelMetric | undefined): number => {
     }
 }
 
-const changeChannelSource = (event: ListboxChangeEvent): void => {
-    if (event.value === null) {
+const channelKey = (channel: AvailableChannel): string =>
+    `${channel.deviceUID}/${channel.channelName}`
+const sourceGroups = computed(() =>
+    channelSources.value.map((source) => ({
+        label: source.deviceName,
+        options: source.channels.map((channel) => ({
+            label: channel.channelFrontendName,
+            value: channelKey(channel),
+            color: channel.lineColor,
+            rightText: `${channel.value}${valueSuffix(channel.metric)}`,
+        })),
+    })),
+)
+const chosenChannelKey = computed(() =>
+    chosenChannelSource.value != null ? channelKey(chosenChannelSource.value) : undefined,
+)
+const changeChannelSource = (value: string | string[] | undefined): void => {
+    if (value == null || Array.isArray(value)) {
         return // do not update on unselect
     }
-    chosenChannelSource.value = event.value
+    const channel = channelSources.value
+        .flatMap((source) => source.channels)
+        .find((candidate) => channelKey(candidate) === value)
+    if (channel == null) return
+    chosenChannelSource.value = channel
     chosenMax.value = valueMax(chosenChannelSource.value?.metric)
 }
 
@@ -403,9 +423,9 @@ onMounted(async () => {
         <entity-title-rename :current-name="chosenName" :save-name-function="saveNameFunction" />
         <div class="flex flex-wrap gap-x-1 justify-end">
             <div v-if="!shouldCreateAlert" class="p-2 pr-0">
-                <Button
-                    outlined
-                    class="h-[2.375rem] px-3"
+                <UiButton
+                    variant="outline"
+                    size="icon"
                     v-tooltip.top="t('views.alerts.deleteAlert')"
                     @click="deleteAlert"
                 >
@@ -415,13 +435,12 @@ onMounted(async () => {
                         :path="mdiTrashCanOutline"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </Button>
+                </UiButton>
             </div>
             <div class="p-2">
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
+                <UiButton
+                    class="w-32"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    label="Save"
                     v-tooltip.top="t('views.alerts.saveAlert')"
                     :disabled="chosenChannelSource == null || chosenName.length === 0"
                     @click="saveAlert"
@@ -432,7 +451,7 @@ onMounted(async () => {
                         :path="mdiContentSaveOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
     </div>
@@ -443,49 +462,16 @@ onMounted(async () => {
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.channelSource') }}
                     </small>
-                    <Listbox
-                        :model-value="chosenChannelSource"
-                        class="w-full mt-1 mb-6"
-                        :options="channelSources"
+                    <UiGroupedListbox
+                        :model-value="chosenChannelKey"
+                        class="w-full mt-1 mb-6 max-h-[28rem]"
+                        :groups="sourceGroups"
                         filter
-                        checkmark
-                        option-label="channelFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="channels"
                         :filter-placeholder="t('common.search')"
-                        list-style="max-height: 100%"
                         :invalid="chosenChannelSource == null"
                         v-tooltip.top="t('views.alerts.channelSourceTooltip')"
                         @update:model-value="changeChannelSource"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex items-center w-full justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.channelFrontendName }}
-                                </div>
-                                <div>
-                                    {{
-                                        slotProps.option.value +
-                                        valueSuffix(slotProps.option.metric)
-                                    }}
-                                </div>
-                            </div>
-                        </template>
-                    </Listbox>
+                    />
                 </div>
                 <div class="mt-1 w-96">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
@@ -502,10 +488,8 @@ onMounted(async () => {
                                     </div>
                                 </td>
                                 <td class="py-4 px-4 w-60 leading-none items-center text-center">
-                                    <InputNumber
-                                        id="max-input"
+                                    <UiNumberInput
                                         v-model="chosenMax"
-                                        show-buttons
                                         :min="
                                             chosenMin +
                                             (chosenChannelSource?.metric !== ChannelMetric.RPM
@@ -514,24 +498,10 @@ onMounted(async () => {
                                         "
                                         :max="valueMax(chosenChannelSource?.metric)"
                                         :step="stepSize(chosenChannelSource?.metric)"
-                                        :min-fraction-digits="
-                                            chosenChannelSource?.metric !== ChannelMetric.Temp
-                                                ? 0
-                                                : 1
-                                        "
                                         :suffix="valueSuffix(chosenChannelSource?.metric)"
-                                        button-layout="horizontal"
-                                        :input-style="{ width: '8rem' }"
                                         :disabled="chosenChannelSource == null"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
-                                    <Slider
+                                    />
+                                    <UiSlider
                                         v-model="chosenMax"
                                         class="!w-48 ml-1"
                                         :step="stepSize(chosenChannelSource?.metric)"
@@ -557,10 +527,8 @@ onMounted(async () => {
                                 <td
                                     class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
                                 >
-                                    <InputNumber
-                                        id="min-input"
+                                    <UiNumberInput
                                         v-model="chosenMin"
-                                        show-buttons
                                         :min="0"
                                         :max="
                                             chosenMax -
@@ -569,24 +537,10 @@ onMounted(async () => {
                                                 : 100)
                                         "
                                         :step="stepSize(chosenChannelSource?.metric)"
-                                        :min-fraction-digits="
-                                            chosenChannelSource?.metric !== ChannelMetric.Temp
-                                                ? 0
-                                                : 1
-                                        "
                                         :suffix="valueSuffix(chosenChannelSource?.metric)"
-                                        button-layout="horizontal"
-                                        :input-style="{ width: '8rem' }"
                                         :disabled="chosenChannelSource == null"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
-                                    <Slider
+                                    />
+                                    <UiSlider
                                         v-model="chosenMin"
                                         class="!w-48 ml-1"
                                         :step="stepSize(chosenChannelSource?.metric)"
@@ -612,27 +566,15 @@ onMounted(async () => {
                                 <td
                                     class="py-4 px-4 w-60 leading-none items-center text-center border-border-one border-t-2"
                                 >
-                                    <InputNumber
-                                        id="warmup-duration"
+                                    <UiNumberInput
                                         v-model="chosenWarmupDuration"
-                                        show-buttons
                                         :min="0"
                                         :max="60"
                                         :step="0.5"
-                                        :min-fraction-digits="1"
                                         :suffix="' s'"
-                                        button-layout="horizontal"
-                                        :input-style="{ width: '8rem' }"
                                         :disabled="chosenChannelSource == null"
-                                    >
-                                        <template #incrementicon>
-                                            <span class="pi pi-plus" />
-                                        </template>
-                                        <template #decrementicon>
-                                            <span class="pi pi-minus" />
-                                        </template>
-                                    </InputNumber>
-                                    <Slider
+                                    />
+                                    <UiSlider
                                         v-model="chosenWarmupDuration"
                                         class="!w-48 ml-1"
                                         :step="0.5"
