@@ -31,7 +31,7 @@ const { t } = useI18n()
 
 const isEditingName = ref(false)
 const nameInput: Ref<string> = ref('')
-const nameInputRef = ref()
+const nameInputRef = ref<HTMLInputElement>()
 const isCancelling = ref(false)
 
 const inputWidth = computed(() => {
@@ -42,7 +42,7 @@ const inputWidth = computed(() => {
 const startEditingName = (): void => {
     nameInput.value = props.currentName
     isEditingName.value = true
-    setTimeout(() => nameInputRef.value?.$el?.focus())
+    setTimeout(() => nameInputRef.value?.focus())
 }
 const saveNameInline = async (): Promise<void> => {
     const sanitized = deviceStore.sanitizeString(nameInput.value)
@@ -57,7 +57,7 @@ const saveNameInline = async (): Promise<void> => {
 const cancelEditName = (event: KeyboardEvent): void => {
     event.preventDefault()
     isCancelling.value = true
-    nameInputRef.value?.$el?.blur()
+    nameInputRef.value?.blur()
     isEditingName.value = false
 }
 const handleBlur = (): void => {
