@@ -25,16 +25,16 @@ import { useSettingsStore } from '@/stores/SettingsStore'
 import { DeviceSettingReadDTO, DeviceSettingWriteLightingDTO } from '@/models/DaemonSettings'
 import { LightingMode, LightingModeType } from '@/models/LightingMode'
 import { computed, inject, nextTick, onMounted, ref, type Ref, watch } from 'vue'
-import InputNumber from 'primevue/inputnumber'
 import CCColorPicker from '@/components/CCColorPicker.vue'
-import Button from 'primevue/button'
 import { mdiContentSaveOutline } from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
-import Select from 'primevue/select'
-import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
-import Slider from 'primevue/slider'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiListbox from '@/shell/ui/UiListbox.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiSlider from '@/shell/ui/UiSlider.vue'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -185,11 +185,27 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     return true
 }
 
-const changeLightingSpeed = (event: ListboxChangeEvent): void => {
-    if (event.value === null) {
+const modeOptions = computed(() =>
+    lightingModes.map((mode: LightingMode) => ({ label: mode.frontend_name, value: mode.name })),
+)
+const selectedModeName = computed<string | undefined>({
+    get: () => selectedMode.value?.name,
+    set: (name) => {
+        const mode = lightingModes.find((candidate: LightingMode) => candidate.name === name)
+        if (mode != null) selectedMode.value = mode
+    },
+})
+const speedOptions = computed(() =>
+    lightingSpeeds.map((speed: string) => ({
+        label: deviceStore.toTitleCase(speed),
+        value: speed,
+    })),
+)
+const changeLightingSpeed = (value: string | string[] | undefined): void => {
+    if (value == null || Array.isArray(value)) {
         return // do not update on unselect
     }
-    selectedSpeed.value = event.value
+    selectedSpeed.value = value
 }
 
 const numberColorsScrolled = (event: WheelEvent): void => {
@@ -260,10 +276,9 @@ onMounted(() => {
         <entity-title-rename :current-name="channelLabel" :save-name-function="saveNameFunction" />
         <div class="flex flex-wrap gap-x-1 justify-end">
             <div class="p-2 flex flex-row">
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
+                <UiButton
+                    class="w-32"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    label="Save"
                     v-tooltip.top="t('views.lighting.saveLightingSettings')"
                     @click="saveLighting"
                 >
@@ -273,7 +288,7 @@ onMounted(() => {
                         :path="mdiContentSaveOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
     </div>
@@ -285,37 +300,25 @@ onMounted(() => {
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
                             {{ t('views.lighting.lightingMode') }}<br />
                         </small>
-                        <Select
-                            v-model="selectedMode"
-                            :options="lightingModes"
-                            option-label="frontend_name"
-                            placeholder="Mode"
-                            class="w-full mt-1"
-                            dropdown-icon="pi pi-sun"
-                            scroll-height="40rem"
+                        <span
                             v-tooltip.top="t('views.lighting.lightingMode')"
-                            filter
-                            variant="filled"
+                            class="mt-1 block w-full"
                         >
-                            <template #option="slotProps">
-                                <div class="flex align-items-center">
-                                    <div>{{ slotProps.option.frontend_name }}</div>
-                                </div>
-                            </template>
-                        </Select>
+                            <UiSelect
+                                v-model="selectedModeName"
+                                :options="modeOptions"
+                                class="w-full"
+                            />
+                        </span>
                     </div>
                     <div v-if="selectedMode.speed_enabled" class="mt-4 mr-4 w-96">
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
                             {{ t('views.lighting.speed') }}
                         </small>
-                        <Listbox
+                        <UiListbox
                             :model-value="selectedSpeed"
-                            :options="lightingSpeeds"
-                            :option-label="(value: string) => deviceStore.toTitleCase(value)"
+                            :options="speedOptions"
                             class="w-full"
-                            checkmark
-                            placeholder="Speed"
-                            list-style="max-height: 100%"
                             v-tooltip.top="t('views.lighting.speed')"
                             @update:model-value="changeLightingSpeed"
                         />
@@ -341,36 +344,25 @@ onMounted(() => {
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
                             {{ t('views.lighting.numberOfColors') }}<br />
                         </small>
-                        <InputNumber
-                            placeholder="Number of Colors"
-                            v-model="selectedNumberOfColors"
-                            mode="decimal"
-                            class="mt-0.5 w-full"
-                            showButtons
-                            :min="selectedMode.min_colors"
-                            :max="selectedMode.max_colors"
-                            :use-grouping="false"
-                            :step="1"
-                            button-layout="horizontal"
-                            :input-style="{ width: '8rem' }"
-                            v-tooltip.top="t('views.lighting.numberOfColorsTooltip')"
-                            :disabled="selectedMode.min_colors == selectedMode.max_colors"
-                        >
-                            <template #incrementicon>
-                                <span class="pi pi-plus" />
-                            </template>
-                            <template #decrementicon>
-                                <span class="pi pi-minus" />
-                            </template>
-                        </InputNumber>
-                        <Slider
-                            v-model="selectedNumberOfColors"
-                            class="!w-[23.25rem] ml-1.5"
-                            :step="1"
-                            :min="selectedMode.min_colors"
-                            :max="selectedMode.max_colors"
-                            :disabled="selectedMode.min_colors == selectedMode.max_colors"
-                        />
+                        <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                            <UiNumberInput
+                                v-model="selectedNumberOfColors"
+                                class="mt-0.5"
+                                :min="selectedMode.min_colors"
+                                :max="selectedMode.max_colors"
+                                :step="1"
+                                v-tooltip.top="t('views.lighting.numberOfColorsTooltip')"
+                                :disabled="selectedMode.min_colors == selectedMode.max_colors"
+                            />
+                            <UiSlider
+                                v-model="selectedNumberOfColors"
+                                class="mt-3 !w-full px-1"
+                                :step="1"
+                                :min="selectedMode.min_colors"
+                                :max="selectedMode.max_colors"
+                                :disabled="selectedMode.min_colors == selectedMode.max_colors"
+                            />
+                        </div>
                     </div>
                 </div>
                 <div
