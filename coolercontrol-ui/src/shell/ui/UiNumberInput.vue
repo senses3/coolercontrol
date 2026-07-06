@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiMinus, mdiPlus } from '@mdi/js'
+import { computed } from 'vue'
 
 const model = defineModel<number>({ required: true })
 const props = withDefaults(
@@ -47,6 +48,8 @@ const onInput = (event: Event): void => {
     const value = Number((event.target as HTMLInputElement).value)
     if (!Number.isNaN(value)) model.value = clamp(value)
 }
+// Size the input to its content so the suffix hugs the number.
+const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 1) + 1}ch`)
 </script>
 
 <template>
@@ -62,7 +65,7 @@ const onInput = (event: Event): void => {
         >
             <svg-icon type="mdi" :path="mdiMinus" :size="14" />
         </button>
-        <span class="flex items-center gap-1">
+        <span class="flex min-w-16 items-center justify-center px-1">
             <input
                 type="number"
                 :value="model"
@@ -70,10 +73,13 @@ const onInput = (event: Event): void => {
                 :max="max"
                 :step="step"
                 :disabled="disabled"
-                class="w-16 bg-transparent text-center text-base text-text-color outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                class="bg-transparent text-right text-base text-text-color outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                :style="{ width: inputWidth }"
                 @change="onInput"
             />
-            <span v-if="suffix" class="pr-1 text-sm text-text-color-secondary">{{ suffix }}</span>
+            <span v-if="suffix" class="pl-0.5 text-sm text-text-color-secondary">
+                {{ suffix }}
+            </span>
         </span>
         <button
             type="button"
