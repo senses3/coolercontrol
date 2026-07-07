@@ -101,8 +101,10 @@ watch([logSearch, logRows], () => {
 </script>
 
 <template>
-    <div class="flex h-[3.5rem] border-b-4 border-border-one items-center justify-between">
-        <div class="pl-4 py-2 text-2xl font-bold">{{ t('views.alerts.alertsOverview') }}</div>
+    <div class="flex flex-wrap items-center gap-3 px-4 pt-4">
+        <h1 class="text-xl font-semibold text-text-color">
+            {{ t('views.alerts.alertsOverview') }}
+        </h1>
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">

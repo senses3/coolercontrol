@@ -421,7 +421,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="flex border-b-4 border-border-one items-center justify-between">
+    <div class="flex items-center justify-between px-2 pt-2">
         <entity-title-rename :current-name="chosenName" :save-name-function="saveNameFunction" />
         <div class="flex flex-wrap gap-x-1 justify-end">
             <div v-if="!shouldCreateAlert" class="p-2 pr-0">

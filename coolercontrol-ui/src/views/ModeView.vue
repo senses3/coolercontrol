@@ -228,7 +228,7 @@ const deleteMode = (): void => {
 </script>
 
 <template>
-    <div class="flex h-[3.6rem] border-b-4 border-border-one items-center justify-between">
+    <div class="flex items-center justify-between px-2 pt-2">
         <div class="flex flex-row overflow-hidden">
             <entity-title-rename
                 :current-name="currentMode.name"
