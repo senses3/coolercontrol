@@ -27,6 +27,8 @@ export interface UiGroupedOption {
     value: string
     /** Sensor line color rendered as a dash before the label. */
     color?: string
+    /** Render the color as a round dot (tags) instead of a line (sensors). */
+    dot?: boolean
     /** Right-aligned live value, e.g. '45.0 °C'. */
     rightText?: string
     disabled?: boolean
@@ -104,6 +106,7 @@ const toggle = (value: string): void => {
         <div class="min-h-0 flex-1 overflow-y-auto p-1">
             <template v-for="group in visibleGroups" :key="group.label">
                 <div
+                    v-if="group.label !== ''"
                     class="flex items-center gap-2 px-2 py-1.5 text-sm font-semibold text-text-color"
                 >
                     <slot name="group" :group="group">
@@ -116,8 +119,11 @@ const toggle = (value: string): void => {
                     :key="option.value"
                     type="button"
                     :disabled="option.disabled"
-                    class="flex w-full items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
-                    :class="{ 'bg-surface-hover': isSelected(option.value) }"
+                    class="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
+                    :class="[
+                        group.label === '' ? 'pl-2' : 'pl-6',
+                        { 'bg-surface-hover': isSelected(option.value) },
+                    ]"
                     @click="toggle(option.value)"
                 >
                     <svg-icon
@@ -127,8 +133,13 @@ const toggle = (value: string): void => {
                         class="shrink-0"
                         :class="isSelected(option.value) ? 'text-accent' : 'invisible'"
                     />
+                    <span
+                        v-if="option.color && option.dot"
+                        class="h-3 w-3 shrink-0 rounded-full"
+                        :style="{ backgroundColor: option.color }"
+                    />
                     <svg-icon
-                        v-if="option.color"
+                        v-else-if="option.color"
                         type="mdi"
                         :path="mdiMinusThick"
                         :size="14"
