@@ -23,14 +23,20 @@ import {
     mdiBellPlusOutline,
     mdiChevronDown,
     mdiChevronUp,
+    mdiMinusThick,
+    mdiMonitor,
     mdiPageFirst,
     mdiPageLast,
     mdiChevronLeft,
     mdiChevronRight,
+    mdiPower,
+    mdiVolumeHigh,
 } from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { AlertState, getAlertStateDisplayName, getAlertStateIcon } from '@/models/Alert.ts'
+import { Alert, AlertState, getAlertStateDisplayName, getAlertStateIcon } from '@/models/Alert.ts'
+import { ChannelMetric, getChannelMetricDisplayName } from '@/models/ChannelSource.ts'
+import UiTag from '@/shell/ui/UiTag.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -64,6 +70,64 @@ const alertsList = computed(() => {
 const onRowSelect = (alertUID: string) => {
     router.push({ name: 'monitoring-alert', params: { alertUID } })
 }
+
+// Card grid: alerts needing attention first, then the panel's menu order.
+const sortedAlerts = computed(() => {
+    const rank = (alert: Alert): number =>
+        alert.state === AlertState.Active ? 0 : alert.state === AlertState.Error ? 1 : 2
+    return [...alertsList.value].sort((a, b) => rank(a) - rank(b))
+})
+const tagSeverity = (state?: AlertState): 'danger' | 'warn' | 'success' =>
+    state === AlertState.Active ? 'danger' : state === AlertState.Error ? 'warn' : 'success'
+const sourceChannel = (alert: Alert) =>
+    settingsStore.allUIDeviceSettings
+        .get(alert.channel_source.device_uid)
+        ?.sensorsAndChannels.get(alert.channel_source.channel_name)
+const sourceLabel = (alert: Alert): string =>
+    sourceChannel(alert)?.name ?? alert.channel_source.channel_name
+const sourceColor = (alert: Alert): string =>
+    sourceChannel(alert)?.color ?? 'rgb(var(--colors-text-color-secondary))'
+const valueSuffix = (metric: ChannelMetric): string => {
+    switch (metric) {
+        case ChannelMetric.Duty:
+        case ChannelMetric.Load:
+            return ` ${t('common.percentUnit')}`
+        case ChannelMetric.RPM:
+            return ` ${t('common.rpmAbbr')}`
+        case ChannelMetric.Freq:
+            return ` ${t('common.mhzAbbr')}`
+        default:
+            return ` ${t('common.tempUnit')}`
+    }
+}
+const liveValue = (alert: Alert): string => {
+    const values = deviceStore.currentDeviceStatus
+        .get(alert.channel_source.device_uid)
+        ?.get(alert.channel_source.channel_name)
+    if (values == null) return ''
+    switch (alert.channel_source.channel_metric) {
+        case ChannelMetric.Duty:
+        case ChannelMetric.Load:
+            return values.duty ?? ''
+        case ChannelMetric.RPM:
+            return values.rpm ?? ''
+        case ChannelMetric.Freq:
+            return values.freq ?? ''
+        default:
+            return values.temp ?? ''
+    }
+}
+// Latest log entry per alert: the moment it entered its current state.
+const lastLogTimes = computed(() => {
+    const latest = new Map<string, string>()
+    for (const log of settingsStore.alertLogs) {
+        const existing = latest.get(log.uid)
+        if (existing == null || new Date(log.timestamp) > new Date(existing)) {
+            latest.set(log.uid, log.timestamp)
+        }
+    }
+    return latest
+})
 
 // Alert log listing: newest first by default, searchable, paged.
 const logSearch = ref('')
@@ -109,61 +173,112 @@ watch([logSearch, logRows], () => {
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
             <div class="mt-8 flex flex-col">
-                <div class="w-max">
-                    <div class="flex items-center justify-between">
-                        <span class="pb-1 ml-1 font-semibold text-xl text-text-color">{{
-                            t('layout.topbar.alerts')
-                        }}</span>
-                        <UiButton
-                            size="sm"
-                            class="my-2"
-                            v-tooltip.top="{ value: t('layout.menu.tooltips.addAlert') }"
-                            @click="router.push({ name: 'monitoring-alert-new' })"
-                        >
+                <span class="pb-3 ml-1 font-semibold text-xl text-text-color">{{
+                    t('layout.topbar.alerts')
+                }}</span>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    <div
+                        v-for="alert in sortedAlerts"
+                        :key="alert.uid"
+                        class="flex cursor-pointer flex-col gap-2 rounded-lg border bg-bg-two p-4 hover:bg-surface-hover"
+                        :class="
+                            alert.state === AlertState.Active || alert.state === AlertState.Error
+                                ? 'border-error'
+                                : 'border-border-one'
+                        "
+                        @click="onRowSelect(alert.uid)"
+                    >
+                        <div class="flex items-center gap-2">
                             <svg-icon
-                                class="outline-0"
                                 type="mdi"
-                                :path="mdiBellPlusOutline"
-                                :size="deviceStore.getREMSize(1.25)"
+                                class="shrink-0"
+                                :class="{ 'text-error': alert.state === AlertState.Active }"
+                                :path="getAlertStateIcon(alert.state!)"
+                                :size="getREMSize(1.5)"
                             />
-                        </UiButton>
-                    </div>
-                    <UiTable bordered>
-                        <template #head>
-                            <tr>
-                                <th></th>
-                                <th>{{ t('common.state') }}</th>
-                                <th class="w-full">{{ t('common.name') }}</th>
-                            </tr>
-                        </template>
-                        <tr
-                            v-for="alert in alertsList"
-                            :key="alert.uid"
-                            class="cursor-pointer hover:bg-surface-hover"
-                            @click="onRowSelect(alert.uid)"
+                            <span class="truncate text-base font-semibold text-text-color">
+                                {{ alert.name }}
+                            </span>
+                            <UiTag
+                                class="ml-auto shrink-0"
+                                :value="getAlertStateDisplayName(alert.state!)"
+                                :severity="tagSeverity(alert.state)"
+                            />
+                        </div>
+                        <div class="flex items-center gap-2 text-base text-text-color">
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiMinusThick"
+                                :size="14"
+                                class="shrink-0"
+                                :style="{ color: sourceColor(alert) }"
+                            />
+                            <span class="truncate">{{ sourceLabel(alert) }}</span>
+                            <span class="shrink-0 text-text-color-secondary">
+                                {{
+                                    getChannelMetricDisplayName(alert.channel_source.channel_metric)
+                                }}
+                            </span>
+                        </div>
+                        <div class="text-sm text-text-color-secondary">
+                            {{
+                                t('views.alerts.range', {
+                                    min: alert.min,
+                                    max: alert.max,
+                                    unit: valueSuffix(alert.channel_source.channel_metric),
+                                })
+                            }}
+                            <template v-if="liveValue(alert) !== ''">
+                                <br />
+                                {{ t('components.sensorTable.current') }}: {{ liveValue(alert)
+                                }}{{ valueSuffix(alert.channel_source.channel_metric) }}
+                            </template>
+                        </div>
+                        <div
+                            class="mt-auto flex items-center gap-2 text-sm text-text-color-secondary"
                         >
-                            <td>
+                            <span v-if="lastLogTimes.get(alert.uid) != null" class="truncate">
+                                {{
+                                    t('views.alerts.since', {
+                                        time: new Date(
+                                            lastLogTimes.get(alert.uid)!,
+                                        ).toLocaleString(),
+                                    })
+                                }}
+                            </span>
+                            <span class="ml-auto flex shrink-0 items-center gap-1.5">
                                 <svg-icon
+                                    v-if="alert.desktop_notify"
                                     type="mdi"
-                                    :class="{ 'text-error': alert.state === AlertState.Active }"
-                                    :path="getAlertStateIcon(alert.state!)"
-                                    :size="getREMSize(1.5)"
+                                    :path="mdiMonitor"
+                                    :size="14"
+                                    v-tooltip.top="t('views.alerts.desktopNotify')"
                                 />
-                            </td>
-                            <td>
-                                <span
-                                    class="underline"
-                                    :class="{
-                                        'text-error': alert.state === AlertState.Active,
-                                        'text-success': alert.state === AlertState.Inactive,
-                                    }"
-                                >
-                                    {{ getAlertStateDisplayName(alert.state!) }}
-                                </span>
-                            </td>
-                            <td class="w-full text-ellipsis underline">{{ alert.name }}</td>
-                        </tr>
-                    </UiTable>
+                                <svg-icon
+                                    v-if="alert.desktop_notify_audio"
+                                    type="mdi"
+                                    :path="mdiVolumeHigh"
+                                    :size="14"
+                                    v-tooltip.top="t('views.alerts.desktopNotifyAudio')"
+                                />
+                                <svg-icon
+                                    v-if="alert.shutdown_on_activation"
+                                    type="mdi"
+                                    class="text-error"
+                                    :path="mdiPower"
+                                    :size="14"
+                                    v-tooltip.top="t('views.alerts.shutdownOnActivation')"
+                                />
+                            </span>
+                        </div>
+                    </div>
+                    <div
+                        class="flex min-h-[8rem] cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-one p-4 text-text-color-secondary hover:bg-surface-hover hover:text-text-color"
+                        @click="router.push({ name: 'monitoring-alert-new' })"
+                    >
+                        <svg-icon type="mdi" :path="mdiBellPlusOutline" :size="20" />
+                        {{ t('views.alerts.newAlert') }}
+                    </div>
                 </div>
             </div>
             <div class="mt-8 flex flex-col">
