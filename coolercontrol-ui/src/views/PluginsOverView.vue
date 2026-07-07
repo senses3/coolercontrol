@@ -158,7 +158,7 @@ onUnmounted(() => {
                 <span class="pb-3 ml-1 font-semibold text-xl text-text-color">
                     {{ t('layout.plugins.installedPlugins') }}
                 </span>
-                <UiTable>
+                <UiTable bordered>
                     <template #head>
                         <tr>
                             <th>{{ t('common.name') }}</th>

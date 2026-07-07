@@ -128,7 +128,7 @@ watch([logSearch, logRows], () => {
                             />
                         </UiButton>
                     </div>
-                    <UiTable>
+                    <UiTable bordered>
                         <template #head>
                             <tr>
                                 <th></th>
@@ -170,50 +170,56 @@ watch([logSearch, logRows], () => {
                 <span class="pb-3 ml-1 font-semibold text-xl text-text-color">{{
                     t('views.alerts.alertLogs')
                 }}</span>
-                <div
-                    class="flex flex-wrap items-center justify-between gap-2 border-b border-border-one bg-bg-two p-2"
-                >
-                    <UiInput v-model="logSearch" :placeholder="t('common.search')" />
-                    <div class="flex items-center gap-1">
-                        <UiButton
-                            variant="ghost"
-                            size="icon"
-                            :disabled="logPage <= 1"
-                            @click="logPage = 1"
+                <UiTable bordered class="w-full">
+                    <template #toolbar>
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-2 border-b border-border-one bg-bg-two p-2"
                         >
-                            <svg-icon type="mdi" :path="mdiPageFirst" :size="18" />
-                        </UiButton>
-                        <UiButton
-                            variant="ghost"
-                            size="icon"
-                            :disabled="logPage <= 1"
-                            @click="logPage -= 1"
-                        >
-                            <svg-icon type="mdi" :path="mdiChevronLeft" :size="18" />
-                        </UiButton>
-                        <span class="px-2 text-text-color-secondary">
-                            {{ Math.min(logPage, logPageCount) }} / {{ logPageCount }}
-                        </span>
-                        <UiButton
-                            variant="ghost"
-                            size="icon"
-                            :disabled="logPage >= logPageCount"
-                            @click="logPage += 1"
-                        >
-                            <svg-icon type="mdi" :path="mdiChevronRight" :size="18" />
-                        </UiButton>
-                        <UiButton
-                            variant="ghost"
-                            size="icon"
-                            :disabled="logPage >= logPageCount"
-                            @click="logPage = logPageCount"
-                        >
-                            <svg-icon type="mdi" :path="mdiPageLast" :size="18" />
-                        </UiButton>
-                        <UiSelect v-model="logRows" :options="logRowsOptions" class="!min-w-24" />
-                    </div>
-                </div>
-                <UiTable class="w-full">
+                            <UiInput v-model="logSearch" :placeholder="t('common.search')" />
+                            <div class="flex items-center gap-1">
+                                <UiButton
+                                    variant="ghost"
+                                    size="icon"
+                                    :disabled="logPage <= 1"
+                                    @click="logPage = 1"
+                                >
+                                    <svg-icon type="mdi" :path="mdiPageFirst" :size="18" />
+                                </UiButton>
+                                <UiButton
+                                    variant="ghost"
+                                    size="icon"
+                                    :disabled="logPage <= 1"
+                                    @click="logPage -= 1"
+                                >
+                                    <svg-icon type="mdi" :path="mdiChevronLeft" :size="18" />
+                                </UiButton>
+                                <span class="px-2 text-text-color-secondary">
+                                    {{ Math.min(logPage, logPageCount) }} / {{ logPageCount }}
+                                </span>
+                                <UiButton
+                                    variant="ghost"
+                                    size="icon"
+                                    :disabled="logPage >= logPageCount"
+                                    @click="logPage += 1"
+                                >
+                                    <svg-icon type="mdi" :path="mdiChevronRight" :size="18" />
+                                </UiButton>
+                                <UiButton
+                                    variant="ghost"
+                                    size="icon"
+                                    :disabled="logPage >= logPageCount"
+                                    @click="logPage = logPageCount"
+                                >
+                                    <svg-icon type="mdi" :path="mdiPageLast" :size="18" />
+                                </UiButton>
+                                <UiSelect
+                                    v-model="logRows"
+                                    :options="logRowsOptions"
+                                    class="!min-w-24"
+                                />
+                            </div>
+                        </div>
+                    </template>
                     <template #head>
                         <tr>
                             <th

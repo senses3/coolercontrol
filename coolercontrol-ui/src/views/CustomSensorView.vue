@@ -849,7 +849,7 @@ onMounted(async () => {
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempWeights') }}
                     </small>
-                    <UiTable>
+                    <UiTable bordered>
                         <template #head>
                             <tr>
                                 <th class="w-full">{{ t('views.customSensors.tempName') }}</th>
