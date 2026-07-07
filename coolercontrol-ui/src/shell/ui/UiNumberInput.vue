@@ -28,6 +28,7 @@ const props = withDefaults(
         min?: number
         max?: number
         step?: number
+        prefix?: string
         suffix?: string
         disabled?: boolean
     }>(),
@@ -35,6 +36,7 @@ const props = withDefaults(
         min: Number.MIN_SAFE_INTEGER,
         max: Number.MAX_SAFE_INTEGER,
         step: 1,
+        prefix: '',
         suffix: '',
         disabled: false,
     },
@@ -94,6 +96,9 @@ const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 
             <svg-icon type="mdi" :path="mdiMinus" :size="14" />
         </button>
         <span class="flex min-w-16 items-center justify-center px-1">
+            <span v-if="prefix" class="pr-0.5 text-sm text-text-color-secondary">
+                {{ prefix }}
+            </span>
             <input
                 type="number"
                 :value="model"

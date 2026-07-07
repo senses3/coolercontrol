@@ -36,7 +36,7 @@ import { Mode } from '@/models/Mode.ts'
 import { UID } from '@/models/Device.ts'
 import { DeviceSettingReadDTO } from '@/models/DaemonSettings.ts'
 import { getProfileDisplayName } from '@/models/Profile.ts'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
@@ -267,9 +267,8 @@ const deleteMode = (): void => {
                 class="p-2"
                 v-tooltip.top="{ value: t('views.mode.currentlyActive'), disabled: !isActivated }"
             >
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
-                    label="Save"
+                <UiButton
+                    class="w-32"
                     v-tooltip.top="t('views.mode.activateMode')"
                     :disabled="isActivated"
                     @click="activateMode"
@@ -280,7 +279,7 @@ const deleteMode = (): void => {
                         :path="mdiBookmarkCheckOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
     </div>

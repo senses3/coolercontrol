@@ -45,8 +45,9 @@ const props = withDefaults(
         options: UiSelectOption[]
         placeholder?: string
         disabled?: boolean
+        invalid?: boolean
     }>(),
-    { placeholder: '', disabled: false },
+    { placeholder: '', disabled: false, invalid: false },
 )
 
 // Render the selected label directly instead of relying on SelectValue
@@ -63,7 +64,8 @@ defineOptions({ inheritAttrs: false })
     <SelectRoot v-model="model" :disabled="disabled">
         <SelectTrigger
             v-bind="$attrs"
-            class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border-one bg-bg-two px-3 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border bg-bg-two px-3 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            :class="invalid ? 'border-error' : 'border-border-one'"
         >
             <SelectValue class="truncate">
                 <span v-if="selectedLabel">{{ selectedLabel }}</span>
