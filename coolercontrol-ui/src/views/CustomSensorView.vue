@@ -829,7 +829,7 @@ onMounted(async () => {
                     </small>
                     <UiGroupedListbox
                         v-model="chosenTempSourceKeys"
-                        class="w-full mt-1 max-h-[28rem]"
+                        class="w-full max-h-[28rem]"
                         :groups="tempGroups"
                         filter
                         :filter-placeholder="t('common.search')"
@@ -843,7 +843,7 @@ onMounted(async () => {
                 </div>
                 <div
                     v-if="selectedMixFunction === CustomSensorMixFunctionType.WeightedAvg"
-                    class="mt-1 w-96"
+                    class="w-96"
                     v-tooltip.top="t('views.customSensors.tempWeights')"
                 >
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
