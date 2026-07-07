@@ -26,9 +26,8 @@ import {
     mdiPowerPlugOutline,
 } from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
-import DataTable, { DataTableRowSelectEvent } from 'primevue/datatable'
-import Column from 'primevue/column'
-import Tag from 'primevue/tag'
+import UiTable from '@/shell/ui/UiTable.vue'
+import UiTag from '@/shell/ui/UiTag.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -81,8 +80,8 @@ const loadStatuses = async (): Promise<void> => {
     pluginStatuses.value = statuses
 }
 
-const onRowSelect = (event: DataTableRowSelectEvent) => {
-    router.push({ name: 'plugin-page', params: { pluginId: event.data.id } })
+const onRowSelect = (plugin: { id: string }) => {
+    router.push({ name: 'plugin-page', params: { pluginId: plugin.id } })
 }
 
 onMounted(async () => {
@@ -159,64 +158,60 @@ onUnmounted(() => {
                 <span class="pb-3 ml-1 font-semibold text-xl text-text-color">
                     {{ t('layout.plugins.installedPlugins') }}
                 </span>
-                <DataTable
-                    :value="pluginsList"
-                    selection-mode="single"
-                    data-key="id"
-                    :meta-key-selection="false"
-                    @row-select="onRowSelect"
-                >
-                    <template #empty>
-                        <div class="flex items-center gap-2 text-text-color-secondary py-4">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiPowerPlugOutline"
-                                :size="deviceStore.getREMSize(1.25)"
-                            />
-                            {{ t('layout.plugins.noPlugins') }}
-                        </div>
+                <UiTable>
+                    <template #head>
+                        <tr>
+                            <th>{{ t('common.name') }}</th>
+                            <th>{{ t('layout.plugins.type') }}</th>
+                            <th>{{ t('common.state') }}</th>
+                            <th>{{ t('views.appInfo.version') }}</th>
+                            <th>{{ t('layout.plugins.description') }}</th>
+                            <th>{{ t('layout.plugins.privileges') }}</th>
+                        </tr>
                     </template>
-                    <Column field="id" :header="t('common.name')" body-class="underline" />
-                    <Column field="service_type" :header="t('layout.plugins.type')" />
-                    <Column field="status" :header="t('common.state')">
-                        <template #body="slotProps">
-                            <Tag
-                                :value="
-                                    statusDisplayName(
-                                        slotProps.data.status,
-                                        slotProps.data.disabled,
-                                    )
-                                "
-                                :severity="
-                                    statusSeverity(slotProps.data.status, slotProps.data.disabled)
-                                "
+                    <tr v-if="pluginsList.length === 0">
+                        <td colspan="6">
+                            <div class="flex items-center gap-2 text-text-color-secondary py-4">
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiPowerPlugOutline"
+                                    :size="deviceStore.getREMSize(1.25)"
+                                />
+                                {{ t('layout.plugins.noPlugins') }}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr
+                        v-for="plugin in pluginsList"
+                        :key="plugin.id"
+                        class="cursor-pointer hover:bg-surface-hover"
+                        @click="onRowSelect(plugin)"
+                    >
+                        <td class="underline">{{ plugin.id }}</td>
+                        <td>{{ plugin.service_type }}</td>
+                        <td>
+                            <UiTag
+                                :value="statusDisplayName(plugin.status, plugin.disabled)"
+                                :severity="statusSeverity(plugin.status, plugin.disabled)"
                             />
-                        </template>
-                    </Column>
-                    <Column field="version" :header="t('views.appInfo.version')">
-                        <template #body="slotProps">
-                            {{ slotProps.data.version ?? '-' }}
-                        </template>
-                    </Column>
-                    <Column field="description" :header="t('layout.plugins.description')">
-                        <template #body="slotProps">
+                        </td>
+                        <td>{{ plugin.version ?? '-' }}</td>
+                        <td>
                             <span class="text-text-color-secondary text-sm">
-                                {{ slotProps.data.description ?? '-' }}
+                                {{ plugin.description ?? '-' }}
                             </span>
-                        </template>
-                    </Column>
-                    <Column field="privileged" :header="t('layout.plugins.privileges')">
-                        <template #body="slotProps">
-                            <span :class="{ 'font-bold': slotProps.data.privileged }">
+                        </td>
+                        <td>
+                            <span :class="{ 'font-bold': plugin.privileged }">
                                 {{
-                                    slotProps.data.privileged
+                                    plugin.privileged
                                         ? t('layout.settings.plugins.privileged')
                                         : t('layout.settings.plugins.restricted')
                                 }}
                             </span>
-                        </template>
-                    </Column>
-                </DataTable>
+                        </td>
+                    </tr>
+                </UiTable>
             </div>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar

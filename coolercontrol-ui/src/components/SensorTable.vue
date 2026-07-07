@@ -19,11 +19,10 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiMemory } from '@mdi/js'
+import { mdiMemory, mdiMinusThick } from '@mdi/js'
+import UiTable from '@/shell/ui/UiTable.vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import { onBeforeUnmount, onMounted, Ref, ref, watch } from 'vue'
 import { Dashboard, DataType } from '@/models/Dashboard.ts'
 import { UID } from '@/models/Device.ts'
@@ -128,6 +127,11 @@ const isFirstRowOfChannel = (index: number): boolean => {
 // single merged cell on the left.
 const rowClass = (data: DeviceData): string =>
     data.isLastOfChannel === false ? 'channel-continued' : ''
+
+// First row of each device group gets a full-width device header row above it.
+const isFirstOfDevice = (index: number): boolean =>
+    index === 0 ||
+    deviceTableData.value[index - 1].deviceUID !== deviceTableData.value[index].deviceUID
 
 const rebuildTableData = (stats: StatsResponseDTO) => {
     deviceTableData.value.length = 0
@@ -412,112 +416,88 @@ onBeforeUnmount(() => {
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="pb-24 h-screen w-full">
             <div class="h-full">
-                <DataTable
-                    :value="deviceTableData"
-                    row-group-mode="subheader"
-                    group-rows-by="deviceUID"
-                    :row-class="rowClass"
-                    scrollable
-                    scroll-height="flex"
-                    :pt="{
-                        tableContainer: () => ({
-                            class: ['rounded-none border-0 border-border-one'],
-                        }),
-                        // PrimeVue defaults the row-group-header cell to
-                        // colspan=columnsLength-1 (reserves a slot for the
-                        // optional expander). We don't use expandableRowGroups,
-                        // so force full width.
-                        rowGroupHeaderCell: { colspan: 4 },
-                    }"
-                >
-                    <template #groupheader="slotProps">
-                        <div
-                            class="device-subheader flex items-center font-semibold text-lg"
-                            :style="{ color: deviceColor(slotProps.data.deviceUID) }"
-                        >
-                            <div class="mr-2">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.5)"
-                                    :color="deviceColor(slotProps.data.deviceUID)"
-                                />
-                            </div>
-                            <div>{{ slotProps.data.deviceName }}</div>
-                        </div>
+                <UiTable sticky-header>
+                    <template #head>
+                        <tr>
+                            <th>{{ t('components.sensorTable.channel') }}</th>
+                            <th class="w-[12%]">{{ t('components.sensorTable.current') }}</th>
+                            <th class="w-[18%]">
+                                <span class="ml-10">{{ t('components.sensorTable.range') }}</span>
+                            </th>
+                            <th class="w-[12%]">{{ t('components.sensorTable.average') }}</th>
+                        </tr>
                     </template>
-                    <Column field="rowID" :header="t('components.sensorTable.channel')">
-                        <template #body="slotProps">
-                            <template v-if="isFirstRowOfChannel(slotProps.index)">
-                                <span
-                                    class="pi pi-minus mr-2 ml-1"
-                                    :style="{ color: slotProps.data.channelColor }"
-                                />{{ slotProps.data.channelLabel }}
-                            </template>
-                        </template>
-                    </Column>
-                    <Column
-                        field="value"
-                        :header="t('components.sensorTable.current')"
-                        :style="{ width: '12%' }"
-                    >
-                        <template #body="slotProps">
-                            <span class="font-bold">{{
-                                format(slotProps.data.value, slotProps.data.dataType)
-                            }}</span>
-                            <span :style="suffixStyle(slotProps.data.dataType)">{{
-                                suffix(slotProps.data.dataType)
-                            }}</span>
-                        </template>
-                    </Column>
-                    <Column
-                        field="min"
-                        :header="t('components.sensorTable.range')"
-                        :pt="{
-                            columnHeaderContent: { class: 'ml-10' },
-                        }"
-                        :style="{ width: '18%' }"
-                    >
-                        <template #body="slotProps">
-                            <span
-                                v-if="slotProps.data.count === 0"
-                                class="text-text-color-secondary"
-                                >—</span
-                            >
-                            <span v-else class="inline-flex items-baseline tabular-nums">
-                                <span class="text-right min-w-[3rem]">{{
-                                    format(slotProps.data.min, slotProps.data.dataType)
+                    <template v-for="(row, index) in deviceTableData" :key="index">
+                        <tr v-if="isFirstOfDevice(index)" class="group-header">
+                            <td colspan="4">
+                                <div
+                                    class="flex items-center font-semibold text-lg"
+                                    :style="{ color: deviceColor(row.deviceUID) }"
+                                >
+                                    <div class="mr-2">
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiMemory"
+                                            :size="deviceStore.getREMSize(1.5)"
+                                        />
+                                    </div>
+                                    <div>{{ row.deviceName }}</div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr :class="rowClass(row)">
+                            <td>
+                                <div
+                                    v-if="isFirstRowOfChannel(index)"
+                                    class="flex items-center gap-2"
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiMinusThick"
+                                        :size="14"
+                                        class="ml-1 shrink-0"
+                                        :style="{ color: row.channelColor }"
+                                    />
+                                    {{ row.channelLabel }}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="font-bold">{{ format(row.value, row.dataType) }}</span>
+                                <span :style="suffixStyle(row.dataType)">{{
+                                    suffix(row.dataType)
                                 }}</span>
-                                <span class="mx-2 text-text-color-secondary">–</span>
-                                <span class="text-left min-w-[3rem]">{{
-                                    format(slotProps.data.max, slotProps.data.dataType)
-                                }}</span>
-                                <span class="ml-1" :style="suffixStyle(slotProps.data.dataType)">{{
-                                    suffix(slotProps.data.dataType)
-                                }}</span>
-                            </span>
-                        </template>
-                    </Column>
-                    <Column
-                        field="avg"
-                        :header="t('components.sensorTable.average')"
-                        :style="{ width: '12%' }"
-                    >
-                        <template #body="slotProps">
-                            <span
-                                v-if="slotProps.data.count === 0"
-                                class="text-text-color-secondary"
-                                >—</span
-                            >
-                            <template v-else>
-                                {{ format(slotProps.data.avg, slotProps.data.dataType) }}
-                                <span :style="suffixStyle(slotProps.data.dataType)">{{
-                                    suffix(slotProps.data.dataType)
-                                }}</span>
-                            </template>
-                        </template>
-                    </Column>
-                </DataTable>
+                            </td>
+                            <td>
+                                <span v-if="row.count === 0" class="text-text-color-secondary"
+                                    >—</span
+                                >
+                                <span v-else class="inline-flex items-baseline tabular-nums">
+                                    <span class="text-right min-w-[3rem]">{{
+                                        format(row.min, row.dataType)
+                                    }}</span>
+                                    <span class="mx-2 text-text-color-secondary">–</span>
+                                    <span class="text-left min-w-[3rem]">{{
+                                        format(row.max, row.dataType)
+                                    }}</span>
+                                    <span class="ml-1" :style="suffixStyle(row.dataType)">{{
+                                        suffix(row.dataType)
+                                    }}</span>
+                                </span>
+                            </td>
+                            <td>
+                                <span v-if="row.count === 0" class="text-text-color-secondary"
+                                    >—</span
+                                >
+                                <template v-else>
+                                    {{ format(row.avg, row.dataType) }}
+                                    <span :style="suffixStyle(row.dataType)">{{
+                                        suffix(row.dataType)
+                                    }}</span>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                </UiTable>
             </div>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar
@@ -532,32 +512,27 @@ onBeforeUnmount(() => {
 </template>
 
 <style lang="scss" scoped>
-// PrimeVue DataTable renders the rowGroupHeader as <tr data-pc-section="rowgroupheader">
-// containing a single <td>. The td inherits the bodyCell preset's border-b, which
-// shows up as a "cut-off line" under the device name. Swap that for a heavier top
-// border so adjacent device groups read as separate sections.
-:deep([data-pc-section='rowgroupheader']) > td {
-    //border-top: 0 !important;
-    //border-top: 3px solid rgb(var(--colors-bg-two)) !important;
-    border-bottom: 3px solid rgb(var(--colors-border-one)) !important;
-    padding-top: 2rem !important;
-    //padding-bottom: 1.0rem !important;
+// Device group header rows: a heavier bottom border + top spacing so adjacent
+// device groups read as separate sections.
+tr.group-header > td {
+    border-bottom: 3px solid rgb(var(--colors-border-one));
+    padding-top: 2rem;
 }
 
 // Drop the Channel cell's bottom border between rows of the same channel
 // (e.g. a fan with both duty and rpm). Combined with hiding the marker/label
 // on subsequent rows, the cells visually fuse into one tall "rowspan" cell.
-:deep(tr.channel-continued) > td:first-of-type {
-    border-bottom: 0 !important;
+tr.channel-continued > td:first-of-type {
+    border-bottom: 0;
 }
 
 // Row hover: subtle backdrop on the row's cells. For multi-row channels
 // (e.g. fan duty + rpm), hovering either row highlights both so the pair
 // reads as one selection. The reverse direction needs :has() (Chromium
 // 105+); older Qt builds get only forward pairing.
-:deep(tbody tr:not([data-pc-section='rowgroupheader']):hover > td),
-:deep(tbody tr.channel-continued:hover + tr > td),
-:deep(tbody tr.channel-continued:has(+ tr:hover) > td) {
-    background-color: rgba(var(--colors-surface-hover) / 0.05) !important;
+tbody tr:not(.group-header):hover > td,
+tbody tr.channel-continued:hover + tr > td,
+tbody tr.channel-continued:has(+ tr:hover) > td {
+    background-color: rgba(var(--colors-surface-hover) / 0.05);
 }
 </style>

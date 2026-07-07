@@ -23,6 +23,7 @@ import {
     mdiAlertCircle,
     mdiContentSaveOutline,
     mdiFolderSearchOutline,
+    mdiMinusThick,
     mdiTrashCanOutline,
 } from '@mdi/js'
 import {
@@ -34,8 +35,6 @@ import {
     getCustomSensorTypeDisplayName,
     getCustomSensorMixFunctionTypeDisplayName,
 } from '@/models/CustomSensor.ts'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import { onMounted, ref, toRaw, type Ref, watch, computed } from 'vue'
 import { $enum } from 'ts-enum-util'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -49,6 +48,7 @@ import UiListbox from '@/shell/ui/UiListbox.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiTable from '@/shell/ui/UiTable.vue'
 import UiGroupedListbox from '@/shell/ui/UiGroupedListbox.vue'
 import { Dashboard, DashboardDeviceChannel } from '@/models/Dashboard.ts'
 import { v4 as uuidV4 } from 'uuid'
@@ -849,29 +849,34 @@ onMounted(async () => {
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempWeights') }}
                     </small>
-                    <DataTable :value="chosenTempSources">
-                        <Column
-                            field="tempFrontendName"
-                            :header="t('views.customSensors.tempName')"
-                            body-class="w-full"
+                    <UiTable>
+                        <template #head>
+                            <tr>
+                                <th class="w-full">{{ t('views.customSensors.tempName') }}</th>
+                                <th>{{ t('views.customSensors.weight') }}</th>
+                            </tr>
+                        </template>
+                        <tr
+                            v-for="source in chosenTempSources"
+                            :key="`${source.deviceUID}/${source.tempName}`"
                         >
-                            <template #body="slotProps">
-                                <span
-                                    class="pi pi-minus mr-2"
-                                    :style="{ color: slotProps.data.lineColor }"
-                                />{{ slotProps.data.tempFrontendName }}
-                            </template>
-                        </Column>
-                        <Column :header="t('views.customSensors.weight')">
-                            <template #body="slotProps">
-                                <UiNumberInput
-                                    v-model="slotProps.data.weight"
-                                    :min="1"
-                                    :max="254"
-                                />
-                            </template>
-                        </Column>
-                    </DataTable>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiMinusThick"
+                                        :size="14"
+                                        class="shrink-0"
+                                        :style="{ color: source.lineColor }"
+                                    />
+                                    {{ source.tempFrontendName }}
+                                </div>
+                            </td>
+                            <td>
+                                <UiNumberInput v-model="source.weight" :min="1" :max="254" />
+                            </td>
+                        </tr>
+                    </UiTable>
                 </div>
             </div>
             <!--Need a separate model for single-selection temp source-->
