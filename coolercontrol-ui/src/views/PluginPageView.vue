@@ -40,9 +40,9 @@ import {
     ServiceType,
 } from '@/models/Plugins.ts'
 import pluginMetadataModal from '@/layout/PluginUi.vue'
-import Button from 'primevue/button'
-import Tag from 'primevue/tag'
-import ToggleSwitch from 'primevue/toggleswitch'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
+import UiTag from '@/shell/ui/UiTag.vue'
 
 const STATUS_POLL_INTERVAL_MS = 30_000
 
@@ -271,7 +271,7 @@ onUnmounted(() => {
                 <span v-if="plugin.version" class="text-text-color-secondary text-sm">
                     v{{ plugin.version }}
                 </span>
-                <Tag :value="statusDisplayName" :severity="statusSeverity" class="ml-2" />
+                <UiTag :value="statusDisplayName" :severity="statusSeverity" class="ml-2" />
                 <span v-if="pluginStatusReason" class="text-text-color-secondary text-sm italic">
                     {{ pluginStatusReason }}
                 </span>
@@ -279,7 +279,7 @@ onUnmounted(() => {
 
             <div class="flex items-center gap-2">
                 <!-- Enable/disable toggle -->
-                <ToggleSwitch
+                <UiSwitch
                     v-tooltip.top="
                         isDisabled ? t('layout.plugins.enable') : t('layout.plugins.disable')
                     "
@@ -289,30 +289,30 @@ onUnmounted(() => {
 
                 <!-- Lifecycle controls (managed integration plugins only, when enabled) -->
                 <template v-if="isManaged && isIntegration">
-                    <Button
+                    <UiButton
                         v-tooltip.top="t('layout.plugins.start')"
-                        class="!p-1.5"
+                        variant="ghost"
+                        size="icon"
+                        class="text-success"
                         :disabled="pluginStatus === PluginStatus.Running"
-                        severity="success"
-                        text
                         @click="startPlugin"
                     >
                         <svg-icon type="mdi" :path="mdiPlay" :size="deviceStore.getREMSize(1.5)" />
-                    </Button>
-                    <Button
+                    </UiButton>
+                    <UiButton
                         v-tooltip.top="t('layout.plugins.stop')"
-                        class="!p-1.5"
+                        variant="ghost"
+                        size="icon"
+                        class="text-error"
                         :disabled="pluginStatus === PluginStatus.Stopped"
-                        severity="danger"
-                        text
                         @click="stopPlugin"
                     >
                         <svg-icon type="mdi" :path="mdiStop" :size="deviceStore.getREMSize(1.5)" />
-                    </Button>
-                    <Button
+                    </UiButton>
+                    <UiButton
                         v-tooltip.top="t('layout.plugins.restart')"
-                        class="!p-1.5"
-                        text
+                        variant="ghost"
+                        size="icon"
                         @click="restartPlugin"
                     >
                         <svg-icon
@@ -320,15 +320,16 @@ onUnmounted(() => {
                             :path="mdiRestart"
                             :size="deviceStore.getREMSize(1.5)"
                         />
-                    </Button>
+                    </UiButton>
                 </template>
 
                 <!-- Plugin info button (visible for plugins with UI) -->
-                <Button
+                <UiButton
                     v-if="hasUi"
                     v-tooltip.top="t('layout.plugins.info')"
-                    class="!bg-accent/80 hover:!bg-accent h-[2.375rem] !border !border-border-one"
-                    text
+                    variant="outline"
+                    size="icon"
+                    class="!bg-accent/80 hover:!bg-accent"
                     @click="openMetadataModal"
                 >
                     <svg-icon
@@ -336,7 +337,7 @@ onUnmounted(() => {
                         :path="mdiInformationOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
 
