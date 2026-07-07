@@ -260,14 +260,14 @@ onUnmounted(() => {
     </div>
     <div v-else class="flex flex-col w-full h-full">
         <!-- Header toolbar -->
-        <div class="flex h-[3.5rem] border-b-4 border-border-one items-center justify-between">
-            <div class="pl-4 py-2 flex items-center gap-3">
+        <div class="flex items-center justify-between px-4 pt-4">
+            <div class="flex items-center gap-3">
                 <svg-icon
                     type="mdi"
                     :path="mdiPowerPlugOutline"
                     :size="deviceStore.getREMSize(1.75)"
                 />
-                <span class="text-2xl font-bold">{{ plugin.id }}</span>
+                <h1 class="text-xl font-semibold text-text-color">{{ plugin.id }}</h1>
                 <span v-if="plugin.version" class="text-text-color-secondary text-sm">
                     v{{ plugin.version }}
                 </span>
@@ -277,7 +277,7 @@ onUnmounted(() => {
                 </span>
             </div>
 
-            <div class="pr-4 flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 <!-- Enable/disable toggle -->
                 <ToggleSwitch
                     v-tooltip.top="

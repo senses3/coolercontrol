@@ -705,6 +705,8 @@ export default {
             proceed: 'Proceed',
         },
         alerts: {
+            range: 'Range: {min} to {max}{unit}',
+            since: 'since {time}',
             createAlert: 'Create Alert',
             editAlert: 'Edit Alert',
             deleteAlert: 'Delete Alert',

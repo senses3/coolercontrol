@@ -35,7 +35,7 @@ import ConfirmationService from 'primevue/confirmationservice'
 import CC from './presets/cc'
 import VueFullscreen from 'vue-fullscreen'
 
-import Tooltip from 'primevue/tooltip'
+import { tooltipDirective } from '@/shell/tooltipDirective.ts'
 import mitt from 'mitt'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
@@ -63,6 +63,6 @@ app.use(DialogService)
 app.use(ConfirmationService)
 app.use(VueFullscreen)
 
-app.directive('tooltip', Tooltip)
+app.directive('tooltip', tooltipDirective)
 
 app.mount('#app')

@@ -24,6 +24,7 @@ import { computed, onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
+import AlertLogTable from '@/components/AlertLogTable.vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -421,7 +422,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="flex border-b-4 border-border-one items-center justify-between">
+    <div class="flex items-center justify-between px-2 pt-2">
         <entity-title-rename :current-name="chosenName" :save-name-function="saveNameFunction" />
         <div class="flex flex-wrap gap-x-1 justify-end">
             <div v-if="!shouldCreateAlert" class="p-2 pr-0">
@@ -609,6 +610,12 @@ onMounted(async () => {
                         </UiSettingRow>
                     </UiSettingsCard>
                 </div>
+            </div>
+            <div v-if="!shouldCreateAlert" class="mt-8 flex max-w-4xl flex-col">
+                <span class="pb-3 ml-1 font-semibold text-xl text-text-color">{{
+                    t('views.alerts.alertLogs')
+                }}</span>
+                <AlertLogTable :alert-u-i-d="props.alertUID" />
             </div>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar

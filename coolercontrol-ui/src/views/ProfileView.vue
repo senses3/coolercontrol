@@ -2202,10 +2202,7 @@ defineExpose({ saveProfileState, contextIsDirty })
 </script>
 
 <template>
-    <div
-        id="control-panel"
-        class="flex flex-wrap border-b-4 border-border-one items-center justify-between"
-    >
+    <div id="control-panel" class="flex flex-wrap items-center justify-between px-2 pt-2">
         <entity-title-rename
             :current-name="currentProfile.name"
             :save-name-function="saveNameFunction"

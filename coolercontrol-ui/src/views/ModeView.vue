@@ -25,18 +25,18 @@ import {
     mdiDeleteOutline,
     mdiInformationSlabCircleOutline,
     mdiMemory,
+    mdiMinusThick,
     mdiUpdate,
 } from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { computed, inject, onMounted, type Ref, ref, watch } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { Mode } from '@/models/Mode.ts'
 import { UID } from '@/models/Device.ts'
 import { DeviceSettingReadDTO } from '@/models/DaemonSettings.ts'
 import { getProfileDisplayName } from '@/models/Profile.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiTable from '@/shell/ui/UiTable.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
@@ -68,6 +68,18 @@ interface DeviceData {
     channelLabel: string
     settingType: string
     settingInfo: string
+}
+
+// First row of each device group carries the device cell, spanning the group.
+const isFirstOfDevice = (idx: number): boolean =>
+    idx === 0 || deviceTableData.value[idx - 1].deviceUID !== deviceTableData.value[idx].deviceUID
+const deviceRowSpan = (idx: number): number => {
+    let span = 1
+    for (let i = idx + 1; i < deviceTableData.value.length; i++) {
+        if (deviceTableData.value[i].deviceUID !== deviceTableData.value[idx].deviceUID) break
+        span++
+    }
+    return span
 }
 
 const initTableData = () => {
@@ -216,7 +228,7 @@ const deleteMode = (): void => {
 </script>
 
 <template>
-    <div class="flex h-[3.6rem] border-b-4 border-border-one items-center justify-between">
+    <div class="flex items-center justify-between px-2 pt-2">
         <div class="flex flex-row overflow-hidden">
             <entity-title-rename
                 :current-name="currentMode.name"
@@ -283,54 +295,44 @@ const deleteMode = (): void => {
             </div>
         </div>
     </div>
-    <div class="h-full pb-14">
-        <DataTable
-            :value="deviceTableData"
-            row-group-mode="rowspan"
-            :group-rows-by="['deviceName', 'rowID']"
-            scrollable
-            scroll-height="flex"
-            :pt="{
-                tableContainer: () => ({
-                    class: ['rounded-none border-0 border-border-one'],
-                }),
-            }"
-        >
-            <Column field="deviceName" :header="t('components.sensorTable.device')">
-                <template #body="slotProps">
+    <div class="h-full overflow-y-auto pb-14">
+        <UiTable sticky-header>
+            <template #head>
+                <tr>
+                    <th>{{ t('components.sensorTable.device') }}</th>
+                    <th>{{ t('components.sensorTable.channel') }}</th>
+                    <th>{{ t('components.modeTable.setting') }}</th>
+                    <th></th>
+                </tr>
+            </template>
+            <tr v-for="(row, idx) in deviceTableData" :key="row.rowID">
+                <td v-if="isFirstOfDevice(idx)" :rowspan="deviceRowSpan(idx)" class="align-top">
                     <div class="flex leading-none items-center">
-                        <div class="mr-2">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMemory"
-                                :size="deviceStore.getREMSize(1.3)"
-                            />
-                        </div>
-                        <div>{{ slotProps.data.deviceName }}</div>
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiMemory"
+                            :size="deviceStore.getREMSize(1.3)"
+                            class="mr-2"
+                        />
+                        {{ row.deviceName }}
                     </div>
-                </template>
-            </Column>
-            <!-- This workaround with rowID is needed because of an issue with DataTable and rowGrouping -->
-            <!-- Otherwise channelLabels from other devices are grouped together if they have the same name -->
-            <Column field="rowID" :header="t('components.sensorTable.channel')">
-                <template #body="slotProps">
-                    <span
-                        class="pi pi-minus mr-2"
-                        :style="{ color: slotProps.data.channelColor }"
-                    />{{ slotProps.data.channelLabel }}
-                </template>
-            </Column>
-            <Column field="settingType" :header="t('components.modeTable.setting')">
-                <template #body="slotProps">
-                    {{ slotProps.data.settingType }}
-                </template>
-            </Column>
-            <Column field="settingInfo" header="">
-                <template #body="slotProps">
-                    {{ slotProps.data.settingInfo }}
-                </template>
-            </Column>
-        </DataTable>
+                </td>
+                <td>
+                    <div class="flex items-center gap-2">
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiMinusThick"
+                            :size="14"
+                            class="shrink-0"
+                            :style="{ color: row.channelColor }"
+                        />
+                        {{ row.channelLabel }}
+                    </div>
+                </td>
+                <td>{{ row.settingType }}</td>
+                <td>{{ row.settingInfo }}</td>
+            </tr>
+        </UiTable>
     </div>
 </template>
 
