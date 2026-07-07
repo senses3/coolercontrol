@@ -20,12 +20,15 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
+    mdiArrowTopRightBottomLeft,
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiDeleteOutline,
     mdiExportVariant,
     mdiInformationSlabCircleOutline,
-    mdiMemory,
+    mdiMinus,
+    mdiPlus,
+    mdiPlusCircleOutline,
 } from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import {
@@ -38,8 +41,6 @@ import {
     getProfileTypeDisplayName,
     getProfileMixFunctionTypeDisplayName,
 } from '@/models/Profile.ts'
-import Button from 'primevue/button'
-import MultiSelect from 'primevue/multiselect'
 import {
     computed,
     inject,
@@ -52,8 +53,6 @@ import {
     toRaw,
     type WatchStopHandle,
 } from 'vue'
-import InputNumber from 'primevue/inputnumber'
-import Knob from 'primevue/knob'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import * as echarts from 'echarts/core'
 import {
@@ -74,7 +73,6 @@ import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useToast } from 'primevue/usetoast'
 import { $enum } from 'ts-enum-util'
 import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
-import Select from 'primevue/select'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
@@ -85,6 +83,13 @@ import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
 import HealthWarning from '@/components/HealthWarning.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import UiKnob from '@/shell/ui/UiKnob.vue'
+import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
 
 echarts.use([
     GridComponent,
@@ -317,6 +322,101 @@ const overlayOffsetTypeOptions: Array<{ value: string; label: string }> = [
 const selectedTemp: Ref<number | undefined> = ref()
 const selectedDuty: Ref<number | undefined> = ref()
 const selectedStaticOffset: Ref<number | undefined> = ref()
+
+// String-keyed models for the kit selects.
+const selectedTypeModel = computed<string | undefined>({
+    get: () => selectedType.value,
+    set: (value) => {
+        if (value != null) selectedType.value = value as ProfileType
+    },
+})
+const chosenProfileMixFunctionModel = computed<string | undefined>({
+    get: () => chosenProfileMixFunction.value,
+    set: (value) => {
+        if (value != null) chosenProfileMixFunction.value = value as ProfileMixFunctionType
+    },
+})
+const chosenOverlayOffsetTypeModel = computed<string | undefined>({
+    get: () => chosenOverlayOffsetType.value,
+    set: (value) => {
+        if (value != null) chosenOverlayOffsetType.value = value
+    },
+})
+const memberProfileGroups = computed<UiOptionGroup[]>(() => [
+    {
+        label: '',
+        options: memberProfileOptions.value.map((profile) => ({
+            label: profile.name,
+            value: profile.uid,
+        })),
+    },
+])
+const chosenMemberProfileUids = computed<string[]>({
+    get: () => chosenMemberProfiles.value.map((profile) => profile.uid),
+    set: (uids) => {
+        chosenMemberProfiles.value = uids
+            .map((uid) => settingsStore.profiles.find((profile) => profile.uid === uid))
+            .filter((profile): profile is Profile => profile != null)
+    },
+})
+const overlayBaseOptions = computed(() =>
+    offsetMemberProfileOptions.value.map((profile) => ({
+        label: profile.name,
+        value: profile.uid,
+    })),
+)
+const chosenOverlayMemberProfileUid = computed<string | undefined>({
+    get: () => chosenOverlayMemberProfile.value?.uid,
+    set: (uid) => {
+        chosenOverlayMemberProfile.value = settingsStore.profiles.find(
+            (profile) => profile.uid === uid,
+        )
+    },
+})
+const functionOptions = computed(() =>
+    settingsStore.functions.map((fn) => ({ label: fn.name, value: fn.uid })),
+)
+const chosenFunctionUid = computed<string | undefined>({
+    get: () => chosenFunction.value.uid,
+    set: (uid) => {
+        const found = settingsStore.functions.find((fn) => fn.uid === uid)
+        if (found != null) chosenFunction.value = found
+    },
+})
+const tempKey = (deviceUID: string, tempName: string): string => `${deviceUID}/${tempName}`
+const tempSourceGroups = computed<UiOptionGroup[]>(() =>
+    tempSources.value.map((device) => ({
+        label: device.deviceName,
+        options: device.temps.map((temp) => ({
+            label: temp.tempFrontendName,
+            value: tempKey(temp.deviceUID, temp.tempName),
+            color: temp.lineColor,
+            rightText:
+                temp.limitInfo != null
+                    ? `${temp.limitInfo.badge} · ${temp.temp} ${t('common.tempUnit')}`
+                    : `${temp.temp} ${t('common.tempUnit')}`,
+        })),
+    })),
+)
+const chosenTempKey = computed<string | undefined>({
+    get: () =>
+        chosenTemp.value != null
+            ? tempKey(chosenTemp.value.deviceUID, chosenTemp.value.tempName)
+            : undefined,
+    set: (key) => {
+        chosenTemp.value = tempSources.value
+            .flatMap((device) => device.temps)
+            .find((temp) => tempKey(temp.deviceUID, temp.tempName) === key)
+    },
+})
+const selectedDutyModel = computed<number>({
+    get: () => selectedDuty.value ?? 0,
+    set: (value) => (selectedDuty.value = value),
+})
+const selectedStaticOffsetModel = computed<number>({
+    get: () => selectedStaticOffset.value ?? 0,
+    set: (value) => (selectedStaticOffset.value = value),
+})
 const selectedGraphOffset: Ref<Array<[number, number]>> = ref([])
 const selectedPointIndex: Ref<number | undefined> = ref()
 const selectedTempSourceTemp: Ref<number | undefined> = ref()
@@ -1353,13 +1453,13 @@ const handleDutyScroll = (event: WheelEvent, idx: number): void => {
 
 // Direct input handlers for table cells
 const handleTempInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === 0 || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === 0 || idx === data.length - 1) return
     const clampedTemp = Math.max(getPointTempMin(idx), Math.min(value, getPointTempMax(idx)))
     updatePointFromTable(idx, clampedTemp, data[idx].value[1])
 }
 
 const handleDutyInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === data.length - 1) return
     const clampedDuty = Math.max(dutyMin, Math.min(value, dutyMax))
     updatePointFromTable(idx, data[idx].value[0], clampedDuty)
 }
@@ -2083,8 +2183,8 @@ onUnmounted(() => {
     stopRepeat()
 })
 
-// Prevent the Knob component from consuming non-left mouse button clicks (e.g. browser
-// back/forward buttons). Stop the event before it reaches PrimeVue's handler, then
+// Prevent the knob from consuming non-left mouse button clicks (e.g. browser
+// back/forward buttons). Stop the event before it reaches the knob's handler, then
 // manually trigger history navigation so the browser gesture still works.
 function onKnobMousedown(e: MouseEvent) {
     if (e.button === 0) return
@@ -2148,196 +2248,109 @@ defineExpose({ saveProfileState, contextIsDirty })
                 </div>
             </template>
             <div class="p-2 pr-0">
-                <Select
-                    v-model="selectedType"
-                    :options="profileTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.profileType')"
-                    class="w-[6.5rem] h-[2.375rem]"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
+                <span
                     v-tooltip.top="{
                         escape: false,
                         value: t('views.profiles.tooltip.profileType'),
                     }"
-                />
+                >
+                    <UiSelect
+                        v-model="selectedTypeModel"
+                        :options="profileTypeOptions"
+                        :placeholder="t('views.profiles.profileType')"
+                        class="w-44"
+                    />
+                </span>
             </div>
             <div v-if="selectedType === ProfileType.Mix" class="p-2 pr-0 flex flex-row">
-                <Select
-                    v-model="chosenProfileMixFunction"
-                    :options="mixFunctionTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.mixFunction')"
-                    class="max-w-48 mr-3"
-                    checkmark
-                    dropdown-icon="pi pi-sliders-v"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.profiles.applyMixFunction')"
-                />
-                <MultiSelect
-                    v-model="chosenMemberProfiles"
-                    :options="memberProfileOptions"
-                    option-label="name"
-                    :placeholder="t('views.profiles.memberProfiles')"
-                    class="max-w-48"
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-chart-line"
-                    v-tooltip.top="t('views.profiles.profilesToMix')"
-                    :invalid="chosenMemberProfiles.length < 2"
-                />
+                <span v-tooltip.top="t('views.profiles.applyMixFunction')" class="mr-3">
+                    <UiSelect
+                        v-model="chosenProfileMixFunctionModel"
+                        :options="mixFunctionTypeOptions"
+                        :placeholder="t('views.profiles.mixFunction')"
+                        class="w-44"
+                    />
+                </span>
+                <span v-tooltip.top="t('views.profiles.profilesToMix')">
+                    <UiMultiSelect
+                        v-model="chosenMemberProfileUids"
+                        :groups="memberProfileGroups"
+                        :placeholder="t('views.profiles.memberProfiles')"
+                        class="w-44"
+                        :invalid="chosenMemberProfiles.length < 2"
+                    />
+                </span>
             </div>
             <div v-else-if="selectedType === ProfileType.Overlay" class="p-2 pr-0 flex flex-row">
-                <InputNumber
+                <UiNumberInput
                     v-if="chosenOverlayOffsetType === 'static'"
-                    :placeholder="t('common.offset')"
-                    v-model="selectedStaticOffset"
-                    mode="decimal"
-                    class="w-full h-[2.375rem] mr-3"
-                    :suffix="` ${t('common.percentUnit')}`"
+                    v-model="selectedStaticOffsetModel"
+                    class="mr-3"
                     :prefix="staticOffsetPrefix"
-                    showButtons
+                    :suffix="t('common.percentUnit')"
                     :min="offsetMin"
                     :max="offsetMax"
-                    :use-grouping="false"
-                    :step="1"
-                    button-layout="horizontal"
-                    :input-style="{ width: '5rem' }"
                     :disabled="chosenOverlayMemberProfile == null"
                     v-tooltip.top="t('views.profiles.staticOffset')"
-                >
-                    <template #incrementicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
-                <Select
-                    v-model="chosenOverlayOffsetType"
-                    :options="overlayOffsetTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.offsetType')"
-                    class="max-w-48 mr-3"
-                    checkmark
-                    dropdown-icon="pi pi-sliders-v"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.profiles.offsetType')"
                 />
-                <Select
-                    v-model="chosenOverlayMemberProfile"
-                    :options="offsetMemberProfileOptions"
-                    option-label="name"
-                    :placeholder="t('views.profiles.baseProfile')"
-                    class="max-w-48"
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-chart-line"
-                    :invalid="chosenOverlayMemberProfile == null"
-                    v-tooltip.top="t('views.profiles.baseProfile')"
-                />
+                <span v-tooltip.top="t('views.profiles.offsetType')" class="mr-3">
+                    <UiSelect
+                        v-model="chosenOverlayOffsetTypeModel"
+                        :options="overlayOffsetTypeOptions"
+                        :placeholder="t('views.profiles.offsetType')"
+                        class="w-44"
+                    />
+                </span>
+                <span v-tooltip.top="t('views.profiles.baseProfile')">
+                    <UiSelect
+                        v-model="chosenOverlayMemberProfileUid"
+                        :options="overlayBaseOptions"
+                        :placeholder="t('views.profiles.baseProfile')"
+                        class="w-44"
+                        :invalid="chosenOverlayMemberProfile == null"
+                    />
+                </span>
             </div>
             <div v-else-if="selectedType === ProfileType.Graph" class="flex flex-wrap justify-end">
                 <div class="p-2 pr-1">
-                    <Select
-                        v-model="chosenTemp"
-                        :options="tempSources"
-                        class="w-44 h-[2.375rem]"
-                        option-label="tempFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="temps"
-                        :placeholder="t('views.profiles.tempSource')"
-                        :filter-placeholder="t('common.search')"
-                        filter
-                        checkmark
-                        scroll-height="40rem"
-                        :invalid="chosenTemp == null || tempSourceInvalid"
-                        dropdown-icon="pi pi-inbox"
-                        v-tooltip.top="{ escape: false, value: t('views.profiles.tempSource') }"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex w-full items-center justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.tempFrontendName }}
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <span
-                                        v-if="slotProps.option.limitInfo != null"
-                                        class="text-xs opacity-70"
-                                        v-tooltip.top="slotProps.option.limitInfo.message"
-                                    >
-                                        {{ slotProps.option.limitInfo.badge }}
-                                    </span>
-                                    <span
-                                        >{{ slotProps.option.temp }}
-                                        {{ t('common.tempUnit') }}</span
-                                    >
-                                </div>
-                            </div>
-                        </template>
-                    </Select>
+                    <span v-tooltip.top="{ escape: false, value: t('views.profiles.tempSource') }">
+                        <UiGroupedSelect
+                            v-model="chosenTempKey"
+                            :groups="tempSourceGroups"
+                            :placeholder="t('views.profiles.tempSource')"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            class="w-44"
+                            :invalid="chosenTemp == null || tempSourceInvalid"
+                        />
+                    </span>
                 </div>
                 <div class="p-2 pr-0">
-                    <Select
-                        v-model="chosenFunction"
-                        :options="settingsStore.functions"
-                        option-label="name"
-                        :placeholder="t('views.profiles.function')"
-                        class="w-44 h-[2.375rem]"
-                        checkmark
-                        dropdown-icon="pi pi-directions"
-                        scroll-height="40rem"
-                        v-tooltip.top="t('views.profiles.functionToApply')"
-                    />
+                    <span v-tooltip.top="t('views.profiles.functionToApply')">
+                        <UiSelect
+                            v-model="chosenFunctionUid"
+                            :options="functionOptions"
+                            :placeholder="t('views.profiles.function')"
+                            class="w-44"
+                        />
+                    </span>
                 </div>
             </div>
             <div v-else-if="selectedType === ProfileType.Fixed" class="p-2 pr-0">
-                <InputNumber
-                    :placeholder="t('common.duty')"
-                    v-model="selectedDuty"
-                    inputId="selected-duty"
-                    mode="decimal"
-                    class="duty-input w-full h-[2.375rem]"
-                    :suffix="` ${t('common.percentUnit')}`"
-                    showButtons
+                <UiNumberInput
+                    v-model="selectedDutyModel"
+                    class="duty-input"
+                    :suffix="t('common.percentUnit')"
                     :min="dutyMin"
                     :max="dutyMax"
                     :disabled="selectedPointIndex == null && !showDutyKnob"
-                    :use-grouping="false"
-                    :step="1"
-                    button-layout="horizontal"
-                    :input-style="{ width: '5rem' }"
                     v-tooltip.top="t('views.profiles.fixedDuty')"
-                >
-                    <template #incrementicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
+                />
             </div>
             <div v-if="!hideSave" class="p-2">
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
+                <UiButton
+                    class="w-32"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    :label="t('common.save')"
                     v-tooltip.top="t('views.profiles.saveProfile')"
                     @click="saveProfileState"
                 >
@@ -2347,7 +2360,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                         :path="mdiContentSaveOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
@@ -2362,29 +2375,16 @@ defineExpose({ saveProfileState, contextIsDirty })
     <!-- The UI Display: -->
     <div v-if="showGraph" class="flex flex-col w-full">
         <div class="flex flex-row justify-between mt-4 w-full">
-            <InputNumber
-                :placeholder="t('components.axisOptions.min')"
+            <UiNumberInput
                 v-model="axisXTempMin"
-                mode="decimal"
-                class="h-11 mx-4"
-                :suffix="` ${t('common.tempUnit')}`"
-                showButtons
+                class="mx-4"
+                :suffix="t('common.tempUnit')"
                 :min="inputAxisMinNumberMin"
                 :max="inputAxisMinNumberMax"
-                :use-grouping="false"
                 :step="5"
-                button-layout="horizontal"
-                :input-style="{ width: '5rem' }"
                 :disabled="selectedTempSource == null"
                 v-tooltip.top="t('views.profiles.minProfileTemp')"
-            >
-                <template #incrementicon>
-                    <span class="pi pi-plus" />
-                </template>
-                <template #decrementicon>
-                    <span class="pi pi-minus" />
-                </template>
-            </InputNumber>
+            />
             <div class="flex flex-row items-center">
                 <div
                     class="p-2 mx-4 leading-none items-center"
@@ -2401,29 +2401,16 @@ defineExpose({ saveProfileState, contextIsDirty })
                     {{ selectedLimitInfo.message }}
                 </span>
             </div>
-            <InputNumber
-                :placeholder="t('components.axisOptions.max')"
+            <UiNumberInput
                 v-model="axisXTempMax"
-                mode="decimal"
-                class="h-11 mx-4"
-                :suffix="` ${t('common.tempUnit')}`"
-                showButtons
+                class="mx-4"
+                :suffix="t('common.tempUnit')"
                 :min="inputAxisMaxNumberMin"
                 :max="inputAxisMaxNumberMax"
-                :use-grouping="false"
                 :step="5"
-                button-layout="horizontal"
-                :input-style="{ width: '5rem' }"
                 :disabled="selectedTempSource == null"
                 v-tooltip.top="t('views.profiles.maxProfileTemp')"
-            >
-                <template #incrementicon>
-                    <span class="pi pi-plus" />
-                </template>
-                <template #decrementicon>
-                    <span class="pi pi-minus" />
-                </template>
-            </InputNumber>
+            />
         </div>
     </div>
     <div id="profile-display" class="flex flex-col h-full">
@@ -2435,10 +2422,10 @@ defineExpose({ saveProfileState, contextIsDirty })
             @mousedown.capture="onKnobMousedown"
             @mouseup.capture="onKnobMouseup"
         >
-            <Knob
-                v-model="selectedDuty"
+            <UiKnob
+                v-model="selectedDutyModel"
                 class="duty-knob-input m-2 w-full h-full flex justify-center"
-                :value-template="(value) => `${value}${t('common.percentUnit')}`"
+                :value-template="(value: number) => `${value}${t('common.percentUnit')}`"
                 :min="dutyMin"
                 :max="dutyMax"
                 :step="1"
@@ -2469,14 +2456,15 @@ defineExpose({ saveProfileState, contextIsDirty })
                     <span class="font-semibold text-text-color cursor-default">{{
                         t('views.profiles.points')
                     }}</span>
-                    <Button
-                        @click="cycleTablePosition"
-                        icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                        text
-                        rounded
-                        class="!w-7 !h-7 !p-0"
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        class="!h-7 !w-7"
                         v-tooltip.top="t('views.profiles.moveTable')"
-                    />
+                        @click="cycleTablePosition"
+                    >
+                        <svg-icon type="mdi" :path="mdiArrowTopRightBottomLeft" :size="14" />
+                    </UiButton>
                 </div>
                 <table class="w-full">
                     <thead class="sticky top-7 bg-bg-two/95 cursor-default">
@@ -2514,11 +2502,10 @@ defineExpose({ saveProfileState, contextIsDirty })
                                         handleTempScroll($event, idx)
                                     "
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -2529,30 +2516,29 @@ defineExpose({ saveProfileState, contextIsDirty })
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="point.value[0]"
-                                        @update:modelValue="handleTempInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="1"
-                                        :maxFractionDigits="1"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3.75rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[0].toFixed(1)"
                                         :min="getPointTempMin(idx)"
                                         :max="getPointTempMax(idx)"
-                                        :suffix="t('common.tempUnit')"
+                                        step="0.1"
                                         :disabled="idx === 0 || idx === data.length - 1"
-                                        :inputStyle="{
-                                            width: '3.75rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        @change="
+                                            handleTempInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -2563,7 +2549,9 @@ defineExpose({ saveProfileState, contextIsDirty })
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
                                 </div>
                             </td>
 
@@ -2575,11 +2563,10 @@ defineExpose({ saveProfileState, contextIsDirty })
                                         idx !== data.length - 1 && handleDutyScroll($event, idx)
                                     "
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === data.length - 1 || data[idx].value[1] <= dutyMin
                                         "
@@ -2588,30 +2575,29 @@ defineExpose({ saveProfileState, contextIsDirty })
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="point.value[1]"
-                                        @update:modelValue="handleDutyInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="0"
-                                        :maxFractionDigits="0"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[1].toFixed(0)"
                                         :min="dutyMin"
                                         :max="dutyMax"
-                                        :suffix="t('common.percentUnit')"
+                                        step="1"
                                         :disabled="idx === data.length - 1"
-                                        :inputStyle="{
-                                            width: '3rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        @change="
+                                            handleDutyInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === data.length - 1 || data[idx].value[1] >= dutyMax
                                         "
@@ -2620,33 +2606,39 @@ defineExpose({ saveProfileState, contextIsDirty })
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
                                 </div>
                             </td>
 
                             <!-- Add/Remove Actions -->
                             <td class="px-0.5 py-0.5">
                                 <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                                    <Button
+                                    <UiButton
                                         v-if="canAddPointAfter(idx)"
-                                        icon="pi pi-plus-circle"
-                                        text
-                                        severity="success"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !text-success"
                                         v-tooltip.top="t('views.profiles.addPointAfter')"
                                         @click.stop="addPointFromTable(idx)"
-                                    />
-                                    <Button
+                                    >
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiPlusCircleOutline"
+                                            :size="14"
+                                        />
+                                    </UiButton>
+                                    <UiButton
                                         v-if="canRemovePoint(idx)"
-                                        icon="pi pi-trash"
-                                        text
-                                        severity="danger"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !text-error"
                                         v-tooltip.top="t('views.profiles.removePoint')"
                                         @click.stop="removePointFromTable(idx)"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiDeleteOutline" :size="14" />
+                                    </UiButton>
                                 </div>
                             </td>
                         </tr>
@@ -2666,11 +2658,11 @@ defineExpose({ saveProfileState, contextIsDirty })
             @mousedown.capture="onKnobMousedown"
             @mouseup.capture="onKnobMouseup"
         >
-            <Knob
-                v-model="selectedStaticOffset"
-                class="m-2 w-full h-full flex justify-center outline-none !outline-0"
+            <UiKnob
+                v-model="selectedStaticOffsetModel"
+                class="m-2 w-full h-full flex justify-center"
                 :value-template="
-                    (value) =>
+                    (value: number) =>
                         value > 0
                             ? `+${value}${t('common.percentUnit')}`
                             : `${value}${t('common.percentUnit')}`
@@ -2700,22 +2692,15 @@ defineExpose({ saveProfileState, contextIsDirty })
     cursor: default;
 }
 
-// Compact styling for points table InputNumber components
-:deep(.table-input) {
-    input {
-        background: transparent;
-        border: none;
-        height: 1.5rem;
-
-        &:focus {
-            box-shadow: none;
-            background: var(--cc-bg-one);
-        }
-
-        &:disabled {
-            opacity: 0.6;
-        }
-    }
+// Points table inputs: no native number spinners.
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.table-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 // This is needed particularly in Tauri, as it moves to multiline flex-wrap as soon as the scrollbar
