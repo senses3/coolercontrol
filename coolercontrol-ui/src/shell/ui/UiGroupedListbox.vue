@@ -27,6 +27,8 @@ export interface UiGroupedOption {
     value: string
     /** Sensor line color rendered as a dash before the label. */
     color?: string
+    /** Render the color as a round dot (tags) instead of a line (sensors). */
+    dot?: boolean
     /** Right-aligned live value, e.g. '45.0 °C'. */
     rightText?: string
     disabled?: boolean
@@ -131,8 +133,13 @@ const toggle = (value: string): void => {
                         class="shrink-0"
                         :class="isSelected(option.value) ? 'text-accent' : 'invisible'"
                     />
+                    <span
+                        v-if="option.color && option.dot"
+                        class="h-3 w-3 shrink-0 rounded-full"
+                        :style="{ backgroundColor: option.color }"
+                    />
                     <svg-icon
-                        v-if="option.color"
+                        v-else-if="option.color"
                         type="mdi"
                         :path="mdiMinusThick"
                         :size="14"

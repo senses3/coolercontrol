@@ -312,6 +312,7 @@ const tagGroups = computed(() => [
             label: tag.name,
             value: tag.name,
             color: tag.color,
+            dot: true,
         })),
     },
 ])
