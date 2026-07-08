@@ -101,7 +101,6 @@ const itemClass =
                         type="mdi"
                         :path="mdiLockOutline"
                         :size="deviceStore.getREMSize(1.5)"
-                        :class="deviceStore.loggedIn ? 'text-accent' : ''"
                     />
                     <span class="text-[0.8125rem] leading-tight">
                         {{ t('layout.shell.access') }}
