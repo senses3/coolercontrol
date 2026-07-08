@@ -31,7 +31,7 @@ import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { v4 as uuidV4 } from 'uuid'
 import { useToast } from 'primevue/usetoast'
 import { useRouter } from 'vue-router'
@@ -158,17 +158,17 @@ const back = (): void => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="back">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="back">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="saveProfileAndFunction"
             >
@@ -178,7 +178,7 @@ const back = (): void => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>
