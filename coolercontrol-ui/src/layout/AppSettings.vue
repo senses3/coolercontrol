@@ -531,7 +531,7 @@ onUnmounted(() => {
                 class="break-inside-avoid"
                 :title="t('layout.settings.general')"
             >
-                <UiSettingRow v-tooltip.top="t('layout.settings.tooltips.introduction')">
+                <UiSettingRow>
                     <template #label>{{ t('layout.settings.introduction') }}</template>
                     <UiButton class="w-full" @click="emitter.emit('start-tour')">{{
                         t('layout.settings.startTour')

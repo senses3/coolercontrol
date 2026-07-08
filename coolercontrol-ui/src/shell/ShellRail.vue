@@ -77,6 +77,7 @@ const itemClass =
         </RouterLink>
         <RouterLink
             v-for="section in railSections"
+            :id="`rail-${section.id}`"
             :key="section.id"
             :to="{ name: section.routeName }"
             class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"

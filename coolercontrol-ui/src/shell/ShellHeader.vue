@@ -73,7 +73,7 @@ const itemClass =
         <div class="flex-1" />
         <UiDropdownMenu>
             <template #trigger>
-                <UiButton variant="outline">
+                <UiButton id="modes-switcher" variant="outline">
                     <svg-icon
                         type="mdi"
                         :path="mdiBookmarkMultipleOutline"

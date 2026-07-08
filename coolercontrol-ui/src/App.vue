@@ -112,8 +112,6 @@ const applyCustomTheme = (): void => {
 const onboardingWrapper = ref(null)
 const { start, finish } = useVOnboarding(onboardingWrapper)
 
-type TourMode = 'basic' | 'thorough'
-const tourMode: Ref<TourMode | null> = ref(null)
 const steps: Ref<any[]> = ref([])
 const isTransitioningMode = ref(false)
 
@@ -121,13 +119,13 @@ const POPPER_RIGHT = { popper: { placement: 'right' } }
 const GETTING_STARTED_URL =
     'https://docs.coolercontrol.org/getting-started.html#%F0%9F%A7%99-configure'
 
-const makeStep = (selector: string, key: string): any => ({
+const makeStep = (selector: string, key: string, placement: string = 'right'): any => ({
     attachTo: { element: selector },
     content: {
         title: t(`components.onboarding.${key}`),
         description: t(`components.onboarding.${key}Desc`),
     },
-    options: POPPER_RIGHT,
+    options: { popper: { placement } },
 })
 
 const welcomeStep = (): any => ({
@@ -145,57 +143,34 @@ const finishStep = (): any => ({
 const filterPresent = (list: any[]): any[] =>
     list.filter((s) => document.querySelector(s.attachTo.element) !== null)
 
-//todo: reorder and add:
-
-const buildBasicSteps = (): any[] =>
+// A single tour walks the navigation rail (the new shell's primary nav) plus the
+// header Modes switcher. Section steps fold in concepts that used to have their
+// own old-shell menu items (profiles/functions -> Cooling, dashboards/alerts ->
+// Monitoring, lighting/LCD/custom sensors -> Devices). filterPresent drops any
+// absent anchor (e.g. #rail-plugins when no plugins are installed).
+const buildTourSteps = (): any[] =>
     filterPresent([
-        makeStep('#logo', 'appInfo'),
-        makeStep('#add', 'quickAdd'),
-        makeStep('#dashboard-quick', 'dashboardQuick'),
-        makeStep('#controls', 'controls'),
-        makeStep('#alerts-quick', 'alertsQuick'),
-        makeStep('#settings', 'settings'),
-        makeStep('#restart', 'restartMenu'),
-        makeStep('#system-menu', 'systemMenu'),
-        makeStep('#profiles', 'profiles'),
-        makeStep('#functions', 'functions'),
-        finishStep(),
-    ])
-
-const buildThoroughSteps = (): any[] =>
-    filterPresent([
-        makeStep('#logo', 'appInfo'),
-        makeStep('#add', 'quickAdd'),
-        makeStep('#dashboard-quick', 'dashboardQuick'),
-        makeStep('#controls', 'controls'),
-        makeStep('#modes-quick', 'modesQuick'),
-        makeStep('#collapse-menu', 'collapseMenu'),
-        makeStep('#alerts-quick', 'alertsQuick'),
-        makeStep('#plugins-quick', 'pluginsQuick'),
-        makeStep('#settings', 'settings'),
+        makeStep('#rail-home', 'home'),
+        makeStep('#rail-cooling', 'cooling'),
+        makeStep('#modes-switcher', 'modes', 'left-start'),
+        makeStep('#rail-monitoring', 'monitoring'),
+        makeStep('#rail-devices', 'devices'),
+        makeStep('#rail-settings', 'settings'),
+        makeStep('#rail-plugins', 'plugins'),
         makeStep('#access', 'access'),
         makeStep('#restart', 'restartMenu'),
-        makeStep('#system-menu', 'systemMenu'),
-        makeStep('#dashboards', 'dashboards'),
-        makeStep('#profiles', 'profiles'),
-        makeStep('#functions', 'functions'),
-        makeStep('#modes', 'modes'),
-        makeStep('#alerts', 'alerts'),
-        makeStep('[data-tour-anchor="custom-sensors"]', 'customSensors'),
         finishStep(),
     ])
 
 const startTour = (): void => {
-    tourMode.value = null
     steps.value = [welcomeStep()]
     start()
 }
 
-const chooseTourMode = async (mode: TourMode): Promise<void> => {
-    tourMode.value = mode
+const startFullTour = async (): Promise<void> => {
     isTransitioningMode.value = true
     finish()
-    steps.value = mode === 'thorough' ? buildThoroughSteps() : buildBasicSteps()
+    steps.value = buildTourSteps()
     await nextTick()
     start()
     await nextTick()
@@ -524,7 +499,7 @@ onMounted(async () => {
                     class="bg-bg-two drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] rounded-lg border-2 border-border-one"
                 >
                     <div class="px-4 py-5 sm:p-6">
-                        <!-- Welcome step: intro + 3-button mode choice -->
+                        <!-- Welcome step: intro + start-tour choice -->
                         <template v-if="step.content?.kind === 'welcome'">
                             <div class="relative max-w-2xl">
                                 <button
@@ -575,27 +550,17 @@ onMounted(async () => {
                                     <a
                                         target="_blank"
                                         :href="GETTING_STARTED_URL"
-                                        class="text-accent outline-0"
+                                        class="flex w-fit items-center gap-2 text-accent outline-0"
                                     >
-                                        <svg-icon
-                                            type="mdi"
-                                            :path="mdiOpenInNew"
-                                            :size="16"
-                                            class="mr-2"
-                                        />
+                                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="16" />
                                         {{ t('views.appInfo.gettingStarted') }}
                                     </a>
                                     <a
                                         target="_blank"
                                         href="https://docs.coolercontrol.org/hardware-support.html"
-                                        class="text-accent outline-0"
+                                        class="flex w-fit items-center gap-2 text-accent outline-0"
                                     >
-                                        <svg-icon
-                                            type="mdi"
-                                            :path="mdiOpenInNew"
-                                            :size="16"
-                                            class="mr-2"
-                                        />
+                                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="16" />
                                         {{ t('views.appInfo.hardwareSupport') }}
                                     </a>
                                 </div>
@@ -604,18 +569,11 @@ onMounted(async () => {
                                 </p>
                                 <div class="mt-6 flex flex-col sm:flex-row gap-3">
                                     <button
-                                        @click="chooseTourMode('basic')"
+                                        @click="startFullTour"
                                         type="button"
-                                        class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent/80 hover:!bg-accent px-4 py-2 font-medium text-text-color shadow-sm focus:outline-none"
+                                        class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent px-4 py-2 font-medium text-accent-fg shadow-sm outline-none hover:bg-accent/90"
                                     >
-                                        {{ t('components.onboarding.quickTour') }}
-                                    </button>
-                                    <button
-                                        @click="chooseTourMode('thorough')"
-                                        type="button"
-                                        class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent/80 hover:!bg-accent px-4 py-2 font-medium text-text-color shadow-sm focus:outline-none"
-                                    >
-                                        {{ t('components.onboarding.thoroughTour') }}
+                                        {{ t('components.onboarding.startTour') }}
                                     </button>
                                     <button
                                         @click="skipTour"
@@ -744,23 +702,46 @@ onMounted(async () => {
     height: 1rem;
     position: absolute;
     z-index: -1;
-    border-left: 2px solid rgb(var(--colors-border-one));
-    border-bottom: 2px solid rgb(var(--colors-border-one));
 }
 
+/*
+ * The arrow is a rotated square; its two bordered sides form the tip pointing
+ * toward the anchor. The border pair therefore differs per placement (the base
+ * ::before draws no border, each placement sets its own).
+ */
 [data-v-onboarding-wrapper] [data-popper-placement^='top'] > [data-popper-arrow] {
     bottom: 7px;
+}
+[data-v-onboarding-wrapper] [data-popper-placement^='top'] > [data-popper-arrow]::before {
+    border-right: 2px solid rgb(var(--colors-border-one));
+    border-bottom: 2px solid rgb(var(--colors-border-one));
 }
 
 [data-v-onboarding-wrapper] [data-popper-placement^='right'] > [data-popper-arrow] {
     left: -6px;
 }
+[data-v-onboarding-wrapper] [data-popper-placement^='right'] > [data-popper-arrow]::before {
+    border-left: 2px solid rgb(var(--colors-border-one));
+    border-bottom: 2px solid rgb(var(--colors-border-one));
+}
 
 [data-v-onboarding-wrapper] [data-popper-placement^='bottom'] > [data-popper-arrow] {
     top: -6px;
 }
+[data-v-onboarding-wrapper] [data-popper-placement^='bottom'] > [data-popper-arrow]::before {
+    border-top: 2px solid rgb(var(--colors-border-one));
+    border-left: 2px solid rgb(var(--colors-border-one));
+}
 
 [data-v-onboarding-wrapper] [data-popper-placement^='left'] > [data-popper-arrow] {
     right: -6px;
+}
+[data-v-onboarding-wrapper] [data-popper-placement^='left'] > [data-popper-arrow]::before {
+    /* anchor to the arrow element's right edge so the diamond straddles the
+       popover's right edge (element is positioned by its right side here) */
+    left: auto;
+    right: 0;
+    border-top: 2px solid rgb(var(--colors-border-one));
+    border-right: 2px solid rgb(var(--colors-border-one));
 }
 </style>
