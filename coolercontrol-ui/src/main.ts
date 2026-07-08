@@ -28,8 +28,6 @@ import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
 
-import PrimeVue from 'primevue/config'
-import CC from './presets/cc'
 import VueFullscreen from 'vue-fullscreen'
 
 import { tooltipDirective } from '@/shell/tooltipDirective.ts'
@@ -51,10 +49,6 @@ app.provide('emitter', mitt())
 app.use(createPinia())
 app.use(router)
 app.use(i18n)
-app.use(PrimeVue, {
-    unstyled: true,
-    pt: CC,
-})
 app.use(VueFullscreen)
 
 app.directive('tooltip', tooltipDirective)
