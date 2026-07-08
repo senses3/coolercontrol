@@ -77,7 +77,7 @@ defineOptions({ inheritAttrs: false })
             <SelectContent
                 position="popper"
                 :side-offset="4"
-                class="z-50 max-h-80 min-w-40 overflow-hidden rounded-lg border border-border-one bg-bg-two shadow-md"
+                class="z-[1300] max-h-80 min-w-40 overflow-hidden rounded-lg border border-border-one bg-bg-two shadow-md"
             >
                 <SelectViewport class="p-1">
                     <SelectItem
