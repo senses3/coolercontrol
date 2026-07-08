@@ -42,10 +42,10 @@ const base =
     'disabled:opacity-50 disabled:pointer-events-none'
 
 const variants: Record<Variant, string> = {
-    solid: 'bg-accent text-bg-one hover:bg-accent/80',
+    solid: 'bg-accent text-accent-fg hover:bg-accent/90',
     ghost: 'text-text-color hover:bg-surface-hover',
     outline: 'border border-border-one text-text-color hover:bg-surface-hover',
-    danger: 'bg-error text-bg-one hover:bg-error/80',
+    danger: 'bg-error text-error-fg hover:bg-error/90',
 }
 
 const sizes: Record<Size, string> = {

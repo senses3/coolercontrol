@@ -346,7 +346,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
             <UiButton
                 v-if="step === 1"
                 variant="solid"
-                class="w-40 !bg-accent/80 !text-text-color hover:!bg-accent"
+                class="w-40"
                 :disabled="selectedRows.length === 0 || starting"
                 @click="startBatch"
             >
@@ -366,12 +366,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
             >
                 {{ t('common.cancel') }}
             </UiButton>
-            <UiButton
-                v-else
-                variant="solid"
-                class="w-28 !bg-accent/80 !text-text-color hover:!bg-accent"
-                @click="closeDialog"
-            >
+            <UiButton v-else variant="solid" class="w-28" @click="closeDialog">
                 {{ t('components.wizards.calibration.close') }}
             </UiButton>
         </div>
