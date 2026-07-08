@@ -20,7 +20,7 @@
 import { onMounted, ref, type Ref } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { ErrorResponse } from '@/models/ErrorResponse'

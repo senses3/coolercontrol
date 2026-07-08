@@ -17,7 +17,7 @@
   -->
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 type Variant = 'solid' | 'ghost' | 'outline' | 'danger'
 type Size = 'sm' | 'md' | 'icon'
@@ -26,9 +26,15 @@ const props = withDefaults(
     defineProps<{
         variant?: Variant
         size?: Size
+        autofocus?: boolean
     }>(),
-    { variant: 'solid', size: 'md' },
+    { variant: 'solid', size: 'md', autofocus: false },
 )
+
+const buttonRef = ref<HTMLButtonElement | null>(null)
+onMounted(() => {
+    if (props.autofocus) buttonRef.value?.focus()
+})
 
 const base =
     'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors ' +
@@ -52,7 +58,7 @@ const classes = computed(() => [base, variants[props.variant], sizes[props.size]
 </script>
 
 <template>
-    <button :class="classes" type="button">
+    <button ref="buttonRef" :class="classes" type="button">
         <slot />
     </button>
 </template>

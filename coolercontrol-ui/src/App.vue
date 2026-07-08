@@ -27,7 +27,7 @@ import { useSettingsStore } from '@/stores/SettingsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
 import Button from 'primevue/button'
 import UiToast from '@/shell/ui/UiToast.vue'
-import ConfirmDialog from 'primevue/confirmdialog'
+import UiConfirmDialog from '@/shell/ui/UiConfirmDialog.vue'
 import Dialog from 'primevue/dialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import InputNumber from 'primevue/inputnumber'
@@ -358,32 +358,8 @@ onMounted(async () => {
     <RouterView v-if="loaded" />
     <UiToast />
     <DynamicDialog />
-    <ConfirmDialog
-        :pt="{
-            mask: {
-                style: 'backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);',
-            },
-        }"
-    >
-        <template #message="slotProps">
-            <div class="flex flex-col items-center">
-                <i
-                    v-if="slotProps.message.icon"
-                    class="text-text-color-secondary text-4xl mb-2"
-                    :class="slotProps.message.icon"
-                />
-                <p class="w-96">{{ slotProps.message.message }}</p>
-            </div>
-        </template>
-    </ConfirmDialog>
-    <ConfirmDialog
-        group="AseTek690"
-        :pt="{
-            mask: {
-                style: 'backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);',
-            },
-        }"
-    >
+    <UiConfirmDialog />
+    <UiConfirmDialog group="AseTek690">
         <template #message="slotProps">
             <div class="flex flex-col w-[34rem] gap-3 text-wrap">
                 <p>
@@ -400,7 +376,7 @@ onMounted(async () => {
                 </p>
             </div>
         </template>
-    </ConfirmDialog>
+    </UiConfirmDialog>
     <Dialog
         class="leading-loose"
         :visible="!initSuccessful"
