@@ -28,9 +28,9 @@ import {
     mdiMinusCircleOutline,
     mdiTuneVerticalVariant,
 } from '@mdi/js'
-import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
-import InputNumber from 'primevue/inputnumber'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiCheckbox from '@/shell/ui/UiCheckbox.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { computed, inject, onMounted, ref, type Ref } from 'vue'
 import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
 import { useI18n } from 'vue-i18n'
@@ -234,7 +234,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
             </div>
             <template v-else>
                 <div class="flex items-center gap-x-2 ml-1 pb-2 border-b border-border-one">
-                    <Checkbox v-model="selectAllModel" :indeterminate="partiallySelected" binary />
+                    <UiCheckbox v-model="selectAllModel" :indeterminate="partiallySelected" />
                     <span class="text-sm font-medium cursor-pointer select-none" @click="toggleAll">
                         {{ t('components.wizards.calibration.selectAll') }}
                     </span>
@@ -244,7 +244,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                     :key="row.deviceUID + row.channelName"
                     class="flex items-center gap-x-2 ml-1"
                 >
-                    <Checkbox v-model="fanRows[index].selected" binary />
+                    <UiCheckbox v-model="fanRows[index].selected" />
                     <span class="pi pi-minus" :style="{ color: row.color }" />
                     <span class="truncate">{{ row.label }}</span>
                     <span v-if="row.alreadyCalibrated" class="text-xs text-accent">
@@ -257,24 +257,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                     <span class="text-sm">
                         {{ t('components.wizards.calibration.concurrencyLabel') }}
                     </span>
-                    <InputNumber
-                        v-model="concurrency"
-                        mode="decimal"
-                        show-buttons
-                        button-layout="horizontal"
-                        :min="1"
-                        :max="fanRows.length"
-                        :step="1"
-                        :use-grouping="false"
-                        :input-style="{ width: '3rem' }"
-                    >
-                        <template #incrementicon>
-                            <span class="pi pi-plus" />
-                        </template>
-                        <template #decrementicon>
-                            <span class="pi pi-minus" />
-                        </template>
-                    </InputNumber>
+                    <UiNumberInput v-model="concurrency" :min="1" :max="fanRows.length" :step="1" />
                 </div>
                 <span class="text-xs text-text-color-secondary ml-1">
                     {{ t('components.wizards.calibration.concurrencyNote') }}
@@ -351,39 +334,46 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
 
         <!-- Footer -->
         <div class="flex flex-row justify-between mt-4">
-            <Button
+            <UiButton
                 v-if="step === 1"
-                class="w-24 bg-bg-one"
-                :label="t('common.cancel')"
+                variant="ghost"
+                class="w-24 !bg-bg-one"
                 @click="closeDialog"
-            />
+            >
+                {{ t('common.cancel') }}
+            </UiButton>
             <div v-else />
-            <Button
+            <UiButton
                 v-if="step === 1"
-                class="bg-accent/80 hover:!bg-accent w-40"
-                :label="t('components.wizards.calibration.start')"
+                variant="solid"
+                class="w-40 !bg-accent/80 !text-text-color hover:!bg-accent"
                 :disabled="selectedRows.length === 0 || starting"
                 @click="startBatch"
             >
+                {{ t('components.wizards.calibration.start') }}
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiTuneVerticalVariant"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-else-if="isActive"
-                class="w-28 bg-bg-one"
-                :label="t('common.cancel')"
+                variant="ghost"
+                class="w-28 !bg-bg-one"
                 @click="cancelBatch"
-            />
-            <Button
+            >
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton
                 v-else
-                class="bg-accent/80 hover:!bg-accent w-28"
-                :label="t('components.wizards.calibration.close')"
+                variant="solid"
+                class="w-28 !bg-accent/80 !text-text-color hover:!bg-accent"
                 @click="closeDialog"
-            />
+            >
+                {{ t('components.wizards.calibration.close') }}
+            </UiButton>
         </div>
     </div>
 </template>
