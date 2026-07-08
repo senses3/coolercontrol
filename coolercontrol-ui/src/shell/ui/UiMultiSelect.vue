@@ -78,7 +78,7 @@ const summary = computed((): string => {
             />
         </PopoverTrigger>
         <PopoverPortal>
-            <PopoverContent side="bottom" align="start" :side-offset="4" class="z-50">
+            <PopoverContent side="bottom" align="start" :side-offset="4" class="z-[1300]">
                 <UiGroupedListbox
                     v-model="listModel"
                     :groups="groups"

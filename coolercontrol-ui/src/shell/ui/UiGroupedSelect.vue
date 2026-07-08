@@ -73,7 +73,7 @@ const selectedLabel = computed((): string | undefined => {
             <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" class="shrink-0" />
         </PopoverTrigger>
         <PopoverPortal>
-            <PopoverContent side="bottom" align="start" :side-offset="4" class="z-50">
+            <PopoverContent side="bottom" align="start" :side-offset="4" class="z-[1300]">
                 <UiGroupedListbox
                     v-model="listModel"
                     :groups="groups"
