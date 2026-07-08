@@ -44,6 +44,10 @@ console.info(`
 `)
 const app = createApp(App)
 app.provide('emitter', mitt())
+// Capture whether the app opened at the root URL, before the router's initial
+// navigation rewrites the hash. App.vue applies the configured start page only
+// for a root launch, not for a direct/deep link like /#/home.
+app.provide('startedAtRoot', ['', '#', '#/'].includes(window.location.hash))
 
 app.use(createPinia())
 app.use(router)
