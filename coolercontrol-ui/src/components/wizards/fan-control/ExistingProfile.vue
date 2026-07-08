@@ -20,10 +20,10 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
-import Select from 'primevue/select'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import { UID } from '@/models/Device.ts'
 import { Profile, getProfileDisplayName } from '@/models/Profile.ts'
-import { ref, Ref } from 'vue'
+import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import { v4 as uuidV4 } from 'uuid'
@@ -60,6 +60,17 @@ const selectedProfile: Ref<Profile> = ref(
     ) ?? getProfileOptions()[0],
 )
 
+const profileSelectOptions = computed(() =>
+    getProfileOptions().map((p) => ({ label: getProfileDisplayName(p), value: p.uid })),
+)
+const selectedProfileUid = computed<string | undefined>({
+    get: () => selectedProfile.value?.uid,
+    set: (uid) => {
+        const found = getProfileOptions().find((p) => p.uid === uid)
+        if (found != null) selectedProfile.value = found
+    },
+})
+
 const saveSetting = async () => {
     const setting = new DeviceSettingWriteProfileDTO(selectedProfile.value.uid)
     await settingsStore.saveDaemonDeviceSettingProfile(props.deviceUID, props.channelName, setting)
@@ -81,23 +92,12 @@ const saveSetting = async () => {
                 <small class="ml-2 mb-1 text-sm">
                     {{ t('components.wizards.fanControl.existingProfile') }}:
                 </small>
-                <Select
-                    v-model="selectedProfile"
-                    :options="getProfileOptions()"
+                <UiSelect
+                    v-model="selectedProfileUid"
+                    :options="profileSelectOptions"
                     placeholder="Profile"
-                    class="w-full mr-4 h-11 !justify-end"
-                    checkmark
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="40rem"
-                >
-                    <template #value="{ value }">
-                        <span v-if="value">{{ getProfileDisplayName(value) }}</span>
-                        <span v-else>Profile</span>
-                    </template>
-                    <template #option="{ option }">
-                        {{ getProfileDisplayName(option) }}
-                    </template>
-                </Select>
+                    class="w-full"
+                />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
