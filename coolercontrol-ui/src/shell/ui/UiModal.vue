@@ -46,7 +46,7 @@ withDefaults(
         <DialogPortal>
             <DialogOverlay class="fixed inset-0 z-[1340] bg-black/50 backdrop-blur-[2px]" />
             <DialogContent
-                class="fixed left-1/2 top-1/2 z-[1350] max-h-[92vh] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border-one bg-bg-two p-6 shadow-xl outline-none"
+                class="fixed left-1/2 top-1/2 z-[1350] max-h-[92vh] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border-one bg-bg-two p-6 text-text-color shadow-xl outline-none"
                 :class="contentClass"
             >
                 <div class="mb-4 flex items-start justify-between gap-4">
