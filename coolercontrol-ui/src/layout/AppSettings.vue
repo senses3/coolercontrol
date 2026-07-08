@@ -19,7 +19,14 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiCheck, mdiContentCopy, mdiExport, mdiImport, mdiRestart } from '@mdi/js'
+import {
+    mdiAlertOutline,
+    mdiCheck,
+    mdiContentCopy,
+    mdiExport,
+    mdiImport,
+    mdiRestart,
+} from '@mdi/js'
 import { computed, inject, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -254,7 +261,7 @@ const applyGenericDaemonChange = _.debounce(
         confirm.require({
             message: t('layout.settings.applySettingAndRestart'),
             header: t('layout.settings.restartHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             acceptLabel: t('common.yes'),
             rejectLabel: t('common.no'),

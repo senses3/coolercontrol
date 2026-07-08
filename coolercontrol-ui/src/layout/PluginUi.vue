@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiLinkVariant } from '@mdi/js'
+import { mdiContentCopy, mdiLinkVariant } from '@mdi/js'
 import { inject, Ref } from 'vue'
 import type { DynamicDialogInstance } from '@/shell/dialog'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -127,8 +127,11 @@ const fallbackCopy = (text: string): void => {
                             <code class="ml-1 select-all"
                                 >journalctl -f -u cc-plugin-{{ plugin.id }}</code
                             >
-                            <i
-                                class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiContentCopy"
+                                :size="14"
+                                class="cursor-pointer opacity-60 hover:opacity-100"
                                 @click="copyCommand(`journalctl -f -u cc-plugin-${plugin.id}`)"
                             />
                         </div>
@@ -137,8 +140,11 @@ const fallbackCopy = (text: string): void => {
                             <code class="ml-1 select-all"
                                 >grep cc-plugin-{{ plugin.id }} /var/log/messages</code
                             >
-                            <i
-                                class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiContentCopy"
+                                :size="14"
+                                class="cursor-pointer opacity-60 hover:opacity-100"
                                 @click="
                                     copyCommand(`grep cc-plugin-${plugin.id} /var/log/messages`)
                                 "

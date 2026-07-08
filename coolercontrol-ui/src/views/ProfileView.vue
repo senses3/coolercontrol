@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
+    mdiAlertOutline,
     mdiArrowTopRightBottomLeft,
     mdiContentDuplicate,
     mdiContentSaveOutline,
@@ -1941,7 +1942,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.profiles.unsavedChanges'),
             header: t('views.profiles.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),
@@ -2005,7 +2006,7 @@ const deleteProfile = (): void => {
     confirm.require({
         message: deleteMessage,
         header: t('views.profiles.deleteProfile'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: async () => {
             contextIsDirty.value = false
             await settingsStore.deleteProfile(currentProfile.value.uid)

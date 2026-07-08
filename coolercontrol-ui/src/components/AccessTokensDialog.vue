@@ -27,7 +27,7 @@ import { ErrorResponse } from '@/models/ErrorResponse'
 import type { AccessTokenInfo, CreateTokenResponse } from '@/models/AccessToken'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiClose, mdiContentCopy, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
+import { mdiAlertOutline, mdiClose, mdiContentCopy, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
@@ -92,7 +92,7 @@ async function deleteToken(tokenId: string): Promise<void> {
     confirm.require({
         message: t('auth.tokenDeleteConfirm'),
         header: t('auth.tokenDeleteHeader'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         acceptClass: '!bg-red-500 hover:!bg-red-600',
         accept: async () => {
             const result = await deviceStore.daemonClient.deleteToken(tokenId)

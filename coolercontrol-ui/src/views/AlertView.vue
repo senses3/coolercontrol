@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiContentSaveOutline, mdiTrashCanOutline } from '@mdi/js'
+import { mdiAlertOutline, mdiContentSaveOutline, mdiTrashCanOutline } from '@mdi/js'
 import { computed, onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -205,7 +205,7 @@ const deleteAlert = (): void => {
     confirm.require({
         message: t('views.alerts.deleteAlertConfirm', { name: alert.name }),
         header: t('views.alerts.deleteAlert'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: async () => {
             const successful = await settingsStore.deleteAlert(alert.uid)
             if (successful) {
@@ -349,7 +349,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.alerts.unsavedChanges'),
             header: t('views.alerts.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),

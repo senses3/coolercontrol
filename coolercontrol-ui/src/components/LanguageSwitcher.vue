@@ -30,6 +30,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { mdiTranslate } from '@mdi/js'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
@@ -80,7 +81,7 @@ function changeLocale(value: string | undefined) {
     confirm.require({
         message: t('layout.settings.languageChangeConfirmMessage'),
         header: t('layout.settings.languageChangeConfirm'),
-        icon: 'pi pi-language',
+        icon: mdiTranslate,
         acceptLabel: t('common.ok'),
         rejectLabel: t('common.cancel'),
         accept: () => {

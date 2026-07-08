@@ -36,6 +36,7 @@ import { ChannelInfo } from '@/models/ChannelInfo.ts'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
+    mdiAlertOutline,
     mdiContentCopy,
     mdiHome,
     mdiHomeOutline,
@@ -165,7 +166,7 @@ const deleteDashboard = (): void => {
     confirm.require({
         message: t('views.dashboard.deleteDashboardConfirm', { name: dashboard.name }),
         header: t('views.dashboard.deleteDashboard'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: () => {
             const index = settingsStore.dashboards.findIndex((d) => d.uid === dashboard.uid)
             if (index === -1) return

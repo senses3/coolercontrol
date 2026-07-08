@@ -24,6 +24,7 @@ import {
     mdiAutoFix,
     mdiContentSaveOutline,
     mdiInformationSlabCircleOutline,
+    mdiMinus,
 } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
@@ -440,7 +441,13 @@ const createAndApply = async (): Promise<void> => {
                 class="flex items-center justify-between gap-x-3"
             >
                 <div class="flex items-center min-w-0">
-                    <span class="pi pi-minus mr-2 ml-1" :style="{ color: row.color }" />
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiMinus"
+                        :size="16"
+                        class="mr-2 ml-1"
+                        :style="{ color: row.color }"
+                    />
                     <span class="truncate">{{ row.label }}</span>
                 </div>
                 <UiSelect

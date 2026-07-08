@@ -19,7 +19,15 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiArrowLeft, mdiInformationSlabCircleOutline } from '@mdi/js'
+import {
+    mdiArrowExpand,
+    mdiArrowLeft,
+    mdiInformationSlabCircleOutline,
+    mdiMinus,
+    mdiPlus,
+    mdiPlusCircleOutline,
+    mdiTrashCanOutline,
+} from '@mdi/js'
 import {
     Function,
     FunctionType,
@@ -1625,9 +1633,7 @@ const nextStep = () => {
                         v-tooltip.top="t('views.profiles.moveTable')"
                         @click="cycleTablePosition"
                     >
-                        <span
-                            class="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                        />
+                        <svg-icon type="mdi" :path="mdiArrowExpand" :size="16" class="rotate-90" />
                     </UiButton>
                 </div>
                 <table class="w-full">
@@ -1681,7 +1687,7 @@ const nextStep = () => {
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
                                     >
-                                        <span class="pi pi-minus text-[0.6rem]" />
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
                                     </UiButton>
                                     <input
                                         type="number"
@@ -1714,7 +1720,7 @@ const nextStep = () => {
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
                                     >
-                                        <span class="pi pi-plus text-[0.6rem]" />
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
                                     </UiButton>
                                 </div>
                             </td>
@@ -1740,7 +1746,7 @@ const nextStep = () => {
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
                                     >
-                                        <span class="pi pi-minus text-[0.6rem]" />
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
                                     </UiButton>
                                     <input
                                         type="number"
@@ -1771,7 +1777,7 @@ const nextStep = () => {
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
                                     >
-                                        <span class="pi pi-plus text-[0.6rem]" />
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
                                     </UiButton>
                                 </div>
                             </td>
@@ -1787,7 +1793,11 @@ const nextStep = () => {
                                         v-tooltip.top="t('views.profiles.addPointAfter')"
                                         @click.stop="addPointFromTable(idx)"
                                     >
-                                        <span class="pi pi-plus-circle" />
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiPlusCircleOutline"
+                                            :size="16"
+                                        />
                                     </UiButton>
                                     <UiButton
                                         v-if="canRemovePoint(idx)"
@@ -1797,7 +1807,11 @@ const nextStep = () => {
                                         v-tooltip.top="t('views.profiles.removePoint')"
                                         @click.stop="removePointFromTable(idx)"
                                     >
-                                        <span class="pi pi-trash" />
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiTrashCanOutline"
+                                            :size="16"
+                                        />
                                     </UiButton>
                                 </div>
                             </td>

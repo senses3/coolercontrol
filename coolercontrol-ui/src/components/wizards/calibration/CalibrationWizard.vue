@@ -25,6 +25,7 @@ import {
     mdiCircleOutline,
     mdiInformationSlabCircleOutline,
     mdiLoading,
+    mdiMinus,
     mdiMinusCircleOutline,
     mdiTuneVerticalVariant,
 } from '@mdi/js'
@@ -245,7 +246,12 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                     class="flex items-center gap-x-2 ml-1"
                 >
                     <UiCheckbox v-model="fanRows[index].selected" />
-                    <span class="pi pi-minus" :style="{ color: row.color }" />
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiMinus"
+                        :size="16"
+                        :style="{ color: row.color }"
+                    />
                     <span class="truncate">{{ row.label }}</span>
                     <span v-if="row.alreadyCalibrated" class="text-xs text-accent">
                         {{ t('components.wizards.calibration.calibratedBadge') }}

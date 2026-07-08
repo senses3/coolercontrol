@@ -21,7 +21,7 @@ import { inject, nextTick, ref, watch, type Ref } from 'vue'
 import type { DynamicDialogInstance } from '@/shell/dialog'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiContentCopy } from '@mdi/js'
+import { mdiCloseCircle, mdiContentCopy } from '@mdi/js'
 import UiPasswordInput from '@/shell/ui/UiPasswordInput.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import { useI18n } from 'vue-i18n'
@@ -206,9 +206,12 @@ nextTick(async () => {
                 />
             </div>
             <div class="min-h-[1.2rem] flex items-center gap-1 mb-16">
-                <i
+                <svg-icon
                     v-if="currentPasswdTouched && passwordIsInvalid(currentPasswdInput)"
-                    class="pi pi-times-circle text-red text-xs"
+                    type="mdi"
+                    :path="mdiCloseCircle"
+                    :size="12"
+                    class="text-red"
                 />
             </div>
         </template>
@@ -233,9 +236,12 @@ nextTick(async () => {
                 />
             </div>
             <div class="min-h-[1.2rem] flex items-center gap-1">
-                <i
+                <svg-icon
                     v-if="passwdTouched && passwordIsInvalid(passwdInput)"
-                    class="pi pi-times-circle text-red text-xs"
+                    type="mdi"
+                    :path="mdiCloseCircle"
+                    :size="12"
+                    class="text-red"
                 />
             </div>
 
@@ -261,10 +267,10 @@ nextTick(async () => {
             <div v-if="setPasswd" class="min-h-[1.2rem] flex items-center gap-1 mb-16">
                 <template v-if="confirmPasswdTouched">
                     <template v-if="passwordIsInvalid(confirmPasswdInput)">
-                        <i class="pi pi-times-circle text-red text-xs" />
+                        <svg-icon type="mdi" :path="mdiCloseCircle" :size="12" class="text-red" />
                     </template>
                     <template v-else-if="passwordsMismatch()">
-                        <i class="pi pi-times-circle text-red text-xs" />
+                        <svg-icon type="mdi" :path="mdiCloseCircle" :size="12" class="text-red" />
                         <span class="text-red text-xs">{{
                             t('components.password.passwordMismatch')
                         }}</span>

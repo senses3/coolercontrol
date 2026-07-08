@@ -39,6 +39,7 @@
 
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
+import { mdiRefresh } from '@mdi/js'
 import { useConfirm } from '@/shell/confirm'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore'
@@ -200,7 +201,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
         confirm.require({
             header: t('components.channelExtensionSettings.calibration.reloadHeader'),
             message: composePromptMessage(entries),
-            icon: 'pi pi-refresh',
+            icon: mdiRefresh,
             defaultFocus: 'reject',
             acceptLabel: t('components.channelExtensionSettings.calibration.reloadAccept'),
             rejectLabel: t('components.channelExtensionSettings.calibration.reloadReject'),
@@ -503,7 +504,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
         confirm.require({
             header: t('components.channelExtensionSettings.calibration.reloadHeader'),
             message: t('components.wizards.calibration.reloadBatch', { count: calibrated }),
-            icon: 'pi pi-refresh',
+            icon: mdiRefresh,
             defaultFocus: 'reject',
             acceptLabel: t('components.channelExtensionSettings.calibration.reloadAccept'),
             rejectLabel: t('components.channelExtensionSettings.calibration.reloadReject'),

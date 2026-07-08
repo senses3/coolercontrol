@@ -22,6 +22,7 @@
 import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
+import { mdiAlertOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 
 export function useSystemActions() {
@@ -34,7 +35,7 @@ export function useSystemActions() {
         confirm.require({
             message: t('layout.topbar.restartConfirmMessage'),
             header: t('layout.topbar.restartConfirmHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             accept: async () => {
                 const successful = await deviceStore.daemonClient.shutdownDaemon()

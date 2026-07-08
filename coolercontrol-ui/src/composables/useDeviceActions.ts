@@ -24,6 +24,7 @@
 import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
+import { mdiAlertOutline } from '@mdi/js'
 import type { UID } from '@/models/Device.ts'
 import { CCChannelSettings, CoolerControlDeviceSettingsDTO } from '@/models/CCSettings.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
@@ -65,7 +66,7 @@ export function useDeviceActions() {
         confirm.require({
             header: t('layout.settings.restartHeader'),
             message: t('layout.settings.applySettingAndRestart'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             acceptLabel: t('common.yes'),
             rejectLabel: t('common.no'),
@@ -95,7 +96,7 @@ export function useDeviceActions() {
         confirm.require({
             header: t('components.deviceExtensionSettings.disableDevice'),
             message: t('components.deviceExtensionSettings.disableInfo'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             acceptLabel: t('common.yes'),
             rejectLabel: t('common.no'),
@@ -145,7 +146,7 @@ export function useDeviceActions() {
         confirm.require({
             message: t('layout.settings.devices.toggleRequiresRestart'),
             header: t('layout.settings.devices.enableDevices'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             accept: async () => {
                 const ccSetting = settingsStore.ccDeviceSettings.get(deviceUID)
                 if (ccSetting == null) {
