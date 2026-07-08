@@ -186,6 +186,7 @@ const updateSymmetricStepSize = () => {
             <div class="mt-0 flex flex-col">
                 <UiInput
                     v-model="nameInput"
+                    autofocus
                     :placeholder="t('common.name')"
                     class="w-full"
                     :class="{ '!border-error': nameInvalid }"
