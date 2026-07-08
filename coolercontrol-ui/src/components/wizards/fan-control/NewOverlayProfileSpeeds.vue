@@ -717,8 +717,8 @@ type TablePosition = 'top-left' | 'bottom-right'
 const tablePosition: Ref<TablePosition> = ref('top-left')
 
 const tablePositionClasses = computed(() => ({
-    'top-14 left-[7.5rem]': tablePosition.value === 'top-left',
-    'bottom-20 right-[4.5rem]': tablePosition.value === 'bottom-right',
+    'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',
+    'bottom-[6rem] right-[5.5rem]': tablePosition.value === 'bottom-right',
 }))
 
 const cycleTablePosition = () => {
