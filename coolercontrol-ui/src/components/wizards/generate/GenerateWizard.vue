@@ -678,7 +678,7 @@ const createAndApply = async (): Promise<void> => {
             <UiButton
                 v-else-if="step === 3"
                 variant="solid"
-                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
+                class="w-32"
                 :disabled="assignedCount() === 0 || building"
                 @click="buildPreview"
             >
@@ -692,7 +692,7 @@ const createAndApply = async (): Promise<void> => {
             <UiButton
                 v-else
                 variant="solid"
-                class="w-40 !bg-accent/80 !text-text-color hover:!bg-accent"
+                class="w-40"
                 :disabled="applying"
                 @click="createAndApply"
             >

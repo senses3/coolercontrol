@@ -19,7 +19,7 @@
 // Daemon restart with confirm + toast, ported from the old top bar. Bridged
 // here so the shell rail stays free of direct PrimeVue imports.
 
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'

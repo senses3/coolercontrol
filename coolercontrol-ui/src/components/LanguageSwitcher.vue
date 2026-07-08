@@ -31,7 +31,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UiSelect from '@/shell/ui/UiSelect.vue'
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
 
 const { locale, t } = useI18n()

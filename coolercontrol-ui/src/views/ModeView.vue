@@ -39,7 +39,7 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import UiTable from '@/shell/ui/UiTable.vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 

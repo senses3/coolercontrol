@@ -21,7 +21,7 @@
 // settings Device tab. Lives here so the shell's DevicePage stays free of
 // direct PrimeVue imports (dependency discipline).
 
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'

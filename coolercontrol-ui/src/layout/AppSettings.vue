@@ -23,7 +23,7 @@ import { mdiCheck, mdiContentCopy, mdiExport, mdiImport, mdiRestart } from '@mdi
 import { computed, inject, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import { useRoute } from 'vue-router'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import UiSelect from '@/shell/ui/UiSelect.vue'

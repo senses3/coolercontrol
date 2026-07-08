@@ -30,6 +30,11 @@ module.exports = {
                     colors: {
                         // dark-theme copy
                         accent: '#568af2',
+                        // Contrast foreground for filled accent/error surfaces. These
+                        // placeholders cover the pre-JS flash; ThemeColorsStore recomputes
+                        // --colors-accent-fg / --colors-error-fg per theme at runtime.
+                        'accent-fg': '#1b1e23',
+                        'error-fg': '#f5f6f9',
                         'bg-one': '#1b1e23',
                         'bg-two': '#2c313c',
                         'border-one': '#8a95aa40',

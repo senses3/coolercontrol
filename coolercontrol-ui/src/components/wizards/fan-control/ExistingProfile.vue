@@ -109,12 +109,7 @@ const saveSetting = async () => {
                     :size="deviceStore.getREMSize(1.5)"
                 />
             </UiButton>
-            <UiButton
-                variant="solid"
-                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
-                v-tooltip.top="'Apply'"
-                @click="saveSetting"
-            >
+            <UiButton variant="solid" class="w-32" v-tooltip.top="'Apply'" @click="saveSetting">
                 <svg-icon
                     class="outline-0"
                     type="mdi"

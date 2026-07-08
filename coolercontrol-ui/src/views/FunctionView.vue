@@ -34,7 +34,7 @@ import {
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiListbox from '@/shell/ui/UiListbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'

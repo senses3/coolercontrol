@@ -108,7 +108,7 @@ const saveFunction = async (): Promise<void> => {
             </UiButton>
             <UiButton
                 variant="solid"
-                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
+                class="w-32"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="saveFunction"
             >
