@@ -1112,16 +1112,31 @@ export default {
         onboarding: {
             welcome: 'Welcome to CoolerControl!',
             gettingStartedIntro:
-                'Pick a tour to get oriented. The Quick Tour covers the essentials in a few steps. The Thorough Tour walks through every menu and button.',
+                'Take a quick tour to get oriented. It walks through the navigation rail and the main areas of the app.',
             startTourAgain: 'You can start this tour again at any time from the Info & Tools page.',
             quickTour: 'Quick Tour',
             thoroughTour: 'Thorough Tour',
+            startTour: 'Start Tour',
             maybeLater: 'Maybe Later',
             openGettingStarted: 'Open Getting Started Docs',
             finishLater: "I'll Do It Myself",
             appInfo: 'Info & Tools',
             appInfoDesc:
                 'View app info, daemon status, logs, helpful links, and stress test tools. A badge on the logo alerts you to any issues.',
+            home: 'Home',
+            homeDesc:
+                'Your landing page: daemon status and device health at a glance, plus logs, app info, helpful links, and stress-test tools.',
+            cooling: 'Cooling',
+            coolingDesc:
+                'Your fan control hub: adjust fan speeds and pumps, and apply Profiles and Functions to any channel.',
+            monitoring: 'Monitoring',
+            monitoringDesc:
+                'Build Dashboards, watch every sensor, and set up Alerts to track your system in real time.',
+            devices: 'Devices',
+            devicesDesc:
+                'Review detected hardware, configure per-device features like RGB lighting and LCD screens, and create Custom Sensors.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Browse and open installed plugins that extend CoolerControl.',
             controls: 'Controls',
             controlsDesc:
                 'Adjust fan speeds, apply Profiles, and manage every detected channel from one place.',
@@ -1139,7 +1154,7 @@ export default {
                 'Dashboards let you create custom views with charts and graphs to monitor temperatures, fan speeds, and other sensor data in real time.',
             modes: 'Modes',
             modesDesc:
-                'Modes are saved collections of your settings. Switch between configurations like Silent and Performance with a single click.',
+                'Modes are saved collections of your settings. Switch between configurations like Silent and Performance, or manage them, right here.',
             alerts: 'Alerts',
             alertsDesc:
                 'Alerts notify you when sensor values exceed the thresholds you choose, so you can react before issues become problems.',
@@ -1161,7 +1176,8 @@ export default {
             settings: 'Settings',
             settingsDesc: 'Configure UI preferences, daemon options, and system behavior.',
             access: 'Access',
-            accessDesc: 'Manage your password and confirm your current access level.',
+            accessDesc:
+                'Log in or out and change your password, and manage Access Tokens that grant tools and plugins API access.',
             restartMenu: 'Restart Menu',
             restartMenuDesc: 'Reload the UI or restart the system daemon when needed.',
             collapseMenu: 'Collapse Menu',
