@@ -17,6 +17,8 @@
   -->
 
 <script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { currentConfirm } from '@/shell/confirm'
@@ -57,10 +59,12 @@ const open = computed<boolean>({
     <UiModal v-if="active" v-model:open="open" :title="active.header" content-class="min-w-80">
         <slot name="message" :message="active">
             <div class="flex flex-col items-center">
-                <i
+                <svg-icon
                     v-if="active.icon"
-                    class="mb-2 text-4xl text-text-color-secondary"
-                    :class="active.icon"
+                    type="mdi"
+                    :path="active.icon"
+                    :size="36"
+                    class="mb-2 text-text-color-secondary"
                 />
                 <p class="max-w-96 whitespace-pre-line text-center">{{ active.message }}</p>
             </div>

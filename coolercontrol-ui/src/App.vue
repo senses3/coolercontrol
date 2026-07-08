@@ -27,7 +27,7 @@ import { useSettingsStore } from '@/stores/SettingsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiRefresh } from '@mdi/js'
+import { mdiClose, mdiOpenInNew, mdiRefresh } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
@@ -529,8 +529,10 @@ onMounted(async () => {
                             <div class="relative max-w-2xl">
                                 <button
                                     @click="skipTour"
-                                    class="absolute right-0 top-0 text-text-color-secondary font-medium text-base pi pi-times outline-0"
-                                />
+                                    class="absolute right-0 top-0 text-text-color-secondary font-medium outline-0"
+                                >
+                                    <svg-icon type="mdi" :path="mdiClose" :size="16" />
+                                </button>
                                 <h3 class="text-2xl leading-6 text-text-color">
                                     {{ t('components.onboarding.welcome') }}
                                 </h3>
@@ -575,7 +577,12 @@ onMounted(async () => {
                                         :href="GETTING_STARTED_URL"
                                         class="text-accent outline-0"
                                     >
-                                        <span class="pi pi-external-link mr-2" />
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiOpenInNew"
+                                            :size="16"
+                                            class="mr-2"
+                                        />
                                         {{ t('views.appInfo.gettingStarted') }}
                                     </a>
                                     <a
@@ -583,7 +590,12 @@ onMounted(async () => {
                                         href="https://docs.coolercontrol.org/hardware-support.html"
                                         class="text-accent outline-0"
                                     >
-                                        <span class="pi pi-external-link mr-2" />
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiOpenInNew"
+                                            :size="16"
+                                            class="mr-2"
+                                        />
                                         {{ t('views.appInfo.hardwareSupport') }}
                                     </a>
                                 </div>
@@ -620,8 +632,10 @@ onMounted(async () => {
                             <div class="relative max-w-xl">
                                 <button
                                     @click="skipTour"
-                                    class="absolute right-0 top-0 text-text-color-secondary font-medium text-base pi pi-times outline-0"
-                                />
+                                    class="absolute right-0 top-0 text-text-color-secondary font-medium outline-0"
+                                >
+                                    <svg-icon type="mdi" :path="mdiClose" :size="16" />
+                                </button>
                                 <h3 class="text-2xl leading-6 text-text-color">
                                     {{ t('components.onboarding.thatsIt') }}
                                 </h3>
@@ -634,7 +648,12 @@ onMounted(async () => {
                                         type="button"
                                         class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent/80 hover:!bg-accent px-4 py-2 font-medium text-text-color shadow-sm focus:outline-none"
                                     >
-                                        <span class="pi pi-external-link mr-2" />
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiOpenInNew"
+                                            :size="16"
+                                            class="mr-2"
+                                        />
                                         {{ t('components.onboarding.openGettingStarted') }}
                                     </button>
                                     <button
@@ -669,8 +688,10 @@ onMounted(async () => {
                                 >
                                     <button
                                         @click="skipTour"
-                                        class="absolute right-0 bottom-full mb-[-1.0rem] text-text-color-secondary font-medium text-base pi pi-times outline-0"
-                                    />
+                                        class="absolute right-0 bottom-full mb-[-1.0rem] text-text-color-secondary font-medium outline-0"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiClose" :size="16" />
+                                    </button>
                                     <template v-if="!isFirst">
                                         <button
                                             @click="previous"

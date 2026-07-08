@@ -22,7 +22,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiCircle } from '@mdi/js'
+import { mdiAlertOutline, mdiCircle } from '@mdi/js'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -108,7 +108,7 @@ const confirmOrRun = (action: () => void, starting: 'cpu' | 'gpu' | 'ram' | 'dri
         confirm.require({
             message: t('views.appInfo.psuWarningMessage'),
             header: t('views.appInfo.psuWarningHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'reject',
             rejectLabel: t('common.cancel'),
             acceptLabel: t('views.appInfo.proceed'),

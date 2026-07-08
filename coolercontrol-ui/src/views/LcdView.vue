@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
+    mdiAlertOutline,
     mdiContentSaveOutline,
     mdiFileImageOutline,
     mdiImageMultipleOutline,
@@ -433,7 +434,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.lcd.unsavedChanges'),
             header: t('views.lcd.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),

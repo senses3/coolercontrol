@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
+    mdiAlertOutline,
     mdiBookmarkCheckOutline,
     mdiContentDuplicate,
     mdiDeleteOutline,
@@ -200,7 +201,7 @@ const updateModeWithCurrentSettings = (): void => {
     confirm.require({
         message: t('views.modes.updateModeConfirm', { name: currentMode.value.name }),
         header: t('views.modes.editMode'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: async () => {
             await settingsStore.updateModeSettings(currentMode.value.uid)
         },
@@ -218,7 +219,7 @@ const deleteMode = (): void => {
     confirm.require({
         message: t('views.modes.deleteModeConfirm', { name: currentMode.value.name }),
         header: t('views.modes.deleteMode'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: async () => {
             await settingsStore.deleteMode(currentMode.value.uid)
             await router.push({ name: 'cooling-modes' })

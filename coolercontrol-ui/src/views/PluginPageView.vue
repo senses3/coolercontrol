@@ -20,8 +20,10 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
+    mdiContentCopy,
     mdiInformationOutline,
     mdiLinkVariant,
+    mdiLoading,
     mdiPlay,
     mdiPowerPlugOutline,
     mdiRestart,
@@ -253,7 +255,12 @@ onUnmounted(() => {
 
 <template>
     <div v-if="loading" class="flex items-center justify-center w-full h-full">
-        <i class="pi pi-spin pi-spinner text-4xl text-text-color-secondary" />
+        <svg-icon
+            type="mdi"
+            :path="mdiLoading"
+            :size="36"
+            class="animate-spin text-text-color-secondary"
+        />
     </div>
     <div v-else-if="plugin == null" class="flex items-center justify-center w-full h-full">
         <span class="text-text-color-secondary text-lg">{{ t('layout.plugins.notFound') }}</span>
@@ -419,8 +426,11 @@ onUnmounted(() => {
                                     <code class="ml-1 select-all"
                                         >journalctl -f -u cc-plugin-{{ plugin.id }}</code
                                     >
-                                    <i
-                                        class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiContentCopy"
+                                        :size="14"
+                                        class="cursor-pointer opacity-60 hover:opacity-100"
                                         @click="
                                             copyCommand(`journalctl -f -u cc-plugin-${plugin.id}`)
                                         "
@@ -431,8 +441,11 @@ onUnmounted(() => {
                                     <code class="ml-1 select-all"
                                         >grep cc-plugin-{{ plugin.id }} /var/log/messages</code
                                     >
-                                    <i
-                                        class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiContentCopy"
+                                        :size="14"
+                                        class="cursor-pointer opacity-60 hover:opacity-100"
                                         @click="
                                             copyCommand(
                                                 `grep cc-plugin-${plugin.id} /var/log/messages`,

@@ -17,6 +17,7 @@
  */
 
 import { onMounted, onUnmounted, ref } from 'vue'
+import { mdiAlertOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useToast } from '@/shell/toast'
@@ -93,7 +94,7 @@ export function usePluginIframe(pluginId: string, mode: PluginIframeMode) {
         confirm.require({
             message: t('layout.topbar.restartConfirmMessage'),
             header: t('layout.topbar.restartConfirmHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             accept: async () => {
                 const successful = await deviceStore.daemonClient.shutdownDaemon()

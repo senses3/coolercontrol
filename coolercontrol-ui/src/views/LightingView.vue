@@ -26,7 +26,7 @@ import { DeviceSettingReadDTO, DeviceSettingWriteLightingDTO } from '@/models/Da
 import { LightingMode, LightingModeType } from '@/models/LightingMode'
 import { computed, inject, nextTick, onMounted, ref, type Ref, watch } from 'vue'
 import CCColorPicker from '@/components/CCColorPicker.vue'
-import { mdiContentSaveOutline } from '@mdi/js'
+import { mdiAlertOutline, mdiContentSaveOutline } from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
@@ -245,7 +245,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: 'There are unsaved changes made to these Lighting Settings.',
             header: 'Unsaved Changes',
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: 'Stay',
             acceptLabel: 'Discard',

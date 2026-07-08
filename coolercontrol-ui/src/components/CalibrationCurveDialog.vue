@@ -17,6 +17,9 @@
   -->
 
 <script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiUndo } from '@mdi/js'
 import * as echarts from 'echarts/core'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { LineChart } from 'echarts/charts'
@@ -518,7 +521,7 @@ const chartOption = (cal: Calibration) => {
                         :aria-label="t('components.calibrationCurve.kickDurationReset')"
                         @click="durationOverride = null"
                     >
-                        <i class="pi pi-undo" />
+                        <svg-icon type="mdi" :path="mdiUndo" :size="16" />
                     </UiButton>
                 </div>
                 <div class="flex items-center gap-3">

@@ -26,6 +26,7 @@ import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watc
 import { $enum } from 'ts-enum-util'
 import { useToast } from '@/shell/toast'
 import {
+    mdiAlertOutline,
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiDeleteOutline,
@@ -327,7 +328,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.functions.unsavedChanges'),
             header: t('views.functions.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),
@@ -380,7 +381,7 @@ const deleteFunction = (): void => {
     confirm.require({
         message: deleteMessage,
         header: t('views.functions.deleteFunction'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: async () => {
             contextIsDirty.value = false
             const functionIndex = settingsStore.functions.findIndex(

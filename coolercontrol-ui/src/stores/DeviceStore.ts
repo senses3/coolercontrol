@@ -17,6 +17,7 @@
  */
 
 import { defineStore } from 'pinia'
+import { mdiAlertOutline } from '@mdi/js'
 import { appendLogChunk, type LogLine } from '@/stores/logLines.ts'
 import { Device, DeviceType, type UID } from '@/models/Device'
 import DaemonClient from '@/stores/DaemonClient'
@@ -693,7 +694,7 @@ export const useDeviceStore = defineStore('device', () => {
                         group: 'AseTek690',
                         message: `${device.type_index}`,
                         header: t('device_store.asetek.header'),
-                        icon: 'pi pi-exclamation-triangle',
+                        icon: mdiAlertOutline,
                         acceptLabel: t('components.aseTek690.acceptLabel'),
                         rejectLabel: t('components.aseTek690.rejectLabel'),
                         accept: async () => {

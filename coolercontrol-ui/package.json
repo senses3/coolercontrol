@@ -27,7 +27,6 @@
         "lodash.debounce": "^4.0.8",
         "mitt": "^3.0.1",
         "pinia": "^3.0.4",
-        "primeicons": "^7.0.0",
         "reflect-metadata": "^0.2.2",
         "reka-ui": "^2.10.1",
         "ts-enum-util": "^4.1.0",

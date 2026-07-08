@@ -21,6 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiAlertCircle,
+    mdiAlertOutline,
     mdiContentSaveOutline,
     mdiFolderSearchOutline,
     mdiMinusThick,
@@ -459,7 +460,7 @@ const deleteSensor = (): void => {
     confirm.require({
         message: t('views.customSensors.deleteCustomSensorConfirm', { name: currentName.value }),
         header: t('views.customSensors.deleteCustomSensor'),
-        icon: 'pi pi-exclamation-triangle',
+        icon: mdiAlertOutline,
         accept: async () => {
             contextIsDirty.value = false
             await settingsStore.deleteCustomSensor(customSensorsDeviceUID, customSensor.id)
@@ -577,7 +578,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.customSensors.unsavedChanges'),
             header: t('views.customSensors.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),

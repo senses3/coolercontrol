@@ -29,8 +29,8 @@ const shellFiles = import.meta.glob('../**/*.{ts,vue}', {
 
 const FORBIDDEN = ['primevue', 'element-plus', '@vue-flow', 'radix-vue', '@/presets']
 
-// element-plus, radix-vue and primevue were fully removed (kit-chrome complete);
-// nothing anywhere may reimport them.
+// element-plus, radix-vue, primevue and primeicons were fully removed (kit-chrome
+// complete; icons are @mdi/js only); nothing anywhere may reimport them.
 const allSrcFiles = import.meta.glob('../../**/*.{ts,vue}', {
     query: '?raw',
     import: 'default',
@@ -55,7 +55,7 @@ describe('shell dependency discipline', () => {
         const offenders: string[] = []
         for (const [path, source] of Object.entries(allSrcFiles)) {
             if (path.includes('__tests__')) continue
-            for (const dep of ['element-plus', 'radix-vue', 'primevue']) {
+            for (const dep of ['element-plus', 'radix-vue', 'primevue', 'primeicons']) {
                 if (source.includes(`from '${dep}'`) || source.includes(`'${dep}/`)) {
                     offenders.push(`${path} imports ${dep}`)
                 }
