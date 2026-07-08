@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiCheck, mdiUnfoldMoreHorizontal } from '@mdi/js'
+import { mdiCheck, mdiClose, mdiUnfoldMoreHorizontal } from '@mdi/js'
 import { computed } from 'vue'
 import {
     SelectContent,
@@ -46,8 +46,9 @@ const props = withDefaults(
         placeholder?: string
         disabled?: boolean
         invalid?: boolean
+        clearable?: boolean
     }>(),
-    { placeholder: '', disabled: false, invalid: false },
+    { placeholder: '', disabled: false, invalid: false, clearable: false },
 )
 
 // Render the selected label directly instead of relying on SelectValue
@@ -71,7 +72,18 @@ defineOptions({ inheritAttrs: false })
                 <span v-if="selectedLabel">{{ selectedLabel }}</span>
                 <span v-else class="text-text-color-secondary">{{ placeholder }}</span>
             </SelectValue>
-            <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" />
+            <span class="flex shrink-0 items-center gap-1">
+                <span
+                    v-if="clearable && model != null && model !== ''"
+                    role="button"
+                    aria-label="clear"
+                    class="cursor-pointer rounded text-text-color-secondary hover:text-text-color"
+                    @pointerdown.stop.prevent="model = undefined"
+                >
+                    <svg-icon type="mdi" :path="mdiClose" :size="14" />
+                </span>
+                <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" />
+            </span>
         </SelectTrigger>
         <SelectPortal>
             <SelectContent

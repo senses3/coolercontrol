@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiUnfoldMoreHorizontal } from '@mdi/js'
+import { mdiClose, mdiUnfoldMoreHorizontal } from '@mdi/js'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { computed, ref } from 'vue'
 import UiGroupedListbox, { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
@@ -34,8 +34,16 @@ const props = withDefaults(
         filterPlaceholder?: string
         invalid?: boolean
         disabled?: boolean
+        clearable?: boolean
     }>(),
-    { placeholder: '', filter: false, filterPlaceholder: '', invalid: false, disabled: false },
+    {
+        placeholder: '',
+        filter: false,
+        filterPlaceholder: '',
+        invalid: false,
+        disabled: false,
+        clearable: false,
+    },
 )
 
 defineOptions({ inheritAttrs: false })
@@ -70,7 +78,18 @@ const selectedLabel = computed((): string | undefined => {
         >
             <span v-if="selectedLabel" class="truncate text-text-color">{{ selectedLabel }}</span>
             <span v-else class="truncate text-text-color-secondary">{{ placeholder }}</span>
-            <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" class="shrink-0" />
+            <span class="flex shrink-0 items-center gap-1">
+                <span
+                    v-if="clearable && model != null && model !== ''"
+                    role="button"
+                    aria-label="clear"
+                    class="cursor-pointer rounded text-text-color-secondary hover:text-text-color"
+                    @pointerdown.stop.prevent="model = undefined"
+                >
+                    <svg-icon type="mdi" :path="mdiClose" :size="14" />
+                </span>
+                <svg-icon type="mdi" :path="mdiUnfoldMoreHorizontal" :size="16" />
+            </span>
         </PopoverTrigger>
         <PopoverPortal>
             <PopoverContent side="bottom" align="start" :side-offset="4" class="z-[1300]">
