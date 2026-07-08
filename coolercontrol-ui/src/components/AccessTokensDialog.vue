@@ -38,7 +38,7 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const confirm = useConfirm()
 const toast = useToast()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const tokens: Ref<AccessTokenInfo[]> = ref([])
 const newLabel: Ref<string> = ref('')
@@ -164,6 +164,20 @@ const pad = (n: number): string => String(n).padStart(2, '0')
 const toLocalInput = (date: Date): string =>
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 const nowLocal = toLocalInput(new Date())
+// Date-picker locale precedence: the UI language is the ultimate decider; when it
+// carries no region (e.g. plain 'en'/'de'), borrow the region from the OS locale
+// as a fallback. (Chromium only exposes the OS language-locale here, not a
+// separate regional-format setting, so that is the best fallback available.)
+const dateLocale = computed<string>(() => {
+    try {
+        const ui = new Intl.Locale(locale.value)
+        if (ui.region != null) return ui.baseName
+        const osRegion = new Intl.Locale(Intl.DateTimeFormat().resolvedOptions().locale).region
+        return osRegion != null ? `${ui.language}-${osRegion}` : ui.baseName
+    } catch {
+        return locale.value
+    }
+})
 const expiryLocal = computed<string>({
     get: () => (newExpiry.value ? toLocalInput(newExpiry.value) : ''),
     set: (value) => {
@@ -225,6 +239,7 @@ onMounted(loadTokens)
             <input
                 id="token-expiry"
                 v-model="expiryLocal"
+                :lang="dateLocale"
                 type="datetime-local"
                 :min="nowLocal"
                 class="h-10 rounded-lg border border-border-one bg-bg-one px-3 text-text-color outline-none focus:ring-2 focus:ring-accent"
