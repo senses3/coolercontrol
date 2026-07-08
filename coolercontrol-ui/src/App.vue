@@ -386,6 +386,7 @@ onMounted(async () => {
         :content-style="{ width: '50vw' }"
         :closable="false"
         :dismissable="false"
+        :close-on-escape="false"
     >
         <p>
             {{ t('views.error.connectionErrorMessage') }} <br />
@@ -491,6 +492,7 @@ onMounted(async () => {
         :content-style="{ width: '30vw' }"
         :closable="false"
         :dismissable="false"
+        :close-on-escape="false"
     >
         <p>
             {{ t('views.error.accessDeniedMessage') }}

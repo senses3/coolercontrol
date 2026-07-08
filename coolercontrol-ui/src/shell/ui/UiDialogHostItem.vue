@@ -49,6 +49,7 @@ provide('dialogRef', dialogRef)
         :title="chrome.header ?? ''"
         :closable="chrome.closable ?? true"
         :dismissable="chrome.dismissableMask ?? true"
+        :close-on-escape="chrome.closeOnEscape ?? true"
         :modal="chrome.modal ?? true"
         :content-style="chrome.style"
     >
