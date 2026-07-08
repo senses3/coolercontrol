@@ -20,16 +20,16 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import Select from 'primevue/select'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
 import { UID } from '@/models/Device.ts'
-import InputNumber from 'primevue/inputnumber'
-import Slider from 'primevue/slider'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSlider from '@/shell/ui/UiSlider.vue'
 
 interface Props {
     name: string
@@ -77,6 +77,17 @@ const offsetMax: number = 100
 const staticOffsetPrefix = computed(() =>
     selectedStaticOffset.value != null && selectedStaticOffset.value > 0 ? '+' : '',
 )
+const chosenOverlayMemberProfileUid = computed<string | undefined>({
+    get: () => chosenOverlayMemberProfile.value?.uid,
+    set: (uid) => {
+        chosenOverlayMemberProfile.value = offsetMemberProfileOptions.value.find(
+            (p) => p.uid === uid,
+        )
+    },
+})
+const overlayBaseOptions = computed(() =>
+    offsetMemberProfileOptions.value.map((p) => ({ label: p.name, value: p.uid })),
+)
 const nextStep = () => {
     if (chosenOverlayMemberProfile.value == null) {
         return
@@ -99,71 +110,45 @@ const nextStep = () => {
                 <br />
                 {{ t('components.wizards.fanControl.withSettings') }}:
             </div>
-            <div class="mt-0 flex flex-col">
+            <div class="mt-0 flex flex-col" v-tooltip.top="t('views.profiles.baseProfile')">
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.baseProfile') }}
                 </small>
-                <Select
-                    v-model="chosenOverlayMemberProfile"
-                    :options="offsetMemberProfileOptions"
-                    option-label="name"
+                <UiSelect
+                    v-model="chosenOverlayMemberProfileUid"
+                    :options="overlayBaseOptions"
                     :placeholder="t('views.profiles.baseProfile')"
-                    class="w-full mr-3 h-11 bg-bg-one !justify-end"
-                    checkmark
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-chart-line"
                     :invalid="chosenOverlayMemberProfile == null"
-                    v-tooltip.top="t('views.profiles.baseProfile')"
+                    class="w-full"
                 />
             </div>
-            <div class="mt-0 flex flex-col">
+            <div class="mt-0 flex flex-col" v-tooltip.top="t('views.profiles.offsetType')">
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.offsetType') }}
                 </small>
-                <Select
+                <UiSelect
                     v-model="chosenOverlayOffsetType"
                     :options="overlayOffsetTypeOptions"
-                    option-label="label"
-                    option-value="value"
                     :placeholder="t('views.profiles.offsetType')"
-                    class="w-full mr-3 h-11 bg-bg-one !justify-end"
-                    checkmark
-                    dropdown-icon="pi pi-sliders-v"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.profiles.offsetType')"
+                    class="w-full"
                 />
             </div>
             <div class="mt-0 flex flex-col" v-if="chosenOverlayOffsetType === 'static'">
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.staticOffset') }}
                 </small>
-                <InputNumber
-                    :placeholder="t('common.offset')"
+                <UiNumberInput
                     v-model="selectedStaticOffset"
-                    mode="decimal"
-                    class="duty-input h-11 w-full"
-                    :suffix="` ${t('common.percentUnit')}`"
                     :prefix="staticOffsetPrefix"
-                    showButtons
+                    :suffix="` ${t('common.percentUnit')}`"
                     :min="offsetMin"
                     :max="offsetMax"
-                    :use-grouping="false"
                     :step="1"
-                    button-layout="horizontal"
-                    :input-style="{ width: '8rem', background: 'rgb(var(--colors-bg-one))' }"
                     :disabled="chosenOverlayMemberProfile == null"
-                >
-                    <template #incrementicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
+                />
                 <div class="mx-1.5 mt-0">
-                    <Slider
+                    <UiSlider
                         v-model="selectedStaticOffset"
-                        class="!w-full"
                         :step="1"
                         :min="offsetMin"
                         :max="offsetMax"
@@ -173,20 +158,22 @@ const nextStep = () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="chosenOverlayMemberProfile == null"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>

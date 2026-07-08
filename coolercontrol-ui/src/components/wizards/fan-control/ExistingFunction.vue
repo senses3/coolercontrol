@@ -20,10 +20,10 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import Select from 'primevue/select'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import { UID } from '@/models/Device.ts'
 import { Function } from '@/models/Profile.ts'
-import { ref, Ref } from 'vue'
+import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -49,6 +49,17 @@ const selectedFunction: Ref<Function> = ref(
 
 const getFunctionOptions = (): any[] => settingsStore.functions
 
+const functionSelectOptions = computed(() =>
+    getFunctionOptions().map((f) => ({ label: f.name, value: f.uid })),
+)
+const selectedFunctionUidModel = computed<string | undefined>({
+    get: () => selectedFunction.value?.uid,
+    set: (uid) => {
+        const found = getFunctionOptions().find((f) => f.uid === uid)
+        if (found != null) selectedFunction.value = found
+    },
+})
+
 const nextStep = () => {
     if (selectedFunction.value == null) {
         return
@@ -65,15 +76,11 @@ const nextStep = () => {
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('components.wizards.fanControl.existingFunction') }}:
                 </small>
-                <Select
-                    v-model="selectedFunction"
-                    :options="getFunctionOptions()"
-                    option-label="name"
+                <UiSelect
+                    v-model="selectedFunctionUidModel"
+                    :options="functionSelectOptions"
                     placeholder="Function"
-                    class="w-full mr-4 h-11 bg-bg-one !justify-end"
-                    checkmark
-                    dropdown-icon="pi pi-directions"
-                    scroll-height="40rem"
+                    class="w-full"
                 />
             </div>
         </div>

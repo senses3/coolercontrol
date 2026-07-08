@@ -28,9 +28,9 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useToast } from 'primevue/usetoast'
 import { useRouter } from 'vue-router'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import Slider from 'primevue/slider'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSlider from '@/shell/ui/UiSlider.vue'
 import { Profile, ProfileType } from '@/models/Profile.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import { v4 as uuidV4 } from 'uuid'
@@ -113,49 +113,29 @@ const saveSetting = async (): Promise<void> => {
                 <span class="font-bold">{{ channelLabel }}</span
                 ><br /><br />{{ t('components.wizards.fanControl.withSettings') }}:
             </div>
-            <InputNumber
-                :placeholder="t('common.duty')"
+            <UiNumberInput
                 v-model="manualDuty"
-                mode="decimal"
-                class="duty-input h-11 w-full"
                 :suffix="` ${t('common.percentUnit')}`"
-                showButtons
                 :min="dutyMin"
                 :max="dutyMax"
-                :use-grouping="false"
                 :step="1"
-                button-layout="horizontal"
-                :input-style="{ width: '8rem', background: 'rgb(var(--colors-bg-one))' }"
-            >
-                <template #incrementicon>
-                    <span class="pi pi-plus" />
-                </template>
-                <template #decrementicon>
-                    <span class="pi pi-minus" />
-                </template>
-            </InputNumber>
+            />
             <div class="mx-1.5 mt-0">
-                <Slider
-                    v-model="manualDuty"
-                    class="!w-full"
-                    :step="1"
-                    :min="dutyMin"
-                    :max="dutyMax"
-                />
+                <UiSlider v-model="manualDuty" :step="1" :min="dutyMin" :max="dutyMax" />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="saveSetting"
             >
@@ -165,7 +145,7 @@ const saveSetting = async (): Promise<void> => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>
