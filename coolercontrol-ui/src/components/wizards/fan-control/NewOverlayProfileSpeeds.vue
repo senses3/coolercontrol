@@ -40,9 +40,8 @@ import VChart from 'vue-echarts'
 import type { GraphicComponentLooseOption } from 'echarts/types/dist/shared.d.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { computed, onMounted, onUnmounted, ref, Ref, watch, type WatchStopHandle } from 'vue'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
 import _ from 'lodash'
+import UiButton from '@/shell/ui/UiButton.vue'
 
 echarts.use([
     GridComponent,
@@ -801,13 +800,13 @@ const handleOffsetTableScroll = (event: WheelEvent, idx: number): void => {
 
 // Direct input handlers for table cells
 const handleDutyTableInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === 0 || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === 0 || idx === data.length - 1) return
     const clampedDuty = Math.max(getPointDutyMin(idx), Math.min(value, getPointDutyMax(idx)))
     updatePointFromTable(idx, clampedDuty, data[idx].value[1])
 }
 
 const handleOffsetTableInput = (idx: number, value: number | null): void => {
-    if (value == null) return
+    if (value == null || Number.isNaN(value)) return
     const clampedOffset = Math.max(offsetMin, Math.min(value, offsetMax))
     updatePointFromTable(idx, data[idx].value[0], clampedOffset)
 }
@@ -1150,14 +1149,17 @@ const nextStep = () => {
                     <span class="font-semibold text-text-color cursor-default">{{
                         t('views.profiles.points')
                     }}</span>
-                    <Button
-                        @click="cycleTablePosition"
-                        icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                        text
-                        rounded
-                        class="!w-7 !h-7 !p-0"
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        class="!h-7 !w-7 !p-0"
                         v-tooltip.top="t('views.profiles.moveTable')"
-                    />
+                        @click="cycleTablePosition"
+                    >
+                        <span
+                            class="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
+                        />
+                    </UiButton>
                 </div>
                 <table class="w-full">
                     <thead class="sticky top-7 bg-bg-two/95 cursor-default">
@@ -1194,11 +1196,10 @@ const nextStep = () => {
                                         handleDutyTableScroll($event, idx)
                                     "
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -1209,30 +1210,29 @@ const nextStep = () => {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="point.value[0]"
-                                        @update:modelValue="handleDutyTableInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="0"
-                                        :maxFractionDigits="0"
+                                    >
+                                        <span class="pi pi-minus text-[0.6rem]" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[0]"
                                         :min="getPointDutyMin(idx)"
                                         :max="getPointDutyMax(idx)"
-                                        :suffix="t('common.percentUnit')"
+                                        step="1"
                                         :disabled="idx === 0 || idx === data.length - 1"
-                                        :inputStyle="{
-                                            width: '3rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        @change="
+                                            handleDutyTableInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -1243,7 +1243,9 @@ const nextStep = () => {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <span class="pi pi-plus text-[0.6rem]" />
+                                    </UiButton>
                                 </div>
                             </td>
 
@@ -1253,73 +1255,73 @@ const nextStep = () => {
                                     class="flex items-center justify-center gap-0.5"
                                     @wheel.prevent="handleOffsetTableScroll($event, idx)"
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="data[idx].value[1] <= offsetMin"
                                         @pointerdown.stop="
                                             startRepeat(() => decrementPointOffset(idx))
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="Math.round(point.value[1]) || 0"
-                                        @update:modelValue="handleOffsetTableInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="0"
-                                        :maxFractionDigits="0"
+                                    >
+                                        <span class="pi pi-minus text-[0.6rem]" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3.5rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="Math.round(point.value[1]) || 0"
                                         :min="offsetMin"
                                         :max="offsetMax"
-                                        :suffix="t('common.percentUnit')"
-                                        :inputStyle="{
-                                            width: '3.5rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        step="1"
+                                        @change="
+                                            handleOffsetTableInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="data[idx].value[1] >= offsetMax"
                                         @pointerdown.stop="
                                             startRepeat(() => incrementPointOffset(idx))
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <span class="pi pi-plus text-[0.6rem]" />
+                                    </UiButton>
                                 </div>
                             </td>
 
                             <!-- Action buttons (add/remove) -->
                             <td class="px-1 py-0.5">
                                 <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                                    <Button
+                                    <UiButton
                                         v-if="canAddPointAfter(idx)"
-                                        icon="pi pi-plus-circle"
-                                        text
-                                        severity="success"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !p-0 !text-success"
                                         v-tooltip.top="t('views.profiles.addPointAfter')"
                                         @click.stop="addPointFromTable(idx)"
-                                    />
-                                    <Button
+                                    >
+                                        <span class="pi pi-plus-circle" />
+                                    </UiButton>
+                                    <UiButton
                                         v-if="canRemovePoint(idx)"
-                                        icon="pi pi-trash"
-                                        text
-                                        severity="danger"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !p-0 !text-error"
                                         v-tooltip.top="t('views.profiles.removePoint')"
                                         @click.stop="removePointFromTable(idx)"
-                                    />
+                                    >
+                                        <span class="pi pi-trash" />
+                                    </UiButton>
                                 </div>
                             </td>
                         </tr>
@@ -1341,15 +1343,17 @@ const nextStep = () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button class="w-24 bg-bg-one" :label="t('common.next')" @click="nextStep" />
+            </UiButton>
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="nextStep">
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>
@@ -1361,21 +1365,14 @@ const nextStep = () => {
     height: max(calc(80vh - 6rem), 20rem);
 }
 
-// Compact styling for points table InputNumber components
-:deep(.table-input) {
-    input {
-        background: transparent;
-        border: none;
-        height: 1.5rem;
-
-        &:focus {
-            box-shadow: none;
-            background: var(--cc-bg-one);
-        }
-
-        &:disabled {
-            opacity: 0.6;
-        }
-    }
+// Points table inputs: no native number spinners.
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.table-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 </style>
