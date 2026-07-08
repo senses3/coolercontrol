@@ -23,9 +23,9 @@ import { mdiArrowLeft } from '@mdi/js'
 import { ref, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import Slider from 'primevue/slider'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSlider from '@/shell/ui/UiSlider.vue'
 
 interface Props {
     name: string
@@ -59,47 +59,30 @@ const nextStep = async (): Promise<void> => {
                 ><br />
                 {{ t('components.wizards.fanControl.withSettings') }}:
             </div>
-            <InputNumber
-                :placeholder="t('common.duty')"
+            <UiNumberInput
                 v-model="manualDuty"
-                mode="decimal"
-                class="duty-input h-11 w-full"
+                class="self-start"
                 :suffix="` ${t('common.percentUnit')}`"
-                showButtons
                 :min="dutyMin"
                 :max="dutyMax"
-                :use-grouping="false"
                 :step="1"
-                button-layout="horizontal"
-                :input-style="{ width: '8rem', background: 'rgb(var(--colors-bg-one))' }"
-            >
-                <template #incrementicon>
-                    <span class="pi pi-plus" />
-                </template>
-                <template #decrementicon>
-                    <span class="pi pi-minus" />
-                </template>
-            </InputNumber>
-            <div class="mx-1.5 mt-0">
-                <Slider
-                    v-model="manualDuty"
-                    class="!w-full"
-                    :step="1"
-                    :min="dutyMin"
-                    :max="dutyMax"
-                />
+            />
+            <div class="mx-1.5 mt-0 w-64">
+                <UiSlider v-model="manualDuty" :step="1" :min="dutyMin" :max="dutyMax" />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button class="w-24 bg-bg-one" :label="t('common.next')" @click="nextStep" />
+            </UiButton>
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="nextStep">
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>

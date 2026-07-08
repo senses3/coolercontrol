@@ -23,10 +23,11 @@ import { computed, onMounted, ref, Ref, toRaw, watch } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { mdiContentSaveOutline, mdiMemory, mdiTagOutline } from '@mdi/js'
-import Button from 'primevue/button'
+import { mdiContentSaveOutline, mdiTagOutline } from '@mdi/js'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
+import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
 import { DeviceType, UID } from '@/models/Device.ts'
-import MultiSelect from 'primevue/multiselect'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import { useRoute, useRouter } from 'vue-router'
@@ -157,6 +158,31 @@ const valueSuffix = (metric: ChannelMetric | undefined): string => {
             return ` ${t('common.tempUnit')}`
     }
 }
+
+const channelKey = (deviceUID: string, channelName: string): string => `${deviceUID}/${channelName}`
+const channelGroups = computed<UiOptionGroup[]>(() =>
+    availableControlChannels.value.map((device) => ({
+        label: device.deviceName,
+        options: device.channels.map((ch) => ({
+            label: ch.channelFrontendName,
+            value: channelKey(ch.deviceUID, ch.channelName),
+            color: ch.lineColor,
+            rightText: `${ch.value}${valueSuffix(ch.metric)}`,
+        })),
+    })),
+)
+const chosenChannelKeys = computed<string[]>({
+    get: () => chosenChannels.value.map((ch) => channelKey(ch.deviceUID, ch.channelName)),
+    set: (keys) => {
+        chosenChannels.value = keys
+            .map((key) =>
+                availableControlChannels.value
+                    .flatMap((d) => d.channels)
+                    .find((ch) => channelKey(ch.deviceUID, ch.channelName) === key),
+            )
+            .filter((ch): ch is AvailableChannel => ch != null)
+    },
+})
 
 const updateValues = (): void => {
     for (const channelDevice of availableControlChannels.value) {
@@ -295,50 +321,22 @@ onMounted(async () => {
                 <small class="ml-3 font-light text-sm">
                     {{ t('components.wizards.profileApply.channelsApply') }}
                 </small>
-                <MultiSelect
-                    v-model="chosenChannels"
-                    :options="availableControlChannels"
-                    class="w-full h-11 bg-bg-one items-center"
-                    filter
-                    checkmark
-                    option-label="channelFrontendName"
-                    option-group-label="deviceName"
-                    option-group-children="channels"
-                    :filter-placeholder="t('common.search')"
-                    :invalid="chosenChannels.length === 0"
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-gauge"
-                    :placeholder="t('components.wizards.profileApply.selectChannels')"
+                <span
                     v-tooltip.top="{
                         escape: false,
                         value: t('components.wizards.profileApply.channelsTooltip'),
                     }"
                 >
-                    <template #optiongroup="slotProps">
-                        <div class="flex items-center">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMemory"
-                                :size="deviceStore.getREMSize(1.3)"
-                                class="mr-2"
-                            />
-                            <div>{{ slotProps.option.deviceName }}</div>
-                        </div>
-                    </template>
-                    <template #option="slotProps">
-                        <div class="flex items-center w-full justify-between">
-                            <div>
-                                <span
-                                    class="pi pi-minus mr-2 ml-1"
-                                    :style="{ color: slotProps.option.lineColor }"
-                                />{{ slotProps.option.channelFrontendName }}
-                            </div>
-                            <div>
-                                {{ slotProps.option.value + valueSuffix(slotProps.option.metric) }}
-                            </div>
-                        </div>
-                    </template>
-                </MultiSelect>
+                    <UiMultiSelect
+                        v-model="chosenChannelKeys"
+                        :groups="channelGroups"
+                        filter
+                        :filter-placeholder="t('common.search')"
+                        :invalid="chosenChannels.length === 0"
+                        :placeholder="t('components.wizards.profileApply.selectChannels')"
+                        class="w-full"
+                    />
+                </span>
             </template>
 
             <!-- Tag selection mode -->
@@ -394,10 +392,12 @@ onMounted(async () => {
             </template>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" :label="t('common.cancel')" @click="emit('close')" />
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('close')">
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
                 :disabled="chosenChannels.length === 0"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="applyProfileToChannels"
@@ -408,7 +408,7 @@ onMounted(async () => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

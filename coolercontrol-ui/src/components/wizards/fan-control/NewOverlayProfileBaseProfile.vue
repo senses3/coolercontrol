@@ -139,6 +139,7 @@ const nextStep = () => {
                 </small>
                 <UiNumberInput
                     v-model="selectedStaticOffset"
+                    class="self-start"
                     :prefix="staticOffsetPrefix"
                     :suffix="` ${t('common.percentUnit')}`"
                     :min="offsetMin"
@@ -146,7 +147,7 @@ const nextStep = () => {
                     :step="1"
                     :disabled="chosenOverlayMemberProfile == null"
                 />
-                <div class="mx-1.5 mt-0">
+                <div class="mx-1.5 mt-0 w-64">
                     <UiSlider
                         v-model="selectedStaticOffset"
                         :step="1"

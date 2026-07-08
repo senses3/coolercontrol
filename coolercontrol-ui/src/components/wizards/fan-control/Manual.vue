@@ -90,12 +90,13 @@ const saveSetting = async () => {
             </div>
             <UiNumberInput
                 v-model="manualDuty"
+                class="self-start"
                 :suffix="` ${t('common.percentUnit')}`"
                 :min="dutyMin"
                 :max="dutyMax"
                 :step="1"
             />
-            <div class="mx-1.5 mt-4">
+            <div class="mx-1.5 mt-4 w-64">
                 <UiSlider v-model="manualDuty" :step="1" :min="dutyMin" :max="dutyMax" />
             </div>
         </div>
