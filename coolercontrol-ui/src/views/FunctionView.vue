@@ -24,7 +24,7 @@ import { type UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
 import { $enum } from 'ts-enum-util'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import {
     mdiContentDuplicate,
     mdiContentSaveOutline,

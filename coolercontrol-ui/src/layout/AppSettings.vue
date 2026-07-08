@@ -32,7 +32,7 @@ import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import {
     CustomThemeSettings,
     defaultCustomTheme,

@@ -48,7 +48,7 @@ import {
     DeviceSettingWriteProfileDTO,
     DeviceSettingWritePWMModeDTO,
 } from '@/models/DaemonSettings'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { CoolerControlDeviceSettingsDTO, CoolerControlSettingsDTO } from '@/models/CCSettings'
 import { ErrorResponse } from '@/models/ErrorResponse'
 import { CustomSensor } from '@/models/CustomSensor'

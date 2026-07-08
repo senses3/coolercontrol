@@ -23,7 +23,7 @@ import Password from 'primevue/password'
 import Button from 'primevue/button'
 import FloatLabel from 'primevue/floatlabel'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 
 const dialogRef: Ref<DynamicDialogInstance> = inject('dialogRef')!

@@ -22,7 +22,7 @@
 // direct PrimeVue imports (dependency discipline).
 
 import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
 import { CCChannelSettings, CoolerControlDeviceSettingsDTO } from '@/models/CCSettings.ts'

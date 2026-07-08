@@ -29,7 +29,7 @@ import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
 import { UID } from '@/models/Device.ts'
 import { ProfileType } from '@/models/Profile.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useRoute, useRouter } from 'vue-router'
 
 const emit = defineEmits<{

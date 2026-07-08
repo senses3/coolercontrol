@@ -19,7 +19,7 @@
 // Plugin start/stop/restart with toasts, shared by the plugin page and the
 // plugins panel (PrimeVue toast service stays out of the shell).
 
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 

@@ -26,7 +26,7 @@ import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
 import Button from 'primevue/button'
-import Toast from 'primevue/toast'
+import UiToast from '@/shell/ui/UiToast.vue'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Dialog from 'primevue/dialog'
 import DynamicDialog from 'primevue/dynamicdialog'
@@ -356,7 +356,7 @@ onMounted(async () => {
 
 <template>
     <RouterView v-if="loaded" />
-    <Toast position="top-center" />
+    <UiToast />
     <DynamicDialog />
     <ConfirmDialog
         :pt="{

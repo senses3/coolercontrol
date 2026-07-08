@@ -19,7 +19,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useI18n } from 'vue-i18n'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'

@@ -47,7 +47,7 @@ import {
     LcdCarouselSettings,
     TempSource,
 } from '@/models/DaemonSettings'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { ErrorResponse } from '@/models/ErrorResponse'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'

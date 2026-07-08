@@ -21,7 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { computed, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useDialog } from 'primevue/usedialog'
 import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import { mdiChartLine, mdiInformationSlabCircleOutline } from '@mdi/js'

@@ -29,7 +29,7 @@ import {
     ProfileMixFunctionType,
     ProfileType,
 } from '@/models/Profile.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { computed, ref, Ref } from 'vue'
 import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'

@@ -26,7 +26,7 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
 import { v4 as uuidV4 } from 'uuid'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useRouter } from 'vue-router'
 
 interface Props {

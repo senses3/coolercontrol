@@ -20,7 +20,7 @@
 // here so the shell rail stays free of direct PrimeVue imports.
 
 import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 
