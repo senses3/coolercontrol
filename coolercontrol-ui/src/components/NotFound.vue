@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiHome } from '@mdi/js'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 
@@ -35,12 +35,13 @@ const { t } = useI18n()
     <div class="m-10 text-center font-bold text-2xl">
         <p>{{ t('components.notFound.message') }}</p>
         <router-link to="/">
-            <Button
-                class="mt-16 !rounded-lg border-2 bg-accent/70 text-text-color-secondary w-64 h-12 !p-0 hover:text-text-color hover:!bg-accent outline-0"
+            <UiButton
+                variant="solid"
+                class="mt-16 w-64 !h-12 border-2 !bg-accent/70 !p-0 !text-text-color-secondary outline-0 hover:!bg-accent hover:!text-text-color"
             >
                 {{ t('views.error.returnToDashboard') }}
                 <svg-icon class="ml-4" type="mdi" :path="mdiHome" :size="getREMSize(1.75)" />
-            </Button>
+            </UiButton>
         </router-link>
     </div>
 </template>

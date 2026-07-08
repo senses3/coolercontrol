@@ -23,7 +23,7 @@ import { computed, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'primevue/usetoast'
 import { useDialog } from 'primevue/usedialog'
-import ProgressBar from 'primevue/progressbar'
+import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import { mdiChartLine, mdiInformationSlabCircleOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
@@ -171,16 +171,9 @@ onMounted(() => {
 
 <template>
     <div>
-        <!--
-          v-memo keeps PrimeVue's tooltip directive from running its
-          `updated` lifecycle on each poll-driven re-render. Without it,
-          the directive's unbindEvents() removes the visible tooltip
-          from document.body every ~1s while calibration is in_progress.
-        -->
         <div class="flex items-center mb-2">
             <div
                 class="leading-none cursor-help"
-                v-memo="[]"
                 v-tooltip.top="t('components.channelExtensionSettings.calibration.description')"
             >
                 <svg-icon
@@ -197,10 +190,9 @@ onMounted(() => {
         <div :class="['text-sm pb-2', calibrationHasWarnings ? 'text-warning' : '']">
             {{ calibrationStatusText }}
         </div>
-        <progress-bar
+        <UiProgressBar
             v-if="calibrationPhase === 'in_progress'"
             :value="calibrationStatus?.phase === 'in_progress' ? calibrationStatus.percent : 0"
-            :show-value="false"
             class="mb-2"
         />
         <div

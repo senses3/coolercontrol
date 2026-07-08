@@ -22,12 +22,11 @@ import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/compon
 import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
-import { inject, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, watch, type Ref } from 'vue'
 import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
-import Button from 'primevue/button'
-import Select from 'primevue/select'
-import InputNumber from 'primevue/inputnumber'
-import ToggleSwitch from 'primevue/toggleswitch'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
 import _ from 'lodash'
@@ -72,6 +71,27 @@ const boostOptions: Array<{ label: string; value: BoostMode }> = [
     { label: t('components.calibrationCurve.kickBoostOn'), value: 'on' },
     { label: t('components.calibrationCurve.kickBoostOff'), value: 'off' },
 ]
+
+// UiSelect models a plain string; bridge it to the narrower BoostMode ref.
+const boostModeModel = computed<string | undefined>({
+    get: () => boostMode.value,
+    set: (value) => {
+        if (value === 'auto' || value === 'on' || value === 'off') boostMode.value = value
+    },
+})
+
+// The override is nullable (null = use the daemon default), so drive a native
+// input directly: empty clears the override, otherwise clamp to the range.
+const onDurationInput = (event: Event): void => {
+    const raw = (event.target as HTMLInputElement).value
+    if (raw === '') {
+        durationOverride.value = null
+        return
+    }
+    const parsed = Number(raw)
+    if (Number.isNaN(parsed)) return
+    durationOverride.value = Math.min(60000, Math.max(100, parsed))
+}
 
 const syncOverridesFrom = (cal: Calibration): void => {
     syncing = true
@@ -437,11 +457,9 @@ const chartOption = (cal: Calibration) => {
                     >
                         {{ t('components.calibrationCurve.fieldKickBoostOverride') }}:
                     </label>
-                    <Select
-                        v-model="boostMode"
+                    <UiSelect
+                        v-model="boostModeModel"
                         :options="boostOptions"
-                        optionLabel="label"
-                        optionValue="value"
                         :disabled="saving"
                         class="w-44"
                     />
@@ -469,27 +487,39 @@ const chartOption = (cal: Calibration) => {
                     >
                         {{ t('components.calibrationCurve.fieldKickDurationOverride') }}:
                     </label>
-                    <InputNumber
-                        v-model="durationOverride"
-                        :placeholder="`${t('components.calibrationCurve.kickDurationDefault')}: ${calibration.kick_duration_ms} ms`"
-                        :min="100"
-                        :max="60000"
-                        :step="100"
-                        :use-grouping="false"
-                        suffix=" ms"
-                        :disabled="saving"
-                        :input-class="'w-44'"
-                    />
-                    <Button
+                    <span
+                        class="inline-flex h-10 w-44 items-center overflow-hidden rounded-lg border border-border-one bg-bg-one px-3"
+                        :class="{ 'pointer-events-none opacity-50': saving }"
+                    >
+                        <input
+                            type="number"
+                            :value="durationOverride ?? ''"
+                            :placeholder="`${t('components.calibrationCurve.kickDurationDefault')}: ${calibration.kick_duration_ms} ms`"
+                            :min="100"
+                            :max="60000"
+                            :step="100"
+                            :disabled="saving"
+                            class="duration-input w-full min-w-0 bg-transparent text-base text-text-color outline-none placeholder:text-text-color-secondary"
+                            @change="onDurationInput"
+                        />
+                        <span
+                            v-if="durationOverride != null"
+                            class="pl-1 text-sm text-text-color-secondary"
+                        >
+                            ms
+                        </span>
+                    </span>
+                    <UiButton
                         v-tooltip.top="t('components.calibrationCurve.kickDurationReset')"
-                        icon="pi pi-undo"
-                        severity="secondary"
-                        text
-                        rounded
+                        variant="ghost"
+                        size="icon"
+                        class="!h-10 !w-10 rounded-full"
                         :disabled="saving || durationOverride === null"
                         :aria-label="t('components.calibrationCurve.kickDurationReset')"
                         @click="durationOverride = null"
-                    />
+                    >
+                        <i class="pi pi-undo" />
+                    </UiButton>
                 </div>
                 <div class="flex items-center gap-3">
                     <label
@@ -498,7 +528,7 @@ const chartOption = (cal: Calibration) => {
                     >
                         {{ t('components.calibrationCurve.fieldWalkAfterKick') }}:
                     </label>
-                    <ToggleSwitch v-model="walkAfterKick" :disabled="saving" />
+                    <UiSwitch v-model="walkAfterKick" :disabled="saving" />
                 </div>
             </div>
             <div class="text-xs text-text-color-secondary text-right">
@@ -513,5 +543,14 @@ const chartOption = (cal: Calibration) => {
 .calibration-curve-chart {
     width: 100%;
     height: max(calc(80vh - 14rem), 20rem);
+}
+.duration-input::-webkit-outer-spin-button,
+.duration-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.duration-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 </style>
