@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { UID } from '@/models/Device.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -98,17 +98,17 @@ const saveSetting = async () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="saveSetting"
             >
@@ -118,7 +118,7 @@ const saveSetting = async () => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

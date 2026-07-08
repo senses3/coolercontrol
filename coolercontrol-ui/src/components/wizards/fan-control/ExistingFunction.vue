@@ -25,7 +25,7 @@ import { UID } from '@/models/Device.ts'
 import { Function } from '@/models/Profile.ts'
 import { ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 
@@ -78,20 +78,22 @@ const nextStep = () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 10)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 10)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="selectedFunction == null"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>

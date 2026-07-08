@@ -20,16 +20,16 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { DEFAULT_NAME_STRING_LENGTH, useDeviceStore } from '@/stores/DeviceStore.ts'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { computed, ref, type Ref } from 'vue'
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import { $enum } from 'ts-enum-util'
-import InputNumber from 'primevue/inputnumber'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 
 interface Props {
     profileName?: string
@@ -81,6 +81,12 @@ let startingDeviance = currentFunction.value.deviance ?? 2
 let startingOnlyDownward = currentFunction.value.only_downward ?? false
 
 const selectedType: Ref<FunctionType> = ref(newFunction.f_type)
+const selectedTypeModel = computed<string | undefined>({
+    get: () => selectedType.value,
+    set: (value) => {
+        if (value != null) selectedType.value = value as FunctionType
+    },
+})
 const functionTypeOptions = computed(() => {
     // EMA is deprecated in favor of the EMA custom-sensor type. Hide it when creating a function,
     // but keep it selectable when editing one that already uses it.
@@ -178,31 +184,22 @@ const updateSymmetricStepSize = () => {
                 {{ t('components.wizards.fanControl.chooseFunctionNameType') }}:
             </div>
             <div class="mt-0 flex flex-col">
-                <InputText
+                <UiInput
                     v-model="nameInput"
                     :placeholder="t('common.name')"
-                    ref="inputArea"
-                    id="property-name"
-                    class="w-full h-11"
-                    :invalid="nameInvalid"
-                    :input-style="{ background: 'rgb(var(--colors-bg-one))' }"
-                    autofocus
+                    class="w-full"
+                    :class="{ '!border-error': nameInvalid }"
                 />
             </div>
             <div class="mt-0 flex flex-col">
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.functions.functionType') }}
                 </small>
-                <Select
-                    v-model="selectedType"
+                <UiSelect
+                    v-model="selectedTypeModel"
                     :options="functionTypeOptions"
-                    option-label="label"
-                    option-value="value"
                     :placeholder="t('views.functions.functionType')"
-                    class="w-full h-11 mr-3 bg-bg-one !justify-end"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
+                    class="w-full"
                 />
             </div>
             <p>
@@ -290,23 +287,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepDutyMinimum"
-                                    class="min-duty-input"
-                                    show-buttons
                                     :min="dutyMin"
                                     :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr
@@ -329,23 +315,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepDutyMaximum"
-                                    class="max-duty-input"
-                                    show-buttons
                                     :min="chosenStepDutyMinimum"
                                     :max="dutyMax"
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
 
@@ -369,25 +344,14 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepSizeMinDecreasing"
-                                    class="step-min-decrease-input"
-                                    show-buttons
                                     :min="dutyMin"
                                     :max="
                                         chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing
                                     "
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr
@@ -402,23 +366,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepSizeMaxDecreasing"
-                                    class="step-max-decrease-input"
-                                    show-buttons
                                     :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
                                     :max="dutyMax"
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr>
@@ -473,26 +426,13 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenDeviance"
-                                    class="deviance-input"
-                                    show-buttons
                                     :suffix="` ${t('common.tempUnit')}`"
                                     :step="0.1"
                                     :min="devianceMin"
                                     :max="devianceMax"
-                                    :min-fraction-digits="1"
-                                    :max-fraction-digits="1"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr
@@ -507,23 +447,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenDelay"
-                                    class="delay-input"
-                                    show-buttons
                                     :suffix="` ${t('common.secondAbbr')}`"
                                     :min="delayMin"
                                     :max="delayMax"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr
@@ -561,22 +490,11 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenWindowSize"
-                                    class="window-size-input"
-                                    show-buttons
                                     :min="windowSizeMin"
                                     :max="windowSizeMax"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                     </tbody>
@@ -584,26 +502,30 @@ const updateSymmetricStepSize = () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button
+            <UiButton
                 v-if="props.profileName === undefined"
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.cancel')"
                 @click="emit('close')"
-            />
-            <Button v-else class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 10)">
+            >
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton v-else variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 10)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="currentFunction == null || nameInvalid"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>

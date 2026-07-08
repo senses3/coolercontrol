@@ -20,13 +20,13 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import Select from 'primevue/select'
-import Button from 'primevue/button'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { computed, ref, type Ref } from 'vue'
 import { getProfileTypeDisplayName, ProfileType } from '@/models/Profile.ts'
 import { $enum } from 'ts-enum-util'
 import { DEFAULT_NAME_STRING_LENGTH, useDeviceStore } from '@/stores/DeviceStore.ts'
-import InputText from 'primevue/inputtext'
+import UiInput from '@/shell/ui/UiInput.vue'
 import { useI18n } from 'vue-i18n'
 
 interface Props {
@@ -45,6 +45,12 @@ const { t } = useI18n()
 const deviceStore = useDeviceStore()
 
 const selectedType: Ref<ProfileType> = ref(props.type)
+const selectedTypeModel = computed<string | undefined>({
+    get: () => selectedType.value,
+    set: (value) => {
+        if (value != null) selectedType.value = value as ProfileType
+    },
+})
 const profileTypeOptions = computed(() => {
     return [...$enum(ProfileType).values()].map((type) => ({
         value: type,
@@ -86,31 +92,22 @@ const nextStep = () => {
                 {{ t('components.wizards.fanControl.chooseProfileNameType') }}:
             </div>
             <div class="mt-0 flex flex-col">
-                <InputText
+                <UiInput
                     v-model="nameInput"
                     :placeholder="t('common.name')"
-                    ref="inputArea"
-                    id="property-name"
-                    class="w-full h-11"
-                    :invalid="nameInvalid"
-                    :input-style="{ background: 'rgb(var(--color-bg-one))' }"
-                    autofocus
+                    class="w-full"
+                    :class="{ '!border-error': nameInvalid }"
                 />
             </div>
             <div class="mt-0 flex flex-col">
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.profileType') }}
                 </small>
-                <Select
-                    v-model="selectedType"
+                <UiSelect
+                    v-model="selectedTypeModel"
                     :options="profileTypeOptions"
-                    option-label="label"
-                    option-value="value"
                     :placeholder="t('views.profiles.profileType')"
-                    class="w-full h-11 mr-3 bg-bg-one !justify-end"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
+                    class="w-full"
                 />
             </div>
             <p>
@@ -118,20 +115,22 @@ const nextStep = () => {
             </p>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 1)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 1)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="nameInvalid"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>
