@@ -20,7 +20,7 @@
 // shell). The module-level flag prevents stacking via the hotkey.
 
 import { defineAsyncComponent } from 'vue'
-import { useDialog } from 'primevue/usedialog'
+import { useDialog } from '@/shell/dialog'
 import { useI18n } from 'vue-i18n'
 
 const shortcutsView = defineAsyncComponent(() => import('@/components/ShortcutsView.vue'))

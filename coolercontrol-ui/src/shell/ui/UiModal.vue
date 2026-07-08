@@ -30,24 +30,49 @@ import {
 } from 'reka-ui'
 
 const open = defineModel<boolean>('open', { required: true })
-withDefaults(
+const props = withDefaults(
     defineProps<{
         title?: string
         description?: string
         contentClass?: string
+        contentStyle?: Record<string, string>
         closable?: boolean
+        // dismissable: allow escape / overlay-click to close (PrimeVue dismissableMask).
+        dismissable?: boolean
+        // modal: render the dimming/blocking overlay and trap focus.
+        modal?: boolean
     }>(),
-    { title: '', description: '', contentClass: '', closable: true },
+    {
+        title: '',
+        description: '',
+        contentClass: '',
+        closable: true,
+        dismissable: true,
+        modal: true,
+    },
 )
+
+// Block reka's auto-close on escape / outside-click when the dialog is
+// non-dismissable (e.g. the forced password prompt).
+const guardDismiss = (event: Event): void => {
+    if (!props.dismissable) event.preventDefault()
+}
 </script>
 
 <template>
-    <DialogRoot v-model:open="open">
+    <DialogRoot v-model:open="open" :modal="modal">
         <DialogPortal>
-            <DialogOverlay class="fixed inset-0 z-[1340] bg-black/50 backdrop-blur-[2px]" />
+            <DialogOverlay
+                v-if="modal"
+                class="fixed inset-0 z-[1200] bg-black/50 backdrop-blur-[2px]"
+            />
             <DialogContent
-                class="fixed left-1/2 top-1/2 z-[1350] max-h-[92vh] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border-one bg-bg-two p-6 text-text-color shadow-xl outline-none"
+                class="fixed left-1/2 top-1/2 z-[1210] max-h-[92vh] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border-one bg-bg-two p-6 text-text-color shadow-xl outline-none"
                 :class="contentClass"
+                :style="contentStyle"
+                @escape-key-down="guardDismiss"
+                @pointer-down-outside="guardDismiss"
+                @interact-outside="guardDismiss"
             >
                 <div class="mb-4 flex items-start justify-between gap-4">
                     <DialogTitle

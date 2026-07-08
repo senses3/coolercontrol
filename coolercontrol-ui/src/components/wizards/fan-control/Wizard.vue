@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { inject, ref, type Ref } from 'vue'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import { UID } from '@/models/Device.ts'
 import ChooseInitialAction from '@/components/wizards/fan-control/ChooseInitialAction.vue'
 import ExistingProfile from '@/components/wizards/fan-control/ExistingProfile.vue'

@@ -18,7 +18,7 @@
 
 <script setup lang="ts">
 import { inject, nextTick, ref, watch, type Ref } from 'vue'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import Password from 'primevue/password'
 import Button from 'primevue/button'
 import FloatLabel from 'primevue/floatlabel'

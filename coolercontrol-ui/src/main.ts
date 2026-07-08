@@ -29,7 +29,6 @@ import router from './router'
 import i18n from './i18n'
 
 import PrimeVue from 'primevue/config'
-import DialogService from 'primevue/dialogservice'
 import CC from './presets/cc'
 import VueFullscreen from 'vue-fullscreen'
 
@@ -56,7 +55,6 @@ app.use(PrimeVue, {
     unstyled: true,
     pt: CC,
 })
-app.use(DialogService)
 app.use(VueFullscreen)
 
 app.directive('tooltip', tooltipDirective)

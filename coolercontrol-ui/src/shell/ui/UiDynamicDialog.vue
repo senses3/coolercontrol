@@ -17,22 +17,12 @@
   -->
 
 <script setup lang="ts">
-// @ts-ignore
-import SvgIcon from '@jamescoyle/vue-icon'
-import { inject, ref, type Ref } from 'vue'
-import type { DynamicDialogInstance } from '@/shell/dialog'
-import NewMode from '@/components/wizards/mode/NewMode.vue'
-
-const dialogRef: Ref<DynamicDialogInstance> = inject('dialogRef')!
-const closeDialog = () => {
-    dialogRef.value.close()
-}
-
-const currentStep: Ref<number> = ref(1)
+// Host for kit dynamic dialogs (shell/dialog.ts). One item per open dialog so
+// each can provide its own dialogRef; stacking is supported.
+import { openDialogs } from '@/shell/dialog'
+import UiDialogHostItem from '@/shell/ui/UiDialogHostItem.vue'
 </script>
 
 <template>
-    <NewMode v-if="currentStep === 1" @close="closeDialog" />
+    <UiDialogHostItem v-for="dialog in openDialogs" :key="dialog.id" :dialog="dialog" />
 </template>
-
-<style scoped lang="scss"></style>
