@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { UID } from '@/models/Device.ts'
 import { useRouter } from 'vue-router'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -113,8 +113,9 @@ const channelLabel =
                 <span class="font-bold">{{ channelLabel }}</span>
             </p>
             <div class="mt-0 flex flex-col place-items-center gap-y-3">
-                <Button
+                <UiButton
                     v-if="isControlView && !props.isControlFlowView"
+                    variant="ghost"
                     class="!p-2 bg-bg-one w-full !justify-start"
                     @click="redirectSpeedViewAndClose"
                 >
@@ -127,7 +128,7 @@ const channelLabel =
                         />
                         {{ t('components.wizards.fanControl.currentSettings') }}
                     </div>
-                </Button>
+                </UiButton>
                 <div
                     v-if="
                         !props.isControlFlowView &&
@@ -136,11 +137,12 @@ const channelLabel =
                     "
                     class="flex flex-row w-full gap-x-3"
                 >
-                    <Button
+                    <UiButton
                         v-if="
                             props.selectedProfileUID !== undefined &&
                             props.selectedProfileUID !== '0'
                         "
+                        variant="ghost"
                         class="!p-2 bg-bg-one w-full !justify-start"
                         @click="redirectProfileAndClose"
                     >
@@ -153,9 +155,10 @@ const channelLabel =
                             />
                             {{ currentProfileMessage }}
                         </div>
-                    </Button>
-                    <Button
+                    </UiButton>
+                    <UiButton
                         v-if="selectedFunctionUID !== '0'"
+                        variant="ghost"
                         class="!p-2 bg-bg-one w-full !justify-start"
                         @click="redirectFunctionAndClose"
                     >
@@ -168,13 +171,13 @@ const channelLabel =
                             />
                             {{ currentFunctionMessage }}
                         </div>
-                    </Button>
+                    </UiButton>
                 </div>
                 <div class="flex flex-row w-full gap-x-3">
-                    <Button
+                    <UiButton
                         v-if="profilesLength > 1"
+                        variant="ghost"
                         class="!p-2 bg-bg-one w-full !justify-start"
-                        :label="t('components.wizards.fanControl.existingProfile')"
                         @click="emit('nextStep', 2)"
                     >
                         <div class="flex flex-row font-semibold items-center">
@@ -186,8 +189,9 @@ const channelLabel =
                             />
                             {{ t('components.wizards.fanControl.existingProfile') }}
                         </div>
-                    </Button>
-                    <Button
+                    </UiButton>
+                    <UiButton
+                        variant="ghost"
                         class="!p-2 bg-bg-one w-full !justify-start"
                         @click="emit('nextStep', 3)"
                     >
@@ -200,9 +204,13 @@ const channelLabel =
                             />
                             {{ t('components.wizards.fanControl.createNewProfile') }}
                         </div>
-                    </Button>
+                    </UiButton>
                 </div>
-                <Button class="!p-2 bg-bg-one w-full !justify-start" @click="emit('nextStep', 4)">
+                <UiButton
+                    variant="ghost"
+                    class="!p-2 bg-bg-one w-full !justify-start"
+                    @click="emit('nextStep', 4)"
+                >
                     <div class="flex flex-row font-semibold items-center">
                         <svg-icon
                             class="outline-0 mr-2"
@@ -212,9 +220,10 @@ const channelLabel =
                         />
                         {{ t('components.wizards.fanControl.manualSpeed') }}
                     </div>
-                </Button>
-                <Button
+                </UiButton>
+                <UiButton
                     v-if="props.selectedProfileUID == null || props.selectedProfileUID !== '0'"
+                    variant="ghost"
                     class="!p-2 bg-bg-one w-full !justify-start"
                     @click="resetSettings"
                 >
@@ -227,12 +236,14 @@ const channelLabel =
                         />
                         {{ t('components.wizards.fanControl.resetSettings') }}
                     </div>
-                </Button>
+                </UiButton>
             </div>
         </div>
 
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" :label="t('common.cancel')" @click="emit('close')" />
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('close')">
+                {{ t('common.cancel') }}
+            </UiButton>
         </div>
     </div>
 </template>

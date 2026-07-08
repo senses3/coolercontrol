@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { mdiArrowLeft, mdiButtonCursor, mdiFlaskEmptyOutline, mdiPlusBoxOutline } from '@mdi/js'
@@ -57,9 +57,9 @@ const defaultFunctionAction = () => {
             <p>
                 <span v-html="t('components.wizards.fanControl.functionDescription')" />
             </p>
-            <Button
+            <UiButton
+                variant="ghost"
                 class="!p-2 h-11 bg-bg-one !justify-start"
-                :label="t('components.wizards.fanControl.defaultFunction')"
                 @click="defaultFunctionAction"
             >
                 <div class="flex flex-row font-semibold items-center">
@@ -71,11 +71,11 @@ const defaultFunctionAction = () => {
                     />
                     {{ t('components.wizards.fanControl.defaultFunction') }}
                 </div>
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-if="functionsLength > 1"
+                variant="ghost"
                 class="!p-2 h-11 bg-bg-one !justify-start"
-                :label="t('components.wizards.fanControl.existingFunction')"
                 @click="emit('nextStep', 12)"
             >
                 <div class="flex flex-row font-semibold items-center">
@@ -87,10 +87,10 @@ const defaultFunctionAction = () => {
                     />
                     {{ t('components.wizards.fanControl.existingFunction') }}
                 </div>
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="!p-2 h-11 bg-bg-one !justify-start"
-                :label="t('components.wizards.fanControl.createNewFunction')"
                 @click="emit('nextStep', 11)"
             >
                 <div class="flex flex-row font-semibold items-center">
@@ -102,17 +102,17 @@ const defaultFunctionAction = () => {
                     />
                     {{ t('components.wizards.fanControl.createNewFunction') }}
                 </div>
-            </Button>
+            </UiButton>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 h-11 bg-bg-one" label="Back" @click="emit('nextStep', 9)">
+            <UiButton variant="ghost" class="w-24 h-11 bg-bg-one" @click="emit('nextStep', 9)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

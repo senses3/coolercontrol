@@ -25,7 +25,7 @@ import { UID } from '@/models/Device.ts'
 import { Profile, getProfileDisplayName } from '@/models/Profile.ts'
 import { ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { v4 as uuidV4 } from 'uuid'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
@@ -101,17 +101,17 @@ const saveSetting = async () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 1)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 1)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                label="Apply"
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
                 v-tooltip.top="'Apply'"
                 @click="saveSetting"
             >
@@ -121,7 +121,7 @@ const saveSetting = async () => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>
