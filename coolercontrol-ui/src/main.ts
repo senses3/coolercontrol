@@ -29,7 +29,6 @@ import router from './router'
 import i18n from './i18n'
 
 import PrimeVue from 'primevue/config'
-import ToastService from 'primevue/toastservice'
 import DialogService from 'primevue/dialogservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import CC from './presets/cc'
@@ -58,7 +57,6 @@ app.use(PrimeVue, {
     unstyled: true,
     pt: CC,
 })
-app.use(ToastService)
 app.use(DialogService)
 app.use(ConfirmationService)
 app.use(VueFullscreen)

@@ -24,7 +24,7 @@ import { inject, Ref } from 'vue'
 import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { PluginDto } from '@/models/Plugins.ts'
 
 const deviceStore = useDeviceStore()

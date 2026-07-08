@@ -32,7 +32,7 @@ import { Profile, ProfileType } from '@/models/Profile.ts'
 import { CCChannelSettings, ChannelExtensions } from '@/models/CCSettings.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 
 const props = defineProps<{
     deviceUID: UID

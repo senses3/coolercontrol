@@ -31,7 +31,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { usePluginIframe } from '@/composables/usePluginIframe.ts'
 import { useDialog } from 'primevue/usedialog'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import {
     getPluginStatusDisplayName,
