@@ -25,10 +25,12 @@ import {
     mdiContentSaveOutline,
     mdiInformationSlabCircleOutline,
 } from '@mdi/js'
-import Button from 'primevue/button'
-import Select from 'primevue/select'
-import SelectButton from 'primevue/selectbutton'
-import { inject, nextTick, ref, watch, type Ref } from 'vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
+import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
+import { computed, inject, nextTick, ref, watch, type Ref } from 'vue'
 import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
 import { useI18n } from 'vue-i18n'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
@@ -111,12 +113,9 @@ const calibrateFansFirst = async (): Promise<void> => {
     openCalibrationWizard(preselect.length > 0 ? preselect : undefined)
 }
 
-// The shared Select preset positions the clear (X) icon at right-12, which leaves it stranded
-// mid-field here because this preset puts the dropdown chevron on the left. Move the X flush to
-// the right edge and reserve just enough label padding so the text does not run under it.
-const selectPt = {
-    label: { class: '!pr-9' },
-    clearIcon: { class: '!right-3' },
+// The kit select models a plain string; a cleared value (skip) maps back to null.
+const setFanKind = (index: number, value: string | undefined): void => {
+    fanRows.value[index].kind = (value as FanKind) ?? null
 }
 
 // Step 2: confirm the key temps. Pre-filled by a best-guess heuristic the user must verify.
@@ -161,6 +160,37 @@ const fillTemps = (): void => {
     }
 }
 fillTemps()
+
+// Grouped temp selects: bridge the object model to a device/temp key string.
+const tempKey = (deviceUID: string, tempName: string): string => `${deviceUID}/${tempName}`
+const tempOptionGroups = computed<UiOptionGroup[]>(() =>
+    tempGroups.value.map((group) => ({
+        label: group.deviceName,
+        options: group.temps.map((temp) => ({
+            label: temp.label,
+            value: tempKey(temp.deviceUID, temp.tempName),
+            color: temp.color,
+        })),
+    })),
+)
+const findTemp = (key: string | undefined): TempOption | null =>
+    key == null
+        ? null
+        : (tempGroups.value
+              .flatMap((group) => group.temps)
+              .find((temp) => tempKey(temp.deviceUID, temp.tempName) === key) ?? null)
+const makeTempKeyModel = (tempRef: Ref<TempOption | null>) =>
+    computed<string | undefined>({
+        get: () =>
+            tempRef.value != null
+                ? tempKey(tempRef.value.deviceUID, tempRef.value.tempName)
+                : undefined,
+        set: (key) => (tempRef.value = findTemp(key)),
+    })
+const cpuTempKey = makeTempKeyModel(cpuTemp)
+const gpuTempKey = makeTempKeyModel(gpuTemp)
+const liquidTempKey = makeTempKeyModel(liquidTemp)
+const ambientTempKey = makeTempKeyModel(ambientTemp)
 
 // Step 3: choose the global preset, with optional per-role overrides.
 const presetOptions = [Preset.Silent, Preset.Balanced, Preset.Performance]
@@ -210,6 +240,16 @@ watch(globalPreset, (newPreset, oldPreset) => {
         if (row.preset === oldPreset) row.preset = newPreset
     }
 })
+
+// Preset toggle (single-select segmented control, mirrors the old SelectButton).
+const presetToggleOptions = presetOptions.map((preset) => ({ label: preset, value: preset }))
+const globalPresetModel = computed<string>({
+    get: () => globalPreset.value,
+    set: (value) => (globalPreset.value = value as Preset),
+})
+const setOverridePreset = (index: number, value: string): void => {
+    overrideRows.value[index].preset = value as Preset
+}
 
 const goToPresets = (): void => {
     buildOverrideRows()
@@ -403,16 +443,13 @@ const createAndApply = async (): Promise<void> => {
                     <span class="pi pi-minus mr-2 ml-1" :style="{ color: row.color }" />
                     <span class="truncate">{{ row.label }}</span>
                 </div>
-                <Select
-                    v-model="fanRows[index].kind"
+                <UiSelect
+                    :model-value="fanRows[index].kind ?? undefined"
                     :options="kindOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="w-56 h-10"
-                    show-clear
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
+                    clearable
                     :placeholder="t('components.wizards.generate.skip')"
+                    class="w-56"
+                    @update:model-value="setFanKind(index, $event)"
                 />
             </div>
         </div>
@@ -433,65 +470,45 @@ const createAndApply = async (): Promise<void> => {
                 class="flex items-center justify-between gap-x-3"
             >
                 <span class="ml-1">{{ picker.label }}</span>
-                <Select
+                <UiGroupedSelect
                     v-if="picker.model === 'cpu'"
-                    v-model="cpuTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
+                    v-model="cpuTempKey"
+                    :groups="tempOptionGroups"
+                    clearable
                     filter
                     :filter-placeholder="t('common.search')"
                     :placeholder="t('components.wizards.generate.tempNone')"
+                    class="w-64"
                 />
-                <Select
+                <UiGroupedSelect
                     v-else-if="picker.model === 'gpu'"
-                    v-model="gpuTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
+                    v-model="gpuTempKey"
+                    :groups="tempOptionGroups"
+                    clearable
                     filter
                     :filter-placeholder="t('common.search')"
                     :placeholder="t('components.wizards.generate.tempNone')"
+                    class="w-64"
                 />
-                <Select
+                <UiGroupedSelect
                     v-else-if="picker.model === 'liquid'"
-                    v-model="liquidTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
+                    v-model="liquidTempKey"
+                    :groups="tempOptionGroups"
+                    clearable
                     filter
                     :filter-placeholder="t('common.search')"
                     :placeholder="t('components.wizards.generate.tempNone')"
+                    class="w-64"
                 />
-                <Select
+                <UiGroupedSelect
                     v-else
-                    v-model="ambientTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
+                    v-model="ambientTempKey"
+                    :groups="tempOptionGroups"
+                    clearable
                     filter
                     :filter-placeholder="t('common.search')"
                     :placeholder="t('components.wizards.generate.tempNone')"
+                    class="w-64"
                 />
             </div>
         </div>
@@ -501,10 +518,9 @@ const createAndApply = async (): Promise<void> => {
             <small class="ml-1 font-light text-sm">
                 {{ t('components.wizards.generate.presetIntro') }}
             </small>
-            <SelectButton
-                v-model="globalPreset"
-                :options="presetOptions"
-                :allow-empty="false"
+            <UiToggleGroup
+                v-model="globalPresetModel"
+                :options="presetToggleOptions"
                 class="self-start"
             />
             <button
@@ -520,10 +536,10 @@ const createAndApply = async (): Promise<void> => {
                     class="flex items-center justify-between gap-x-3"
                 >
                     <span class="ml-1">{{ row.label }}</span>
-                    <SelectButton
-                        v-model="overrideRows[index].preset"
-                        :options="presetOptions"
-                        :allow-empty="false"
+                    <UiToggleGroup
+                        :model-value="overrideRows[index].preset"
+                        :options="presetToggleOptions"
+                        @update:model-value="setOverridePreset(index, $event)"
                     />
                 </div>
             </div>
@@ -631,42 +647,38 @@ const createAndApply = async (): Promise<void> => {
 
         <!-- Footer -->
         <div class="flex flex-row justify-between mt-4">
-            <Button
-                v-if="step === 1"
-                class="w-24 bg-bg-one"
-                :label="t('common.cancel')"
-                @click="closeDialog"
-            />
-            <Button
-                v-else
-                class="w-24 bg-bg-one"
-                :label="t('common.back')"
-                @click="step = step - 1"
-            >
+            <UiButton v-if="step === 1" variant="ghost" class="w-24 bg-bg-one" @click="closeDialog">
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton v-else variant="ghost" class="w-24 bg-bg-one" @click="step = step - 1">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-if="step === 1"
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="assignedCount() === 0"
                 @click="step = 2"
-            />
-            <Button
+            >
+                {{ t('common.next') }}
+            </UiButton>
+            <UiButton
                 v-else-if="step === 2"
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 @click="goToPresets"
-            />
-            <Button
+            >
+                {{ t('common.next') }}
+            </UiButton>
+            <UiButton
                 v-else-if="step === 3"
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('components.wizards.generate.preview')"
+                variant="solid"
+                class="w-32 !bg-accent/80 !text-text-color hover:!bg-accent"
                 :disabled="assignedCount() === 0 || building"
                 @click="buildPreview"
             >
@@ -676,11 +688,11 @@ const createAndApply = async (): Promise<void> => {
                     :path="mdiAutoFix"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-else
-                class="bg-accent/80 hover:!bg-accent w-40"
-                :label="t('components.wizards.generate.createApply')"
+                variant="solid"
+                class="w-40 !bg-accent/80 !text-text-color hover:!bg-accent"
                 :disabled="applying"
                 @click="createAndApply"
             >
@@ -690,7 +702,7 @@ const createAndApply = async (): Promise<void> => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>
