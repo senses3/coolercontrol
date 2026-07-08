@@ -19,9 +19,11 @@
 <script setup lang="ts">
 import { inject, nextTick, ref, watch, type Ref } from 'vue'
 import type { DynamicDialogInstance } from '@/shell/dialog'
-import Password from 'primevue/password'
-import Button from 'primevue/button'
-import FloatLabel from 'primevue/floatlabel'
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiContentCopy } from '@mdi/js'
+import UiPasswordInput from '@/shell/ui/UiPasswordInput.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/shell/toast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -148,26 +150,26 @@ const goNext = async (): Promise<void> => {
         }
     }
     step.value = 2
-    nextTick(() => passwdInputArea.value.$el.children[0].focus())
+    nextTick(() => passwdInputArea.value.focus())
 }
 
 const goBack = (): void => {
     step.value = 1
     submitError.value = null
-    nextTick(() => currentPasswdInputArea.value.$el.children[0].focus())
+    nextTick(() => currentPasswdInputArea.value.focus())
 }
 
 const focusConfirm = (): void => {
     if (passwordIsInvalid(passwdInput.value)) return
-    nextTick(() => confirmPasswdInputArea.value.$el.children[0].focus())
+    nextTick(() => confirmPasswdInputArea.value.focus())
 }
 
 nextTick(async () => {
     await new Promise((resolve) => setTimeout(resolve, 300))
     if (step.value === 1) {
-        currentPasswdInputArea.value.$el.children[0].focus()
+        currentPasswdInputArea.value.focus()
     } else {
-        passwdInputArea.value.$el.children[0].focus()
+        passwdInputArea.value.focus()
     }
 })
 </script>
@@ -187,21 +189,22 @@ nextTick(async () => {
         <!-- Step 1: current password -->
         <template v-if="step === 1">
             <input type="text" autocomplete="username" value="CCAdmin" hidden aria-hidden="true" />
-            <FloatLabel class="mt-6 mb-1">
-                <Password
+            <div class="mt-6 mb-1">
+                <label
+                    for="current-password"
+                    class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                    >{{ t('common.currentPassword') }}</label
+                >
+                <UiPasswordInput
                     ref="currentPasswdInputArea"
-                    :class="{ filled: !passwordIsInvalid(currentPasswdInput) }"
                     id="current-password"
                     v-model="currentPasswdInput"
                     :invalid="currentPasswdTouched && passwordIsInvalid(currentPasswdInput)"
-                    :feedback="false"
-                    :pt="{ pcInputText: { root: { autocomplete: 'current-password' } } }"
-                    toggle-mask
+                    autocomplete="current-password"
                     required
                     @keydown.enter="goNext"
                 />
-                <label for="current-password">{{ t('common.currentPassword') }}</label>
-            </FloatLabel>
+            </div>
             <div class="min-h-[1.2rem] flex items-center gap-1 mb-16">
                 <i
                     v-if="currentPasswdTouched && passwordIsInvalid(currentPasswdInput)"
@@ -213,31 +216,22 @@ nextTick(async () => {
         <!-- Step 2: new password + confirm -->
         <template v-if="step === 2">
             <input type="text" autocomplete="username" value="CCAdmin" hidden aria-hidden="true" />
-            <FloatLabel class="mt-6 mb-1">
-                <Password
+            <div class="mt-6 mb-1">
+                <label
+                    :for="setPasswd ? 'new-password' : 'password'"
+                    class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                    >{{ setPasswd ? t('common.newPassword') : t('common.password') }}</label
+                >
+                <UiPasswordInput
                     ref="passwdInputArea"
-                    :class="{ filled: !passwordIsInvalid(passwdInput) }"
                     :id="setPasswd ? 'new-password' : 'password'"
                     v-model="passwdInput"
                     :invalid="passwdTouched && passwordIsInvalid(passwdInput)"
-                    :feedback="setPasswd"
-                    :pt="{
-                        pcInputText: {
-                            root: { autocomplete: setPasswd ? 'new-password' : 'current-password' },
-                        },
-                    }"
-                    toggle-mask
+                    :autocomplete="setPasswd ? 'new-password' : 'current-password'"
                     required
                     @keydown.enter="setPasswd ? focusConfirm() : closeAndProcess()"
-                    :prompt-label="t('common.passwordPrompt')"
-                    :weak-label="t('common.passwordWeak')"
-                    :medium-label="t('common.passwordMedium')"
-                    :strong-label="t('common.passwordStrong')"
                 />
-                <label :for="setPasswd ? 'new-password' : 'password'">{{
-                    setPasswd ? t('common.newPassword') : t('common.password')
-                }}</label>
-            </FloatLabel>
+            </div>
             <div class="min-h-[1.2rem] flex items-center gap-1">
                 <i
                     v-if="passwdTouched && passwordIsInvalid(passwdInput)"
@@ -245,25 +239,25 @@ nextTick(async () => {
                 />
             </div>
 
-            <FloatLabel v-if="setPasswd" class="mt-2 mb-1">
-                <Password
+            <div v-if="setPasswd" class="mt-2 mb-1">
+                <label
+                    for="confirm-password"
+                    class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                    >{{ t('common.confirmPassword') }}</label
+                >
+                <UiPasswordInput
                     ref="confirmPasswdInputArea"
-                    :class="{ filled: !passwordIsInvalid(confirmPasswdInput) }"
                     id="confirm-password"
                     v-model="confirmPasswdInput"
                     :invalid="
                         confirmPasswdTouched &&
                         (passwordIsInvalid(confirmPasswdInput) || passwordsMismatch())
                     "
-                    :feedback="false"
-                    :pt="{ pcInputText: { root: { autocomplete: 'new-password' } } }"
-                    toggle-mask
+                    autocomplete="new-password"
                     required
-                    bellow
                     @keydown.enter="closeAndProcess"
                 />
-                <label for="confirm-password">{{ t('common.confirmPassword') }}</label>
-            </FloatLabel>
+            </div>
             <div v-if="setPasswd" class="min-h-[1.2rem] flex items-center gap-1 mb-16">
                 <template v-if="confirmPasswdTouched">
                     <template v-if="passwordIsInvalid(confirmPasswdInput)">
@@ -283,32 +277,30 @@ nextTick(async () => {
             {{ submitError }}
         </p>
         <footer class="flex flex-col items-center place-content-between mt-4">
-            <Button
+            <UiButton
                 v-if="step === 1"
-                class="bg-accent/80 hover:!bg-accent/100 w-full"
+                class="w-full"
                 @click="goNext"
                 :disabled="passwordIsInvalid(currentPasswdInput) || submitting"
-                :loading="submitting"
             >
                 {{ t('components.password.continueButton') }}
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-if="step === 2"
-                class="bg-accent/80 hover:!bg-accent/100 w-full"
+                class="w-full"
                 @click="closeAndProcess"
                 :disabled="formIsInvalid() || submitting"
-                :loading="submitting"
             >
                 {{ setPasswd ? t('common.savePassword') : t('common.ok') }}
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-if="step === 2 && setPasswd && !autoFilledCurrentPasswd"
-                text
+                variant="ghost"
                 class="mt-2 text-text-color-secondary"
                 @click="goBack"
             >
                 ← {{ t('components.password.backButton') }}
-            </Button>
+            </UiButton>
             <br />
             <span
                 v-if="!autoFilledCurrentPasswd"
@@ -334,18 +326,19 @@ nextTick(async () => {
                     <code class="flex-1 font-mono text-sm select-all break-all">{{
                         RESET_COMMAND
                     }}</code>
-                    <Button
-                        text
-                        size="small"
-                        icon="pi pi-copy"
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
                         :aria-label="t('components.password.forgotPasswordCopyCommand')"
                         v-tooltip.top="t('components.password.forgotPasswordCopyCommand')"
                         @click="copyResetCommand"
-                    />
+                    >
+                        <svg-icon type="mdi" :path="mdiContentCopy" :size="18" />
+                    </UiButton>
                 </div>
-                <Button class="bg-accent/80 hover:!bg-accent/100 mt-1" @click="reloadAfterReset">
+                <UiButton class="mt-1" @click="reloadAfterReset">
                     {{ t('components.password.forgotPasswordReloadButton') }}
-                </Button>
+                </UiButton>
             </div>
         </footer>
     </form>
