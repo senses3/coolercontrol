@@ -53,6 +53,9 @@ const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const daemonState = useDaemonState()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+// True only when the app opened at the root URL (captured in main.ts before the
+// router rewrote the hash); gates the configured-start-page redirect below.
+const startedAtRoot = inject<boolean>('startedAtRoot', false)
 
 const daemonPort: Ref<number> = ref(deviceStore.getDaemonPort())
 const daemonAddress: Ref<string> = ref(deviceStore.getDaemonAddress())
@@ -309,11 +312,11 @@ onMounted(async () => {
     // Re-attach to a calibration batch the daemon is still driving after a
     // reload (the daemon owns the queue, so it survived the suspend/reload).
     const calibrationBatchResumed = await calibrationStore.ensureBatchPolling()
-    // Honor the configured startup page, but only when the user landed on the
-    // default root route (no deep link). Targets remap to the new shell:
-    // AppInfo -> Home (its content lives there now), Controls -> Cooling,
-    // HomeDashboard -> Monitoring (home dashboard).
-    if (router.currentRoute.value.name === 'section-home') {
+    // Honor the configured startup page, but only when the app opened at the
+    // root URL (startedAtRoot), not on a direct/deep link like /#/home. Targets
+    // remap to the new shell: AppInfo -> Home (its content lives there now),
+    // Controls -> Cooling, HomeDashboard -> Monitoring (home dashboard).
+    if (startedAtRoot) {
         const startup = settingsStore.startupPage
         if (startup === StartupPage.Controls) {
             await router.replace({ name: 'section-cooling' })
