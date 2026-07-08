@@ -45,7 +45,7 @@ const ensureTooltipEl = (): HTMLDivElement => {
     if (tooltipEl != null) return tooltipEl
     tooltipEl = document.createElement('div')
     tooltipEl.className =
-        'fixed z-[1200] hidden pointer-events-none max-w-80 whitespace-pre-line rounded-lg ' +
+        'fixed z-[1500] hidden pointer-events-none max-w-80 whitespace-pre-line rounded-lg ' +
         'border border-border-one bg-bg-two px-2.5 py-1.5 text-sm text-text-color shadow-md'
     document.body.appendChild(tooltipEl)
     const hideOnViewportChange = () => hide()
