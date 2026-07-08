@@ -25,20 +25,22 @@ import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
-import Button from 'primevue/button'
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiRefresh } from '@mdi/js'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiToast from '@/shell/ui/UiToast.vue'
 import UiConfirmDialog from '@/shell/ui/UiConfirmDialog.vue'
-import Dialog from 'primevue/dialog'
+import UiModal from '@/shell/ui/UiModal.vue'
 import UiDynamicDialog from '@/shell/ui/UiDynamicDialog.vue'
-import InputNumber from 'primevue/inputnumber'
-import InputText from 'primevue/inputtext'
 import { ThemeMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
 import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
-import FloatLabel from 'primevue/floatlabel'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n({ useScope: 'global' })
@@ -377,11 +379,13 @@ onMounted(async () => {
             </div>
         </template>
     </UiConfirmDialog>
-    <Dialog
-        class="leading-loose"
-        :visible="!initSuccessful"
-        :header="t('views.error.connectionError')"
-        :style="{ width: '50vw' }"
+    <UiModal
+        content-class="leading-loose"
+        :open="!initSuccessful"
+        :title="t('views.error.connectionError')"
+        :content-style="{ width: '50vw' }"
+        :closable="false"
+        :dismissable="false"
     >
         <p>
             {{ t('views.error.connectionErrorMessage') }} <br />
@@ -415,41 +419,37 @@ onMounted(async () => {
         </h6>
         <h6 v-else class="text-xl mb-4">{{ t('views.error.daemonAddressWeb') }}</h6>
         <div>
-            <div class="mt-8 flex flex-row">
-                <FloatLabel variant="on">
-                    <InputText
+            <div class="mt-8 flex flex-row items-end">
+                <div>
+                    <label
+                        for="host-address"
+                        class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                        >{{ t('common.address') }}</label
+                    >
+                    <UiInput
                         id="host-address"
                         v-model="daemonAddress"
                         class="mb-2 w-60"
                         v-tooltip.top="t('views.error.addressTooltip')"
                         :invalid="daemonAddress.length === 0"
                     />
-                    <label for="host-address">{{ t('common.address') }}</label>
-                </FloatLabel>
-                <span class="mx-2">:</span>
-                <FloatLabel variant="on">
-                    <InputNumber
+                </div>
+                <span class="mx-2 mb-4">:</span>
+                <div>
+                    <label
+                        for="daemon-port"
+                        class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                        >{{ t('common.port') }}</label
+                    >
+                    <UiNumberInput
                         id="daemon-port"
                         v-model="daemonPort"
-                        showButtons
                         :min="80"
                         :max="65535"
-                        :useGrouping="false"
                         class="mb-2"
-                        :input-style="{ width: '6rem' }"
                         v-tooltip.top="t('views.error.portTooltip')"
-                        button-layout="horizontal"
-                        :allow-empty="false"
-                    >
-                        <template #incrementicon>
-                            <span class="pi pi-plus" />
-                        </template>
-                        <template #decrementicon>
-                            <span class="pi pi-minus" />
-                        </template>
-                    </InputNumber>
-                    <label for="daemon-port">{{ t('common.port') }}</label>
-                </FloatLabel>
+                    />
+                </div>
             </div>
             <div class="flex flex-col mb-3 w-12 leading-none align-middle">
                 <small class="ml-3 font-light text-sm text-text-color-secondary">{{
@@ -461,48 +461,52 @@ onMounted(async () => {
                 </div>
             </div>
             <div>
-                <Button
-                    :label="t('common.saveAndRefresh')"
+                <UiButton
                     class="mb-2 w-44"
                     v-tooltip.top="t('views.error.saveTooltip')"
                     @click="saveDaemonSettings"
-                />
+                >
+                    {{ t('common.saveAndRefresh') }}
+                </UiButton>
             </div>
-            <Button
-                :label="t('common.reset')"
+            <UiButton
+                variant="outline"
                 v-tooltip.top="t('views.error.resetTooltip')"
                 @click="resetDaemonSettings"
-            />
+            >
+                {{ t('common.reset') }}
+            </UiButton>
         </div>
-        <template #footer>
-            <Button
-                :label="t('common.retry')"
-                icon="pi pi-refresh"
-                @click="deviceStore.reloadUI()"
-            />
-        </template>
-    </Dialog>
-    <Dialog
-        class="leading-loose"
-        :visible="deviceStore.accessDenied"
-        :header="t('views.error.accessDenied')"
-        :style="{ width: '30vw' }"
+        <div class="mt-4 flex justify-end">
+            <UiButton class="gap-1" @click="deviceStore.reloadUI()">
+                <svg-icon type="mdi" :path="mdiRefresh" :size="18" />
+                {{ t('common.retry') }}
+            </UiButton>
+        </div>
+    </UiModal>
+    <UiModal
+        content-class="leading-loose"
+        :open="deviceStore.accessDenied"
+        :title="t('views.error.accessDenied')"
+        :content-style="{ width: '30vw' }"
         :closable="false"
+        :dismissable="false"
     >
         <p>
             {{ t('views.error.accessDeniedMessage') }}
         </p>
-        <template #footer>
-            <Button
-                class="outline-none"
-                :label="t('common.retry')"
-                icon="pi pi-refresh"
+        <div class="mt-4 flex justify-end">
+            <UiButton
+                class="gap-1"
                 @click="deviceStore.reloadUI()"
                 @keydown.enter="deviceStore.reloadUI()"
                 autofocus
-            />
-        </template>
-    </Dialog>
+            >
+                <svg-icon type="mdi" :path="mdiRefresh" :size="18" />
+                {{ t('common.retry') }}
+            </UiButton>
+        </div>
+    </UiModal>
     <VOnboardingWrapper
         ref="onboardingWrapper"
         :steps="steps"
