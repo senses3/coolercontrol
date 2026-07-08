@@ -37,8 +37,12 @@ const props = withDefaults(
         contentClass?: string
         contentStyle?: Record<string, string>
         closable?: boolean
-        // dismissable: allow escape / overlay-click to close (PrimeVue dismissableMask).
+        // dismissable: allow an outside/overlay click to close (PrimeVue dismissableMask).
         dismissable?: boolean
+        // closeOnEscape: allow the Escape key to close. Kept separate from
+        // dismissable so a dialog can protect against stray outside-clicks while
+        // still honoring an intentional Escape (access tokens / password prompt).
+        closeOnEscape?: boolean
         // modal: render the dimming/blocking overlay and trap focus.
         modal?: boolean
     }>(),
@@ -48,14 +52,17 @@ const props = withDefaults(
         contentClass: '',
         closable: true,
         dismissable: true,
+        closeOnEscape: true,
         modal: true,
     },
 )
 
-// Block reka's auto-close on escape / outside-click when the dialog is
-// non-dismissable (e.g. the forced password prompt).
-const guardDismiss = (event: Event): void => {
+// Block reka's auto-close on outside-click / escape independently.
+const guardOutside = (event: Event): void => {
     if (!props.dismissable) event.preventDefault()
+}
+const guardEscape = (event: Event): void => {
+    if (!props.closeOnEscape) event.preventDefault()
 }
 </script>
 
@@ -70,9 +77,9 @@ const guardDismiss = (event: Event): void => {
                 class="fixed left-1/2 top-1/2 z-[1210] max-h-[92vh] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border-one bg-bg-two p-6 text-text-color shadow-xl outline-none"
                 :class="contentClass"
                 :style="contentStyle"
-                @escape-key-down="guardDismiss"
-                @pointer-down-outside="guardDismiss"
-                @interact-outside="guardDismiss"
+                @escape-key-down="guardEscape"
+                @pointer-down-outside="guardOutside"
+                @interact-outside="guardOutside"
             >
                 <div class="mb-4 flex items-start justify-between gap-4">
                     <DialogTitle

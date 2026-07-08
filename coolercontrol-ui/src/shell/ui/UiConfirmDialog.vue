@@ -18,9 +18,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { currentConfirm } from '@/shell/confirm'
 import UiModal from '@/shell/ui/UiModal.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
+
+const { t } = useI18n()
 
 // Each mounted dialog serves one group; the default one (no group prop) serves
 // ungrouped confirms.
@@ -68,7 +71,7 @@ const open = computed<boolean>({
                 :autofocus="active.defaultFocus === 'reject'"
                 @click="finish('reject')"
             >
-                {{ active.rejectLabel }}
+                {{ active.rejectLabel ?? t('common.no') }}
             </UiButton>
             <UiButton
                 variant="solid"
@@ -76,7 +79,7 @@ const open = computed<boolean>({
                 :class="active.acceptClass"
                 @click="finish('accept')"
             >
-                {{ active.acceptLabel }}
+                {{ active.acceptLabel ?? t('common.yes') }}
             </UiButton>
         </div>
     </UiModal>

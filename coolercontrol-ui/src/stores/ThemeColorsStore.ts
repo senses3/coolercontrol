@@ -67,6 +67,10 @@ export const useThemeColorsStore = defineStore('theme-colors', () => {
             '--colors-error-fg',
             bestForeground(parseRgb(rawVar('--colors-error'))).join(' '),
         )
+        // Match native controls (date picker popup + icon, scrollbars) to the
+        // theme's brightness so they don't render light-on-dark.
+        document.documentElement.style.colorScheme =
+            relLuminance(parseRgb(rawVar('--colors-bg-one'))) > 0.4 ? 'light' : 'dark'
     }
 
     const reLoadThemeColors = () => {
