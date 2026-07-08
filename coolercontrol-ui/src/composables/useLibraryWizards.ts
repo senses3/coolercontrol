@@ -20,7 +20,7 @@
 // code without a direct PrimeVue import there (dependency discipline).
 
 import { defineAsyncComponent } from 'vue'
-import { useDialog } from 'primevue/usedialog'
+import { useDialog } from '@/shell/dialog'
 import { useI18n } from 'vue-i18n'
 
 const profileWizard = defineAsyncComponent(() => import('@/components/wizards/profile/Wizard.vue'))

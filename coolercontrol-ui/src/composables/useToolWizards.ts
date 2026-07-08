@@ -22,7 +22,7 @@
 // whose listeners died with the old shell.
 
 import { defineAsyncComponent } from 'vue'
-import { useDialog } from 'primevue/usedialog'
+import { useDialog } from '@/shell/dialog'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
 

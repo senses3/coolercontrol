@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { inject, ref, type Ref } from 'vue'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import { Function } from '@/models/Profile.ts'
 import NewFunction from '@/components/wizards/fan-control/NewFunction.vue'
 import Summary from '@/components/wizards/function/Summary.vue'

@@ -21,7 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiLinkVariant } from '@mdi/js'
 import { inject, Ref } from 'vue'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/shell/toast'

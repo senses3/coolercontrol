@@ -29,7 +29,7 @@ import Button from 'primevue/button'
 import UiToast from '@/shell/ui/UiToast.vue'
 import UiConfirmDialog from '@/shell/ui/UiConfirmDialog.vue'
 import Dialog from 'primevue/dialog'
-import DynamicDialog from 'primevue/dynamicdialog'
+import UiDynamicDialog from '@/shell/ui/UiDynamicDialog.vue'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import { ThemeMode } from '@/models/UISettings.ts'
@@ -357,7 +357,7 @@ onMounted(async () => {
 <template>
     <RouterView v-if="loaded" />
     <UiToast />
-    <DynamicDialog />
+    <UiDynamicDialog />
     <UiConfirmDialog />
     <UiConfirmDialog group="AseTek690">
         <template #message="slotProps">
