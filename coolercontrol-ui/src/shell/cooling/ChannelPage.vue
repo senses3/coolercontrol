@@ -42,6 +42,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
@@ -371,29 +372,13 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         :max="speedOptions?.max_duty ?? 100"
                         class="w-full max-w-md"
                     />
-                    <div
-                        class="flex items-center gap-1 rounded-lg border border-border-one bg-bg-two px-2 py-1"
-                    >
-                        <input
-                            type="number"
-                            :value="manualDuty"
-                            :min="speedOptions?.min_duty ?? 0"
-                            :max="speedOptions?.max_duty ?? 100"
-                            step="1"
-                            class="w-14 bg-transparent text-right tabular-nums text-text-color outline-none"
-                            @change="
-                                (e) =>
-                                    (manualDuty = Math.min(
-                                        Math.max(
-                                            Number((e.target as HTMLInputElement).value),
-                                            speedOptions?.min_duty ?? 0,
-                                        ),
-                                        speedOptions?.max_duty ?? 100,
-                                    ))
-                            "
-                        />
-                        <span class="text-text-color-secondary">%</span>
-                    </div>
+                    <UiNumberInput
+                        v-model="manualDuty"
+                        :min="speedOptions?.min_duty ?? 0"
+                        :max="speedOptions?.max_duty ?? 100"
+                        :step="1"
+                        suffix="%"
+                    />
                 </div>
                 <SpeedFixedChart
                     :duty="manualDuty"
