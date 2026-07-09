@@ -176,7 +176,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: 'هذا الجهاز معطّل.',
                 enableDevice: 'تمكين الجهاز',
-                disableUnusedSensors: 'تعطيل المستشعرات غير المستخدمة (موصى به)',
+                disableUnusedSensors: 'تعطيل المستشعرات غير المستخدمة… (موصى به)',
                 sensors: 'المستشعرات',
             },
             coolingPage: {

@@ -180,7 +180,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: 'Este dispositivo está deshabilitado.',
                 enableDevice: 'Habilitar Dispositivo',
-                disableUnusedSensors: 'Deshabilitar sensores no utilizados (recomendado)',
+                disableUnusedSensors: 'Deshabilitar sensores no utilizados… (recomendado)',
                 sensors: 'Sensores',
             },
             coolingPage: {

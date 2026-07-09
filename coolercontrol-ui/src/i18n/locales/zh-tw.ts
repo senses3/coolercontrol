@@ -176,7 +176,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: '此裝置已停用。',
                 enableDevice: '啟用裝置',
-                disableUnusedSensors: '停用未使用的感測器（建議）',
+                disableUnusedSensors: '停用未使用的感測器…（建議）',
                 sensors: '感測器',
             },
             coolingPage: {

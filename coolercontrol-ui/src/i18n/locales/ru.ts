@@ -178,7 +178,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: 'Это устройство отключено.',
                 enableDevice: 'Включить устройство',
-                disableUnusedSensors: 'Отключить неиспользуемые датчики (рекомендуется)',
+                disableUnusedSensors: 'Отключить неиспользуемые датчики… (рекомендуется)',
                 sensors: 'Датчики',
             },
             coolingPage: {

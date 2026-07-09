@@ -176,7 +176,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: 'このデバイスは無効化されています。',
                 enableDevice: 'デバイスを有効化',
-                disableUnusedSensors: '使用していないセンサーを無効化（推奨）',
+                disableUnusedSensors: '使用していないセンサーを無効化…（推奨）',
                 sensors: 'センサー',
             },
             coolingPage: {

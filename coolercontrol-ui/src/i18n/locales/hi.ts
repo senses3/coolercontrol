@@ -177,7 +177,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: 'यह डिवाइस अक्षम है।',
                 enableDevice: 'डिवाइस सक्षम करें',
-                disableUnusedSensors: 'अप्रयुक्त सेंसर अक्षम करें (अनुशंसित)',
+                disableUnusedSensors: 'अप्रयुक्त सेंसर अक्षम करें… (अनुशंसित)',
                 sensors: 'सेंसर',
             },
             coolingPage: {
