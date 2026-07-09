@@ -121,6 +121,22 @@ export default defineConfig({
         assetsInlineLimit: 10_240_000,
         cssCodeSplit: false,
         chunkSizeWarningLimit: 2_500,
+        rollupOptions: {
+            // reka-ui bundles its own @vueuse/core whose built output places
+            // /* #__PURE__ */ comments where Rolldown flags them as invalid.
+            // It is a third-party artifact we cannot fix, so silence only that
+            // warning for that dependency; our own annotations still warn.
+            onLog(level, log, handler) {
+                if (
+                    level === 'warn' &&
+                    log.code === 'INVALID_ANNOTATION' &&
+                    (log.id ?? log.message ?? '').includes('@vueuse/core')
+                ) {
+                    return
+                }
+                handler(level, log)
+            },
+        },
     },
     css: {
         postcss: './postcss.config.js',
