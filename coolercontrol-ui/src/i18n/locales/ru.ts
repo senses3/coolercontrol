@@ -845,6 +845,7 @@ export default {
         modes: {
             createMode: 'Создать режим',
             editMode: 'Редактировать режим',
+            updateToCurrent: 'Сохранить текущие настройки в режим',
             deleteMode: 'Удалить режим',
             noModes: 'Нет настроенных режимов',
             deleteModeConfirm: 'Вы уверены, что хотите удалить режим: "{name}"?',

@@ -828,6 +828,7 @@ export default {
         modes: {
             createMode: '모드 생성',
             editMode: '모드 편집',
+            updateToCurrent: '현재 설정을 모드에 저장',
             deleteMode: '모드 삭제',
             noModes: '구성된 모드 없음',
             deleteModeConfirm: '다음 모드를 삭제할까요: "{name}" 맞나요?',

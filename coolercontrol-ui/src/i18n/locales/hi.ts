@@ -832,6 +832,7 @@ export default {
         modes: {
             createMode: 'मोड बनाएं',
             editMode: 'मोड संपादित करें',
+            updateToCurrent: 'वर्तमान सेटिंग्स को मोड में सहेजें',
             deleteMode: 'मोड हटाएं',
             noModes: 'कोई मोड कॉन्फ़िगर नहीं है',
             deleteModeConfirm: 'क्या आप वाकई मोड हटाना चाहते हैं: "{name}"?',

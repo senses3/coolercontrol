@@ -830,6 +830,7 @@ export default {
         modes: {
             createMode: 'إنشاء وضع',
             editMode: 'تعديل الوضع',
+            updateToCurrent: 'حفظ الإعدادات الحالية في الوضع',
             deleteMode: 'حذف الوضع',
             noModes: 'لا توجد أوضاع مكونة',
             deleteModeConfirm: 'هل أنت متأكد من رغبتك في حذف الوضع: "{name}"؟',

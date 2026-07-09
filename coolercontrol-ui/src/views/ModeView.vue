@@ -23,11 +23,11 @@ import {
     mdiAlertOutline,
     mdiBookmarkCheckOutline,
     mdiContentDuplicate,
+    mdiContentSaveOutline,
     mdiDeleteOutline,
     mdiInformationSlabCircleOutline,
     mdiMemory,
     mdiMinusThick,
-    mdiUpdate,
 } from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { computed, inject, onMounted, type Ref, ref, watch } from 'vue'
@@ -249,10 +249,14 @@ const deleteMode = (): void => {
         <div class="flex flex-row items-center">
             <div
                 class="p-2 flex leading-none items-center cursor-pointer"
-                v-tooltip.top="t('views.modes.editMode')"
+                v-tooltip.top="t('views.modes.updateToCurrent')"
                 @click="updateModeWithCurrentSettings"
             >
-                <svg-icon type="mdi" :path="mdiUpdate" :size="deviceStore.getREMSize(1.25)" />
+                <svg-icon
+                    type="mdi"
+                    :path="mdiContentSaveOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
             </div>
             <div
                 class="p-2 flex leading-none items-center cursor-pointer"

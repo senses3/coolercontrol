@@ -806,6 +806,7 @@ export default {
         modes: {
             createMode: '创建模式',
             editMode: '编辑模式',
+            updateToCurrent: '将当前设置保存到模式',
             deleteMode: '删除模式',
             noModes: '尚未配置模式',
             deleteModeConfirm: '确定要删除模式："{name}"?',

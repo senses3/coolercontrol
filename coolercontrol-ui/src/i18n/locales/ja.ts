@@ -839,6 +839,7 @@ export default {
         modes: {
             createMode: 'モードを作成',
             editMode: 'モードを編集',
+            updateToCurrent: '現在の設定をモードに保存',
             deleteMode: 'モードを削除',
             noModes: 'モードが設定されていません',
             deleteModeConfirm: 'モードを削除してもよろしいですか："{name}"？',
