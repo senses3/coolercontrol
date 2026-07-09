@@ -105,6 +105,112 @@ export default {
         },
     },
     layout: {
+        shell: {
+            home: 'ホーム',
+            cooling: '冷却',
+            monitoring: 'モニタリング',
+            devices: 'デバイス',
+            settings: '設定',
+            plugins: 'プラグイン',
+            modes: 'モード',
+            sectionPlaceholder: 'このセクションはUIリデザインのフェーズ{phase}で追加されます。',
+            panelPlaceholder: 'セクションの内容はフェーズ{phase}で追加されます。',
+            laterPhase: '後のフェーズでここに移動します',
+            manageModes: 'モードを管理',
+            access: 'アクセス',
+            power: '電源',
+            noModes: '保存されたモードがありません',
+            coolingPanel: {
+                pinned: 'ピン留め済み',
+                pin: 'ピン留め',
+                unpin: 'ピン留め解除',
+                library: 'プロファイルと機能',
+                profiles: 'プロファイル',
+                functions: '機能',
+            },
+            monitoringPanel: {
+                newDashboard: '新しいダッシュボード',
+                createAlert: 'このセンサーのアラートを作成',
+                failAlert: '故障アラートを作成（0 rpmでトリガー）',
+                failAlertSuffix: '故障',
+            },
+            devicesPanel: {
+                disabled: '無効',
+            },
+            sensorDest: {
+                monitoring: 'モニタリング',
+                cooling: '冷却',
+                lighting: '照明',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'センサーを管理',
+                hint: 'デバイスとセンサーを有効化または無効化します。使用していないものは無効化することをお勧めします。',
+                pendingChanges: '変更なし | {count}件の変更 | {count}件の変更',
+                applyRestart: '適用して再起動',
+                disabledDevices: '無効化されたデバイス',
+                openButton: 'センサーを管理',
+            },
+            homePanel: {
+                overview: '概要',
+                logs: 'ログ',
+            },
+            homePage: {
+                viewLogs: 'ログを表示',
+                logsAll: 'すべて',
+                logsWarnings: '警告以上',
+                logsErrors: 'エラー',
+                logsNoMatches: '一致するログ行がありません。',
+                getStartedGroup: 'はじめに',
+                learnGroup: '学ぶ',
+                resourcesGroup: 'リソース',
+                modeAndAlerts: 'モードとアラート',
+                noActiveMode: 'アクティブなモードがありません',
+                setUpCooling: '冷却を設定',
+            },
+            devicesPage: {
+                landingHint: 'デバイスを選択して詳細と設定を表示します。',
+                temps: '温度',
+                fans: 'ファン',
+                lighting: '照明',
+                lcd: 'LCD',
+                deviceDisabled: 'このデバイスは無効化されています。',
+                enableDevice: 'デバイスを有効化',
+                disableUnusedSensors: '使用していないセンサーを無効化（推奨）',
+                sensors: 'センサー',
+            },
+            coolingPage: {
+                landingHint: 'ファンまたはポンプを選択して冷却を表示・調整します。',
+                noChannels: '制御可能なファンまたはポンプのチャンネルが検出されませんでした。',
+                guidedSetup: 'ガイド付きセットアップ',
+                manualAt: '手動 {duty}%',
+                manualDuty: '手動デューティ',
+                modeProfile: 'プロファイル',
+                modeManual: '手動',
+                modeUnmanaged: '未管理',
+                unmanagedHint:
+                    'デバイスまたはそのファームウェアがこのチャンネルを制御します。CoolerControlは速度コマンドを送信しません。',
+                apply: '適用',
+                saveAndApply: '保存して適用',
+                selectProfile: 'プロファイルを選択',
+                sharedWith: '他{count}件と共有中',
+                sharedTooltip: 'このプロファイルは他のチャンネルも制御しています。',
+                forkForFan: 'このファン用に複製',
+                notControllable:
+                    'このチャンネルは速度を報告しますが、CoolerControlでは制御できません。',
+                advanced: '詳細設定',
+                activeMode: 'アクティブ',
+                previousMode: '前回',
+                activate: 'アクティブ化',
+                noModes:
+                    '保存されたモードはまだありません。モードはすべてのチャンネル設定をスナップショットして素早く切り替えられます。',
+                chain: {
+                    tempSource: '温度ソース',
+                    profile: 'プロファイル',
+                    function: '機能',
+                },
+            },
+        },
         topbar: {
             login: 'ログイン',
             logout: 'ログアウト',
@@ -124,6 +230,7 @@ export default {
             collapseMenu: 'メニューを折りたたむ',
             controls: 'コントロール',
             alerts: 'アラート',
+            plugins: 'プラグイン',
             settings: '設定',
             openInBrowser: 'ブラウザで開く',
             modes: 'モード',
@@ -161,6 +268,7 @@ export default {
             dashboards: 'ダッシュボード',
             modes: 'モード',
             appearance: '外観',
+            general: '一般',
             language: '言語',
             selectLanguage: '言語を選択',
             english: '英語',
@@ -198,6 +306,14 @@ export default {
             entitiesBelowSensors: 'センサーの下にエンティティを表示',
             dashboardLineSize: 'ダッシュボードの線のサイズ',
             themeStyle: 'テーマスタイル',
+            themeMode: {
+                system: 'システム',
+                dark: 'ダーク',
+                light: 'ライト',
+                highContrastDark: 'ハイコントラストダーク',
+                highContrastLight: 'ハイコントラストライト',
+                custom: 'カスタム',
+            },
             desktop: 'デスクトップ',
             startInTray: 'トレイで起動',
             closeToTray: 'トレイに閉じる',
@@ -229,26 +345,6 @@ export default {
                 themeApplied: 'テーマを適用しました',
                 invalidThemeCode: '無効なテーマコード',
             },
-            applySettingAndRestart:
-                'この設定を変更するにはデーモンとUIの再起動が必要です。今すぐ実行しますか？',
-            restartHeader: '設定を適用して再起動',
-            restartSuccess: '今再起動しています',
-            success: '成功',
-            successDetail: '操作が正常に完了しました',
-            settingsAppliedSuccess: '設定が正常に適用されました',
-            restartRequestSuccess: '再起動リクエストが正常に送信されました',
-            colorPickerDialogTitle: '色を選択',
-            colorPickerConfirm: '確認',
-            colorPickerCancel: 'キャンセル',
-            languageChangeConfirm: '言語を変更しますか？',
-            languageChangeConfirmMessage:
-                '続行してもよろしいですか？インターフェース要素の一部が正しく表示されない場合は、手動でページを更新してください。',
-            languageChangeSuccess: '言語の切り替えに成功しました。',
-            languageChangeError: '言語の変更に失敗しました。もう一度お試しください。',
-            themeChangeSuccess: 'テーマの切り替えに成功しました。',
-            entitiesBelowSensorsEnabledMessage: 'エンティティはセンサーの下に表示されます。',
-            entitiesBelowSensorsDisabledMessage:
-                'エンティティはセンサーの下に表示されなくなります。',
             tooltips: {
                 introduction: 'アプリケーション紹介ツアーを開始します。',
                 timeFormat: '時間形式：12時間（AM/PM）または24時間',
@@ -302,31 +398,27 @@ export default {
                 pasteThemeCode: '共有されたコード (cct1:...) からカスタムテーマを適用します。',
                 exportThemeFile: '現在のカスタムテーマをJSONファイルに保存します。',
                 importThemeFile: 'ディスク上のJSONファイルからカスタムテーマを読み込みます。',
-                applySettingAndRestart:
-                    'この設定を変更するにはデーモンとUIの再起動が必要です。今すぐ実行しますか？',
-                restartHeader: '設定を適用して再起動',
-                restartSuccess: '今再起動しています',
-                success: '成功',
-                successDetail: '操作が正常に完了しました',
-                settingsAppliedSuccess: '設定が正常に適用されました',
-                restartRequestSuccess: '再起動リクエストが正常に送信されました',
-                colorPickerDialogTitle: '色を選択',
-                colorPickerConfirm: '確認',
-                colorPickerCancel: 'キャンセル',
-                languageChangeConfirm: '言語を変更しますか？',
-                languageChangeConfirmMessage:
-                    '続行してもよろしいですか？インターフェース要素の一部が正しく表示されない場合は、手動でページを更新してください。',
-                languageChangeSuccess: '言語の切り替えに成功しました。',
-                languageChangeError: '言語の変更に失敗しました。もう一度お試しください。',
             },
-            themeMode: {
-                system: 'システム',
-                dark: 'ダーク',
-                light: 'ライト',
-                highContrastDark: 'ハイコントラストダーク',
-                highContrastLight: 'ハイコントラストライト',
-                custom: 'カスタム',
-            },
+            applySettingAndRestart:
+                'この設定を変更するにはデーモンとUIの再起動が必要です。今すぐ実行しますか？',
+            restartHeader: '設定を適用して再起動',
+            restartSuccess: '今再起動しています',
+            success: '成功',
+            successDetail: '操作が正常に完了しました',
+            settingsAppliedSuccess: '設定が正常に適用されました',
+            restartRequestSuccess: '再起動リクエストが正常に送信されました',
+            colorPickerDialogTitle: '色を選択',
+            colorPickerConfirm: '確認',
+            colorPickerCancel: 'キャンセル',
+            languageChangeConfirm: '言語を変更しますか？',
+            languageChangeConfirmMessage:
+                '続行してもよろしいですか？インターフェース要素の一部が正しく表示されない場合は、手動でページを更新してください。',
+            languageChangeSuccess: '言語の切り替えに成功しました。',
+            languageChangeError: '言語の変更に失敗しました。もう一度お試しください。',
+            themeChangeSuccess: 'テーマの切り替えに成功しました。',
+            entitiesBelowSensorsEnabledMessage: 'エンティティはセンサーの下に表示されます。',
+            entitiesBelowSensorsDisabledMessage:
+                'エンティティはセンサーの下に表示されなくなります。',
         },
         menu: {
             system: 'システム',
@@ -420,35 +512,6 @@ export default {
         },
     },
     views: {
-        error: {
-            accessDenied: 'アクセス拒否',
-            accessDeniedMessage: '認証に失敗しました。パスワードを確認して再度お試しください。',
-            connectionError: 'CoolerControl 接続エラー',
-            connectionToast: 'デーモンに接続できません',
-            connectionToastDetail:
-                'デーモンに接続できません。サービスが実行されていることを確認して、再接続を試みてください。',
-            connectionRetryFailure: '接続失敗 - 再試行に失敗しました',
-            connectionRetryDetail: '複数回試行してもデーモンに接続できませんでした。',
-            errorLoadingGraph: 'グラフの読み込みエラー',
-            highCpuUsageWarning: '高いCPU使用率を検出しました',
-            highCpuUsageDetail:
-                '現在のCPU使用率が高いです。\nシステムへの影響を減らすために、以下を検討してください：\n1. 表示するチャートの数を減らす\n2. 監視するセンサーの数を減らす\n3. ポーリング間隔を増やす',
-            pageNotFound: 'ページが見つかりません',
-            returnToDashboard: 'ダッシュボードに戻る',
-            connectionErrorMessage: 'CoolerControlデーモンに接続できませんでした。',
-            serviceRunningMessage: 'デーモンサービスが実行されているか確認してください。',
-            checkProjectPage: 'デーモンのセットアップに関するヘルプについては、',
-            projectPage: 'プロジェクトページ',
-            helpfulCommands: '役立つコマンド：',
-            nonStandardAddress: '非標準のデーモンアドレスをお持ちの場合は、以下で指定できます：',
-            daemonAddressDesktop: 'デーモンアドレス（デスクトップアプリ）',
-            daemonAddressWeb: 'デーモンアドレス（Web UI）',
-            addressTooltip: '接続を確立するためのIPアドレスまたはドメイン名。',
-            portTooltip: '接続を確立するためのポート。',
-            sslTooltip: 'SSL/TLSを使用してデーモンに接続するかどうか。',
-            saveTooltip: '設定を保存してUIをリロードします',
-            resetTooltip: 'デフォルト設定にリセットします',
-        },
         daemon: {
             title: 'デーモン',
             daemonErrors: 'デーモンエラー',
@@ -578,12 +641,6 @@ export default {
             duplicateDashboard: 'ダッシュボードを複製',
         },
         appInfo: {
-            gettingStartedAutoCreate:
-                '{wizard} を使うと、すべてのファンの基本的なプロファイルを一度に設定できます。',
-            gettingStartedAutoCreateLink: 'プロファイルの自動作成',
-            calibrateFans:
-                '一貫した制御のために、{wizard}。これにより、同じ % が各ファンで同程度の速度を意味するようになります。',
-            calibrateFansLink: 'ファンをキャリブレーション',
             title: '情報とツール',
             noWarranty: 'このプログラムは絶対に保証がありません。',
             changeStartupPage: '設定で起動時のページを変更',
@@ -603,6 +660,7 @@ export default {
             uiTour: 'UIツアー',
             uiTourDesc: 'アプリケーションのガイド付きツアー',
             gettingStarted: '開始方法',
+            helpSettingUp: 'ファン制御の設定ヘルプ',
             gettingStartedGraphProfile: 'グラフプロファイル',
             gettingStartedControlsPage: 'コントロールページ',
             gettingStartedStep1:
@@ -610,7 +668,12 @@ export default {
             gettingStartedStep2:
                 '{controls}（またはファン自体のページ）から割り当てます。プロファイルは自動適用されません。',
             gettingStartedStep3: '同じプロファイルを複数のファンで再利用できます。',
-            helpSettingUp: 'ファン制御の設定ヘルプ',
+            gettingStartedAutoCreate:
+                '{wizard} を使うと、すべてのファンの基本的なプロファイルを一度に設定できます。',
+            gettingStartedAutoCreateLink: 'プロファイルの自動作成',
+            calibrateFans:
+                '一貫した制御のために、{wizard}。これにより、同じ % が各ファンで同程度の速度を意味するようになります。',
+            calibrateFansLink: 'ファンをキャリブレーション',
             hardwareSupport: 'ハードウェアサポート',
             hardwareSupportDesc: 'サポートされているデバイスとドライバのインストール',
             gitRepository: 'Gitリポジトリ',
@@ -658,6 +721,8 @@ export default {
             proceed: '続行',
         },
         alerts: {
+            range: '範囲：{min}～{max}{unit}',
+            since: '{time}から',
             createAlert: 'アラートを作成',
             editAlert: 'アラートを編集',
             deleteAlert: 'アラートを削除',
@@ -724,6 +789,7 @@ export default {
             },
             profileDeleted: 'プロファイルが削除されました',
             profileDuplicated: 'プロファイルが複製されました',
+            usedBy: '使用箇所',
             deleteProfileConfirm: '本当に削除しますか："{name}"？',
             deleteProfileWithChannelsConfirm:
                 '"{name}"は現在：{channels}で使用されています。\nこのプロファイルを削除すると、それらのチャンネルの設定がリセットされます。\n本当に"{name}"を削除しますか？',
@@ -787,10 +853,7 @@ export default {
             saveFunction: '機能を保存',
             functionType: '機能タイプ',
             functionTypeTooltip:
-                '機能タイプ：<br/>' +
-                '- <b>恒等関数</b>：ステップサイズ制限を適用しますが、それ以外はプロファイル値をそのまま渡します。<br/>' +
-                '- <b>標準</b>：ステップサイズ制限とヒステリシス設定を適用し、ファン応答時間と安定性を精密に制御します。<br/>' +
-                '- <b>指数移動平均</b>：加重平均を使用して温度変動を平滑化します。標準より簡単ですが精度は劣ります。',
+                '機能タイプ：<br/>- <b>恒等関数</b>：ステップサイズ制限を適用しますが、それ以外はプロファイル値をそのまま渡します。<br/>- <b>標準</b>：ステップサイズ制限とヒステリシス設定を適用し、ファン応答時間と安定性を精密に制御します。<br/>- <b>指数移動平均</b>：加重平均を使用して温度変動を平滑化します。標準より簡単ですが精度は劣ります。',
             stepSizeTitle: 'ステップサイズ',
             fixedStepSize: '固定',
             fixedStepSizeTooltip:
@@ -842,10 +905,10 @@ export default {
             onlyDownward: '下降時のみ',
             onlyDownwardTooltip: '温度が下降しているときのみヒステリシス設定を適用します。',
             general: '一般',
+            stepOverrides: 'ステップオーバーライド',
             thresholdHopping: 'しきい値ホッピング',
             thresholdHoppingTooltip:
                 'ファン速度が30秒以上変化しない場合、ステップサイズとヒステリシス制限が一時的にバイパスされます。\nこれにより、保守的なしきい値設定でもファンが最終的に目標速度に達することが保証されます。',
-            stepOverrides: 'ステップオーバーライド',
             bypassMinAtExtremes: '常に 0% / 100% を適用',
             bypassMinAtExtremesTooltip:
                 '有効にすると、変化が最小ステップサイズより小さい場合でも、0% または 100% のターゲットデューティが適用されます。\nファンを完全に停止させるか、最大 RPM に到達させるのに便利です。デフォルトでは無効です。',
@@ -855,11 +918,41 @@ export default {
             newFunction: '新しい機能',
             functionDeleted: '機能が削除されました',
             functionDuplicated: '機能が複製されました',
+            usedBy: '使用箇所',
             deleteFunctionConfirm: '"{name}"を削除してもよろしいですか？',
             deleteFunctionWithProfilesConfirm:
                 '"{name}"は現在以下のプロファイルで使用されています：{profiles}。\nこの機能を削除すると、それらのプロファイルの機能がリセットされます。\n"{name}"を削除してもよろしいですか？',
             functionUpdated: '機能が更新されました',
             functionUpdateError: 'この機能の更新中にエラーが発生しました',
+        },
+        error: {
+            accessDenied: 'アクセス拒否',
+            accessDeniedMessage: '認証に失敗しました。パスワードを確認して再度お試しください。',
+            connectionError: 'CoolerControl 接続エラー',
+            connectionToast: 'デーモンに接続できません',
+            connectionToastDetail:
+                'デーモンに接続できません。サービスが実行されていることを確認して、再接続を試みてください。',
+            connectionRetryFailure: '接続失敗 - 再試行に失敗しました',
+            connectionRetryDetail: '複数回試行してもデーモンに接続できませんでした。',
+            errorLoadingGraph: 'グラフの読み込みエラー',
+            highCpuUsageWarning: '高いCPU使用率を検出しました',
+            highCpuUsageDetail:
+                '現在のCPU使用率が高いです。\nシステムへの影響を減らすために、以下を検討してください：\n1. 表示するチャートの数を減らす\n2. 監視するセンサーの数を減らす\n3. ポーリング間隔を増やす',
+            pageNotFound: 'ページが見つかりません',
+            returnToDashboard: 'ダッシュボードに戻る',
+            connectionErrorMessage: 'CoolerControlデーモンに接続できませんでした。',
+            serviceRunningMessage: 'デーモンサービスが実行されているか確認してください。',
+            checkProjectPage: 'デーモンのセットアップに関するヘルプについては、',
+            projectPage: 'プロジェクトページ',
+            helpfulCommands: '役立つコマンド：',
+            nonStandardAddress: '非標準のデーモンアドレスをお持ちの場合は、以下で指定できます：',
+            daemonAddressDesktop: 'デーモンアドレス（デスクトップアプリ）',
+            daemonAddressWeb: 'デーモンアドレス（Web UI）',
+            addressTooltip: '接続を確立するためのIPアドレスまたはドメイン名。',
+            portTooltip: '接続を確立するためのポート。',
+            sslTooltip: 'SSL/TLSを使用してデーモンに接続するかどうか。',
+            saveTooltip: '設定を保存してUIをリロードします',
+            resetTooltip: 'デフォルト設定にリセットします',
         },
         singleDashboard: {
             minutes: '分',
@@ -910,6 +1003,8 @@ export default {
             notImageType: 'ファイルが画像タイプとして登録されていません',
         },
         shortcuts: {
+            browserHint:
+                'Webブラウザでは代わりにCtrl+Alt+数字を使用してください（ブラウザはCtrl+数字をタブ切り替えに予約しています）。',
             shortcuts: 'キーボードショートカット',
             ctrl: 'Ctrl',
             alt: 'Alt',
@@ -1034,12 +1129,27 @@ export default {
             startTourAgain: '情報とツールページからいつでもこのツアーを再開できます。',
             quickTour: 'クイックツアー',
             thoroughTour: '詳細ツアー',
+            startTour: 'ツアーを開始',
             maybeLater: '後で',
             openGettingStarted: 'はじめに文書を開く',
             finishLater: '自分でやってみる',
             appInfo: '情報とツール',
             appInfoDesc:
                 'アプリ情報、デーモンステータス、ログ、便利なリンク、ストレステストツールを表示します。ロゴ上のバッジが問題をお知らせします。',
+            home: 'ホーム',
+            homeDesc:
+                'ランディングページ：デーモンの状態とデバイスの状態が一目でわかり、ログ、アプリ情報、役立つリンク、ストレステストツールも利用できます。',
+            cooling: '冷却',
+            coolingDesc:
+                'ファン制御の拠点：ファン速度やポンプを調整し、任意のチャンネルにプロファイルと機能を適用できます。',
+            monitoring: 'モニタリング',
+            monitoringDesc:
+                'ダッシュボードを作成し、すべてのセンサーを監視し、アラートを設定してシステムをリアルタイムで追跡します。',
+            devices: 'デバイス',
+            devicesDesc:
+                '検出されたハードウェアを確認し、RGB照明やLCD画面などのデバイスごとの機能を設定し、カスタムセンサーを作成します。',
+            plugins: 'プラグイン',
+            pluginsDesc: 'CoolerControlを拡張するインストール済みプラグインを閲覧して開きます。',
             controls: 'コントロール',
             controlsDesc:
                 'ファン速度を調整し、プロファイルを適用し、検出されたすべてのチャネルを一箇所で管理できます。',
@@ -1151,50 +1261,6 @@ export default {
                 stageDownSweep: 'ダウンスイープ',
                 stageFinalizing: '完了処理中',
             },
-            generate: {
-                title: 'プロファイルの自動作成',
-                tooltip: 'いくつかの選択からファン用のプロファイルを自動作成します',
-                stepFans: 'ファンの割り当て',
-                stepTemps: '主要な温度',
-                stepPreset: 'パフォーマンス',
-                assignIntro:
-                    '各ファンに役割を割り当ててください。ファンを未設定のままにするとスキップされます。',
-                skip: 'スキップ',
-                noFans: '制御可能なファンが検出されませんでした。',
-                tempsIntro:
-                    '主要な温度を確認してください。これらは推測値として事前入力されています。確認してください。',
-                cpuTemp: 'CPU温度',
-                gpuTemp: 'GPU温度',
-                liquidTemp: '液体温度',
-                ambientTemp: '周囲温度（任意）',
-                tempNone: 'なし',
-                presetIntro: 'ファンをどの程度積極的に回転させるかを選択してください。',
-                perKindOverrides: '役割ごとの上書き（詳細）',
-                cfmCaveat:
-                    '正圧バイアスは風量ではなくデューティに基づいています。ファンの数が偏っている場合、正圧は保証できません。',
-                generate: '生成',
-                preview: 'プレビュー',
-                previewIntro:
-                    '作成および適用される内容を確認してください。確認するまで何も保存されません。',
-                previewAssignments: 'ファンの割り当て',
-                willCreateHeader: '作成される項目',
-                startingPointNote:
-                    'ゼロから作るのではなく、手軽な出発点です。すべてのシステムで完璧というわけではないため、作成後に確認・テスト・調整してください。',
-                replaces: '{name} を置き換えます',
-                createApply: '作成して適用',
-                generated: '{count} 個のプロファイルを生成しました。',
-                generateError: 'プロファイルを生成できませんでした。',
-                applyError: 'プロファイルを作成できませんでした。',
-                kind: {
-                    CpuCooler: 'CPU空冷クーラー',
-                    GpuFan: 'GPUファン',
-                    AioRadiator: 'AIOラジエーター',
-                    AioPump: 'AIOポンプ',
-                    CaseIntake: 'ケース吸気',
-                    CaseExhaust: 'ケース排気',
-                    LaptopFan: 'ノートPCファン',
-                },
-            },
             fanControl: {
                 fanControlWizard: 'ファン制御ウィザード',
                 editCurrentProfile: 'プロファイルを編集',
@@ -1247,6 +1313,51 @@ export default {
             },
             customSensor: {
                 new: '新しいカスタムセンサー',
+            },
+            generate: {
+                title: 'プロファイルの自動作成',
+                tooltip: 'いくつかの選択からファン用のプロファイルを自動作成します',
+                stepFans: 'ファンの割り当て',
+                stepTemps: '主要な温度',
+                stepPreset: 'パフォーマンス',
+                assignIntro:
+                    '各ファンに役割を割り当ててください。ファンを未設定のままにするとスキップされます。',
+                calibrateFirst: '最良の一貫性のためにまずファンをキャリブレーションします（数分）',
+                skip: 'スキップ',
+                noFans: '制御可能なファンが検出されませんでした。',
+                tempsIntro:
+                    '主要な温度を確認してください。これらは推測値として事前入力されています。確認してください。',
+                cpuTemp: 'CPU温度',
+                gpuTemp: 'GPU温度',
+                liquidTemp: '液体温度',
+                ambientTemp: '周囲温度（任意）',
+                tempNone: 'なし',
+                presetIntro: 'ファンをどの程度積極的に回転させるかを選択してください。',
+                perKindOverrides: '役割ごとの上書き（詳細）',
+                cfmCaveat:
+                    '正圧バイアスは風量ではなくデューティに基づいています。ファンの数が偏っている場合、正圧は保証できません。',
+                generate: '生成',
+                preview: 'プレビュー',
+                previewIntro:
+                    '作成および適用される内容を確認してください。確認するまで何も保存されません。',
+                previewAssignments: 'ファンの割り当て',
+                willCreateHeader: '作成される項目',
+                startingPointNote:
+                    'ゼロから作るのではなく、手軽な出発点です。すべてのシステムで完璧というわけではないため、作成後に確認・テスト・調整してください。',
+                replaces: '{name} を置き換えます',
+                createApply: '作成して適用',
+                generated: '{count} 個のプロファイルを生成しました。',
+                generateError: 'プロファイルを生成できませんでした。',
+                applyError: 'プロファイルを作成できませんでした。',
+                kind: {
+                    CpuCooler: 'CPU空冷クーラー',
+                    GpuFan: 'GPUファン',
+                    AioRadiator: 'AIOラジエーター',
+                    AioPump: 'AIOポンプ',
+                    CaseIntake: 'ケース吸気',
+                    CaseExhaust: 'ケース排気',
+                    LaptopFan: 'ノートPCファン',
+                },
             },
         },
         channelExtensionSettings: {
@@ -1439,6 +1550,13 @@ export default {
         writeAccessTooltip:
             '有効にすると、このトークンで変更を行えます。無効にすると、トークンはデータの読み取りのみ可能です。',
     },
+    daemon: {
+        status: {
+            ok: 'OK',
+            hasWarnings: '警告あり',
+            hasErrors: 'エラーあり',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'セッションの有効期限切れ',
@@ -1585,13 +1703,6 @@ export default {
         channelType: {
             lcd: 'LCD',
             lighting: 'ライティング',
-        },
-    },
-    daemon: {
-        status: {
-            ok: 'OK',
-            hasWarnings: '警告あり',
-            hasErrors: 'エラーあり',
         },
     },
 }
