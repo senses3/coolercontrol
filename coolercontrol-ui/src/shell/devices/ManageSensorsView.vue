@@ -187,19 +187,28 @@ onMounted(async () => {
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="flex items-center gap-3 px-4 pt-4">
+        <div class="flex items-center gap-3 border-b border-border-one px-4 py-3">
             <RouterLink
                 :to="{ name: 'section-devices' }"
-                class="text-base text-text-color-secondary outline-none hover:text-text-color focus-visible:text-text-color"
+                class="shrink-0 text-base text-text-color-secondary outline-none hover:text-text-color focus-visible:text-text-color"
             >
                 &lsaquo; {{ t('layout.shell.devices') }}
             </RouterLink>
-            <h1 class="text-xl font-semibold text-text-color">
+            <h1 class="shrink-0 text-xl font-semibold text-text-color">
                 {{ t('layout.shell.manageSensors.title') }}
             </h1>
-            <span class="text-sm text-text-color-secondary">
+            <span class="min-w-0 truncate text-sm text-text-color-secondary">
                 {{ t('layout.shell.manageSensors.hint') }}
             </span>
+            <span class="ml-auto shrink-0 text-sm text-text-color-secondary">
+                {{ t('layout.shell.manageSensors.pendingChanges', changeCount) }}
+            </span>
+            <UiButton class="shrink-0" variant="outline" @click="cancel">
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton class="shrink-0" :disabled="changeCount === 0" @click="apply">
+                {{ t('layout.shell.manageSensors.applyRestart') }}
+            </UiButton>
         </div>
 
         <div class="flex-1 overflow-y-auto px-4 pb-4">
@@ -309,18 +318,6 @@ onMounted(async () => {
                     </div>
                 </div>
             </section>
-        </div>
-
-        <div class="flex items-center gap-3 border-t border-border-one px-4 py-3">
-            <span class="text-sm text-text-color-secondary">
-                {{ t('layout.shell.manageSensors.pendingChanges', changeCount) }}
-            </span>
-            <div class="ml-auto flex gap-2">
-                <UiButton variant="outline" @click="cancel">{{ t('common.cancel') }}</UiButton>
-                <UiButton :disabled="changeCount === 0" @click="apply">
-                    {{ t('layout.shell.manageSensors.applyRestart') }}
-                </UiButton>
-            </div>
         </div>
     </div>
 </template>
