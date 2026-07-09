@@ -847,6 +847,7 @@ export default {
         modes: {
             createMode: 'Crear Modo',
             editMode: 'Editar Modo',
+            updateToCurrent: 'Guardar la configuración actual en el modo',
             deleteMode: 'Eliminar Modo',
             noModes: 'No hay modos configurados',
             deleteModeConfirm: '¿Está seguro de que desea eliminar el modo: "{name}"?',
