@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiInformationSlabCircleOutline, mdiPlus, mdiToggleSwitchOffOutline } from '@mdi/js'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { type Color, DeviceType, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
@@ -37,6 +37,7 @@ import {
     deviceSensorLinks,
 } from '@/shell/devices/devices.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
@@ -136,14 +137,27 @@ const onUseHwmonChange = (value: boolean): void => {
     })
 }
 
-const onDelayChange = (): void => {
+// Command delay changes require a daemon restart, so commit once the value
+// settles (debounced) instead of on every keystroke or step. Track the last
+// committed value so a clamp/round write-back cannot retrigger a second commit.
+let lastDelayIntent = deviceExtensions.value?.delay_millis ?? 0
+const commitDelay = (): void => {
     const value = Math.min(250, Math.max(0, Math.round(delayMillis.value ?? 0)))
-    delayMillis.value = value
+    if (delayMillis.value !== value) delayMillis.value = value
+    if (value === lastDelayIntent) return
+    lastDelayIntent = value
     if (deviceExtensions.value == null || value === deviceExtensions.value.delay_millis) return
     deviceActions.setDelayMillis(props.deviceUID, value, () => {
         delayMillis.value = deviceExtensions.value!.delay_millis
+        lastDelayIntent = delayMillis.value
     })
 }
+let delayCommitTimer: ReturnType<typeof setTimeout> | undefined
+watch(delayMillis, () => {
+    clearTimeout(delayCommitTimer)
+    delayCommitTimer = setTimeout(commitDelay, 500)
+})
+onBeforeUnmount(() => clearTimeout(delayCommitTimer))
 
 const onEnableOverdrive = async (): Promise<void> => {
     amdOverdriveEnabling.value = true
@@ -428,18 +442,13 @@ const enableDevice = openManageSensors
                             </UiTooltip>
                             {{ t('components.deviceExtensionSettings.commandDelay') }}
                         </span>
-                        <span class="flex items-center gap-1.5">
-                            <input
-                                v-model.number="delayMillis"
-                                type="number"
-                                min="0"
-                                max="250"
-                                step="10"
-                                class="h-9 w-20 rounded-lg border border-border-one bg-bg-one px-2 text-right text-base text-text-color outline-none focus:ring-2 focus:ring-accent"
-                                @change="onDelayChange"
-                            />
-                            <span class="text-sm text-text-color-secondary">ms</span>
-                        </span>
+                        <UiNumberInput
+                            v-model="delayMillis"
+                            :min="0"
+                            :max="250"
+                            :step="10"
+                            suffix="ms"
+                        />
                     </div>
                 </div>
             </template>
