@@ -152,6 +152,10 @@ export default {
                 disabledDevices: 'अक्षम उपकरण',
                 openButton: 'सेंसर प्रबंधित करें',
             },
+            toast: {
+                copy: 'कॉपी करें',
+                dismissAll: 'सभी खारिज करें',
+            },
             homePanel: {
                 overview: 'अवलोकन',
                 logs: 'लॉग',

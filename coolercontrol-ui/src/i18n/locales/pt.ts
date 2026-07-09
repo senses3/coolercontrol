@@ -153,6 +153,10 @@ export default {
                 disabledDevices: 'Dispositivos Desabilitados',
                 openButton: 'Gerenciar Sensores',
             },
+            toast: {
+                copy: 'Copiar',
+                dismissAll: 'Descartar tudo',
+            },
             homePanel: {
                 overview: 'Visão Geral',
                 logs: 'Logs',

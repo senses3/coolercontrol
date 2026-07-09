@@ -151,6 +151,10 @@ export default {
                 disabledDevices: 'الأجهزة المعطّلة',
                 openButton: 'إدارة المستشعرات',
             },
+            toast: {
+                copy: 'نسخ',
+                dismissAll: 'إغلاق الكل',
+            },
             homePanel: {
                 overview: 'نظرة عامة',
                 logs: 'السجلات',

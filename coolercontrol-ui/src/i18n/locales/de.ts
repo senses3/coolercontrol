@@ -154,6 +154,10 @@ export default {
                 disabledDevices: 'Deaktivierte Geräte',
                 openButton: 'Sensoren verwalten',
             },
+            toast: {
+                copy: 'Kopieren',
+                dismissAll: 'Alle schließen',
+            },
             homePanel: {
                 overview: 'Übersicht',
                 logs: 'Logs',

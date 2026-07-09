@@ -156,6 +156,10 @@ export default {
                 disabledDevices: 'Appareils désactivés',
                 openButton: 'Gérer les capteurs',
             },
+            toast: {
+                copy: 'Copier',
+                dismissAll: 'Tout ignorer',
+            },
             homePanel: {
                 overview: 'Aperçu',
                 logs: 'Journaux',

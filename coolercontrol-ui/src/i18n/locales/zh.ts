@@ -151,6 +151,10 @@ export default {
                 disabledDevices: '已禁用的设备',
                 openButton: '管理传感器',
             },
+            toast: {
+                copy: '复制',
+                dismissAll: '全部关闭',
+            },
             homePanel: {
                 overview: '概览',
                 logs: '日志',

@@ -151,6 +151,10 @@ export default {
                 disabledDevices: '已停用的裝置',
                 openButton: '管理感測器',
             },
+            toast: {
+                copy: '複製',
+                dismissAll: '全部關閉',
+            },
             homePanel: {
                 overview: '概覽',
                 logs: '日誌',
