@@ -153,6 +153,10 @@ export default {
                 disabledDevices: 'Отключённые устройства',
                 openButton: 'Управление датчиками',
             },
+            toast: {
+                copy: 'Копировать',
+                dismissAll: 'Закрыть все',
+            },
             homePanel: {
                 overview: 'Обзор',
                 logs: 'Логи',

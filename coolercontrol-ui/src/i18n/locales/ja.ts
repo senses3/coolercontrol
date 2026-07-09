@@ -151,6 +151,10 @@ export default {
                 disabledDevices: '無効化されたデバイス',
                 openButton: 'センサーを管理',
             },
+            toast: {
+                copy: 'コピー',
+                dismissAll: 'すべて閉じる',
+            },
             homePanel: {
                 overview: '概要',
                 logs: 'ログ',

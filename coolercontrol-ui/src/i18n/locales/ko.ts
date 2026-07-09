@@ -151,6 +151,10 @@ export default {
                 disabledDevices: '비활성화된 장치',
                 openButton: '센서 관리',
             },
+            toast: {
+                copy: '복사',
+                dismissAll: '모두 닫기',
+            },
             homePanel: {
                 overview: '개요',
                 logs: '로그',

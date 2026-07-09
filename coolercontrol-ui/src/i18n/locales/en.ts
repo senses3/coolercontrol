@@ -151,6 +151,10 @@ export default {
                 disabledDevices: 'Disabled Devices',
                 openButton: 'Manage Sensors',
             },
+            toast: {
+                copy: 'Copy',
+                dismissAll: 'Dismiss all',
+            },
             homePanel: {
                 overview: 'Overview',
                 logs: 'Logs',
