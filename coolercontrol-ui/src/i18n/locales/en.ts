@@ -176,11 +176,8 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: 'This device is disabled.',
                 enableDevice: 'Enable Device',
-                disableDevice: 'Disable this device',
-                disable: 'Disable',
                 disableUnusedSensors: 'Disable unused sensors (recommended)',
                 sensors: 'Sensors',
-                lightingLcd: 'Lighting & LCD',
             },
             coolingPage: {
                 landingHint: 'Select a fan or pump to view and adjust its cooling.',

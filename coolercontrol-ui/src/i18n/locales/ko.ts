@@ -105,6 +105,112 @@ export default {
         },
     },
     layout: {
+        shell: {
+            home: '홈',
+            cooling: '냉각',
+            monitoring: '모니터링',
+            devices: '장치',
+            settings: '설정',
+            plugins: '플러그인',
+            modes: '모드',
+            sectionPlaceholder: '이 섹션은 UI 재설계의 {phase}단계에서 제공됩니다.',
+            panelPlaceholder: '섹션 콘텐츠는 {phase}단계에서 제공됩니다.',
+            laterPhase: '이후 단계에서 여기로 이동합니다',
+            manageModes: '모드 관리',
+            access: '액세스',
+            power: '전원',
+            noModes: '저장된 모드 없음',
+            coolingPanel: {
+                pinned: '고정됨',
+                pin: '고정',
+                unpin: '고정 해제',
+                library: '프로파일 및 기능',
+                profiles: '프로파일',
+                functions: '기능',
+            },
+            monitoringPanel: {
+                newDashboard: '새 대시보드',
+                createAlert: '이 센서에 대한 알림 생성',
+                failAlert: '실패 알림 생성 (0 rpm에서 발생)',
+                failAlertSuffix: '실패',
+            },
+            devicesPanel: {
+                disabled: '비활성화됨',
+            },
+            sensorDest: {
+                monitoring: '모니터링',
+                cooling: '냉각',
+                lighting: '조명',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: '센서 관리',
+                hint: '장치와 센서를 활성화하거나 비활성화합니다. 사용하지 않는 항목은 비활성화하는 것을 추천합니다.',
+                pendingChanges: '변경 없음 | {count}개 변경 | {count}개 변경',
+                applyRestart: '적용 및 재시작',
+                disabledDevices: '비활성화된 장치',
+                openButton: '센서 관리',
+            },
+            homePanel: {
+                overview: '개요',
+                logs: '로그',
+            },
+            homePage: {
+                viewLogs: '로그 보기',
+                logsAll: '전체',
+                logsWarnings: '주의+',
+                logsErrors: '오류',
+                logsNoMatches: '일치하는 로그 줄이 없습니다.',
+                getStartedGroup: '시작하기',
+                learnGroup: '학습',
+                resourcesGroup: '리소스',
+                modeAndAlerts: '모드 및 알림',
+                noActiveMode: '활성 모드 없음',
+                setUpCooling: '냉각 설정',
+            },
+            devicesPage: {
+                landingHint: '장치를 선택하여 세부 정보와 설정을 확인하세요.',
+                temps: '온도',
+                fans: '팬',
+                lighting: '조명',
+                lcd: 'LCD',
+                deviceDisabled: '이 장치는 비활성화되어 있습니다.',
+                enableDevice: '장치 활성화',
+                disableUnusedSensors: '사용하지 않는 센서 비활성화 (추천)',
+                sensors: '센서',
+            },
+            coolingPage: {
+                landingHint: '팬 또는 펌프를 선택하여 냉각을 확인하고 조정하세요.',
+                noChannels: '제어 가능한 팬 또는 펌프 채널이 감지되지 않았습니다.',
+                guidedSetup: '가이드 설정',
+                manualAt: '수동 {duty}%',
+                manualDuty: '수동 점유',
+                modeProfile: '프로파일',
+                modeManual: '수동',
+                modeUnmanaged: '관리 안 됨',
+                unmanagedHint:
+                    '장치 또는 펌웨어가 이 채널을 제어합니다. CoolerControl은 속도 명령을 전송하지 않습니다.',
+                apply: '적용',
+                saveAndApply: '저장 및 적용',
+                selectProfile: '프로파일 선택',
+                sharedWith: '다른 {count}개와 공유됨',
+                sharedTooltip: '이 프로파일은 다른 채널도 구동합니다.',
+                forkForFan: '이 팬용으로 분기',
+                notControllable:
+                    '이 채널은 속도를 보고하지만 CoolerControl에서 제어할 수 없습니다.',
+                advanced: '고급',
+                activeMode: '활성',
+                previousMode: '이전',
+                activate: '활성화',
+                noModes:
+                    '아직 저장된 모드가 없습니다. 모드는 빠른 전환을 위해 모든 채널 설정을 스냅샷합니다.',
+                chain: {
+                    tempSource: '온도 소스',
+                    profile: '프로파일',
+                    function: '기능',
+                },
+            },
+        },
         topbar: {
             login: '로그인',
             logout: '로그아웃',
@@ -124,6 +230,7 @@ export default {
             collapseMenu: '메뉴 접기',
             controls: '제어',
             alerts: '알림',
+            plugins: '플러그인',
             settings: '설정',
             openInBrowser: '브라우저에서 열기',
             modes: '모드',
@@ -161,6 +268,7 @@ export default {
             dashboards: '대시보드',
             modes: '모드',
             appearance: '디자인',
+            general: '일반',
             language: '언어',
             selectLanguage: '언어 선택',
             english: '영어',
@@ -527,12 +635,6 @@ export default {
             duplicateDashboard: '대시보드 복제',
         },
         appInfo: {
-            gettingStartedAutoCreate:
-                '{wizard}을(를) 사용하면 모든 팬의 기본 프로필을 한 번에 설정할 수 있습니다.',
-            gettingStartedAutoCreateLink: '프로필 자동 생성',
-            calibrateFans:
-                '일관된 제어를 위해 {wizard}. 그러면 특정 %가 모든 팬에서 비슷한 속도를 의미하게 됩니다.',
-            calibrateFansLink: '팬을 보정하세요',
             title: '정보 및 도구',
             noWarranty: '이 프로그램에는 어떠한 보증도 제공되지 않습니다.',
             changeStartupPage: '설정에서 시작 페이지 변경',
@@ -552,13 +654,19 @@ export default {
             uiTour: 'UI 투어',
             uiTourDesc: '애플리케이션의 가이드 투어',
             gettingStarted: '시작하기',
+            helpSettingUp: '팬 제어 설정 도움말',
             gettingStartedGraphProfile: '그래프 프로파일',
             gettingStartedControlsPage: '제어 페이지',
             gettingStartedStep1: '팬 프로파일에서 {profile}을 만들고 팬 곡선을 조정하세요.',
             gettingStartedStep2:
                 '{controls}(또는 팬의 자체 페이지)에서 할당하세요. 프로파일은 자동 적용되지 않습니다.',
             gettingStartedStep3: '동일한 프로파일을 여러 팬에 재사용할 수 있습니다.',
-            helpSettingUp: '팬 제어 설정 도움말',
+            gettingStartedAutoCreate:
+                '{wizard}을(를) 사용하면 모든 팬의 기본 프로필을 한 번에 설정할 수 있습니다.',
+            gettingStartedAutoCreateLink: '프로필 자동 생성',
+            calibrateFans:
+                '일관된 제어를 위해 {wizard}. 그러면 특정 %가 모든 팬에서 비슷한 속도를 의미하게 됩니다.',
+            calibrateFansLink: '팬을 보정하세요',
             hardwareSupport: '하드웨어 지원',
             hardwareSupportDesc: '지원되는 장치 및 드라이버 설치',
             gitRepository: '깃 저장소',
@@ -606,6 +714,8 @@ export default {
             proceed: '계속',
         },
         alerts: {
+            range: '범위: {min} ~ {max}{unit}',
+            since: '{time}부터',
             createAlert: '경고 생성',
             editAlert: '경고 편집',
             deleteAlert: '경고 삭제',
@@ -671,6 +781,7 @@ export default {
             },
             profileDeleted: '프로파일 삭제됨',
             profileDuplicated: '프로파일 중복됨',
+            usedBy: '사용처',
             deleteProfileConfirm: '다음을 삭제할까요: "{name}" 맞나요?',
             deleteProfileWithChannelsConfirm:
                 '"{name}"은/는 현재 다음에서 사용 중입니다: {channels}.\n이 프로파일을 삭제하면 해당 채널들의 설정이 초기화됩니다.\n"{name}" 프로파일을 삭제할까요?',
@@ -731,10 +842,7 @@ export default {
             saveFunction: '기능 저장',
             functionType: '기능 유형',
             functionTypeTooltip:
-                '기능 유형:<br/>' +
-                '- <b>항등</b>: 단계 크기 제한을 적용하지만 그 외에는 프로파일 값을 변경하지 않고 그대로 전달합니다.<br/>' +
-                '- <b>기본</b>: 팬 응답 타이밍 및 안정성을 정밀하게 제어하기 위해 단계 크기 제한 및 이력 설정을 적용합니다.<br/>' +
-                '- <b지수 이동 평균</b>: 가중 평균을 사용하여 온도 변동을 완화합니다. 표준보다 간단하지만 정밀도는 떨어집니다.',
+                '기능 유형:<br/>- <b>항등</b>: 단계 크기 제한을 적용하지만 그 외에는 프로파일 값을 변경하지 않고 그대로 전달합니다.<br/>- <b>기본</b>: 팬 응답 타이밍 및 안정성을 정밀하게 제어하기 위해 단계 크기 제한 및 이력 설정을 적용합니다.<br/>- <b지수 이동 평균</b>: 가중 평균을 사용하여 온도 변동을 완화합니다. 표준보다 간단하지만 정밀도는 떨어집니다.',
             stepSizeTitle: '단계 크기',
             fixedStepSize: '고정',
             fixedStepSizeTooltip:
@@ -786,10 +894,10 @@ export default {
             onlyDownward: '하향할 때만',
             onlyDownwardTooltip: '온도가 감소할 때만 이력 현상 설정을 적용합니다.',
             general: '일반',
+            stepOverrides: '단계 재정의',
             thresholdHopping: '임계값 도약',
             thresholdHoppingTooltip:
                 '팬 속도가 30초 이상 변하지 않으면 단계 크기 및 이력 현상 제한이 일시적으로 무시됩니다.\n이렇게 하면 보수적인 임계값 설정에서도 팬이 결국 목표 속도에 도달합니다.',
-            stepOverrides: '단계 재정의',
             bypassMinAtExtremes: '항상 0% / 100% 적용',
             bypassMinAtExtremesTooltip:
                 '활성화되면 변경이 최소 단계 크기보다 작더라도 0% 또는 100%의 목표 듀티가 적용됩니다.\n팬이 완전히 멈추거나 최대 RPM에 도달하도록 보장하는 데 유용합니다. 기본적으로 비활성화됩니다.',
@@ -799,6 +907,7 @@ export default {
             newFunction: '새 기능',
             functionDeleted: '기능 삭제됨',
             functionDuplicated: '기능 중복됨',
+            usedBy: '사용처',
             deleteFunctionConfirm: '"{name}"을/를 삭제할까요?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}"은/는 현재 다음 프로파일에서 사용 중입니다: {profiles}.\n이 기능을 삭제하면 해당 프로파일 기능이 초기화됩니다.\n"{name}"을/를 삭제할까요?',
@@ -884,6 +993,8 @@ export default {
             notImageType: '이미지가 이미지 유형으로 등록되지 않았음',
         },
         shortcuts: {
+            browserHint:
+                '웹 브라우저에서는 대신 Ctrl+Alt+숫자를 사용하세요 (브라우저는 탭 전환에 Ctrl+숫자를 사용합니다).',
             shortcuts: '키보드 단축키',
             ctrl: 'Ctrl',
             alt: 'Alt',
@@ -1009,12 +1120,27 @@ export default {
             startTourAgain: '정보 및 도구 페이지에서 언제든지 이 투어를 다시 시작할 수 있습니다.',
             quickTour: '빠른 투어',
             thoroughTour: '전체 투어',
+            startTour: '투어 시작',
             maybeLater: '나중에',
             openGettingStarted: '시작하기 문서 열기',
             finishLater: '직접 해보기',
             appInfo: '정보 및 도구',
             appInfoDesc:
                 '앱 정보, 데몬 상태, 로그, 유용한 링크 및 스트레스 테스트 도구를 확인하세요. 로고에 표시되는 배지가 문제를 알려줍니다.',
+            home: '홈',
+            homeDesc:
+                '랜딩 페이지: 데몬 상태와 장치 상태를 한눈에 확인하고, 로그, 앱 정보, 유용한 링크, 스트레스 테스트 도구를 제공합니다.',
+            cooling: '냉각',
+            coolingDesc:
+                '팬 제어 허브: 팬 속도와 펌프를 조정하고 모든 채널에 프로파일과 기능을 적용합니다.',
+            monitoring: '모니터링',
+            monitoringDesc:
+                '대시보드를 만들고, 모든 센서를 관찰하고, 알림을 설정하여 시스템을 실시간으로 추적하세요.',
+            devices: '장치',
+            devicesDesc:
+                '감지된 하드웨어를 검토하고, RGB 조명이나 LCD 화면 같은 장치별 기능을 구성하고, 커스텀 센서를 만드세요.',
+            plugins: '플러그인',
+            pluginsDesc: 'CoolerControl을 확장하는 설치된 플러그인을 둘러보고 열어보세요.',
             controls: '제어',
             controlsDesc:
                 '한 곳에서 팬 속도를 조절하고, 프로파일을 적용하고, 감지된 모든 채널을 관리할 수 있습니다.',
@@ -1126,49 +1252,6 @@ export default {
                 stageDownSweep: '하강 스윕',
                 stageFinalizing: '마무리 중',
             },
-            generate: {
-                title: '프로필 자동 생성',
-                tooltip: '몇 가지 선택만으로 팬용 프로필을 자동 생성합니다',
-                stepFans: '팬 할당',
-                stepTemps: '주요 온도',
-                stepPreset: '성능',
-                assignIntro: '각 팬에 역할을 할당하세요. 팬을 설정하지 않으면 건너뜁니다.',
-                skip: '건너뛰기',
-                noFans: '제어 가능한 팬이 감지되지 않았습니다.',
-                tempsIntro:
-                    '주요 온도를 확인하세요. 최선의 추정값으로 미리 채워져 있으니 확인해 주세요.',
-                cpuTemp: 'CPU 온도',
-                gpuTemp: 'GPU 온도',
-                liquidTemp: '액체 온도',
-                ambientTemp: '주변 온도(선택 사항)',
-                tempNone: '없음',
-                presetIntro: '팬을 얼마나 적극적으로 가속할지 선택하세요.',
-                perKindOverrides: '역할별 재정의(고급)',
-                cfmCaveat:
-                    '양압 편향은 공기 흐름이 아니라 듀티를 기준으로 합니다. 팬 수가 불균형하면 양압을 보장할 수 없습니다.',
-                generate: '생성',
-                preview: '미리 보기',
-                previewIntro:
-                    '생성 및 적용될 내용을 검토하세요. 확인하기 전에는 아무것도 저장되지 않습니다.',
-                previewAssignments: '팬 할당',
-                willCreateHeader: '생성될 항목',
-                startingPointNote:
-                    '처음부터 만드는 대신 간편한 출발점입니다. 모든 시스템에 완벽하지는 않으므로 생성 후 확인, 테스트, 조정하세요.',
-                replaces: '{name} 대체',
-                createApply: '생성 및 적용',
-                generated: '프로필 {count}개를 생성했습니다.',
-                generateError: '프로필을 생성할 수 없습니다.',
-                applyError: '프로필을 만들 수 없습니다.',
-                kind: {
-                    CpuCooler: 'CPU 공랭 쿨러',
-                    GpuFan: 'GPU 팬',
-                    AioRadiator: 'AIO 라디에이터',
-                    AioPump: 'AIO 펌프',
-                    CaseIntake: '케이스 흡기',
-                    CaseExhaust: '케이스 배기',
-                    LaptopFan: '노트북 팬',
-                },
-            },
             fanControl: {
                 fanControlWizard: '팬 제어 마법사',
                 editCurrentProfile: '프로파일 편집',
@@ -1221,6 +1304,50 @@ export default {
             },
             customSensor: {
                 new: '새 커스텀 센서',
+            },
+            generate: {
+                title: '프로필 자동 생성',
+                tooltip: '몇 가지 선택만으로 팬용 프로필을 자동 생성합니다',
+                stepFans: '팬 할당',
+                stepTemps: '주요 온도',
+                stepPreset: '성능',
+                assignIntro: '각 팬에 역할을 할당하세요. 팬을 설정하지 않으면 건너뜁니다.',
+                calibrateFirst: '최상의 일관성을 위해 먼저 팬을 보정하세요 (몇 분 소요)',
+                skip: '건너뛰기',
+                noFans: '제어 가능한 팬이 감지되지 않았습니다.',
+                tempsIntro:
+                    '주요 온도를 확인하세요. 최선의 추정값으로 미리 채워져 있으니 확인해 주세요.',
+                cpuTemp: 'CPU 온도',
+                gpuTemp: 'GPU 온도',
+                liquidTemp: '액체 온도',
+                ambientTemp: '주변 온도(선택 사항)',
+                tempNone: '없음',
+                presetIntro: '팬을 얼마나 적극적으로 가속할지 선택하세요.',
+                perKindOverrides: '역할별 재정의(고급)',
+                cfmCaveat:
+                    '양압 편향은 공기 흐름이 아니라 듀티를 기준으로 합니다. 팬 수가 불균형하면 양압을 보장할 수 없습니다.',
+                generate: '생성',
+                preview: '미리 보기',
+                previewIntro:
+                    '생성 및 적용될 내용을 검토하세요. 확인하기 전에는 아무것도 저장되지 않습니다.',
+                previewAssignments: '팬 할당',
+                willCreateHeader: '생성될 항목',
+                startingPointNote:
+                    '처음부터 만드는 대신 간편한 출발점입니다. 모든 시스템에 완벽하지는 않으므로 생성 후 확인, 테스트, 조정하세요.',
+                replaces: '{name} 대체',
+                createApply: '생성 및 적용',
+                generated: '프로필 {count}개를 생성했습니다.',
+                generateError: '프로필을 생성할 수 없습니다.',
+                applyError: '프로필을 만들 수 없습니다.',
+                kind: {
+                    CpuCooler: 'CPU 공랭 쿨러',
+                    GpuFan: 'GPU 팬',
+                    AioRadiator: 'AIO 라디에이터',
+                    AioPump: 'AIO 펌프',
+                    CaseIntake: '케이스 흡기',
+                    CaseExhaust: '케이스 배기',
+                    LaptopFan: '노트북 팬',
+                },
             },
         },
         channelExtensionSettings: {
@@ -1347,7 +1474,7 @@ export default {
             title: '고급 장치 설정',
             directAccess: '직접 접속',
             directAccessDesc:
-                '이 옵션을 활성화하면 liquidctl 드라이버는 HWMon 커널 드라이버\낸드를 무시하고 장치와 직접 통신합니다.\n이는 두 드라이버를 모두 사용할 때 충돌이 발생하는 장치에 유용할 수 있습니다.',
+                '이 옵션을 활성화하면 liquidctl 드라이버는 HWMon 커널 드라이버낸드를 무시하고 장치와 직접 통신합니다.\n이는 두 드라이버를 모두 사용할 때 충돌이 발생하는 장치에 유용할 수 있습니다.',
             useHwmon: 'HWMon 드라이버 사용',
             useHwmonDesc:
                 '이 장치의 드라이버를 liquidctl에서 HWMon 커널 드라이버로 전환합니다.\n이렇게 하면 성능과 안정성이 향상될 수 있지만, 사용 가능한 기능이 제한될 수 있습니다.',

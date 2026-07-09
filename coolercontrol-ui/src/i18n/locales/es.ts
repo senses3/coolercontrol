@@ -108,6 +108,114 @@ export default {
         },
     },
     layout: {
+        shell: {
+            home: 'Inicio',
+            cooling: 'Refrigeración',
+            monitoring: 'Monitoreo',
+            devices: 'Dispositivos',
+            settings: 'Configuración',
+            plugins: 'Plugins',
+            modes: 'Modos',
+            sectionPlaceholder:
+                'Esta sección llegará en la fase {phase} del rediseño de la interfaz.',
+            panelPlaceholder: 'El contenido de la sección llegará en la fase {phase}.',
+            laterPhase: 'Se trasladará aquí en una fase posterior',
+            manageModes: 'Gestionar modos',
+            access: 'Acceso',
+            power: 'Energía',
+            noModes: 'No hay modos guardados',
+            coolingPanel: {
+                pinned: 'Fijado',
+                pin: 'Fijar',
+                unpin: 'Desfijar',
+                library: 'Perfiles y Funciones',
+                profiles: 'Perfiles',
+                functions: 'Funciones',
+            },
+            monitoringPanel: {
+                newDashboard: 'Nuevo Panel',
+                createAlert: 'Crear alerta para este sensor',
+                failAlert: 'Crear una alerta de fallo (se activa a 0 rpm)',
+                failAlertSuffix: 'Fallo',
+            },
+            devicesPanel: {
+                disabled: 'Deshabilitado',
+            },
+            sensorDest: {
+                monitoring: 'Monitoreo',
+                cooling: 'Refrigeración',
+                lighting: 'Iluminación',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'Gestionar Sensores',
+                hint: 'Habilite o deshabilite dispositivos y sensores. Se recomienda deshabilitar los que no se utilizan.',
+                pendingChanges: 'Sin cambios | {count} cambio | {count} cambios',
+                applyRestart: 'Aplicar y Reiniciar',
+                disabledDevices: 'Dispositivos Deshabilitados',
+                openButton: 'Gestionar Sensores',
+            },
+            homePanel: {
+                overview: 'Resumen',
+                logs: 'Registros',
+            },
+            homePage: {
+                viewLogs: 'Ver Registros',
+                logsAll: 'Todos',
+                logsWarnings: 'Advertencias+',
+                logsErrors: 'Errores',
+                logsNoMatches: 'No hay líneas de registro coincidentes.',
+                getStartedGroup: 'Primeros Pasos',
+                learnGroup: 'Aprender',
+                resourcesGroup: 'Recursos',
+                modeAndAlerts: 'Modo y Alertas',
+                noActiveMode: 'Sin modo activo',
+                setUpCooling: 'Configurar refrigeración',
+            },
+            devicesPage: {
+                landingHint: 'Seleccione un dispositivo para ver sus detalles y configuración.',
+                temps: 'temps',
+                fans: 'ventiladores',
+                lighting: 'iluminación',
+                lcd: 'LCD',
+                deviceDisabled: 'Este dispositivo está deshabilitado.',
+                enableDevice: 'Habilitar Dispositivo',
+                disableUnusedSensors: 'Deshabilitar sensores no utilizados (recomendado)',
+                sensors: 'Sensores',
+            },
+            coolingPage: {
+                landingHint:
+                    'Seleccione un ventilador o bomba para ver y ajustar su refrigeración.',
+                noChannels: 'No se detectaron canales de ventilador o bomba controlables.',
+                guidedSetup: 'Configuración Guiada',
+                manualAt: 'Manual {duty}%',
+                manualDuty: 'Ciclo manual',
+                modeProfile: 'Perfil',
+                modeManual: 'Manual',
+                modeUnmanaged: 'Sin gestión',
+                unmanagedHint:
+                    'El dispositivo o su firmware controla este canal. CoolerControl no enviará ningún comando de velocidad.',
+                apply: 'Aplicar',
+                saveAndApply: 'Guardar y Aplicar',
+                selectProfile: 'Seleccionar un perfil',
+                sharedWith: 'Compartido con {count} más',
+                sharedTooltip: 'Este perfil también controla otros canales.',
+                forkForFan: 'Bifurcar para este ventilador',
+                notControllable:
+                    'Este canal informa su velocidad pero CoolerControl no puede controlarlo.',
+                advanced: 'Avanzado',
+                activeMode: 'Activo',
+                previousMode: 'Anterior',
+                activate: 'Activar',
+                noModes:
+                    'Aún no hay modos guardados. Los modos capturan todas las configuraciones de canal para un cambio rápido.',
+                chain: {
+                    tempSource: 'Fuente de temperatura',
+                    profile: 'Perfil',
+                    function: 'Función',
+                },
+            },
+        },
         topbar: {
             login: 'Iniciar sesión',
             logout: 'Cerrar sesión',
@@ -127,6 +235,7 @@ export default {
             collapseMenu: 'Contraer menú',
             controls: 'Controles',
             alerts: 'Alertas',
+            plugins: 'Plugins',
             settings: 'Configuración',
             openInBrowser: 'Abrir en navegador',
             modes: 'Modos',
@@ -164,6 +273,7 @@ export default {
             dashboards: 'Paneles',
             modes: 'Modos',
             appearance: 'Apariencia',
+            general: 'General',
             language: 'Idioma',
             selectLanguage: 'Seleccionar idioma',
             english: 'Inglés',
@@ -539,12 +649,6 @@ export default {
             duplicateDashboard: 'Duplicar Panel',
         },
         appInfo: {
-            gettingStartedAutoCreate:
-                '{wizard} permite configurar perfiles básicos para todos sus ventiladores de una sola vez.',
-            gettingStartedAutoCreateLink: 'Crear perfiles automáticamente',
-            calibrateFans:
-                'Para un control uniforme, {wizard} para que un % determinado signifique una velocidad similar en cada ventilador.',
-            calibrateFansLink: 'calibre sus ventiladores',
             title: 'Info y Herramientas',
             noWarranty: 'Este programa viene sin absolutamente ninguna garantía.',
             changeStartupPage: 'Cambiar la página de inicio en Ajustes',
@@ -564,6 +668,7 @@ export default {
             uiTour: 'Recorrido por la UI',
             uiTourDesc: 'Realice un recorrido guiado por la aplicación',
             gettingStarted: 'Primeros Pasos',
+            helpSettingUp: 'Ayuda para configurar el control de ventiladores',
             gettingStartedGraphProfile: 'Perfil de Gráfico',
             gettingStartedControlsPage: 'Página de Controles',
             gettingStartedStep1:
@@ -571,7 +676,12 @@ export default {
             gettingStartedStep2:
                 'Asígnelo en la {controls} (o en la página del ventilador). Los Perfiles no se aplican automáticamente.',
             gettingStartedStep3: 'Reutilice el mismo Perfil en tantos ventiladores como desee.',
-            helpSettingUp: 'Ayuda para configurar el control de ventiladores',
+            gettingStartedAutoCreate:
+                '{wizard} permite configurar perfiles básicos para todos sus ventiladores de una sola vez.',
+            gettingStartedAutoCreateLink: 'Crear perfiles automáticamente',
+            calibrateFans:
+                'Para un control uniforme, {wizard} para que un % determinado signifique una velocidad similar en cada ventilador.',
+            calibrateFansLink: 'calibre sus ventiladores',
             hardwareSupport: 'Soporte de Hardware',
             hardwareSupportDesc: 'Dispositivos compatibles e instalación de controladores',
             gitRepository: 'Repositorio Git',
@@ -619,6 +729,8 @@ export default {
             proceed: 'Continuar',
         },
         alerts: {
+            range: 'Rango: {min} a {max}{unit}',
+            since: 'desde {time}',
             createAlert: 'Crear Alerta',
             editAlert: 'Editar Alerta',
             deleteAlert: 'Eliminar Alerta',
@@ -685,6 +797,7 @@ export default {
             },
             profileDeleted: 'Perfil Eliminado',
             profileDuplicated: 'Perfil Duplicado',
+            usedBy: 'Usado por',
             deleteProfileConfirm: '¿Está seguro de que desea eliminar: "{name}"?',
             deleteProfileWithChannelsConfirm:
                 '"{name}" está siendo utilizado actualmente por: {channels}.\nEliminar este Perfil restablecerá la configuración de esos canales.\n¿Está seguro de que desea eliminar "{name}"?',
@@ -749,10 +862,7 @@ export default {
             saveFunction: 'Guardar Función',
             functionType: 'Tipo de Función',
             functionTypeTooltip:
-                'Tipos de función:<br/>' +
-                '- <b>Identidad</b>: Aplica límites de tamaño de paso pero por lo demás pasa el valor del perfil sin cambios.<br/>' +
-                '- <b>Estándar</b>: Aplica límites de tamaño de paso y configuración de histéresis para un control preciso del tiempo de respuesta y estabilidad del ventilador.<br/>' +
-                '- <b>Promedio Móvil Exponencial</b>: Suaviza las fluctuaciones de temperatura usando un promedio ponderado. Más simple pero menos preciso que Estándar.',
+                'Tipos de función:<br/>- <b>Identidad</b>: Aplica límites de tamaño de paso pero por lo demás pasa el valor del perfil sin cambios.<br/>- <b>Estándar</b>: Aplica límites de tamaño de paso y configuración de histéresis para un control preciso del tiempo de respuesta y estabilidad del ventilador.<br/>- <b>Promedio Móvil Exponencial</b>: Suaviza las fluctuaciones de temperatura usando un promedio ponderado. Más simple pero menos preciso que Estándar.',
             stepSizeTitle: 'Tamaño de Paso',
             fixedStepSize: 'Fijo',
             fixedStepSizeTooltip:
@@ -805,10 +915,10 @@ export default {
             onlyDownwardTooltip:
                 'Solo aplicar configuración de histéresis cuando la temperatura está disminuyendo.',
             general: 'General',
+            stepOverrides: 'Anulaciones de paso',
             thresholdHopping: 'Salto de Umbral',
             thresholdHoppingTooltip:
                 'Cuando la velocidad del ventilador permanece sin cambios durante 30+ segundos, los límites de tamaño de paso e histéresis se omiten temporalmente.\nEsto asegura que los ventiladores eventualmente alcancen su velocidad objetivo, incluso con configuraciones de umbral conservadoras.',
-            stepOverrides: 'Anulaciones de paso',
             bypassMinAtExtremes: 'Aplicar siempre 0% / 100%',
             bypassMinAtExtremesTooltip:
                 'Cuando está habilitado, los ciclos de trabajo objetivo de 0% o 100% se aplican incluso cuando el cambio es menor que el tamaño de paso mínimo.\nÚtil para garantizar que los ventiladores se detengan completamente o alcancen las RPM máximas. Deshabilitado por defecto.',
@@ -818,6 +928,7 @@ export default {
             newFunction: 'Nueva Función',
             functionDeleted: 'Función Eliminada',
             functionDuplicated: 'Función Duplicada',
+            usedBy: 'Usada por',
             deleteFunctionConfirm: '¿Está seguro de que desea eliminar "{name}"?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" está siendo utilizada actualmente por los Perfiles: {profiles}.\nEliminar esta Función restablecerá las Funciones de esos Perfiles.\n¿Está seguro de que desea eliminar "{name}"?',
@@ -905,6 +1016,8 @@ export default {
             notImageType: 'La imagen no se registra como un tipo de imagen',
         },
         shortcuts: {
+            browserHint:
+                'En un navegador web, use Ctrl+Alt+número en su lugar (los navegadores reservan Ctrl+número para cambiar de pestaña).',
             shortcuts: 'Atajos de teclado',
             ctrl: 'Ctrl',
             alt: 'Alt',
@@ -1030,12 +1143,27 @@ export default {
                 'Puede iniciar este recorrido nuevamente en cualquier momento desde la página Información y Herramientas.',
             quickTour: 'Recorrido Rápido',
             thoroughTour: 'Recorrido Detallado',
+            startTour: 'Iniciar Recorrido',
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',
             finishLater: 'Lo haré yo mismo',
             appInfo: 'Información y Herramientas',
             appInfoDesc:
                 'Vea información de la app, estado del daemon, registros, enlaces útiles y herramientas de prueba de carga. Una insignia en el logo le alerta sobre problemas.',
+            home: 'Inicio',
+            homeDesc:
+                'Su página de inicio: estado del daemon y estado de los dispositivos de un vistazo, además de registros, información de la app, enlaces útiles y herramientas de prueba de estrés.',
+            cooling: 'Refrigeración',
+            coolingDesc:
+                'Su centro de control de ventiladores: ajuste las velocidades de ventiladores y bombas, y aplique Perfiles y Funciones a cualquier canal.',
+            monitoring: 'Monitoreo',
+            monitoringDesc:
+                'Cree Paneles, observe cada sensor y configure Alertas para monitorear su sistema en tiempo real.',
+            devices: 'Dispositivos',
+            devicesDesc:
+                'Revise el hardware detectado, configure funciones por dispositivo como iluminación RGB y pantallas LCD, y cree Sensores Personalizados.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Explore y abra los plugins instalados que amplían CoolerControl.',
             controls: 'Controles',
             controlsDesc:
                 'Ajuste velocidades de ventiladores, aplique Perfiles y gestione cada canal detectado desde un solo lugar.',
@@ -1151,51 +1279,6 @@ export default {
                 stageDownSweep: 'Barrido descendente',
                 stageFinalizing: 'Finalizando',
             },
-            generate: {
-                title: 'Crear perfiles automáticamente',
-                tooltip:
-                    'Crear automáticamente perfiles para sus ventiladores a partir de unas pocas opciones',
-                stepFans: 'Asignar ventiladores',
-                stepTemps: 'Temperaturas clave',
-                stepPreset: 'Rendimiento',
-                assignIntro:
-                    'Asigne una función a cada ventilador. Deje un ventilador sin asignar para omitirlo.',
-                skip: 'Omitir',
-                noFans: 'No se detectaron ventiladores controlables.',
-                tempsIntro:
-                    'Confirme sus temperaturas clave. Están rellenadas como mejor estimación: verifíquelas.',
-                cpuTemp: 'Temp. CPU',
-                gpuTemp: 'Temp. GPU',
-                liquidTemp: 'Temp. del líquido',
-                ambientTemp: 'Temp. ambiente (opcional)',
-                tempNone: 'Ninguna',
-                presetIntro: 'Elija con qué agresividad deben acelerar los ventiladores.',
-                perKindOverrides: 'Anulaciones por función (avanzado)',
-                cfmCaveat:
-                    'El sesgo de presión positiva se basa en el ciclo de trabajo (duty), no en el flujo de aire: con cantidades de ventiladores desiguales no puede garantizar presión positiva.',
-                generate: 'Generar',
-                preview: 'Vista previa',
-                previewIntro:
-                    'Revise lo que se creará y aplicará. No se guarda nada hasta que confirme.',
-                previewAssignments: 'Asignaciones de ventiladores',
-                willCreateHeader: 'Se creará',
-                startingPointNote:
-                    'Un punto de partida sencillo en lugar de empezar desde cero. No serán perfectos para todos los sistemas, así que verifíquelos, pruébelos y ajústelos después de crearlos.',
-                replaces: 'reemplaza {name}',
-                createApply: 'Crear y aplicar',
-                generated: '{count} perfiles generados.',
-                generateError: 'No se pudieron generar los perfiles.',
-                applyError: 'No se pudieron crear los perfiles.',
-                kind: {
-                    CpuCooler: 'Refrigerador de aire de CPU',
-                    GpuFan: 'Ventilador de GPU',
-                    AioRadiator: 'Radiador AIO',
-                    AioPump: 'Bomba AIO',
-                    CaseIntake: 'Entrada de la caja',
-                    CaseExhaust: 'Salida de la caja',
-                    LaptopFan: 'Ventilador de portátil',
-                },
-            },
             fanControl: {
                 fanControlWizard: 'Asistente de Control de Ventiladores',
                 editCurrentProfile: 'Editar Perfil',
@@ -1248,6 +1331,53 @@ export default {
             },
             customSensor: {
                 new: 'Nuevo Sensor Personalizado',
+            },
+            generate: {
+                title: 'Crear perfiles automáticamente',
+                tooltip:
+                    'Crear automáticamente perfiles para sus ventiladores a partir de unas pocas opciones',
+                stepFans: 'Asignar ventiladores',
+                stepTemps: 'Temperaturas clave',
+                stepPreset: 'Rendimiento',
+                assignIntro:
+                    'Asigne una función a cada ventilador. Deje un ventilador sin asignar para omitirlo.',
+                calibrateFirst:
+                    'Calibre primero los ventiladores para una mayor uniformidad (unos minutos)',
+                skip: 'Omitir',
+                noFans: 'No se detectaron ventiladores controlables.',
+                tempsIntro:
+                    'Confirme sus temperaturas clave. Están rellenadas como mejor estimación: verifíquelas.',
+                cpuTemp: 'Temp. CPU',
+                gpuTemp: 'Temp. GPU',
+                liquidTemp: 'Temp. del líquido',
+                ambientTemp: 'Temp. ambiente (opcional)',
+                tempNone: 'Ninguna',
+                presetIntro: 'Elija con qué agresividad deben acelerar los ventiladores.',
+                perKindOverrides: 'Anulaciones por función (avanzado)',
+                cfmCaveat:
+                    'El sesgo de presión positiva se basa en el ciclo de trabajo (duty), no en el flujo de aire: con cantidades de ventiladores desiguales no puede garantizar presión positiva.',
+                generate: 'Generar',
+                preview: 'Vista previa',
+                previewIntro:
+                    'Revise lo que se creará y aplicará. No se guarda nada hasta que confirme.',
+                previewAssignments: 'Asignaciones de ventiladores',
+                willCreateHeader: 'Se creará',
+                startingPointNote:
+                    'Un punto de partida sencillo en lugar de empezar desde cero. No serán perfectos para todos los sistemas, así que verifíquelos, pruébelos y ajústelos después de crearlos.',
+                replaces: 'reemplaza {name}',
+                createApply: 'Crear y aplicar',
+                generated: '{count} perfiles generados.',
+                generateError: 'No se pudieron generar los perfiles.',
+                applyError: 'No se pudieron crear los perfiles.',
+                kind: {
+                    CpuCooler: 'Refrigerador de aire de CPU',
+                    GpuFan: 'Ventilador de GPU',
+                    AioRadiator: 'Radiador AIO',
+                    AioPump: 'Bomba AIO',
+                    CaseIntake: 'Entrada de la caja',
+                    CaseExhaust: 'Salida de la caja',
+                    LaptopFan: 'Ventilador de portátil',
+                },
             },
         },
         channelExtensionSettings: {

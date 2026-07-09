@@ -105,6 +105,112 @@ export default {
         },
     },
     layout: {
+        shell: {
+            home: 'الرئيسية',
+            cooling: 'التبريد',
+            monitoring: 'المراقبة',
+            devices: 'الأجهزة',
+            settings: 'الإعدادات',
+            plugins: 'الإضافات',
+            modes: 'الأوضاع',
+            sectionPlaceholder: 'يصل هذا القسم في المرحلة {phase} من إعادة تصميم الواجهة.',
+            panelPlaceholder: 'يصل محتوى القسم في المرحلة {phase}.',
+            laterPhase: 'ينتقل إلى هنا في مرحلة لاحقة',
+            manageModes: 'إدارة الأوضاع',
+            access: 'الوصول',
+            power: 'الطاقة',
+            noModes: 'لا توجد أوضاع محفوظة',
+            coolingPanel: {
+                pinned: 'مثبت',
+                pin: 'تثبيت',
+                unpin: 'إلغاء التثبيت',
+                library: 'الملفات الشخصية والوظائف',
+                profiles: 'الملفات الشخصية',
+                functions: 'الوظائف',
+            },
+            monitoringPanel: {
+                newDashboard: 'لوحة معلومات جديدة',
+                createAlert: 'إنشاء تنبيه لهذا المستشعر',
+                failAlert: 'إنشاء تنبيه عطل (يُنشَّط عند 0 RPM)',
+                failAlertSuffix: 'عطل',
+            },
+            devicesPanel: {
+                disabled: 'معطّل',
+            },
+            sensorDest: {
+                monitoring: 'المراقبة',
+                cooling: 'التبريد',
+                lighting: 'الإضاءة',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'إدارة المستشعرات',
+                hint: 'تمكين أو تعطيل الأجهزة والمستشعرات. يُنصح بتعطيل غير المستخدمة.',
+                pendingChanges: 'بدون تغييرات | {count} تغيير | {count} تغييرات',
+                applyRestart: 'تطبيق وإعادة التشغيل',
+                disabledDevices: 'الأجهزة المعطّلة',
+                openButton: 'إدارة المستشعرات',
+            },
+            homePanel: {
+                overview: 'نظرة عامة',
+                logs: 'السجلات',
+            },
+            homePage: {
+                viewLogs: 'عرض السجلات',
+                logsAll: 'الكل',
+                logsWarnings: 'التحذيرات+',
+                logsErrors: 'الأخطاء',
+                logsNoMatches: 'لا توجد أسطر سجل مطابقة.',
+                getStartedGroup: 'البدء',
+                learnGroup: 'التعلّم',
+                resourcesGroup: 'الموارد',
+                modeAndAlerts: 'الوضع والتنبيهات',
+                noActiveMode: 'لا يوجد وضع نشط',
+                setUpCooling: 'إعداد التبريد',
+            },
+            devicesPage: {
+                landingHint: 'حدد جهازًا لعرض تفاصيله وإعداداته.',
+                temps: 'درجات الحرارة',
+                fans: 'المراوح',
+                lighting: 'الإضاءة',
+                lcd: 'LCD',
+                deviceDisabled: 'هذا الجهاز معطّل.',
+                enableDevice: 'تمكين الجهاز',
+                disableUnusedSensors: 'تعطيل المستشعرات غير المستخدمة (موصى به)',
+                sensors: 'المستشعرات',
+            },
+            coolingPage: {
+                landingHint: 'حدد مروحة أو مضخة لعرض تبريدها وضبطه.',
+                noChannels: 'لم يتم اكتشاف قنوات مراوح أو مضخات قابلة للتحكم.',
+                guidedSetup: 'إعداد موجّه',
+                manualAt: 'يدوي {duty}%',
+                manualDuty: 'دورة التشغيل اليدوية',
+                modeProfile: 'ملف شخصي',
+                modeManual: 'يدوي',
+                modeUnmanaged: 'غير مُدار',
+                unmanagedHint:
+                    'يتحكم الجهاز أو برنامجه الثابت في هذه القناة. لن يرسل CoolerControl أي أوامر سرعة.',
+                apply: 'تطبيق',
+                saveAndApply: 'حفظ وتطبيق',
+                selectProfile: 'اختر ملفًا شخصيًا',
+                sharedWith: 'مُشترَك مع {count} أخرى',
+                sharedTooltip: 'يشغّل هذا الملف الشخصي قنوات أخرى أيضًا.',
+                forkForFan: 'إنشاء نسخة لهذه المروحة',
+                notControllable:
+                    'تُبلّغ هذه القناة عن سرعتها لكن لا يمكن لـ CoolerControl التحكم بها.',
+                advanced: 'متقدم',
+                activeMode: 'نشط',
+                previousMode: 'السابق',
+                activate: 'تفعيل',
+                noModes:
+                    'لا توجد أوضاع محفوظة بعد. تلتقط الأوضاع جميع إعدادات القنوات للتبديل السريع.',
+                chain: {
+                    tempSource: 'مصدر درجة الحرارة',
+                    profile: 'الملف الشخصي',
+                    function: 'الوظيفة',
+                },
+            },
+        },
         topbar: {
             login: 'تسجيل الدخول',
             logout: 'تسجيل الخروج',
@@ -124,6 +230,7 @@ export default {
             collapseMenu: 'طي القائمة',
             controls: 'عناصر التحكم',
             alerts: 'التنبيهات',
+            plugins: 'الإضافات',
             settings: 'الإعدادات',
             openInBrowser: 'فتح في المتصفح',
             modes: 'الأوضاع',
@@ -161,6 +268,7 @@ export default {
             dashboards: 'لوحات المعلومات',
             modes: 'الأوضاع',
             appearance: 'المظهر',
+            general: 'عام',
             language: 'اللغة',
             selectLanguage: 'اختر اللغة',
             english: 'الإنجليزية',
@@ -528,12 +636,6 @@ export default {
             duplicateDashboard: 'تكرار لوحة المعلومات',
         },
         appInfo: {
-            gettingStartedAutoCreate:
-                'يمكن استخدام {wizard} لإعداد ملفات تعريف أساسية لجميع مراوحك دفعة واحدة.',
-            gettingStartedAutoCreateLink: 'إنشاء الملفات تلقائيًا',
-            calibrateFans:
-                'للحصول على تحكم متسق، {wizard} بحيث تعني نسبة % معينة سرعة متشابهة في كل مروحة.',
-            calibrateFansLink: 'عايِر مراوحك',
             title: 'معلومات وأدوات',
             noWarranty: 'يأتي هذا البرنامج بدون أي ضمان على الإطلاق.',
             changeStartupPage: 'تغيير صفحة البدء من الإعدادات',
@@ -553,13 +655,19 @@ export default {
             uiTour: 'جولة الواجهة',
             uiTourDesc: 'جولة إرشادية في التطبيق',
             gettingStarted: 'البدء',
+            helpSettingUp: 'المساعدة في إعداد التحكم بالمروحة',
             gettingStartedGraphProfile: 'ملف تعريف رسومي',
             gettingStartedControlsPage: 'صفحة عناصر التحكم',
             gettingStartedStep1: 'أنشئ {profile} في ملفات تعريف المروحة واضبط منحنى المروحة.',
             gettingStartedStep2:
                 'قم بتطبيقه من {controls} (أو من صفحة المروحة نفسها). لا يتم تطبيق الملفات تلقائيًا.',
             gettingStartedStep3: 'يمكن إعادة استخدام نفس الملف لعدد غير محدود من المراوح.',
-            helpSettingUp: 'المساعدة في إعداد التحكم بالمروحة',
+            gettingStartedAutoCreate:
+                'يمكن استخدام {wizard} لإعداد ملفات تعريف أساسية لجميع مراوحك دفعة واحدة.',
+            gettingStartedAutoCreateLink: 'إنشاء الملفات تلقائيًا',
+            calibrateFans:
+                'للحصول على تحكم متسق، {wizard} بحيث تعني نسبة % معينة سرعة متشابهة في كل مروحة.',
+            calibrateFansLink: 'عايِر مراوحك',
             hardwareSupport: 'دعم الأجهزة',
             hardwareSupportDesc: 'الأجهزة المدعومة وتثبيت برامج التشغيل',
             gitRepository: 'مستودع Git',
@@ -607,6 +715,8 @@ export default {
             proceed: 'متابعة',
         },
         alerts: {
+            range: 'النطاق: من {min} إلى {max}{unit}',
+            since: 'منذ {time}',
             createAlert: 'إنشاء تنبيه',
             editAlert: 'تعديل التنبيه',
             deleteAlert: 'حذف التنبيه',
@@ -672,6 +782,7 @@ export default {
             },
             profileDeleted: 'تم حذف ملف التعريف',
             profileDuplicated: 'تم تكرار ملف التعريف',
+            usedBy: 'مُستخدَم بواسطة',
             deleteProfileConfirm: 'هل أنت متأكد أنك تريد الحذف: "{name}"؟',
             deleteProfileWithChannelsConfirm:
                 '"{name}" قيد الاستخدام حاليًا بواسطة: {channels}.\nحذف ملف التعريف هذا سيعيد ضبط إعدادات تلك القنوات.\nهل أنت متأكد أنك تريد حذف "{name}"؟',
@@ -733,10 +844,7 @@ export default {
             saveFunction: 'حفظ الوظيفة',
             functionType: 'نوع الوظيفة',
             functionTypeTooltip:
-                'أنواع الوظائف:<br/>' +
-                '- <b>هوية</b>: تطبق حدود حجم الخطوة لكنها تمرر قيمة ملف التعريف دون تغيير.<br/>' +
-                '- <b>قياسية</b>: تطبق حدود حجم الخطوة وإعدادات التخلف للتحكم الدقيق في وقت استجابة المروحة واستقرارها.<br/>' +
-                '- <b>متوسط متحرك أسي</b>: يسهل تقلبات درجة الحرارة باستخدام متوسط مرجح. أبسط ولكن أقل دقة من القياسية.',
+                'أنواع الوظائف:<br/>- <b>هوية</b>: تطبق حدود حجم الخطوة لكنها تمرر قيمة ملف التعريف دون تغيير.<br/>- <b>قياسية</b>: تطبق حدود حجم الخطوة وإعدادات التخلف للتحكم الدقيق في وقت استجابة المروحة واستقرارها.<br/>- <b>متوسط متحرك أسي</b>: يسهل تقلبات درجة الحرارة باستخدام متوسط مرجح. أبسط ولكن أقل دقة من القياسية.',
             stepSizeTitle: 'حجم الخطوة',
             fixedStepSize: 'ثابت',
             fixedStepSizeTooltip:
@@ -787,10 +895,10 @@ export default {
             onlyDownward: 'فقط للأسفل',
             onlyDownwardTooltip: 'تطبيق إعدادات التخلف فقط عندما تنخفض درجة الحرارة.',
             general: 'عام',
+            stepOverrides: 'تجاوزات الخطوة',
             thresholdHopping: 'قفز العتبة',
             thresholdHoppingTooltip:
                 'عندما تبقى سرعة المروحة دون تغيير لمدة 30+ ثانية، يتم تجاوز حدود حجم الخطوة والتخلف مؤقتاً.\nهذا يضمن أن المراوح تصل في النهاية إلى سرعتها المستهدفة، حتى مع إعدادات العتبة المحافظة.',
-            stepOverrides: 'تجاوزات الخطوة',
             bypassMinAtExtremes: 'تطبيق 0% / 100% دائماً',
             bypassMinAtExtremesTooltip:
                 'عند التفعيل، يتم تطبيق دورات التشغيل المستهدفة بنسبة 0% أو 100% حتى عندما يكون التغيير أصغر من الحد الأدنى لحجم الخطوة.\nمفيد لضمان توقف المراوح تماماً أو الوصول إلى أقصى RPM. معطل افتراضياً.',
@@ -800,6 +908,7 @@ export default {
             newFunction: 'وظيفة جديدة',
             functionDeleted: 'تم حذف الوظيفة',
             functionDuplicated: 'تم تكرار الوظيفة',
+            usedBy: 'مُستخدَمة بواسطة',
             deleteFunctionConfirm: 'هل أنت متأكد من رغبتك في حذف "{name}"؟',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" يستخدم حاليًا بواسطة ملفات التعريف: {profiles}.\nحذف هذه الوظيفة سيعيد تعيين وظائف تلك الملفات الشخصية.\nهل أنت متأكد من رغبتك في حذف "{name}"؟',
@@ -886,6 +995,8 @@ export default {
             notImageType: 'الصورة لا تسجل كنوع صورة',
         },
         shortcuts: {
+            browserHint:
+                'في متصفح الويب، استخدم Ctrl+Alt+رقم بدلاً من ذلك (تحجز المتصفحات Ctrl+رقم للتبديل بين علامات التبويب).',
             shortcuts: 'اختصارات لوحة المفاتيح',
             ctrl: 'Ctrl',
             alt: 'Alt',
@@ -1010,12 +1121,27 @@ export default {
             startTourAgain: 'يمكنك بدء هذه الجولة مرة أخرى في أي وقت من صفحة المعلومات والأدوات.',
             quickTour: 'جولة سريعة',
             thoroughTour: 'جولة شاملة',
+            startTour: 'بدء الجولة',
             maybeLater: 'ربما لاحقًا',
             openGettingStarted: 'افتح وثائق البدء',
             finishLater: 'سأقوم بذلك بنفسي',
             appInfo: 'المعلومات والأدوات',
             appInfoDesc:
                 'اعرض معلومات التطبيق وحالة الخدمة والسجلات والروابط المفيدة وأدوات اختبار الضغط. شارة على الشعار تنبهك لأي مشاكل.',
+            home: 'الرئيسية',
+            homeDesc:
+                'صفحتك الرئيسية: حالة الخدمة وسلامة الأجهزة في لمحة، بالإضافة إلى السجلات ومعلومات التطبيق والروابط المفيدة وأدوات اختبار الإجهاد.',
+            cooling: 'التبريد',
+            coolingDesc:
+                'مركز التحكم بالمراوح: اضبط سرعات المراوح والمضخات، وطبّق الملفات الشخصية والوظائف على أي قناة.',
+            monitoring: 'المراقبة',
+            monitoringDesc:
+                'أنشئ لوحات المعلومات، وراقب كل مستشعر، وأعدّ التنبيهات لتتبع نظامك في الوقت الفعلي.',
+            devices: 'الأجهزة',
+            devicesDesc:
+                'راجع الأجهزة المكتشفة، وكوّن ميزات كل جهاز مثل إضاءة RGB وشاشات LCD، وأنشئ المستشعرات المخصصة.',
+            plugins: 'الإضافات',
+            pluginsDesc: 'تصفح وافتح الإضافات المثبتة التي توسّع CoolerControl.',
             controls: 'التحكمات',
             controlsDesc:
                 'اضبط سرعات المراوح وطبق الملفات الشخصية وأدر كل قناة مكتشفة من مكان واحد.',
@@ -1123,48 +1249,6 @@ export default {
                 stageDownSweep: 'مسح تنازلي',
                 stageFinalizing: 'جارٍ الإنهاء',
             },
-            generate: {
-                title: 'إنشاء الملفات تلقائيًا',
-                tooltip: 'إنشاء ملفات تعريف لمراوحك تلقائيًا من بضعة خيارات',
-                stepFans: 'تعيين المراوح',
-                stepTemps: 'درجات الحرارة الرئيسية',
-                stepPreset: 'الأداء',
-                assignIntro: 'عيّن دورًا لكل مروحة. اترك مروحة دون تعيين لتخطيها.',
-                skip: 'تخطي',
-                noFans: 'لم يتم اكتشاف مراوح قابلة للتحكم.',
-                tempsIntro:
-                    'أكّد درجات الحرارة الرئيسية. تم ملؤها مسبقًا كأفضل تقدير: يُرجى التحقق منها.',
-                cpuTemp: 'حرارة المعالج',
-                gpuTemp: 'حرارة كرت الشاشة',
-                liquidTemp: 'حرارة السائل',
-                ambientTemp: 'الحرارة المحيطة (اختياري)',
-                tempNone: 'لا شيء',
-                presetIntro: 'اختر مدى قوة تسارع المراوح.',
-                perKindOverrides: 'تجاوزات حسب الدور (متقدم)',
-                cfmCaveat:
-                    'انحياز الضغط الموجب يعتمد على دورة التشغيل (duty) وليس على تدفق الهواء: مع أعداد مراوح غير متوازنة لا يمكن ضمان ضغط موجب.',
-                generate: 'إنشاء',
-                preview: 'معاينة',
-                previewIntro: 'راجع ما سيتم إنشاؤه وتطبيقه. لا يتم حفظ أي شيء حتى تؤكد.',
-                previewAssignments: 'تعيينات المراوح',
-                willCreateHeader: 'سيتم الإنشاء',
-                startingPointNote:
-                    'نقطة انطلاق سهلة بدلاً من البدء من الصفر. لن تكون مثالية لكل نظام، لذا تحقق منها واختبرها وعدّلها بعد الإنشاء.',
-                replaces: 'يستبدل {name}',
-                createApply: 'إنشاء وتطبيق',
-                generated: 'تم إنشاء {count} ملف تعريف.',
-                generateError: 'تعذّر إنشاء الملفات.',
-                applyError: 'تعذّر إنشاء الملفات.',
-                kind: {
-                    CpuCooler: 'مبرّد هوائي للمعالج',
-                    GpuFan: 'مروحة كرت الشاشة',
-                    AioRadiator: 'مشعّ AIO',
-                    AioPump: 'مضخة AIO',
-                    CaseIntake: 'سحب الصندوق',
-                    CaseExhaust: 'طرد الصندوق',
-                    LaptopFan: 'مروحة اللابتوب',
-                },
-            },
             fanControl: {
                 fanControlWizard: 'معالج التحكم في المروحة',
                 editCurrentProfile: 'تحرير الملف',
@@ -1217,6 +1301,49 @@ export default {
             },
             customSensor: {
                 new: 'مستشعر مخصص جديد',
+            },
+            generate: {
+                title: 'إنشاء الملفات تلقائيًا',
+                tooltip: 'إنشاء ملفات تعريف لمراوحك تلقائيًا من بضعة خيارات',
+                stepFans: 'تعيين المراوح',
+                stepTemps: 'درجات الحرارة الرئيسية',
+                stepPreset: 'الأداء',
+                assignIntro: 'عيّن دورًا لكل مروحة. اترك مروحة دون تعيين لتخطيها.',
+                calibrateFirst: 'عايِر المراوح أولًا للحصول على أفضل اتساق (بضع دقائق)',
+                skip: 'تخطي',
+                noFans: 'لم يتم اكتشاف مراوح قابلة للتحكم.',
+                tempsIntro:
+                    'أكّد درجات الحرارة الرئيسية. تم ملؤها مسبقًا كأفضل تقدير: يُرجى التحقق منها.',
+                cpuTemp: 'حرارة المعالج',
+                gpuTemp: 'حرارة كرت الشاشة',
+                liquidTemp: 'حرارة السائل',
+                ambientTemp: 'الحرارة المحيطة (اختياري)',
+                tempNone: 'لا شيء',
+                presetIntro: 'اختر مدى قوة تسارع المراوح.',
+                perKindOverrides: 'تجاوزات حسب الدور (متقدم)',
+                cfmCaveat:
+                    'انحياز الضغط الموجب يعتمد على دورة التشغيل (duty) وليس على تدفق الهواء: مع أعداد مراوح غير متوازنة لا يمكن ضمان ضغط موجب.',
+                generate: 'إنشاء',
+                preview: 'معاينة',
+                previewIntro: 'راجع ما سيتم إنشاؤه وتطبيقه. لا يتم حفظ أي شيء حتى تؤكد.',
+                previewAssignments: 'تعيينات المراوح',
+                willCreateHeader: 'سيتم الإنشاء',
+                startingPointNote:
+                    'نقطة انطلاق سهلة بدلاً من البدء من الصفر. لن تكون مثالية لكل نظام، لذا تحقق منها واختبرها وعدّلها بعد الإنشاء.',
+                replaces: 'يستبدل {name}',
+                createApply: 'إنشاء وتطبيق',
+                generated: 'تم إنشاء {count} ملف تعريف.',
+                generateError: 'تعذّر إنشاء الملفات.',
+                applyError: 'تعذّر إنشاء الملفات.',
+                kind: {
+                    CpuCooler: 'مبرّد هوائي للمعالج',
+                    GpuFan: 'مروحة كرت الشاشة',
+                    AioRadiator: 'مشعّ AIO',
+                    AioPump: 'مضخة AIO',
+                    CaseIntake: 'سحب الصندوق',
+                    CaseExhaust: 'طرد الصندوق',
+                    LaptopFan: 'مروحة اللابتوب',
+                },
             },
         },
         channelExtensionSettings: {
@@ -1407,6 +1534,13 @@ export default {
         writeAccessTooltip:
             'عند التفعيل، يمكن لهذا الرمز إجراء تغييرات. عند التعطيل، يمكن للرمز قراءة البيانات فقط.',
     },
+    daemon: {
+        status: {
+            ok: 'حسنًا',
+            hasWarnings: 'لديه تحذيرات',
+            hasErrors: 'لديه أخطاء',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'انتهت الجلسة',
@@ -1449,13 +1583,6 @@ export default {
                 summary: 'خطأ',
                 detail: 'تمت مقاطعة العملية.',
             },
-        },
-    },
-    daemon: {
-        status: {
-            ok: 'حسنًا',
-            hasWarnings: 'لديه تحذيرات',
-            hasErrors: 'لديه أخطاء',
         },
     },
     models: {
