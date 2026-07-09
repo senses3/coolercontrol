@@ -281,7 +281,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="t('layout.shell.coolingPanel.unpin')"
+                            v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
                             @click.prevent="togglePin(channel)"
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
@@ -374,7 +374,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="
+                            v-tooltip.top="
                                 isPinned(channel)
                                     ? t('layout.shell.coolingPanel.unpin')
                                     : t('layout.shell.coolingPanel.pin')
@@ -401,7 +401,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addProfile')"
+                v-tooltip.top="t('layout.menu.tooltips.addProfile')"
                 @click="openProfileWizard"
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
@@ -448,7 +448,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addFunction')"
+                v-tooltip.top="t('layout.menu.tooltips.addFunction')"
                 @click="openFunctionWizard"
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />

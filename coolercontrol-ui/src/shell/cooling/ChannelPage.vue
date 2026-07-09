@@ -438,7 +438,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     <div v-if="sharedChannels.length > 0" class="flex items-center gap-2">
                         <span
                             class="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border-one bg-bg-two px-3 text-sm text-text-color-secondary"
-                            :title="t('layout.shell.coolingPage.sharedTooltip')"
+                            v-tooltip.top="t('layout.shell.coolingPage.sharedTooltip')"
                         >
                             <svg-icon type="mdi" :path="mdiShareVariantOutline" :size="13" />
                             {{

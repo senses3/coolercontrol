@@ -136,7 +136,7 @@ const openWizard = (): void => {
                 v-if="channel.controllable"
                 type="button"
                 class="ml-auto hidden shrink-0 rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block"
-                :title="t('layout.shell.coolingPage.guidedSetup')"
+                v-tooltip.top="t('layout.shell.coolingPage.guidedSetup')"
                 @click.stop.prevent="openWizard"
             >
                 <svg-icon type="mdi" :path="mdiAutoFix" :size="18" />

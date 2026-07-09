@@ -309,7 +309,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                                 <button
                                     type="button"
                                     class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                                    :title="
+                                    v-tooltip.top="
                                         isPinned(device.uid, sensorName)
                                             ? t('layout.shell.coolingPanel.unpin')
                                             : t('layout.shell.coolingPanel.pin')

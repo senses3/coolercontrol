@@ -312,7 +312,7 @@ const shortcutClasses =
                             query: daemonState.status === DaemonStatus.OK ? {} : { level: 'warn' },
                         }"
                         class="flex w-fit items-center gap-2 rounded text-text-color outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent"
-                        :title="t('layout.shell.homePage.viewLogs')"
+                        v-tooltip.top="t('layout.shell.homePage.viewLogs')"
                     >
                         <svg-icon type="mdi" :path="mdiCircle" :size="12" :class="badgeColor" />
                         {{
