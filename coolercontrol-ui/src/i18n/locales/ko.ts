@@ -176,7 +176,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: '이 장치는 비활성화되어 있습니다.',
                 enableDevice: '장치 활성화',
-                disableUnusedSensors: '사용하지 않는 센서 비활성화 (추천)',
+                disableUnusedSensors: '사용하지 않는 센서 비활성화… (추천)',
                 sensors: '센서',
             },
             coolingPage: {

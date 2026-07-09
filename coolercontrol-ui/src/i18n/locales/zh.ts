@@ -176,7 +176,7 @@ export default {
                 lcd: 'LCD',
                 deviceDisabled: '此设备已禁用。',
                 enableDevice: '启用设备',
-                disableUnusedSensors: '禁用未使用的传感器（推荐）',
+                disableUnusedSensors: '禁用未使用的传感器…（推荐）',
                 sensors: '传感器',
             },
             coolingPage: {
