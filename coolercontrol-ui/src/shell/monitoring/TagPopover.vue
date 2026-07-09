@@ -149,7 +149,7 @@ const inputClasses =
     <PopoverRoot v-model:open="open">
         <PopoverTrigger
             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-            :title="t('components.menuTagAssign.title')"
+            v-tooltip.top="t('components.menuTagAssign.title')"
             @click.prevent
         >
             <svg-icon type="mdi" :path="mdiTagOutline" :size="16" />
@@ -226,7 +226,7 @@ const inputClasses =
                                 <button
                                     type="button"
                                     class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color"
-                                    :title="t('components.menuTagAssign.editTag')"
+                                    v-tooltip.top="t('components.menuTagAssign.editTag')"
                                     @click="startEdit(entry.name)"
                                 >
                                     <svg-icon type="mdi" :path="mdiPencilOutline" :size="14" />
@@ -234,7 +234,7 @@ const inputClasses =
                                 <button
                                     type="button"
                                     class="rounded p-0.5 text-text-color-secondary outline-none hover:text-error"
-                                    :title="t('components.menuTagAssign.deleteTag')"
+                                    v-tooltip.top="t('components.menuTagAssign.deleteTag')"
                                     @click="deleteTag(entry.name)"
                                 >
                                     <svg-icon type="mdi" :path="mdiTrashCanOutline" :size="14" />
@@ -267,7 +267,7 @@ const inputClasses =
                         type="button"
                         class="rounded-lg border border-border-one p-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
                         :disabled="!newTagValid"
-                        :title="t('common.add')"
+                        v-tooltip.top="t('common.add')"
                         @click="createAndAssign"
                     >
                         <svg-icon type="mdi" :path="mdiPlus" :size="16" />

@@ -22,7 +22,9 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlert,
     mdiBellOutline,
+    mdiBellPlusOutline,
     mdiDragVertical,
+    mdiFanAlert,
     mdiHome,
     mdiPinOff,
     mdiPinOutline,
@@ -37,6 +39,7 @@ import { useRouter } from 'vue-router'
 import type { Color, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import { AlertState } from '@/models/Alert.ts'
+import { ChannelMetric } from '@/models/ChannelSource.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -137,6 +140,34 @@ const togglePin = (sensor: MonitoringSensor): void => {
     settingsStore.pinnedIds = settingsStore.pinnedIds.includes(id)
         ? settingsStore.pinnedIds.filter((pinned) => pinned !== id)
         : [...settingsStore.pinnedIds, id]
+}
+
+// Alert convenience: temp sensors get a plain new-alert button; fan channels
+// (those reporting rpm) get a "fail alert" prefilled to catch 0 rpm; other
+// value types (duty/load/watts/freq) get no button.
+type AlertKind = 'temp' | 'fan'
+const alertKind = (sensor: MonitoringSensor): AlertKind | null => {
+    if (sensor.isTemp) return 'temp'
+    const values = currentDeviceStatus.value.get(sensor.deviceUID)?.get(sensor.channelName)
+    return values?.rpm != null ? 'fan' : null
+}
+const createAlert = (sensor: MonitoringSensor): void => {
+    const kind = alertKind(sensor)
+    if (kind == null) return
+    const query: Record<string, string> = {
+        device: sensor.deviceUID,
+        channel: sensor.channelName,
+    }
+    if (kind === 'fan') {
+        query.metric = ChannelMetric.RPM
+        // Alert when the fan drops to 0 rpm; the upper bound is effectively open.
+        query.min = '1'
+        query.max = '100000'
+        query.name = `${sensorLabel(sensor.deviceUID, sensor.channelName)} ${t('layout.shell.monitoringPanel.failAlertSuffix')}`
+    } else {
+        query.metric = ChannelMetric.Temp
+    }
+    router.push({ name: 'monitoring-alert-new', query })
 }
 
 const isDashboardPinned = (dashboard: Dashboard): boolean =>
@@ -293,7 +324,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="t('layout.shell.coolingPanel.unpin')"
+                            v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
                             @click.prevent="toggleDashboardPin(dashboard)"
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
@@ -343,9 +374,28 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
                         <button
+                            v-if="alertKind(sensor) != null"
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="t('layout.shell.coolingPanel.unpin')"
+                            v-tooltip.top="
+                                alertKind(sensor) === 'fan'
+                                    ? t('layout.shell.monitoringPanel.failAlert')
+                                    : t('layout.shell.monitoringPanel.createAlert')
+                            "
+                            @click.prevent="createAlert(sensor)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="
+                                    alertKind(sensor) === 'fan' ? mdiFanAlert : mdiBellPlusOutline
+                                "
+                                :size="16"
+                            />
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
                             @click.prevent="togglePin(sensor)"
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
@@ -360,7 +410,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addDashboard')"
+                v-tooltip.top="t('layout.menu.tooltips.addDashboard')"
                 @click="addDashboard"
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
@@ -396,7 +446,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         :path="mdiHome"
                         :size="14"
                         class="shrink-0 text-text-color-secondary"
-                        :title="t('views.dashboard.setAsHome')"
+                        v-tooltip.top="t('views.dashboard.setAsHome')"
                     />
                 </RouterLink>
                 <div
@@ -408,7 +458,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                     <button
                         type="button"
                         class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                        :title="
+                        v-tooltip.top="
                             isDashboardPinned(dashboard)
                                 ? t('layout.shell.coolingPanel.unpin')
                                 : t('layout.shell.coolingPanel.pin')
@@ -438,7 +488,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addAlert')"
+                v-tooltip.top="t('layout.menu.tooltips.addAlert')"
                 @click="router.push({ name: 'monitoring-alert-new' })"
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
@@ -559,9 +609,28 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             "
                         />
                         <button
+                            v-if="alertKind(sensor) != null"
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="
+                            v-tooltip.top="
+                                alertKind(sensor) === 'fan'
+                                    ? t('layout.shell.monitoringPanel.failAlert')
+                                    : t('layout.shell.monitoringPanel.createAlert')
+                            "
+                            @click.prevent="createAlert(sensor)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="
+                                    alertKind(sensor) === 'fan' ? mdiFanAlert : mdiBellPlusOutline
+                                "
+                                :size="16"
+                            />
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            v-tooltip.top="
                                 isPinned(sensor)
                                     ? t('layout.shell.coolingPanel.unpin')
                                     : t('layout.shell.coolingPanel.pin')

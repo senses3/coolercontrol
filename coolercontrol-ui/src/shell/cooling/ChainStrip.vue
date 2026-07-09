@@ -52,7 +52,7 @@ const pillIcon = (kind: ChainPill['kind']): string => {
             <button
                 type="button"
                 class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border-one bg-bg-two px-2.5 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t(`layout.shell.coolingPage.chain.${pill.kind}`)"
+                v-tooltip.top="t(`layout.shell.coolingPage.chain.${pill.kind}`)"
                 @click="emit('pill-click', pill.kind)"
             >
                 <svg-icon type="mdi" :path="pillIcon(pill.kind)" :size="14" />

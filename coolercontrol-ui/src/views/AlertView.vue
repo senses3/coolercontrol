@@ -25,7 +25,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import AlertLogTable from '@/components/AlertLogTable.vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiGroupedListbox from '@/shell/ui/UiGroupedListbox.vue'
@@ -67,6 +67,7 @@ const deviceStore = useDeviceStore()
 const rawStore = toRaw(deviceStore.$state)
 const settingsStore = useSettingsStore()
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const confirm = useConfirm()
 
@@ -158,10 +159,19 @@ const fillChannelSources = async (): Promise<void> => {
 }
 await fillChannelSources()
 const startingChannelSource = () => {
-    if (shouldCreateAlert) return undefined
-    const deviceUID = alert.channel_source.device_uid
-    const channelName = alert.channel_source.channel_name
-    const channelMetric = alert.channel_source.channel_metric
+    // Edit: use the alert's own source. Create: honor an optional
+    // ?device/&channel/&metric query (from the Monitoring "create alert" row
+    // convenience) to preselect the source.
+    const deviceUID = shouldCreateAlert
+        ? (route.query.device as string | undefined)
+        : alert.channel_source.device_uid
+    const channelName = shouldCreateAlert
+        ? (route.query.channel as string | undefined)
+        : alert.channel_source.channel_name
+    const channelMetric = shouldCreateAlert
+        ? (route.query.metric as ChannelMetric | undefined)
+        : alert.channel_source.channel_metric
+    if (deviceUID == null || channelName == null) return undefined
     for (const device of channelSources.value) {
         if (device.deviceUID !== deviceUID) {
             continue
@@ -175,6 +185,13 @@ const startingChannelSource = () => {
     return undefined
 }
 chosenChannelSource.value = startingChannelSource()
+// Create-from-sensor convenience: honor optional min/max/name query overrides
+// (the fan "fail alert" prefills min=1 with an open max to catch 0 rpm).
+if (shouldCreateAlert) {
+    if (route.query.min != null) chosenMin.value = Number(route.query.min)
+    if (route.query.max != null) chosenMax.value = Number(route.query.max)
+    if (route.query.name != null) chosenName.value = String(route.query.name)
+}
 
 const saveAlert = async (): Promise<void> => {
     alert.max = chosenMax.value

@@ -180,7 +180,7 @@ const actionButtonClasses =
                             type="button"
                             :class="actionButtonClasses"
                             :disabled="busy.has(plugin.id)"
-                            :title="t('layout.plugins.start')"
+                            v-tooltip.top="t('layout.plugins.start')"
                             @click.prevent="runAction(plugin.id, pluginActions.startPlugin)"
                         >
                             <svg-icon type="mdi" :path="mdiPlay" :size="16" />
@@ -190,7 +190,7 @@ const actionButtonClasses =
                             type="button"
                             :class="actionButtonClasses"
                             :disabled="busy.has(plugin.id)"
-                            :title="t('layout.plugins.stop')"
+                            v-tooltip.top="t('layout.plugins.stop')"
                             @click.prevent="runAction(plugin.id, pluginActions.stopPlugin)"
                         >
                             <svg-icon type="mdi" :path="mdiStop" :size="16" />
@@ -200,7 +200,7 @@ const actionButtonClasses =
                             type="button"
                             :class="actionButtonClasses"
                             :disabled="busy.has(plugin.id)"
-                            :title="t('layout.plugins.restart')"
+                            v-tooltip.top="t('layout.plugins.restart')"
                             @click.prevent="runAction(plugin.id, pluginActions.restartPlugin)"
                         >
                             <svg-icon type="mdi" :path="mdiRestart" :size="16" />
