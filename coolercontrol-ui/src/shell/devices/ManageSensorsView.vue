@@ -299,7 +299,7 @@ onMounted(async () => {
                         "
                     >
                         <span class="truncate text-base font-medium text-text-color">
-                            {{ deviceLabel(setting.uid) }}
+                            {{ setting.name }}
                         </span>
                         <UiSwitch
                             class="ml-auto"
