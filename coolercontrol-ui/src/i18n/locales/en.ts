@@ -130,6 +130,9 @@ export default {
             },
             monitoringPanel: {
                 newDashboard: 'New Dashboard',
+                createAlert: 'Create alert for this sensor',
+                failAlert: 'Create a fail alert (triggers at 0 rpm)',
+                failAlertSuffix: 'Fail',
             },
             devicesPanel: {
                 disabled: 'Disabled',

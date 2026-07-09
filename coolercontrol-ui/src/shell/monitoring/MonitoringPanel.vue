@@ -22,7 +22,9 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlert,
     mdiBellOutline,
+    mdiBellPlusOutline,
     mdiDragVertical,
+    mdiFanAlert,
     mdiHome,
     mdiPinOff,
     mdiPinOutline,
@@ -37,6 +39,7 @@ import { useRouter } from 'vue-router'
 import type { Color, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import { AlertState } from '@/models/Alert.ts'
+import { ChannelMetric } from '@/models/ChannelSource.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -137,6 +140,34 @@ const togglePin = (sensor: MonitoringSensor): void => {
     settingsStore.pinnedIds = settingsStore.pinnedIds.includes(id)
         ? settingsStore.pinnedIds.filter((pinned) => pinned !== id)
         : [...settingsStore.pinnedIds, id]
+}
+
+// Alert convenience: temp sensors get a plain new-alert button; fan channels
+// (those reporting rpm) get a "fail alert" prefilled to catch 0 rpm; other
+// value types (duty/load/watts/freq) get no button.
+type AlertKind = 'temp' | 'fan'
+const alertKind = (sensor: MonitoringSensor): AlertKind | null => {
+    if (sensor.isTemp) return 'temp'
+    const values = currentDeviceStatus.value.get(sensor.deviceUID)?.get(sensor.channelName)
+    return values?.rpm != null ? 'fan' : null
+}
+const createAlert = (sensor: MonitoringSensor): void => {
+    const kind = alertKind(sensor)
+    if (kind == null) return
+    const query: Record<string, string> = {
+        device: sensor.deviceUID,
+        channel: sensor.channelName,
+    }
+    if (kind === 'fan') {
+        query.metric = ChannelMetric.RPM
+        // Alert when the fan drops to 0 rpm; the upper bound is effectively open.
+        query.min = '1'
+        query.max = '100000'
+        query.name = `${sensorLabel(sensor.deviceUID, sensor.channelName)} ${t('layout.shell.monitoringPanel.failAlertSuffix')}`
+    } else {
+        query.metric = ChannelMetric.Temp
+    }
+    router.push({ name: 'monitoring-alert-new', query })
 }
 
 const isDashboardPinned = (dashboard: Dashboard): boolean =>
@@ -342,6 +373,25 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
+                        <button
+                            v-if="alertKind(sensor) != null"
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            :title="
+                                alertKind(sensor) === 'fan'
+                                    ? t('layout.shell.monitoringPanel.failAlert')
+                                    : t('layout.shell.monitoringPanel.createAlert')
+                            "
+                            @click.prevent="createAlert(sensor)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="
+                                    alertKind(sensor) === 'fan' ? mdiFanAlert : mdiBellPlusOutline
+                                "
+                                :size="16"
+                            />
+                        </button>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -558,6 +608,25 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                                     onTagOpen(`${sensor.deviceUID}-${sensor.channelName}`, open)
                             "
                         />
+                        <button
+                            v-if="alertKind(sensor) != null"
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            :title="
+                                alertKind(sensor) === 'fan'
+                                    ? t('layout.shell.monitoringPanel.failAlert')
+                                    : t('layout.shell.monitoringPanel.createAlert')
+                            "
+                            @click.prevent="createAlert(sensor)"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="
+                                    alertKind(sensor) === 'fan' ? mdiFanAlert : mdiBellPlusOutline
+                                "
+                                :size="16"
+                            />
+                        </button>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
