@@ -35,11 +35,35 @@ interface TooltipOptions {
 interface TooltipHost extends Element {
     $ccTooltip?: TooltipOptions
     $ccTooltipShow?: () => void
+    $ccTooltipShowDelayed?: () => void
     $ccTooltipHide?: () => void
 }
 
 let tooltipEl: HTMLDivElement | undefined
 let currentHost: TooltipHost | undefined
+
+// Hover has a short show-delay (a middle ground between instant and the browser's
+// long native delay). Keyboard focus shows immediately for accessibility.
+const SHOW_DELAY_MS = 500
+let showTimer: ReturnType<typeof setTimeout> | undefined
+let pendingHost: TooltipHost | undefined
+
+const scheduleShow = (host: TooltipHost): void => {
+    if (showTimer != null) clearTimeout(showTimer)
+    pendingHost = host
+    showTimer = setTimeout(() => {
+        showTimer = undefined
+        pendingHost = undefined
+        show(host)
+    }, SHOW_DELAY_MS)
+}
+
+const cancelShow = (host: TooltipHost): void => {
+    if (host !== pendingHost) return
+    if (showTimer != null) clearTimeout(showTimer)
+    showTimer = undefined
+    pendingHost = undefined
+}
 
 const ensureTooltipEl = (): HTMLDivElement => {
     if (tooltipEl != null) return tooltipEl
@@ -138,8 +162,12 @@ export const tooltipDirective: Directive<
     mounted(host, binding) {
         host.$ccTooltip = parseOptions(binding)
         host.$ccTooltipShow = () => show(host)
-        host.$ccTooltipHide = () => hide(host)
-        host.addEventListener('mouseenter', host.$ccTooltipShow)
+        host.$ccTooltipShowDelayed = () => scheduleShow(host)
+        host.$ccTooltipHide = () => {
+            cancelShow(host)
+            hide(host)
+        }
+        host.addEventListener('mouseenter', host.$ccTooltipShowDelayed)
         host.addEventListener('mouseleave', host.$ccTooltipHide)
         host.addEventListener('focusin', host.$ccTooltipShow)
         host.addEventListener('focusout', host.$ccTooltipHide)
@@ -157,9 +185,12 @@ export const tooltipDirective: Directive<
         place(host, options.position)
     },
     unmounted(host) {
+        cancelShow(host)
         hide(host)
+        if (host.$ccTooltipShowDelayed != null) {
+            host.removeEventListener('mouseenter', host.$ccTooltipShowDelayed)
+        }
         if (host.$ccTooltipShow != null) {
-            host.removeEventListener('mouseenter', host.$ccTooltipShow)
             host.removeEventListener('focusin', host.$ccTooltipShow)
         }
         if (host.$ccTooltipHide != null) {
