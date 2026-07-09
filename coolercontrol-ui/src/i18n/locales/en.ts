@@ -137,6 +137,20 @@ export default {
             devicesPanel: {
                 disabled: 'Disabled',
             },
+            sensorDest: {
+                monitoring: 'Monitoring',
+                cooling: 'Cooling',
+                lighting: 'Lighting',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'Manage Sensors',
+                hint: 'Enable or disable devices and sensors. Disabling unused ones is recommended.',
+                pendingChanges: 'No changes | {count} change | {count} changes',
+                applyRestart: 'Apply & Restart',
+                disabledDevices: 'Disabled Devices',
+                openButton: 'Manage Sensors',
+            },
             homePanel: {
                 overview: 'Overview',
                 logs: 'Logs',
@@ -164,6 +178,7 @@ export default {
                 enableDevice: 'Enable Device',
                 disableDevice: 'Disable this device',
                 disable: 'Disable',
+                disableUnusedSensors: 'Disable unused sensors (recommended)',
                 sensors: 'Sensors',
                 lightingLcd: 'Lighting & LCD',
             },

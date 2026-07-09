@@ -128,6 +128,12 @@ const sectionRoutes: RouteRecordRaw[] = [
         meta: { section: 'devices' },
     },
     {
+        path: 'devices/manage-sensors',
+        name: 'devices-manage-sensors',
+        component: () => import('@/shell/devices/ManageSensorsView.vue'),
+        meta: { section: 'devices' },
+    },
+    {
         path: 'devices/:deviceUID',
         name: 'devices-device',
         component: () => import('@/shell/devices/DevicePage.vue'),

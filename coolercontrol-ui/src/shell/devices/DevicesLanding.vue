@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert } from '@mdi/js'
+import { mdiAlert, mdiToggleSwitchOffOutline } from '@mdi/js'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Device, UID } from '@/models/Device.ts'
@@ -87,6 +87,18 @@ const counts = (device: Device): string => {
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.devicesPage.landingHint') }}
             </span>
+            <RouterLink
+                :to="{ name: 'devices-manage-sensors' }"
+                class="ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border-one px-3 text-sm font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiToggleSwitchOffOutline"
+                    :size="16"
+                    class="text-text-color-secondary"
+                />
+                {{ t('layout.shell.manageSensors.openButton') }}
+            </RouterLink>
         </div>
         <section v-for="group in typeGroups" :key="group.type" class="px-4 pt-4">
             <h2

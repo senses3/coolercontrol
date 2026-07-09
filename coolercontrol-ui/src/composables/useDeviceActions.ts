@@ -133,14 +133,45 @@ export function useDeviceActions() {
         settingsStore.applyThinkPadFanControl(enable)
     }
 
-    // Batch sensor enable/disable for one device, preserving the settings
-    // Device tab semantics: one confirm, save, restart on success; on daemon
-    // rejection every error is shown verbatim (dependency messages) and the
-    // daemon is NOT restarted.
-    const applySensorChanges = (
+    // Writes one device's enable/disable state into its CC settings in place,
+    // returning the settings to save (or null if the device has no settings).
+    // The daemon stamps device and channel detection memos itself, so
+    // client-supplied names are ignored (write-deprecated).
+    const writeDeviceEnableState = (
         deviceUID: UID,
         deviceEnabled: boolean,
         channelStates: Map<string, boolean>,
+    ): CoolerControlDeviceSettingsDTO | null => {
+        const ccSetting = settingsStore.ccDeviceSettings.get(deviceUID)
+        if (ccSetting == null) {
+            console.error(`CCDeviceSetting not found for this device: ${deviceUID}`)
+            return null
+        }
+        ccSetting.disable = !deviceEnabled
+        if (deviceEnabled) {
+            for (const [channelName, enabled] of channelStates) {
+                let channelSettings = ccSetting.channel_settings.get(channelName)
+                if (channelSettings == null) {
+                    // only already-applied channel changes exist in
+                    // channel_settings; enabled channels with no settings are
+                    // not persisted
+                    if (enabled) continue
+                    channelSettings = new CCChannelSettings()
+                    ccSetting.channel_settings.set(channelName, channelSettings)
+                }
+                channelSettings.disabled = !enabled
+            }
+        }
+        return ccSetting
+    }
+
+    // Batch sensor/device enable/disable across any number of devices,
+    // preserving the old settings Device tab semantics: one confirm, then each
+    // changed device is saved, then a single daemon restart on success. On
+    // daemon rejection the error is shown verbatim (dependency messages) and
+    // the daemon is NOT restarted.
+    const applySensorChangesBatch = (
+        edits: Map<UID, { deviceEnabled: boolean; channelStates: Map<string, boolean> }>,
         onDone: (success: boolean) => void,
     ): void => {
         confirm.require({
@@ -148,42 +179,34 @@ export function useDeviceActions() {
             header: t('layout.settings.devices.enableDevices'),
             icon: mdiAlertOutline,
             accept: async () => {
-                const ccSetting = settingsStore.ccDeviceSettings.get(deviceUID)
-                if (ccSetting == null) {
-                    console.error(`CCDeviceSetting not found for this device: ${deviceUID}`)
+                const settingsToSave: CoolerControlDeviceSettingsDTO[] = []
+                for (const [deviceUID, edit] of edits) {
+                    const ccSetting = writeDeviceEnableState(
+                        deviceUID,
+                        edit.deviceEnabled,
+                        edit.channelStates,
+                    )
+                    if (ccSetting != null) settingsToSave.push(ccSetting)
+                }
+                if (settingsToSave.length === 0) {
                     onDone(false)
                     return
                 }
-                // The daemon stamps device and channel detection memos itself;
-                // client-supplied names are ignored (write-deprecated).
-                ccSetting.disable = !deviceEnabled
-                if (deviceEnabled) {
-                    for (const [channelName, enabled] of channelStates) {
-                        let channelSettings = ccSetting.channel_settings.get(channelName)
-                        if (channelSettings == null) {
-                            // only already-applied channel changes exist in
-                            // channel_settings; enabled channels with no
-                            // settings are not persisted
-                            if (enabled) continue
-                            channelSettings = new CCChannelSettings()
-                            ccSetting.channel_settings.set(channelName, channelSettings)
-                        }
-                        channelSettings.disabled = !enabled
+                for (const ccSetting of settingsToSave) {
+                    const result = await deviceStore.daemonClient.saveCCDeviceSettings(
+                        ccSetting.uid,
+                        ccSetting,
+                    )
+                    if (result instanceof ErrorResponse) {
+                        toast.add({
+                            severity: 'error',
+                            summary: t('common.error'),
+                            detail: result.error || t('layout.settings.devices.unknownError'),
+                            life: 0,
+                        })
+                        onDone(false)
+                        return
                     }
-                }
-                const result = await deviceStore.daemonClient.saveCCDeviceSettings(
-                    ccSetting.uid,
-                    ccSetting,
-                )
-                if (result instanceof ErrorResponse) {
-                    toast.add({
-                        severity: 'error',
-                        summary: t('common.error'),
-                        detail: result.error || t('layout.settings.devices.unknownError'),
-                        life: 0,
-                    })
-                    onDone(false)
-                    return
                 }
                 onDone(true)
                 await deviceStore.daemonClient.shutdownDaemon()
@@ -193,6 +216,15 @@ export function useDeviceActions() {
         })
     }
 
+    const applySensorChanges = (
+        deviceUID: UID,
+        deviceEnabled: boolean,
+        channelStates: Map<string, boolean>,
+        onDone: (success: boolean) => void,
+    ): void => {
+        applySensorChangesBatch(new Map([[deviceUID, { deviceEnabled, channelStates }]]), onDone)
+    }
+
     return {
         setDirectAccess,
         setDelayMillis,
@@ -200,5 +232,6 @@ export function useDeviceActions() {
         enableAmdOverdrive,
         applyThinkPadFanControl,
         applySensorChanges,
+        applySensorChangesBatch,
     }
 }
