@@ -19,16 +19,10 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import {
-    mdiCheckboxBlankOutline,
-    mdiCheckboxMarked,
-    mdiInformationSlabCircleOutline,
-    mdiLightbulbOutline,
-    mdiPlus,
-    mdiTelevision,
-} from '@mdi/js'
+import { mdiInformationSlabCircleOutline, mdiPlus, mdiToggleSwitchOffOutline } from '@mdi/js'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { type Color, DeviceType, getDeviceTypeDisplayName, type UID } from '@/models/Device.ts'
 import { getDriverTypeDisplayName } from '@/models/DeviceInfo.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
@@ -37,7 +31,11 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useDeviceActions } from '@/composables/useDeviceActions.ts'
-import { customSensorNames, deviceChannelLinks, sensorToggles } from '@/shell/devices/devices.ts'
+import {
+    customSensorNames,
+    type DeviceSensorLink,
+    deviceSensorLinks,
+} from '@/shell/devices/devices.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -49,6 +47,7 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const colorStore = useThemeColorsStore()
 const deviceActions = useDeviceActions()
+const router = useRouter()
 
 const device = computed(() =>
     [...deviceStore.allDevices()].find((dev) => dev.uid === props.deviceUID),
@@ -162,48 +161,40 @@ const thinkPadFullSpeed = computed({
     set: (value: boolean) => (settingsStore.ccSettings.thinkpad_full_speed = value),
 })
 
-// Sensor enable/disable checklist (per-device slice of the old settings tree).
-const disabledChannelNames = computed((): string[] => {
-    const names: string[] = []
-    for (const [channelName, channelSettings] of ccSetting.value?.channel_settings ?? []) {
-        if (channelSettings.disabled) names.push(channelName)
-    }
-    return names
-})
-const toggles = computed(() =>
-    device.value != null ? sensorToggles(device.value, disabledChannelNames.value) : [],
-)
-const sensorState = ref<Map<string, boolean>>(new Map())
-const resetSensorState = (): void => {
-    sensorState.value = new Map(toggles.value.map((tog) => [tog.channelName, tog.enabled]))
-}
-resetSensorState()
-
 const sensorLabel = (channelName: string): string =>
     uiSettings.value?.sensorsAndChannels.get(channelName)?.name ??
     ccSetting.value?.channel_settings.get(channelName)?.label ??
     channelName
 
-const toggleSensor = (channelName: string): void => {
-    sensorState.value.set(channelName, !(sensorState.value.get(channelName) ?? true))
-}
-const sensorsDirty = computed(() =>
-    toggles.value.some((tog) => sensorState.value.get(tog.channelName) !== tog.enabled),
+// One complete list of the device's channels and sensors, each linking to the
+// page where it is viewed or controlled.
+const sensorLinks = computed((): DeviceSensorLink[] =>
+    device.value != null ? deviceSensorLinks(device.value) : [],
 )
-const applySensors = (): void => {
-    deviceActions.applySensorChanges(props.deviceUID, true, sensorState.value, (success) => {
-        if (!success) resetSensorState()
-    })
+const sensorLinkTarget = (
+    link: DeviceSensorLink,
+): { name: string; params: Record<string, string> } => {
+    const params = { deviceUID: props.deviceUID, channelName: link.channelName }
+    switch (link.kind) {
+        case 'cooling':
+            return { name: 'cooling-channel', params }
+        case 'lighting':
+            return { name: 'device-lighting', params }
+        case 'lcd':
+            return { name: 'device-lcd', params }
+        default:
+            return { name: 'monitoring-sensor', params }
+    }
 }
+const sensorDestLabel = (kind: DeviceSensorLink['kind']): string =>
+    t(`layout.shell.sensorDest.${kind}`)
 
-const disableDevice = (): void => {
-    deviceActions.applySensorChanges(props.deviceUID, false, new Map(), () => {})
+// Enabling/disabling devices and sensors happens in one place: the Manage
+// Sensors editor, deep-linked to this device.
+const openManageSensors = (): void => {
+    router.push({ name: 'devices-manage-sensors', query: { device: props.deviceUID } })
 }
-const enableDevice = (): void => {
-    deviceActions.applySensorChanges(props.deviceUID, true, new Map(), () => {})
-}
-
-const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(device.value) : []))
+const enableDevice = openManageSensors
 </script>
 
 <template>
@@ -231,6 +222,21 @@ const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(d
                     @update:model-value="setDeviceColor"
                 />
             </div>
+
+            <button
+                v-if="!isCustomSensors"
+                type="button"
+                class="mt-3 inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-error/40 px-4 text-base font-medium text-text-color outline-none transition-colors hover:bg-error/10 focus-visible:ring-2 focus-visible:ring-accent"
+                @click="openManageSensors"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiToggleSwitchOffOutline"
+                    :size="18"
+                    class="text-text-color-secondary"
+                />
+                {{ t('layout.shell.devicesPage.disableUnusedSensors') }}
+            </button>
 
             <!-- Device details -->
             <h2 class="pb-2 pt-4 text-xs uppercase text-text-color-secondary">
@@ -435,80 +441,29 @@ const channelLinks = computed(() => (device.value != null ? deviceChannelLinks(d
                             <span class="text-sm text-text-color-secondary">ms</span>
                         </span>
                     </div>
-                    <UiSeparator />
-                    <div class="flex items-center justify-between gap-8 px-4 py-3">
-                        <span class="text-base text-text-color">
-                            {{ t('layout.shell.devicesPage.disableDevice') }}
-                        </span>
-                        <UiButton size="sm" variant="outline" @click="disableDevice">
-                            {{ t('layout.shell.devicesPage.disable') }}
-                        </UiButton>
-                    </div>
                 </div>
             </template>
-            <!-- Sensors enable/disable (custom sensors manage via add/delete instead) -->
-            <template v-if="!isCustomSensors">
-                <div class="flex items-center gap-3 pb-2 pt-6">
-                    <h2 class="text-xs uppercase text-text-color-secondary">
-                        {{ t('layout.shell.devicesPage.sensors') }}
-                    </h2>
-                    <UiButton v-if="sensorsDirty" size="sm" @click="applySensors">
-                        {{ t('common.apply') }}
-                    </UiButton>
-                </div>
-                <div
-                    class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
-                >
-                    <button
-                        v-for="tog in toggles"
-                        :key="tog.channelName"
-                        type="button"
-                        class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                        @click="toggleSensor(tog.channelName)"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="
-                                (sensorState.get(tog.channelName) ?? true)
-                                    ? mdiCheckboxMarked
-                                    : mdiCheckboxBlankOutline
-                            "
-                            :size="18"
-                            :class="
-                                (sensorState.get(tog.channelName) ?? true)
-                                    ? 'text-accent'
-                                    : 'text-text-color-secondary'
-                            "
-                        />
-                        <span class="truncate">{{ sensorLabel(tog.channelName) }}</span>
-                    </button>
-                </div>
-            </template>
-            <!-- Lighting and LCD channels -->
-            <template v-if="channelLinks.length > 0">
+            <!-- Complete sensor/channel list; each links to where it is viewed or controlled. -->
+            <template v-if="!isCustomSensors && sensorLinks.length > 0">
                 <h2 class="pb-2 pt-6 text-xs uppercase text-text-color-secondary">
-                    {{ t('layout.shell.devicesPage.lightingLcd') }}
+                    {{ t('layout.shell.devicesPage.sensors') }}
                 </h2>
                 <div
                     class="flex w-fit min-w-96 flex-col rounded-lg border border-border-one bg-bg-two p-2"
                 >
                     <RouterLink
-                        v-for="link in channelLinks"
+                        v-for="link in sensorLinks"
                         :key="`${link.kind}-${link.channelName}`"
-                        :to="{
-                            name: link.kind === 'lighting' ? 'device-lighting' : 'device-lcd',
-                            params: { deviceUID: link.deviceUID, channelName: link.channelName },
-                        }"
+                        :to="sensorLinkTarget(link)"
                         class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                     >
-                        <svg-icon
-                            type="mdi"
-                            :path="link.kind === 'lighting' ? mdiLightbulbOutline : mdiTelevision"
-                            :size="16"
-                            class="text-text-color-secondary"
+                        <span
+                            class="h-2 w-2 shrink-0 rounded-full"
+                            :style="{ backgroundColor: sensorDotColor(link.channelName) }"
                         />
-                        <span class="truncate">
-                            {{ sensorLabel(link.channelName) }}
+                        <span class="truncate">{{ sensorLabel(link.channelName) }}</span>
+                        <span class="ml-auto shrink-0 pl-3 text-xs text-text-color-secondary">
+                            {{ sensorDestLabel(link.kind) }} &rsaquo;
                         </span>
                     </RouterLink>
                 </div>

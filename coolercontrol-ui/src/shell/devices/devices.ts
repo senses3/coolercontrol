@@ -80,6 +80,49 @@ export function deviceChannelLinks(device: Device): DeviceChannelLink[] {
     return links
 }
 
+// Where a device channel/sensor is viewed or controlled. Read-only sensors go
+// to Monitoring; controllable channels to Cooling; lighting and LCD to their
+// own editors.
+export type SensorLinkKind = 'monitoring' | 'cooling' | 'lighting' | 'lcd'
+
+export interface DeviceSensorLink {
+    channelName: string
+    kind: SensorLinkKind
+}
+
+// Every live channel/sensor of a device with the page it links to, so the
+// device page can present one complete list (temps and read channels, fans and
+// pumps, lighting, LCD). Mirrors sensorToggles' enumeration order.
+export function deviceSensorLinks(device: Device): DeviceSensorLink[] {
+    const links: DeviceSensorLink[] = []
+    const seen = new Set<string>()
+    const add = (channelName: string, kind: SensorLinkKind): void => {
+        if (seen.has(channelName)) return
+        seen.add(channelName)
+        links.push({ channelName, kind })
+    }
+    for (const temp of device.status.temps) {
+        add(temp.name, 'monitoring')
+    }
+    for (const keyword of ['freq', 'power', 'load']) {
+        for (const channel of device.status.channels) {
+            if (channel.name.toLowerCase().includes(keyword)) add(channel.name, 'monitoring')
+        }
+    }
+    if (device.info != null) {
+        for (const [channelName, channelInfo] of device.info.channels.entries()) {
+            if (channelInfo.speed_options != null) add(channelName, 'cooling')
+        }
+        for (const [channelName, channelInfo] of device.info.channels.entries()) {
+            if (channelInfo.lighting_modes.length > 0) add(channelName, 'lighting')
+        }
+        for (const [channelName, channelInfo] of device.info.channels.entries()) {
+            if (channelInfo.lcd_modes.length > 0) add(channelName, 'lcd')
+        }
+    }
+    return links
+}
+
 export interface SensorToggle {
     channelName: string
     enabled: boolean
