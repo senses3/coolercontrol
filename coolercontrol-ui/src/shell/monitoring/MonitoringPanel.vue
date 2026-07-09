@@ -324,7 +324,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="t('layout.shell.coolingPanel.unpin')"
+                            v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
                             @click.prevent="toggleDashboardPin(dashboard)"
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
@@ -377,7 +377,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             v-if="alertKind(sensor) != null"
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="
+                            v-tooltip.top="
                                 alertKind(sensor) === 'fan'
                                     ? t('layout.shell.monitoringPanel.failAlert')
                                     : t('layout.shell.monitoringPanel.createAlert')
@@ -395,7 +395,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="t('layout.shell.coolingPanel.unpin')"
+                            v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
                             @click.prevent="togglePin(sensor)"
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
@@ -410,7 +410,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addDashboard')"
+                v-tooltip.top="t('layout.menu.tooltips.addDashboard')"
                 @click="addDashboard"
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
@@ -446,7 +446,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         :path="mdiHome"
                         :size="14"
                         class="shrink-0 text-text-color-secondary"
-                        :title="t('views.dashboard.setAsHome')"
+                        v-tooltip.top="t('views.dashboard.setAsHome')"
                     />
                 </RouterLink>
                 <div
@@ -458,7 +458,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                     <button
                         type="button"
                         class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                        :title="
+                        v-tooltip.top="
                             isDashboardPinned(dashboard)
                                 ? t('layout.shell.coolingPanel.unpin')
                                 : t('layout.shell.coolingPanel.pin')
@@ -488,7 +488,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             <button
                 type="button"
                 class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                :title="t('layout.menu.tooltips.addAlert')"
+                v-tooltip.top="t('layout.menu.tooltips.addAlert')"
                 @click="router.push({ name: 'monitoring-alert-new' })"
             >
                 <svg-icon type="mdi" :path="mdiPlus" :size="16" />
@@ -612,7 +612,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             v-if="alertKind(sensor) != null"
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="
+                            v-tooltip.top="
                                 alertKind(sensor) === 'fan'
                                     ? t('layout.shell.monitoringPanel.failAlert')
                                     : t('layout.shell.monitoringPanel.createAlert')
@@ -630,7 +630,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            :title="
+                            v-tooltip.top="
                                 isPinned(sensor)
                                     ? t('layout.shell.coolingPanel.unpin')
                                     : t('layout.shell.coolingPanel.pin')
