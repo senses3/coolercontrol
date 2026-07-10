@@ -44,7 +44,7 @@ withDefaults(
                 <TooltipContent
                     :side="side"
                     :side-offset="6"
-                    class="z-50 max-w-80 whitespace-pre-line rounded-lg border border-border-one bg-bg-two px-2.5 py-1.5 text-sm text-text-color shadow-md"
+                    class="z-50 max-w-80 whitespace-pre-line rounded-lg border border-border-one bg-bg-two px-2.5 py-1.5 text-sm text-text-color shadow-overlay"
                 >
                     {{ text }}
                 </TooltipContent>

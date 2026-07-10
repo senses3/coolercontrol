@@ -70,7 +70,7 @@ const ensureTooltipEl = (): HTMLDivElement => {
     tooltipEl = document.createElement('div')
     tooltipEl.className =
         'fixed z-[1500] hidden pointer-events-none max-w-80 whitespace-pre-line rounded-lg ' +
-        'border border-border-one bg-bg-two px-2.5 py-1.5 text-sm text-text-color shadow-md'
+        'border border-border-one bg-bg-two px-2.5 py-1.5 text-sm text-text-color shadow-overlay'
     document.body.appendChild(tooltipEl)
     const hideOnViewportChange = () => hide()
     window.addEventListener('scroll', hideOnViewportChange, { capture: true, passive: true })

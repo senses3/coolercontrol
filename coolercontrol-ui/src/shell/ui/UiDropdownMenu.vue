@@ -34,7 +34,7 @@ import {
             <DropdownMenuContent
                 align="end"
                 :side-offset="4"
-                class="z-[1300] min-w-44 rounded-lg border border-border-one bg-bg-two p-1 shadow-md"
+                class="z-[1300] min-w-44 rounded-lg border border-border-one bg-bg-two p-1 shadow-overlay"
             >
                 <slot />
             </DropdownMenuContent>

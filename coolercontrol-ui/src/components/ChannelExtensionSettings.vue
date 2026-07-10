@@ -186,7 +186,7 @@ defineExpose({
             </popover-trigger>
             <popover-content side="bottom" class="z-10">
                 <div
-                    class="w-full bg-bg-two border border-border-one p-2 rounded-lg text-text-color pb-4 drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                    class="w-full bg-bg-two border border-border-one p-2 rounded-lg text-text-color pb-4 shadow-overlay"
                 >
                     <div class="font-semibold pb-2.5 pt-1 text-center">
                         {{ t('components.channelExtensionSettings.title') }}
