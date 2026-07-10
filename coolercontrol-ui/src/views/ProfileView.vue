@@ -112,6 +112,10 @@ interface Props {
     // Hides the internal save button; the host page saves via the exposed
     // saveProfileState (e.g. the channel page's Apply button).
     hideSave?: boolean
+    // Channel context when embedded in a channel page; lets charts show the
+    // channel's live Actual duty next to the calculated Target.
+    channelDeviceUID?: string
+    channelName?: string
 }
 
 const props = defineProps<Props>()
@@ -2649,6 +2653,8 @@ defineExpose({ saveProfileState, contextIsDirty })
             class="p-6"
             :profiles="chosenMemberProfiles"
             :mixFunctionType="chosenProfileMixFunction"
+            :channel-device-u-i-d="channelDeviceUID"
+            :channel-name="channelName"
             :key="mixProfileKeys"
         />
         <div

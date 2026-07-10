@@ -208,6 +208,8 @@ export default {
                 activate: 'Activate',
                 noModes:
                     'No modes saved yet. Modes snapshot all channel settings for quick switching.',
+                miniCurveHint:
+                    "Assigned profile curve. The dot marks the target duty at the current source temperature; the channel's Function shapes the actual duty.",
                 chain: {
                     tempSource: 'Temperature source',
                     profile: 'Profile',
@@ -764,6 +766,10 @@ export default {
                 'Enable system shutdown when the alert is triggered.\nSystem shutdown will commence one minute after the alert is triggered\nand will be cancelled if the alert recovers.',
         },
         profiles: {
+            targetDuty: 'Target',
+            actualDuty: 'Actual',
+            targetHint:
+                "Target is calculated from the current temperatures, before the channel's Function is applied. Smoothing and hysteresis can make the actual duty differ.",
             createProfile: 'Create Profile',
             editProfile: 'Edit Profile',
             deleteProfile: 'Delete Profile',

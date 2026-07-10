@@ -211,6 +211,8 @@ export default {
                 activate: 'Ativar',
                 noModes:
                     'Nenhum modo salvo ainda. Os modos capturam todas as configurações de canal para troca rápida.',
+                miniCurveHint:
+                    'Curva do perfil atribuído. O ponto marca o alvo na temperatura atual da fonte; a Função do canal define o valor real.',
                 chain: {
                     tempSource: 'Fonte de temperatura',
                     profile: 'Perfil',
@@ -772,6 +774,10 @@ export default {
                 'Ativar o desligamento do sistema quando o alerta for acionado.\nO desligamento do sistema começará um minuto após o alerta ser acionado\ne será cancelado se o alerta for recuperado.',
         },
         profiles: {
+            targetDuty: 'Alvo',
+            actualDuty: 'Atual',
+            targetHint:
+                'O alvo é calculado a partir das temperaturas atuais, antes de a Função do canal ser aplicada. Suavização e histerese podem fazer o valor real diferir.',
             createProfile: 'Criar Perfil',
             editProfile: 'Editar Perfil',
             deleteProfile: 'Excluir Perfil',

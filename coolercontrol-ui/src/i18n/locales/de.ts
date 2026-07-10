@@ -212,6 +212,8 @@ export default {
                 activate: 'Aktivieren',
                 noModes:
                     'Noch keine Modi gespeichert. Modi speichern alle Kanaleinstellungen für schnelles Umschalten.',
+                miniCurveHint:
+                    'Kurve des zugewiesenen Profils. Der Punkt markiert das Ziel bei der aktuellen Temperatur der Quelle; die Funktion des Kanals formt den tatsächlichen Wert.',
                 chain: {
                     tempSource: 'Temperaturquelle',
                     profile: 'Profil',
@@ -774,6 +776,10 @@ export default {
                 'System-Herunterfahren aktivieren, wenn die Warnung ausgelöst wird.\nDas System wird eine Minute nach Auslösung der Warnung heruntergefahren\nund abgebrochen, wenn die Warnung wiederhergestellt wird.',
         },
         profiles: {
+            targetDuty: 'Ziel',
+            actualDuty: 'Ist',
+            targetHint:
+                'Das Ziel wird aus den aktuellen Temperaturen berechnet, bevor die Funktion des Kanals angewendet wird. Glättung und Hysterese können den tatsächlichen Wert abweichen lassen.',
             createProfile: 'Profil erstellen',
             editProfile: 'Profil bearbeiten',
             deleteProfile: 'Profil löschen',

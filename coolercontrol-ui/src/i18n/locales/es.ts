@@ -213,6 +213,8 @@ export default {
                 activate: 'Activar',
                 noModes:
                     'Aún no hay modos guardados. Los modos capturan todas las configuraciones de canal para un cambio rápido.',
+                miniCurveHint:
+                    'Curva del perfil asignado. El punto marca el objetivo a la temperatura actual de la fuente; la Función del canal da forma al valor real.',
                 chain: {
                     tempSource: 'Fuente de temperatura',
                     profile: 'Perfil',
@@ -773,6 +775,10 @@ export default {
                 'Habilitar el apagado del sistema cuando se active la alerta.\nEl apagado del sistema comenzará un minuto después de que se active la alerta\ny se cancelará si la alerta se recupera.',
         },
         profiles: {
+            targetDuty: 'Objetivo',
+            actualDuty: 'Real',
+            targetHint:
+                'El objetivo se calcula a partir de las temperaturas actuales, antes de aplicar la Función del canal. El suavizado y la histéresis pueden hacer que el valor real difiera.',
             createProfile: 'Crear Perfil',
             editProfile: 'Editar Perfil',
             deleteProfile: 'Eliminar Perfil',

@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
 import { ProfileType } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -49,6 +50,7 @@ const PLOT_TOP = 2
 const PLOT_BOTTOM = VIEW_H - 2
 const SPARKLINE_WINDOW = 1800
 
+const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 // The tick ref: reading it in computeds makes the mini redraw per status update.
@@ -160,7 +162,10 @@ const sparklinePoints = computed<string>(() => {
 </script>
 
 <template>
-    <div class="relative">
+    <div
+        class="relative"
+        v-tooltip.top="drawnCurves.length > 0 ? t('layout.shell.coolingPage.miniCurveHint') : ''"
+    >
         <svg
             :viewBox="`0 0 ${VIEW_W} ${VIEW_H}`"
             preserveAspectRatio="none"
