@@ -851,9 +851,6 @@ export default {
             deleteFunction: '기능 삭제',
             noFunctions: '구성된 기능 없음',
             saveFunction: '기능 저장',
-            functionType: '기능 유형',
-            functionTypeTooltip:
-                '기능 유형:<br/>- <b>항등</b>: 단계 크기 제한을 적용하지만 그 외에는 프로파일 값을 변경하지 않고 그대로 전달합니다.<br/>- <b>기본</b>: 팬 응답 타이밍 및 안정성을 정밀하게 제어하기 위해 단계 크기 제한 및 이력 설정을 적용합니다.<br/>- <b지수 이동 평균</b>: 가중 평균을 사용하여 온도 변동을 완화합니다. 표준보다 간단하지만 정밀도는 떨어집니다.',
             stepSizeTitle: '단계 크기',
             fixedStepSize: '고정',
             fixedStepSizeTooltip:
@@ -897,7 +894,6 @@ export default {
                 '팬 속도 변경을 적용하기 전 응답 지연 시간(초)입니다.\n이 지연 시간 내의 일시적인 온도 급변은 무시되어 변동이 완화됩니다.',
             onlyDownward: '하향할 때만',
             onlyDownwardTooltip: '온도가 감소할 때만 이력 현상 설정을 적용합니다.',
-            general: '일반',
             stepOverrides: '단계 재정의',
             thresholdHopping: '임계값 도약',
             thresholdHoppingTooltip:
@@ -1084,13 +1080,6 @@ export default {
             description:
                 '커스텀 센서를 사용하면 기존 센서를 다양한 방식으로 조합하여 시스템 냉각에 대한 제어 및 효율성을 향상시킬 수 있습니다. 또한 파일 기반 데이터를 지원하므로 외부 센서 입력을 스크립트로 제어하여 유연성을 높일 수 있습니다.',
             note: '참고: 혼합 프로파일을 사용하여 여러 커스텀 센서 출력을 결합할 수 있습니다.',
-        },
-        functionInfo: {
-            title: '기능 개요',
-            description:
-                '기능은 프로파일 출력에 적용되는 구성 가능한 알고리즘입니다. 이를 통해 팬 속도 변경 시점을 관리하고, 이력 현상 설정을 조정하고, 동적 온도에 이동 평균을 사용할 수 있습니다.',
-            identityFunction:
-                '항등 기능은 계산된 프로파일 출력값을 수정하지 않고 최소 및 최대 속도 변화 범위만 설정할 수 있으므로 가장 간단한 옵션입니다. 이는 특히 팬 속도의 지속적인 변동을 최소화하는 데 유용합니다.',
         },
         profileInfo: {
             title: '프로파일 개요',
@@ -1281,7 +1270,7 @@ export default {
                 createNewFunction: '새 기능',
                 existingFunction: '기능 선택',
                 defaultFunction: '기본 기능',
-                chooseFunctionNameType: '기능과 유형 선택',
+                chooseFunctionName: '기능 이름 선택',
                 newFunctionName: '{profileName}용 기능',
                 summary: '요약',
                 aNewProfile: '새 프로파일',
@@ -1612,10 +1601,6 @@ export default {
                 graph: '그래프',
                 mix: '혼합',
                 overlay: '오버레이',
-            },
-            functionType: {
-                identity: '항등',
-                standard: '표준',
             },
             mixFunctionType: {
                 min: '최소',

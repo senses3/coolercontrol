@@ -21,14 +21,12 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
-import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile.ts'
+import { Function, FunctionType } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { DEFAULT_NAME_STRING_LENGTH, useDeviceStore } from '@/stores/DeviceStore.ts'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { computed, ref, type Ref } from 'vue'
 import UiInput from '@/shell/ui/UiInput.vue'
-import UiSelect from '@/shell/ui/UiSelect.vue'
-import { $enum } from 'ts-enum-util'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 
 interface Props {
@@ -62,28 +60,15 @@ const newFunction =
                         profileName: props.profileName,
                     })
                   : (props.functionName ?? ''),
-              FunctionType.Standard,
           )
         : props.newFunction
 const currentFunction: Ref<Function> = ref(newFunction)
 
-let startingDelay = currentFunction.value.response_delay ?? 1
-let startingDeviance = currentFunction.value.deviance ?? 2
+// All-off hysteresis values (0/0/false) are the Identity type on the wire.
+let startingDelay = currentFunction.value.response_delay ?? 0
+let startingDeviance = currentFunction.value.deviance ?? 0
 let startingOnlyDownward = currentFunction.value.only_downward ?? false
 
-const selectedType: Ref<FunctionType> = ref(newFunction.f_type)
-const selectedTypeModel = computed<string | undefined>({
-    get: () => selectedType.value,
-    set: (value) => {
-        if (value != null) selectedType.value = value as FunctionType
-    },
-})
-const functionTypeOptions = computed(() =>
-    [...$enum(FunctionType).values()].map((type) => ({
-        value: type,
-        label: getFunctionTypeDisplayName(type),
-    })),
-)
 const nameInput: Ref<string> = ref(newFunction.name)
 const nameInvalid = computed(() => {
     return nameInput.value.length < 1 || nameInput.value.length > DEFAULT_NAME_STRING_LENGTH
@@ -106,7 +91,6 @@ const nextStep = async (): Promise<void> => {
         return
     }
     currentFunction.value.name = nameInput.value
-    currentFunction.value.f_type = selectedType.value
     currentFunction.value.duty_minimum = chosenStepDutyMinimum.value
     currentFunction.value.duty_maximum = chosenStepDutyMaximum.value
     currentFunction.value.step_size_min_decreasing = chosenStepSizeMinDecreasing.value
@@ -121,12 +105,15 @@ const nextStep = async (): Promise<void> => {
         currentFunction.value.duty_maximum = 0
         currentFunction.value.step_size_max_decreasing = 0
     }
-    currentFunction.value.response_delay =
-        selectedType.value === FunctionType.Standard ? chosenDelay.value : undefined
-    currentFunction.value.deviance =
-        selectedType.value === FunctionType.Standard ? chosenDeviance.value : undefined
-    currentFunction.value.only_downward =
-        selectedType.value === FunctionType.Standard ? chosenOnlyDownward.value : undefined
+    // All-off hysteresis maps to the Identity type (the engine's no-op fast
+    // path); anything else is Standard. The type is a wire encoding, the UI
+    // presents a single Function concept.
+    const hysteresisOff =
+        chosenDelay.value === 0 && chosenDeviance.value === 0 && !chosenOnlyDownward.value
+    currentFunction.value.f_type = hysteresisOff ? FunctionType.Identity : FunctionType.Standard
+    currentFunction.value.response_delay = hysteresisOff ? undefined : chosenDelay.value
+    currentFunction.value.deviance = hysteresisOff ? undefined : chosenDeviance.value
+    currentFunction.value.only_downward = hysteresisOff ? undefined : chosenOnlyDownward.value
     currentFunction.value.threshold_hopping = chosenThresholdHopping.value
     currentFunction.value.bypass_min_at_extremes = chosenBypassMinAtExtremes.value
 
@@ -158,9 +145,7 @@ const updateSymmetricStepSize = () => {
 <template>
     <div class="flex flex-col justify-between min-w-96 w-[40vw] min-h-max h-[40vh]">
         <div class="flex flex-col gap-y-4">
-            <div class="w-full">
-                {{ t('components.wizards.fanControl.chooseFunctionNameType') }}:
-            </div>
+            <div class="w-full">{{ t('components.wizards.fanControl.chooseFunctionName') }}:</div>
             <div class="mt-0 flex flex-col">
                 <UiInput
                     v-model="nameInput"
@@ -170,20 +155,6 @@ const updateSymmetricStepSize = () => {
                     :class="{ '!border-error': nameInvalid }"
                 />
             </div>
-            <div class="mt-0 flex flex-col">
-                <small class="ml-2 mb-1 font-light text-sm">
-                    {{ t('views.functions.functionType') }}
-                </small>
-                <UiSelect
-                    v-model="selectedTypeModel"
-                    :options="functionTypeOptions"
-                    :placeholder="t('views.functions.functionType')"
-                    class="w-full"
-                />
-            </div>
-            <p>
-                <span v-html="t('views.functions.functionTypeTooltip')" />
-            </p>
             <div class="pr-1 w-full border-border-one border-2 rounded-lg">
                 <table class="m-0.5 w-full bg-bg-two">
                     <tbody>
@@ -371,7 +342,7 @@ const updateSymmetricStepSize = () => {
                                 <UiSwitch v-model="chosenBypassMinAtExtremes" />
                             </td>
                         </tr>
-                        <tr v-if="selectedType === FunctionType.Standard">
+                        <tr>
                             <th
                                 colspan="2"
                                 class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
@@ -379,10 +350,7 @@ const updateSymmetricStepSize = () => {
                                 {{ t('views.functions.hysteresis') }}
                             </th>
                         </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.Standard"
-                            v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
-                        >
+                        <tr v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')">
                             <td
                                 class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t-2"
                             >
@@ -400,10 +368,7 @@ const updateSymmetricStepSize = () => {
                                 />
                             </td>
                         </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.Standard"
-                            v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
-                        >
+                        <tr v-tooltip.top="t('views.functions.hysteresisDelayTooltip')">
                             <td
                                 class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t"
                             >
@@ -420,10 +385,7 @@ const updateSymmetricStepSize = () => {
                                 />
                             </td>
                         </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.Standard"
-                            v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
-                        >
+                        <tr v-tooltip.top="t('views.functions.onlyDownwardTooltip')">
                             <td
                                 class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t"
                             >
