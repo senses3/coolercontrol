@@ -907,13 +907,6 @@ export default {
             stepSizeMaxDecreasing: 'Máximo Diminuindo',
             stepSizeMaxDecreasingTooltip:
                 'Tamanho de passo máximo quando a velocidade do ventilador está diminuindo.\nLimita a rapidez com que os ventiladores podem desacelerar por atualização.',
-            windowSize: 'Tamanho da Janela',
-            windowSizeTooltip:
-                'Tamanho da amostra de temperatura da janela usado no cálculo da média móvel exponencial.\nValores menores = resposta mais rápida, mais reativo a picos de temperatura.\nValores maiores = resposta mais lenta, transições de velocidade do ventilador mais suaves.\nDica: Use uma Função Padrão para controle preciso sobre o tempo de resposta.',
-            emaCustomSensorAvailableNote:
-                'EMA também está disponível como tipo de Sensor Personalizado, permitindo plotar a temperatura suavizada diretamente.',
-            emaDeprecatedWarning:
-                'O tipo de Função EMA está obsoleto. Por favor, mude para o tipo de Sensor Personalizado EMA.',
             hysteresis: 'Histerese Avançada',
             hysteresisThreshold: 'Limite',
             hysteresisThresholdTooltip:
@@ -1656,7 +1649,6 @@ export default {
             functionType: {
                 identity: 'Identidade',
                 standard: 'Padrão',
-                exponentialMovingAvg: 'Média Móvel Exponencial',
             },
             mixFunctionType: {
                 min: 'Mínimo',

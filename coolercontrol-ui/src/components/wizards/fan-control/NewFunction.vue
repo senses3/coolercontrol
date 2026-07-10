@@ -49,8 +49,6 @@ const deviceStore = useDeviceStore()
 
 const dutyMin: number = 1
 const dutyMax: number = 100
-const windowSizeMin: number = 1
-const windowSizeMax: number = 16
 const devianceMin: number = 0
 const devianceMax: number = 100
 const delayMin: number = 0
@@ -69,13 +67,6 @@ const newFunction =
         : props.newFunction
 const currentFunction: Ref<Function> = ref(newFunction)
 
-let startingWindowSize = 8 // 8 is the recommended default
-if (
-    currentFunction.value.sample_window != null &&
-    (currentFunction.value.sample_window > 0 || currentFunction.value.sample_window <= 16)
-) {
-    startingWindowSize = currentFunction.value.sample_window
-}
 let startingDelay = currentFunction.value.response_delay ?? 1
 let startingDeviance = currentFunction.value.deviance ?? 2
 let startingOnlyDownward = currentFunction.value.only_downward ?? false
@@ -87,20 +78,12 @@ const selectedTypeModel = computed<string | undefined>({
         if (value != null) selectedType.value = value as FunctionType
     },
 })
-const functionTypeOptions = computed(() => {
-    // EMA is deprecated in favor of the EMA custom-sensor type. Hide it when creating a function,
-    // but keep it selectable when editing one that already uses it.
-    return [...$enum(FunctionType).values()]
-        .filter(
-            (type) =>
-                type !== FunctionType.ExponentialMovingAvg ||
-                newFunction.f_type === FunctionType.ExponentialMovingAvg,
-        )
-        .map((type) => ({
-            value: type,
-            label: getFunctionTypeDisplayName(type),
-        }))
-})
+const functionTypeOptions = computed(() =>
+    [...$enum(FunctionType).values()].map((type) => ({
+        value: type,
+        label: getFunctionTypeDisplayName(type),
+    })),
+)
 const nameInput: Ref<string> = ref(newFunction.name)
 const nameInvalid = computed(() => {
     return nameInput.value.length < 1 || nameInput.value.length > DEFAULT_NAME_STRING_LENGTH
@@ -111,7 +94,6 @@ const chosenStepDutyMinimum: Ref<number> = ref(currentFunction.value.duty_minimu
 const chosenStepDutyMaximum: Ref<number> = ref(currentFunction.value.duty_maximum)
 const chosenStepSizeMinDecreasing: Ref<number> = ref(currentFunction.value.step_size_min_decreasing)
 const chosenStepSizeMaxDecreasing: Ref<number> = ref(currentFunction.value.step_size_max_decreasing)
-const chosenWindowSize: Ref<number> = ref(startingWindowSize)
 const chosenDelay: Ref<number> = ref(startingDelay)
 const chosenDeviance: Ref<number> = ref(startingDeviance)
 const chosenOnlyDownward: Ref<boolean> = ref(startingOnlyDownward)
@@ -139,10 +121,6 @@ const nextStep = async (): Promise<void> => {
         currentFunction.value.duty_maximum = 0
         currentFunction.value.step_size_max_decreasing = 0
     }
-    currentFunction.value.sample_window =
-        selectedType.value === FunctionType.ExponentialMovingAvg
-            ? chosenWindowSize.value
-            : undefined
     currentFunction.value.response_delay =
         selectedType.value === FunctionType.Standard ? chosenDelay.value : undefined
     currentFunction.value.deviance =
@@ -204,22 +182,8 @@ const updateSymmetricStepSize = () => {
                 />
             </div>
             <p>
-                <span
-                    v-html="
-                        t('views.functions.functionTypeTooltip') +
-                        '<br/>&nbsp;&nbsp;' +
-                        t('views.functions.emaCustomSensorAvailableNote')
-                    "
-                />
+                <span v-html="t('views.functions.functionTypeTooltip')" />
             </p>
-            <!--
-                EMA migration placeholder. Stage 2 (active deprecation): set the
-                `v-if` below to `selectedType === FunctionType.ExponentialMovingAvg`
-                to surface the deprecation warning.
-            -->
-            <div v-if="false" class="rounded-lg border-2 border-accent bg-bg-two p-3 text-sm">
-                {{ t('views.functions.emaDeprecatedWarning') }}
-            </div>
             <div class="pr-1 w-full border-border-one border-2 rounded-lg">
                 <table class="m-0.5 w-full bg-bg-two">
                     <tbody>
@@ -469,33 +433,6 @@ const updateSymmetricStepSize = () => {
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
                                 <UiSwitch v-model="chosenOnlyDownward" />
-                            </td>
-                        </tr>
-                        <tr v-if="selectedType === FunctionType.ExponentialMovingAvg">
-                            <th
-                                colspan="2"
-                                class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
-                            >
-                                {{ t('views.functions.general') }}
-                            </th>
-                        </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.ExponentialMovingAvg"
-                            v-tooltip.top="t('views.functions.windowSizeTooltip')"
-                        >
-                            <td
-                                class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t-2"
-                            >
-                                {{ t('views.functions.windowSize') }}
-                            </td>
-                            <td
-                                class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
-                            >
-                                <UiNumberInput
-                                    v-model="chosenWindowSize"
-                                    :min="windowSizeMin"
-                                    :max="windowSizeMax"
-                                />
                             </td>
                         </tr>
                     </tbody>

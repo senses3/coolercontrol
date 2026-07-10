@@ -866,12 +866,6 @@ export default {
             stepSizeMaxDecreasing: '最大减少',
             stepSizeMaxDecreasingTooltip:
                 '风扇速度减少时的最大步长。\n限制风扇每次更新可以减速的速度。',
-            windowSize: '窗口大小',
-            windowSizeTooltip:
-                '指数移动平均计算中使用的窗口温度样本大小。\n较小的值 = 更快的响应，对温度峰值更敏感。\n较大的值 = 较慢的响应，更平滑的风扇速度过渡。\n提示：使用标准功能可以精确控制响应时间。',
-            emaCustomSensorAvailableNote:
-                'EMA 也可作为自定义传感器类型使用，可让您直接绘制平滑后的温度。',
-            emaDeprecatedWarning: '函数类型 EMA 已弃用。请切换到 EMA 自定义传感器类型。',
             hysteresis: '高级滞后',
             hysteresisThreshold: '阈值',
             hysteresisThresholdTooltip:
@@ -1575,7 +1569,6 @@ export default {
             functionType: {
                 identity: '恒等',
                 standard: '标准',
-                exponentialMovingAvg: '指数移动平均',
             },
             mixFunctionType: {
                 min: '最小值',

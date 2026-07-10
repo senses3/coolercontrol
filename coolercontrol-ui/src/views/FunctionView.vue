@@ -63,8 +63,6 @@ const contextIsDirty: Ref<boolean> = ref(false)
 
 const dutyMin: number = 1
 const dutyMax: number = 100
-const windowSizeMin: number = 1
-const windowSizeMax: number = 16
 const devianceMin: number = 0
 const devianceMax: number = 100
 const delayMin: number = 0
@@ -73,13 +71,6 @@ const delayMax: number = 30
 const currentFunction = computed(
     () => settingsStore.functions.find((fun) => fun.uid === props.functionUID)!,
 )
-let startingWindowSize = 8 // 8 is the recommended default
-if (
-    currentFunction.value.sample_window != null &&
-    (currentFunction.value.sample_window > 0 || currentFunction.value.sample_window <= 16)
-) {
-    startingWindowSize = currentFunction.value.sample_window
-}
 let startingDelay = currentFunction.value.response_delay ?? 1
 let startingDeviance = currentFunction.value.deviance ?? 2
 let startingOnlyDownward = currentFunction.value.only_downward ?? false
@@ -91,26 +82,17 @@ const chosenStepDutyMinimum: Ref<number> = ref(currentFunction.value.duty_minimu
 const chosenStepDutyMaximum: Ref<number> = ref(currentFunction.value.duty_maximum)
 const chosenStepSizeMinDecreasing: Ref<number> = ref(currentFunction.value.step_size_min_decreasing)
 const chosenStepSizeMaxDecreasing: Ref<number> = ref(currentFunction.value.step_size_max_decreasing)
-const chosenWindowSize: Ref<number> = ref(startingWindowSize)
 const chosenDelay: Ref<number> = ref(startingDelay)
 const chosenDeviance: Ref<number> = ref(startingDeviance)
 const chosenOnlyDownward: Ref<boolean> = ref(startingOnlyDownward)
 const chosenThresholdHopping: Ref<boolean> = ref(currentFunction.value.threshold_hopping)
 const chosenBypassMinAtExtremes: Ref<boolean> = ref(currentFunction.value.bypass_min_at_extremes)
-const functionTypeOptions = computed(() => {
-    // EMA is deprecated in favor of the EMA custom-sensor type. Hide it unless this function
-    // already uses it, so existing EMA functions stay editable but new adoption is discouraged.
-    return [...$enum(FunctionType).values()]
-        .filter(
-            (type) =>
-                type !== FunctionType.ExponentialMovingAvg ||
-                currentFunction.value.f_type === FunctionType.ExponentialMovingAvg,
-        )
-        .map((type) => ({
-            value: type,
-            label: getFunctionTypeDisplayName(type),
-        }))
-})
+const functionTypeOptions = computed(() =>
+    [...$enum(FunctionType).values()].map((type) => ({
+        value: type,
+        label: getFunctionTypeDisplayName(type),
+    })),
+)
 
 const saveFunctionState = async () => {
     if (currentFunction.value.uid === '0') {
@@ -132,10 +114,6 @@ const saveFunctionState = async () => {
         currentFunction.value.duty_maximum = 0
         currentFunction.value.step_size_max_decreasing = 0
     }
-    currentFunction.value.sample_window =
-        selectedType.value === FunctionType.ExponentialMovingAvg
-            ? chosenWindowSize.value
-            : undefined
     currentFunction.value.response_delay =
         selectedType.value === FunctionType.Standard ? chosenDelay.value : undefined
     currentFunction.value.deviance =
@@ -214,13 +192,6 @@ const stepMaxDecreaseScrolled = (event: WheelEvent) => {
             chosenStepSizeMaxDecreasing.value -= 1
     }
 }
-const windowSizeScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenWindowSize.value < windowSizeMax) chosenWindowSize.value += 1
-    } else {
-        if (chosenWindowSize.value > windowSizeMin) chosenWindowSize.value -= 1
-    }
-}
 const devianceScrolled = (event: WheelEvent) => {
     if (event.deltaY < 0) {
         if (chosenDeviance.value < devianceMax) chosenDeviance.value += 0.1
@@ -292,8 +263,6 @@ const addScrollEventListeners = (): void => {
         // @ts-ignore
         ?.addEventListener('wheel', stepMaxDecreaseScrolled)
     // @ts-ignore
-    document?.querySelector('.window-size-input')?.addEventListener('wheel', windowSizeScrolled)
-    // @ts-ignore
     document?.querySelector('.deviance-input')?.addEventListener('wheel', devianceScrolled)
     // @ts-ignore
     document?.querySelector('.delay-input')?.addEventListener('wheel', delayScrolled)
@@ -312,8 +281,6 @@ const removeScrollEventListeners = (): void => {
         ?.querySelector('.step-max-decrease-input')
         // @ts-ignore
         ?.removeEventListener('wheel', stepMaxDecreaseScrolled)
-    // @ts-ignore
-    document?.querySelector('.window-size-input')?.removeEventListener('wheel', windowSizeScrolled)
     // @ts-ignore
     document?.querySelector('.deviance-input')?.removeEventListener('wheel', devianceScrolled)
     // @ts-ignore
@@ -353,7 +320,6 @@ const duplicateFunction = async (): Promise<void> => {
         source.response_delay,
         source.deviance,
         source.only_downward,
-        source.sample_window,
     )
     settingsStore.functions.push(newFunction)
     await settingsStore.saveFunction(newFunction.uid)
@@ -424,7 +390,6 @@ onMounted(async () => {
             chosenStepDutyMaximum,
             chosenStepSizeMinDecreasing,
             chosenStepSizeMaxDecreasing,
-            chosenWindowSize,
             chosenDeviance,
             chosenDelay,
             chosenOnlyDownward,
@@ -517,28 +482,9 @@ onUnmounted(() => {
                     :model-value="selectedType"
                     :options="functionTypeOptions"
                     class="w-full"
-                    v-tooltip.top="{
-                        escape: false,
-                        value:
-                            t('views.functions.functionTypeTooltip') +
-                            '<br/>&nbsp;&nbsp;' +
-                            t('views.functions.emaCustomSensorAvailableNote'),
-                    }"
+                    v-tooltip.top="t('views.functions.functionTypeTooltip')"
                     @update:model-value="changeFunctionType"
                 />
-            </div>
-            <!--
-                EMA migration placeholder. Stage 1 (informational) is delivered via the
-                Function Type tooltip above (`emaCustomSensorAvailableNote` appended).
-                Stage 2 (active deprecation): set the `v-if` below to
-                `selectedType === FunctionType.ExponentialMovingAvg` and drop the
-                appended note from the tooltip.
-            -->
-            <div
-                v-if="false"
-                class="mt-3 mr-4 w-96 rounded-lg border-2 border-accent bg-bg-two p-3 text-sm"
-            >
-                {{ t('views.functions.emaDeprecatedWarning') }}
             </div>
             <UiSettingsCard class="mt-4 w-96" :title="t('views.functions.stepSizeTitle')">
                 <UiSettingRow
@@ -689,23 +635,6 @@ onUnmounted(() => {
                     :label="t('views.functions.onlyDownward')"
                 >
                     <UiSwitch v-model="chosenOnlyDownward" />
-                </UiSettingRow>
-            </UiSettingsCard>
-            <UiSettingsCard
-                class="mt-4 w-96"
-                v-if="selectedType === FunctionType.ExponentialMovingAvg"
-                :title="t('views.functions.general')"
-            >
-                <UiSettingRow
-                    v-if="selectedType === FunctionType.ExponentialMovingAvg"
-                    v-tooltip.top="t('views.functions.windowSizeTooltip')"
-                    :label="t('views.functions.windowSize')"
-                >
-                    <UiNumberInput
-                        v-model="chosenWindowSize"
-                        :min="windowSizeMin"
-                        :max="windowSizeMax"
-                    />
                 </UiSettingRow>
             </UiSettingsCard>
         </ScrollAreaViewport>

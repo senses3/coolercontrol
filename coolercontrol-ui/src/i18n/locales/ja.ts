@@ -899,13 +899,6 @@ export default {
             stepSizeMaxDecreasing: '最大減少',
             stepSizeMaxDecreasingTooltip:
                 'ファン速度が減少しているときの最大ステップサイズ。\n更新ごとにファンがどれだけ速く減速できるかを制限します。',
-            windowSize: 'ウィンドウサイズ',
-            windowSizeTooltip:
-                '指数移動平均計算で使用されるウィンドウ温度サンプルサイズ。\n小さい値 = より速い応答、温度スパイクにより反応的。\n大きい値 = より遅い応答、より滑らかなファン速度遷移。\nヒント：応答タイミングの精密な制御には標準機能を使用してください。',
-            emaCustomSensorAvailableNote:
-                'EMAはカスタムセンサータイプとしても利用でき、スムージングされた温度を直接グラフ化できます。',
-            emaDeprecatedWarning:
-                '関数タイプのEMAは非推奨です。EMAカスタムセンサータイプに切り替えてください。',
             hysteresis: '高度なヒステリシス',
             hysteresisThreshold: 'しきい値',
             hysteresisThresholdTooltip:
@@ -1636,7 +1629,6 @@ export default {
             functionType: {
                 identity: 'アイデンティティ',
                 standard: '標準',
-                exponentialMovingAvg: '指数移動平均',
             },
             mixFunctionType: {
                 min: '最小',

@@ -920,13 +920,6 @@ export default {
             stepSizeMaxDecreasing: 'Maximum Décroissant',
             stepSizeMaxDecreasingTooltip:
                 'Taille de pas maximale lorsque la vitesse du ventilateur diminue.\nLimite la rapidité avec laquelle les ventilateurs peuvent ralentir par mise à jour.',
-            windowSize: 'Taille de la Fenêtre',
-            windowSizeTooltip:
-                "Taille de l'échantillon de température de fenêtre utilisée dans le calcul de la moyenne mobile exponentielle.\nValeurs plus petites = réponse plus rapide, plus réactif aux pics de température.\nValeurs plus grandes = réponse plus lente, transitions de vitesse du ventilateur plus douces.\nConseil : Utilisez une Fonction Standard pour un contrôle précis du temps de réponse.",
-            emaCustomSensorAvailableNote:
-                'EMA est également disponible en tant que type de Capteur Personnalisé, ce qui vous permet de tracer directement la température lissée.',
-            emaDeprecatedWarning:
-                'Le type de Fonction EMA est obsolète. Veuillez passer au type de Capteur Personnalisé EMA.',
             hysteresis: 'Hystérésis Avancée',
             hysteresisThreshold: 'Seuil',
             hysteresisThresholdTooltip:
@@ -1674,7 +1667,6 @@ export default {
             functionType: {
                 identity: 'Identité',
                 standard: 'Standard',
-                exponentialMovingAvg: 'Moyenne Mobile Exponentielle',
             },
             mixFunctionType: {
                 min: 'Minimum',
