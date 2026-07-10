@@ -27,7 +27,7 @@ import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useFanControlWizard } from '@/composables/useFanControlWizard.ts'
-import Sparkline from '@/shell/cooling/Sparkline.vue'
+import ChannelMiniGraph from '@/shell/cooling/ChannelMiniGraph.vue'
 import type { CoolingChannel } from '@/shell/cooling/channels.ts'
 
 const props = defineProps<{ channel: CoolingChannel }>()
@@ -155,7 +155,7 @@ const openWizard = (): void => {
                 </span>
             </div>
         </div>
-        <Sparkline
+        <ChannelMiniGraph
             :device-u-i-d="channel.deviceUID"
             :channel-name="channel.channelName"
             :color="color"
