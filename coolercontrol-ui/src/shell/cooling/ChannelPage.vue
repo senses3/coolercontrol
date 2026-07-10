@@ -333,7 +333,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
         <template v-if="controllable">
             <div class="flex flex-wrap items-center gap-3">
                 <UiToggleGroup v-model="controlMode" :options="controlModeOptions" />
-                <UiButton variant="ghost" @click="openWizard">
+                <UiButton variant="outline" @click="openWizard">
                     <svg-icon type="mdi" :path="mdiAutoFix" :size="16" />
                     {{ t('layout.shell.coolingPage.guidedSetup') }}
                 </UiButton>

@@ -175,7 +175,7 @@ defineExpose({
     >
         <popover-root @update:open="(open) => (isPopupOpen = open)">
             <popover-trigger
-                class="h-[2.375rem] rounded-lg border-2 border-border-one !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
+                class="h-[2.375rem] rounded-lg border-2 border-border-one bg-control !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
             >
                 <svg-icon
                     class="outline-0 mt-[-2px]"

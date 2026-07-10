@@ -31,7 +31,7 @@ withDefaults(defineProps<{ options: UiSelectOption[]; disabled?: boolean }>(), {
 
 <template>
     <div
-        class="flex flex-col gap-0.5 rounded-lg border border-border-one bg-bg-two p-1 text-left"
+        class="flex flex-col gap-0.5 rounded-lg border border-border-one bg-control p-1 text-left"
         :class="{ 'pointer-events-none opacity-50': disabled }"
     >
         <button

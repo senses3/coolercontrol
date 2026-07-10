@@ -21,6 +21,25 @@
 @tailwind utilities;
 @tailwind variants;
 
+/* Control-surface elevation: a control's body must contrast with its parent
+   surface. Containers painted bg-one/bg-two flip the variable for their
+   subtree, so kit controls using .bg-control adapt to their placement:
+   raised (bg-two) on the page, inset (bg-one) inside cards and dialogs. */
+:root {
+    --control-bg: var(--colors-bg-two);
+}
+.bg-bg-two {
+    --control-bg: var(--colors-bg-one);
+}
+.bg-bg-one {
+    --control-bg: var(--colors-bg-two);
+}
+@layer components {
+    .bg-control {
+        background-color: rgb(var(--control-bg));
+    }
+}
+
 /* width */
 ::-webkit-scrollbar {
     width: 0.4rem;

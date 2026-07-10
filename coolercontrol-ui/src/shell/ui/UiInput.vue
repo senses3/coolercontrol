@@ -43,6 +43,6 @@ onMounted(() => {
         :autofocus="autofocus"
         :placeholder="placeholder"
         :disabled="disabled"
-        class="h-10 rounded-lg border border-border-one bg-bg-one px-3 text-base text-text-color outline-none focus:ring-2 focus:ring-accent disabled:pointer-events-none disabled:opacity-50"
+        class="h-10 rounded-lg border border-border-one bg-control px-3 text-base text-text-color outline-none focus:ring-2 focus:ring-accent disabled:pointer-events-none disabled:opacity-50"
     />
 </template>

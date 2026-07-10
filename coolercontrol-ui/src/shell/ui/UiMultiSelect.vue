@@ -63,7 +63,7 @@ const summary = computed((): string => {
         <PopoverTrigger
             v-bind="$attrs"
             :disabled="disabled"
-            class="inline-flex h-10 min-w-0 items-center justify-between gap-2 rounded-lg border bg-bg-two px-3 text-base outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
+            class="inline-flex h-10 min-w-0 items-center justify-between gap-2 rounded-lg border bg-control px-3 text-base outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
             :class="[
                 invalid ? 'border-error' : 'border-border-one',
                 model.length > 0 ? 'text-text-color' : 'text-text-color-secondary',

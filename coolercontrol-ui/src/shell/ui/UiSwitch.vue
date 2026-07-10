@@ -33,7 +33,7 @@ withDefaults(defineProps<{ disabled?: boolean; twoSided?: boolean }>(), {
         v-model="model"
         :disabled="disabled"
         class="relative h-6 w-11 shrink-0 cursor-pointer rounded-full border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-        :class="twoSided ? 'border-accent bg-accent' : 'border-border-one bg-bg-one'"
+        :class="twoSided ? 'border-accent bg-accent' : 'border-border-one bg-control'"
     >
         <SwitchThumb
             class="block h-4 w-4 translate-x-1 rounded-full transition-transform data-[state=checked]:translate-x-6 data-[state=checked]:bg-white"
