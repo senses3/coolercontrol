@@ -883,9 +883,6 @@ export default {
             deleteFunction: 'Supprimer la Fonction',
             noFunctions: 'Aucune fonction configurée',
             saveFunction: 'Enregistrer la Fonction',
-            functionType: 'Type de Fonction',
-            functionTypeTooltip:
-                "Types de fonction :<br/>- <b>Identité</b> : Applique les limites de taille de pas mais transmet sinon la valeur du profil inchangée.<br/>- <b>Standard</b> : Applique les limites de taille de pas et les paramètres d'hystérésis pour un contrôle précis du temps de réponse et de la stabilité du ventilateur.<br/>- <b>Moyenne Mobile Exponentielle</b> : Lisse les fluctuations de température en utilisant une moyenne pondérée. Plus simple mais moins précis que Standard.",
             stepSizeTitle: 'Taille du Pas',
             fixedStepSize: 'Fixe',
             fixedStepSizeTooltip:
@@ -930,7 +927,6 @@ export default {
             onlyDownward: 'Seulement Descendant',
             onlyDownwardTooltip:
                 "Appliquer les paramètres d'hystérésis uniquement lorsque la température diminue.",
-            general: 'Général',
             stepOverrides: 'Dérogations de pas',
             thresholdHopping: 'Saut de Seuil',
             thresholdHoppingTooltip:
@@ -1122,13 +1118,6 @@ export default {
             description:
                 'Les capteurs personnalisés vous permettent de combiner des capteurs existants de différentes manières, améliorant votre contrôle et votre efficacité sur le refroidissement du système. De plus, ils prennent en charge les données basées sur des fichiers, vous permettant de scripter des entrées de capteurs externes pour plus de flexibilité.',
             note: 'Remarque : Vous pouvez utiliser des profils de mélange pour combiner plusieurs sorties de capteurs personnalisés.',
-        },
-        functionInfo: {
-            title: 'Aperçu des Fonctions',
-            description:
-                "Les fonctions sont des algorithmes configurables appliqués aux sorties de profil. Elles vous permettent de gérer quand les changements de vitesse des ventilateurs se produisent, d'ajuster les paramètres d'hystérésis et d'utiliser des moyennes mobiles pour les températures dynamiques.",
-            identityFunction:
-                "La fonction Identité est l'option la plus simple car elle ne modifie pas la sortie calculée du profil ; elle vous permet seulement de définir des plages minimales et maximales de changement de vitesse. Cela est particulièrement bénéfique pour minimiser les fluctuations constantes de vitesse des ventilateurs.",
         },
         profileInfo: {
             title: 'Aperçu des Profils',
@@ -1324,7 +1313,7 @@ export default {
                 createNewFunction: 'Nouvelle Fonction',
                 existingFunction: 'Choisir une Fonction',
                 defaultFunction: 'Fonction par Défaut',
-                chooseFunctionNameType: 'Choisir un nom et un type de fonction',
+                chooseFunctionName: 'Choisissez un nom de fonction',
                 newFunctionName: 'Fonction pour {profileName}',
                 summary: 'Résumé',
                 aNewProfile: 'Un nouveau profil',
@@ -1663,10 +1652,6 @@ export default {
                 graph: 'Graphique',
                 mix: 'Mélange',
                 overlay: 'Superposition',
-            },
-            functionType: {
-                identity: 'Identité',
-                standard: 'Standard',
             },
             mixFunctionType: {
                 min: 'Minimum',

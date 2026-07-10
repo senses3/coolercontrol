@@ -829,9 +829,6 @@ export default {
             deleteFunction: '删除功能',
             noFunctions: '尚未配置功能',
             saveFunction: '保存功能',
-            functionType: '功能类型',
-            functionTypeTooltip:
-                '功能类型：<br/>- <b>恒等函数</b>：应用步长限制，但其他方面保持配置文件值不变。<br/>- <b>标准</b>：应用步长限制和滞后设置，精确控制风扇响应时间和稳定性。<br/>- <b>指数移动平均</b>：使用加权平均平滑温度波动。比标准更简单但精度较低。',
             stepSizeTitle: '步长',
             fixedStepSize: '固定',
             fixedStepSizeTooltip:
@@ -875,7 +872,6 @@ export default {
                 '应用风扇速度变化前的响应延迟（秒）。\n此延迟内的临时温度峰值将被忽略，从而平滑波动。',
             onlyDownward: '仅下降时',
             onlyDownwardTooltip: '仅在温度下降时应用滞后设置。',
-            general: '常规',
             stepOverrides: '步长覆盖',
             thresholdHopping: '阈值跳跃',
             thresholdHoppingTooltip:
@@ -1058,13 +1054,6 @@ export default {
                 '自定义传感器允许您以各种方式组合现有传感器，增强您对系统冷却的控制和效率。此外，它们支持基于文件的数据，使您能够脚本化外部传感器输入，实现更大的灵活性。',
             note: '注意：您可以使用混合配置文件来组合多个自定义传感器输出。',
         },
-        functionInfo: {
-            title: '功能概览',
-            description:
-                '功能是应用于配置文件输出的可配置算法。它们使您能够管理风扇速度变化的时机，调整滞后设置，并为动态温度使用移动平均值。',
-            identityFunction:
-                '恒等功能是最简单的选项，因为它不会修改计算的配置文件输出；它只允许您设置最小和最大速度变化范围。这对于最小化风扇速度的持续波动特别有益。',
-        },
         profileInfo: {
             title: '配置文件概览',
             description:
@@ -1241,7 +1230,7 @@ export default {
                 createNewFunction: '新功能',
                 existingFunction: '选择功能',
                 defaultFunction: '默认功能',
-                chooseFunctionNameType: '选择功能名称和类型',
+                chooseFunctionName: '选择功能名称',
                 newFunctionName: '{profileName}的功能',
                 summary: '摘要',
                 aNewProfile: '新配置文件',
@@ -1565,10 +1554,6 @@ export default {
                 graph: '曲线图',
                 mix: '混合',
                 overlay: '叠加',
-            },
-            functionType: {
-                identity: '恒等',
-                standard: '标准',
             },
             mixFunctionType: {
                 min: '最小值',

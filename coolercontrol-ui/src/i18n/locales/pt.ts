@@ -870,9 +870,6 @@ export default {
             deleteFunction: 'Excluir Função',
             noFunctions: 'Nenhuma função configurada',
             saveFunction: 'Salvar Função',
-            functionType: 'Tipo de Função',
-            functionTypeTooltip:
-                'Tipos de função:<br/>- <b>Identidade</b>: Aplica limites de tamanho de passo mas de resto passa o valor do perfil inalterado.<br/>- <b>Padrão</b>: Aplica limites de tamanho de passo e configurações de histerese para controle preciso do tempo de resposta e estabilidade do ventilador.<br/>- <b>Média Móvel Exponencial</b>: Suaviza flutuações de temperatura usando uma média ponderada. Mais simples mas menos preciso que Padrão.',
             stepSizeTitle: 'Tamanho do Passo',
             fixedStepSize: 'Fixo',
             fixedStepSizeTooltip:
@@ -917,7 +914,6 @@ export default {
             onlyDownward: 'Apenas Descendente',
             onlyDownwardTooltip:
                 'Aplicar configurações de histerese apenas quando a temperatura estiver diminuindo.',
-            general: 'Geral',
             stepOverrides: 'Substituições de passo',
             thresholdHopping: 'Salto de Limite',
             thresholdHoppingTooltip:
@@ -1106,13 +1102,6 @@ export default {
             description:
                 'Os sensores personalizados permitem que você combine sensores existentes de várias maneiras, melhorando seu controle e eficiência sobre o resfriamento do sistema. Além disso, eles suportam dados baseados em arquivos, permitindo que você crie scripts para entradas de sensores externos para maior flexibilidade.',
             note: 'Nota: Você pode usar Perfis de Mistura para combinar várias saídas de Sensores Personalizados.',
-        },
-        functionInfo: {
-            title: 'Visão Geral das Funções',
-            description:
-                'As funções são algoritmos configuráveis aplicados às saídas de perfil. Elas permitem que você gerencie quando ocorrem mudanças na velocidade do ventilador, ajuste configurações de histerese e use médias móveis para temperaturas dinâmicas.',
-            identityFunction:
-                'A função de Identidade é a opção mais simples, pois não modifica a saída calculada do perfil; apenas permite definir faixas mínimas e máximas de mudança de velocidade. Isso é particularmente benéfico para minimizar as flutuações constantes de velocidade do ventilador.',
         },
         profileInfo: {
             title: 'Visão Geral dos Perfis',
@@ -1307,7 +1296,7 @@ export default {
                 createNewFunction: 'Nova Função',
                 existingFunction: 'Escolher Função',
                 defaultFunction: 'Função Padrão',
-                chooseFunctionNameType: 'Escolher Nome e Tipo da Função',
+                chooseFunctionName: 'Escolha um nome para a função',
                 newFunctionName: 'Função para {profileName}',
                 summary: 'Resumo',
                 aNewProfile: 'Um novo Perfil',
@@ -1645,10 +1634,6 @@ export default {
                 graph: 'Gráfico',
                 mix: 'Mistura',
                 overlay: 'Sobreposição',
-            },
-            functionType: {
-                identity: 'Identidade',
-                standard: 'Padrão',
             },
             mixFunctionType: {
                 min: 'Mínimo',

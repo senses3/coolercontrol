@@ -203,21 +203,6 @@ export enum FunctionType {
     Standard = 'Standard',
 }
 
-/**
- * Get localized display name for FunctionType
- */
-export function getFunctionTypeDisplayName(type: FunctionType): string {
-    const t = i18n.global.t
-    switch (type) {
-        case FunctionType.Identity:
-            return t('models.profile.functionType.identity')
-        case FunctionType.Standard:
-            return t('models.profile.functionType.standard')
-        default:
-            return type
-    }
-}
-
 export class Function {
     /**
      * The Unique identifier for this function

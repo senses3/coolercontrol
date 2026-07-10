@@ -862,9 +862,6 @@ export default {
             deleteFunction: '機能を削除',
             noFunctions: '機能が設定されていません',
             saveFunction: '機能を保存',
-            functionType: '機能タイプ',
-            functionTypeTooltip:
-                '機能タイプ：<br/>- <b>恒等関数</b>：ステップサイズ制限を適用しますが、それ以外はプロファイル値をそのまま渡します。<br/>- <b>標準</b>：ステップサイズ制限とヒステリシス設定を適用し、ファン応答時間と安定性を精密に制御します。<br/>- <b>指数移動平均</b>：加重平均を使用して温度変動を平滑化します。標準より簡単ですが精度は劣ります。',
             stepSizeTitle: 'ステップサイズ',
             fixedStepSize: '固定',
             fixedStepSizeTooltip:
@@ -908,7 +905,6 @@ export default {
                 'ファン速度変更を適用する前の応答遅延（秒）。\nこの遅延内の一時的な温度スパイクは無視され、変動が平滑化されます。',
             onlyDownward: '下降時のみ',
             onlyDownwardTooltip: '温度が下降しているときのみヒステリシス設定を適用します。',
-            general: '一般',
             stepOverrides: 'ステップオーバーライド',
             thresholdHopping: 'しきい値ホッピング',
             thresholdHoppingTooltip:
@@ -1093,13 +1089,6 @@ export default {
             description:
                 'カスタムセンサーを使用すると、既存のセンサーをさまざまな方法で組み合わせ、システム冷却に対する制御と効率を向上させることができます。さらに、ファイルベースのデータをサポートし、より柔軟性を高めるために外部センサー入力をスクリプト化することができます。',
             note: '注：ミックスプロファイルを使用して、複数のカスタムセンサー出力を組み合わせることができます。',
-        },
-        functionInfo: {
-            title: '機能の概要',
-            description:
-                '機能は、プロファイル出力に適用できる構成可能なアルゴリズムです。ファン速度変化のタイミングを管理し、ヒステリシス設定を調整し、動的温度に移動平均を使用することができます。',
-            identityFunction:
-                'アイデンティティ機能は最も単純なオプションで、計算されたプロファイル出力を変更せず、最小および最大速度変更範囲を設定することのみが可能です。これは、ファン速度の絶え間ない変動を最小限に抑えるのに特に有益です。',
         },
         profileInfo: {
             title: 'プロファイルの概要',
@@ -1290,7 +1279,7 @@ export default {
                 createNewFunction: '新規機能',
                 existingFunction: '機能を選択',
                 defaultFunction: 'デフォルト機能',
-                chooseFunctionNameType: '機能名とタイプを選択',
+                chooseFunctionName: 'ファンクション名を選択',
                 newFunctionName: '{profileName}の機能',
                 summary: '概要',
                 aNewProfile: '新しいプロファイル',
@@ -1625,10 +1614,6 @@ export default {
                 graph: 'グラフ',
                 mix: 'ミックス',
                 overlay: 'オーバーレイ',
-            },
-            functionType: {
-                identity: 'アイデンティティ',
-                standard: '標準',
             },
             mixFunctionType: {
                 min: '最小',

@@ -859,12 +859,6 @@ export default {
             deleteFunction: 'Delete Function',
             noFunctions: 'No functions configured',
             saveFunction: 'Save Function',
-            functionType: 'Function Type',
-            functionTypeTooltip:
-                'Function types:<br/>' +
-                '- <b>Identity</b>: Applies step size limits but otherwise passes the profile value unchanged.<br/>' +
-                '- <b>Standard</b>: Applies step size limits and hysteresis settings for precise control over fan response timing and stability.<br/>' +
-                '- <b>Exponential Moving Average</b>: Smooths temperature fluctuations using a weighted average. Simpler but less precise than Standard.',
             stepSizeTitle: 'Step Size',
             fixedStepSize: 'Fixed',
             fixedStepSizeTooltip:
@@ -908,7 +902,6 @@ export default {
                 'Response delay (seconds) before applying fan speed changes.\nTemporary temperature spikes within this delay are ignored, smoothing out fluctuations.',
             onlyDownward: 'Only Downward',
             onlyDownwardTooltip: 'Only apply hysteresis settings when temperature is decreasing.',
-            general: 'General',
             stepOverrides: 'Step Overrides',
             thresholdHopping: 'Threshold Hopping',
             thresholdHoppingTooltip:
@@ -1095,13 +1088,6 @@ export default {
             description:
                 'Custom sensors allow you to combine existing sensors in various ways, enhancing your control and efficiency over system cooling. Additionally, they support file-based data, enabling you to script external sensor inputs for greater flexibility.',
             note: 'Note: You can use Mix Profiles to combine multiple Custom Sensor outputs.',
-        },
-        functionInfo: {
-            title: 'Function Overview',
-            description:
-                'Functions are configurable algorithms applied to profile outputs. They enable you to manage when fan speed changes occur, adjust hysteresis settings, and use moving averages for dynamic temperatures.',
-            identityFunction:
-                "The Identity function is the simplest option as it doesn't modify the computed profile output; it only allows you to set minimum and maximum speed change ranges. This is particularly beneficial for minimizing constant fan speed fluctuations.",
         },
         profileInfo: {
             title: 'Profile Overview',
@@ -1293,7 +1279,7 @@ export default {
                 createNewFunction: 'New Function',
                 existingFunction: 'Choose Function',
                 defaultFunction: 'Default Function',
-                chooseFunctionNameType: 'Choose a Function Name and Type',
+                chooseFunctionName: 'Choose a Function Name',
                 newFunctionName: 'Function for {profileName}',
                 summary: 'Summary',
                 aNewProfile: 'A new Profile',
@@ -1624,10 +1610,6 @@ export default {
                 graph: 'Graph',
                 mix: 'Mix',
                 overlay: 'Overlay',
-            },
-            functionType: {
-                identity: 'Identity',
-                standard: 'Standard',
             },
             mixFunctionType: {
                 min: 'Min',

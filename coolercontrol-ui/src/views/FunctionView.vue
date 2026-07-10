@@ -19,11 +19,10 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile'
+import { Function, FunctionType } from '@/models/Profile'
 import { type UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
-import { $enum } from 'ts-enum-util'
 import { useToast } from '@/shell/toast'
 import {
     mdiAlertOutline,
@@ -37,7 +36,6 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
 import UiButton from '@/shell/ui/UiButton.vue'
-import UiListbox from '@/shell/ui/UiListbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
 import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
@@ -71,11 +69,11 @@ const delayMax: number = 30
 const currentFunction = computed(
     () => settingsStore.functions.find((fun) => fun.uid === props.functionUID)!,
 )
-let startingDelay = currentFunction.value.response_delay ?? 1
-let startingDeviance = currentFunction.value.deviance ?? 2
+// All-off hysteresis values (0/0/false) are the Identity type on the wire.
+let startingDelay = currentFunction.value.response_delay ?? 0
+let startingDeviance = currentFunction.value.deviance ?? 0
 let startingOnlyDownward = currentFunction.value.only_downward ?? false
 
-const selectedType: Ref<FunctionType> = ref(currentFunction.value.f_type)
 const chosenFixedStepSize: Ref<boolean> = ref(currentFunction.value.duty_maximum === 0)
 const chosenAsymmetric: Ref<boolean> = ref(currentFunction.value.step_size_min_decreasing > 0)
 const chosenStepDutyMinimum: Ref<number> = ref(currentFunction.value.duty_minimum)
@@ -87,19 +85,12 @@ const chosenDeviance: Ref<number> = ref(startingDeviance)
 const chosenOnlyDownward: Ref<boolean> = ref(startingOnlyDownward)
 const chosenThresholdHopping: Ref<boolean> = ref(currentFunction.value.threshold_hopping)
 const chosenBypassMinAtExtremes: Ref<boolean> = ref(currentFunction.value.bypass_min_at_extremes)
-const functionTypeOptions = computed(() =>
-    [...$enum(FunctionType).values()].map((type) => ({
-        value: type,
-        label: getFunctionTypeDisplayName(type),
-    })),
-)
 
 const saveFunctionState = async () => {
     if (currentFunction.value.uid === '0') {
         console.error('Changing of the default Function is not allowed.')
         return
     }
-    currentFunction.value.f_type = selectedType.value
     currentFunction.value.duty_minimum = chosenStepDutyMinimum.value
     currentFunction.value.duty_maximum = chosenStepDutyMaximum.value
     currentFunction.value.step_size_min_decreasing = chosenStepSizeMinDecreasing.value
@@ -114,12 +105,15 @@ const saveFunctionState = async () => {
         currentFunction.value.duty_maximum = 0
         currentFunction.value.step_size_max_decreasing = 0
     }
-    currentFunction.value.response_delay =
-        selectedType.value === FunctionType.Standard ? chosenDelay.value : undefined
-    currentFunction.value.deviance =
-        selectedType.value === FunctionType.Standard ? chosenDeviance.value : undefined
-    currentFunction.value.only_downward =
-        selectedType.value === FunctionType.Standard ? chosenOnlyDownward.value : undefined
+    // All-off hysteresis maps to the Identity type (the engine's no-op fast
+    // path); anything else is Standard. The type is a wire encoding, the UI
+    // presents a single Function concept.
+    const hysteresisOff =
+        chosenDelay.value === 0 && chosenDeviance.value === 0 && !chosenOnlyDownward.value
+    currentFunction.value.f_type = hysteresisOff ? FunctionType.Identity : FunctionType.Standard
+    currentFunction.value.response_delay = hysteresisOff ? undefined : chosenDelay.value
+    currentFunction.value.deviance = hysteresisOff ? undefined : chosenDeviance.value
+    currentFunction.value.only_downward = hysteresisOff ? undefined : chosenOnlyDownward.value
     currentFunction.value.threshold_hopping = chosenThresholdHopping.value
     currentFunction.value.bypass_min_at_extremes = chosenBypassMinAtExtremes.value
     const successful = await settingsStore.updateFunction(currentFunction.value.uid)
@@ -205,13 +199,6 @@ const delayScrolled = (event: WheelEvent) => {
     } else {
         if (chosenDelay.value > delayMin) chosenDelay.value -= 1
     }
-}
-
-const changeFunctionType = (value: string | undefined): void => {
-    if (value == null) {
-        return // do not update on unselect
-    }
-    selectedType.value = value as FunctionType
 }
 
 // const inputArea = ref()
@@ -377,13 +364,8 @@ const usedByProfiles = computed((): string[] =>
 
 onMounted(async () => {
     addScrollEventListeners()
-    // re-add some scroll event listeners for elements that are rendered on Type change
-    watch(selectedType, () => {
-        nextTick(addScrollEventListeners)
-    })
     watch(
         [
-            selectedType,
             chosenFixedStepSize,
             chosenAsymmetric,
             chosenStepDutyMinimum,
@@ -474,19 +456,7 @@ onUnmounted(() => {
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <div class="mt-0 mr-4 w-96">
-                <small class="ml-3 font-light text-sm text-text-color-secondary">
-                    {{ t('views.functions.functionType') }}
-                </small>
-                <UiListbox
-                    :model-value="selectedType"
-                    :options="functionTypeOptions"
-                    class="w-full"
-                    v-tooltip.top="t('views.functions.functionTypeTooltip')"
-                    @update:model-value="changeFunctionType"
-                />
-            </div>
-            <UiSettingsCard class="mt-4 w-96" :title="t('views.functions.stepSizeTitle')">
+            <UiSettingsCard class="w-96" :title="t('views.functions.stepSizeTitle')">
                 <UiSettingRow
                     v-tooltip.top="t('views.functions.fixedStepSizeTooltip')"
                     :label="t('views.functions.fixedStepSize')"
@@ -599,13 +569,8 @@ onUnmounted(() => {
                     <UiSwitch v-model="chosenBypassMinAtExtremes" />
                 </UiSettingRow>
             </UiSettingsCard>
-            <UiSettingsCard
-                class="mt-4 w-96"
-                v-if="selectedType === FunctionType.Standard"
-                :title="t('views.functions.hysteresis')"
-            >
+            <UiSettingsCard class="mt-4 w-96" :title="t('views.functions.hysteresis')">
                 <UiSettingRow
-                    v-if="selectedType === FunctionType.Standard"
                     v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
                     :label="t('views.functions.hysteresisThreshold')"
                 >
@@ -618,7 +583,6 @@ onUnmounted(() => {
                     />
                 </UiSettingRow>
                 <UiSettingRow
-                    v-if="selectedType === FunctionType.Standard"
                     v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
                     :label="t('views.functions.hysteresisDelay')"
                 >
@@ -630,7 +594,6 @@ onUnmounted(() => {
                     />
                 </UiSettingRow>
                 <UiSettingRow
-                    v-if="selectedType === FunctionType.Standard"
                     v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
                     :label="t('views.functions.onlyDownward')"
                 >

@@ -873,9 +873,6 @@ export default {
             deleteFunction: 'Funktion löschen',
             noFunctions: 'Keine Funktionen konfiguriert',
             saveFunction: 'Funktion speichern',
-            functionType: 'Funktionstyp',
-            functionTypeTooltip:
-                'Funktionstypen:<br/>- <b>Identität</b>: Wendet Schrittgrößenbegrenzungen an, gibt aber ansonsten den Profilwert unverändert weiter.<br/>- <b>Standard</b>: Wendet Schrittgrößenbegrenzungen und Hysterese-Einstellungen für präzise Kontrolle über Lüfterreaktionszeit und Stabilität an.<br/>- <b>Exponentieller gleitender Durchschnitt</b>: Glättet Temperaturschwankungen mit einem gewichteten Durchschnitt. Einfacher, aber weniger präzise als Standard.',
             stepSizeTitle: 'Schrittgröße',
             fixedStepSize: 'Fest',
             fixedStepSizeTooltip:
@@ -919,7 +916,6 @@ export default {
                 'Reaktionsverzögerung (Sekunden) vor der Anwendung von Lüftergeschwindigkeitsänderungen.\nTemporäre Temperaturspitzen innerhalb dieser Verzögerung werden ignoriert, um Schwankungen zu glätten.',
             onlyDownward: 'Nur Abwärts',
             onlyDownwardTooltip: 'Hysterese-Einstellungen nur anwenden, wenn die Temperatur sinkt.',
-            general: 'Allgemein',
             stepOverrides: 'Schritt-Überschreibungen',
             thresholdHopping: 'Schwellenwert-Überspringen',
             thresholdHoppingTooltip:
@@ -1113,13 +1109,6 @@ export default {
             description:
                 'Benutzerdefinierte Sensoren ermöglichen es Ihnen, bestehende Sensoren auf verschiedene Weise zu kombinieren und verbessern Ihre Kontrolle und Effizienz bei der Systemkühlung. Zusätzlich unterstützen sie dateibasierte Daten, die es Ihnen ermöglichen, externe Sensoreingaben für größere Flexibilität zu skripten.',
             note: 'Hinweis: Sie können Mix-Profile verwenden, um mehrere benutzerdefinierte Sensorausgaben zu kombinieren.',
-        },
-        functionInfo: {
-            title: 'Funktionsübersicht',
-            description:
-                'Funktionen sind konfigurierbare Algorithmen, die auf Profilausgaben angewendet werden. Sie ermöglichen es Ihnen, zu verwalten, wann Lüftergeschwindigkeitsänderungen auftreten, Hysterese-Einstellungen anzupassen und gleitende Durchschnitte für dynamische Temperaturen zu verwenden.',
-            identityFunction:
-                'Die Identitätsfunktion ist die einfachste Option, da sie die berechnete Profilausgabe nicht modifiziert; sie erlaubt es Ihnen nur, minimale und maximale Geschwindigkeitsänderungsbereiche festzulegen. Dies ist besonders vorteilhaft, um ständige Lüftergeschwindigkeitsschwankungen zu minimieren.',
         },
         profileInfo: {
             title: 'Profilübersicht',
@@ -1315,7 +1304,7 @@ export default {
                 createNewFunction: 'Neue Funktion',
                 existingFunction: 'Funktion wählen',
                 defaultFunction: 'Standardfunktion',
-                chooseFunctionNameType: 'Wählen Sie einen Funktionsnamen und -typ',
+                chooseFunctionName: 'Wähle einen Funktionsnamen',
                 newFunctionName: 'Funktion für {profileName}',
                 summary: 'Zusammenfassung',
                 aNewProfile: 'Ein neues Profil',
@@ -1654,10 +1643,6 @@ export default {
                 graph: 'Graph',
                 mix: 'Mix',
                 overlay: 'Overlay',
-            },
-            functionType: {
-                identity: 'Identität',
-                standard: 'Standard',
             },
             mixFunctionType: {
                 min: 'Minimum',
