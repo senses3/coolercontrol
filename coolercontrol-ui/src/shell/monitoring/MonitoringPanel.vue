@@ -297,7 +297,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 <div
                     v-for="dashboard in pinnedDashboards"
                     :key="`pin-${dashboard.uid}`"
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
                         :to="{
@@ -342,7 +342,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 <div
                     v-for="sensor in pinnedSensors"
                     :key="`pin-${sensor.deviceUID}-${sensor.channelName}`"
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
                         :to="sensorRoute(sensor)"
@@ -426,7 +426,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             <div
                 v-for="dashboard in orderedDashboards"
                 :key="dashboard.uid"
-                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
             >
                 <RouterLink
                     :to="{ name: 'monitoring-dashboard', params: { dashboardUID: dashboard.uid } }"
@@ -496,7 +496,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
         </PanelHeader>
         <RouterLink
             :to="{ name: 'monitoring-alerts' }"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             exact-active-class="bg-surface-hover !text-accent"
         >
             <svg-icon
@@ -518,7 +518,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 v-for="alert in orderedAlerts"
                 :key="alert.uid"
                 :to="{ name: 'monitoring-alert', params: { alertUID: alert.uid } }"
-                class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                 exact-active-class="bg-surface-hover !text-accent"
             >
                 <span
@@ -549,7 +549,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 <div
                     v-for="sensor in group.sensors"
                     :key="sensor.channelName"
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
                         :to="sensorRoute(sensor)"

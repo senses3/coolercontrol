@@ -211,7 +211,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                 <div
                     v-for="channel in pinnedChannels"
                     :key="`pin-${channel.deviceUID}-${channel.channelName}`"
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
                         :to="{
@@ -307,7 +307,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                 <div
                     v-for="channel in group.channels"
                     :key="channel.channelName"
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
                         :to="{
@@ -418,7 +418,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                 v-for="profile in profileLinks"
                 :key="profile.uid"
                 :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                 exact-active-class="bg-surface-hover !text-accent"
             >
                 <svg-icon
@@ -465,7 +465,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                 v-for="fun in functionLinks"
                 :key="fun.uid"
                 :to="{ name: 'functions', params: { functionUID: fun.uid } }"
-                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                 exact-active-class="bg-surface-hover !text-accent"
             >
                 <svg-icon
