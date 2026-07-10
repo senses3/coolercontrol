@@ -89,7 +89,7 @@ const counts = (device: Device): string => {
             </span>
             <RouterLink
                 :to="{ name: 'devices-manage-sensors' }"
-                class="ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border-one px-3 text-sm font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                class="ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-bg-two px-3 text-sm font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <svg-icon
                     type="mdi"

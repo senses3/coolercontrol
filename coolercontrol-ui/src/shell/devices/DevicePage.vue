@@ -240,7 +240,7 @@ const enableDevice = openManageSensors
             <button
                 v-if="!isCustomSensors"
                 type="button"
-                class="mt-3 inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-error/40 px-4 text-base font-medium text-text-color outline-none transition-colors hover:bg-error/10 focus-visible:ring-2 focus-visible:ring-accent"
+                class="mt-3 inline-flex h-10 w-fit items-center gap-2 rounded-lg border border-error/40 bg-bg-two px-4 text-base font-medium text-text-color outline-none transition-colors hover:bg-error/10 focus-visible:ring-2 focus-visible:ring-accent"
                 @click="openManageSensors"
             >
                 <svg-icon

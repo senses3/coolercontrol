@@ -86,7 +86,7 @@ const toggle = (value: string): void => {
 
 <template>
     <div
-        class="flex min-h-0 flex-col rounded-lg border bg-bg-one"
+        class="flex min-h-0 flex-col rounded-lg border bg-bg-two"
         :class="invalid ? 'border-error' : 'border-border-one'"
     >
         <div v-if="filter" class="flex items-center gap-2 border-b border-border-one px-3 py-2">

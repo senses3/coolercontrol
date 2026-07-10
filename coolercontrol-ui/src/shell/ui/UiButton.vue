@@ -44,7 +44,7 @@ const base =
 const variants: Record<Variant, string> = {
     solid: 'bg-accent text-accent-fg hover:bg-accent/90',
     ghost: 'text-text-color hover:bg-surface-hover',
-    outline: 'border border-border-one text-text-color hover:bg-surface-hover',
+    outline: 'border border-border-one bg-bg-two text-text-color hover:bg-surface-hover',
     danger: 'bg-error text-error-fg hover:bg-error/90',
 }
 
