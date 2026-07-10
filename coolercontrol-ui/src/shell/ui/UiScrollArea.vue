@@ -18,6 +18,8 @@
 
 <script setup lang="ts">
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
+import { onMounted, ref } from 'vue'
+import { useEventListener, useResizeObserver } from '@vueuse/core'
 
 withDefaults(defineProps<{ horizontal?: boolean }>(), { horizontal: false })
 
@@ -30,13 +32,59 @@ const thumbClasses =
     "flex-1 bg-text-color-secondary opacity-40 rounded-lg relative before:content-[''] " +
     'before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 ' +
     'before:-translate-y-1/2 before:w-full before:h-full before:min-w-2 before:min-h-[44px]'
+
+// Edge fades signal that content continues above/below when the panel overflows.
+const viewportRef = ref<InstanceType<typeof ScrollAreaViewport>>()
+const showTopFade = ref(false)
+const showBottomFade = ref(false)
+
+const measure = (): void => {
+    const el = viewportRef.value?.viewportElement
+    if (el == null) return
+    showTopFade.value = el.scrollTop > 1
+    showBottomFade.value = el.scrollTop + el.clientHeight < el.scrollHeight - 1
+}
+
+// Scroll updates position; the two observers catch panel resize and content growth.
+useEventListener(() => viewportRef.value?.viewportElement, 'scroll', measure, { passive: true })
+useResizeObserver(() => viewportRef.value?.viewportElement, measure)
+useResizeObserver(
+    () => viewportRef.value?.viewportElement?.firstElementChild as HTMLElement | undefined,
+    measure,
+)
+onMounted(measure)
+
+// Hold the panel colour solid near the edge, then fade across several rows so the
+// cue reads clearly rather than veiling only the last pixel. The bottom fade is
+// taller so a visible band survives above the browser's link status bar, which
+// overlaps the panel's lower edge.
+const fadeBase =
+    'pointer-events-none absolute inset-x-0 z-[1] transition-opacity duration-150 ease-out'
+const fadeStops = (direction: 'top' | 'bottom'): string =>
+    `background-image: linear-gradient(to ${direction}, rgb(var(--colors-bg-one)) 0%, ` +
+    'rgb(var(--colors-bg-one)) 28%, rgb(var(--colors-bg-one) / 0.6) 68%, ' +
+    'rgb(var(--colors-bg-one) / 0) 100%)'
+const topFadeStyle = fadeStops('bottom')
+const bottomFadeStyle = fadeStops('top')
 </script>
 
 <template>
-    <ScrollAreaRoot class="h-full w-full" type="hover" :scroll-hide-delay="100">
-        <ScrollAreaViewport class="h-full w-full">
+    <ScrollAreaRoot class="relative h-full w-full" type="hover" :scroll-hide-delay="100">
+        <ScrollAreaViewport ref="viewportRef" class="h-full w-full">
             <slot />
         </ScrollAreaViewport>
+        <div
+            class="top-0 h-14"
+            :class="[fadeBase, showTopFade ? 'opacity-100' : 'opacity-0']"
+            :style="topFadeStyle"
+            aria-hidden="true"
+        />
+        <div
+            class="bottom-0 h-28"
+            :class="[fadeBase, showBottomFade ? 'opacity-100' : 'opacity-0']"
+            :style="bottomFadeStyle"
+            aria-hidden="true"
+        />
         <ScrollAreaScrollbar orientation="vertical" :class="scrollbarClasses">
             <ScrollAreaThumb :class="thumbClasses" />
         </ScrollAreaScrollbar>
