@@ -293,7 +293,7 @@ fn main() -> Result<()> {
         let config = Rc::new(Config::load_config_file().await?);
         parse_cmd_args(&cmd_args, &config).await?;
         config.verify_writeability()?;
-        config.log_deprecated_function_warnings();
+        config.log_converted_function_warnings();
         paths::ensure_data_dir().await?;
         // admin uses `sidecar_fs` (always Tokio); on the compio main thread there is no Tokio
         // reactor, so run it on the sidecar. Harmless on the Tokio backend too.

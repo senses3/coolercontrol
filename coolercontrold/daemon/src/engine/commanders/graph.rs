@@ -26,8 +26,8 @@ use crate::config::Config;
 use crate::device::{ChannelName, DeviceUID, Duty, UID};
 use crate::engine::main::DutyWritersByType;
 use crate::engine::processors::functions::{
-    FunctionDutyThresholdPostProcessor, FunctionEMAPreProcessor, FunctionIdentityPreProcessor,
-    FunctionSafetyLatchProcessor, FunctionStandardPostProcessor, FunctionStandardPreProcessor,
+    FunctionDutyThresholdPostProcessor, FunctionIdentityPreProcessor, FunctionSafetyLatchProcessor,
+    FunctionStandardPostProcessor, FunctionStandardPreProcessor,
 };
 use crate::engine::processors::profiles::GraphProcessor;
 use crate::engine::{
@@ -42,7 +42,6 @@ use moro_local::Scope;
 struct ProcessorCollection {
     fun_safety_latch: FunctionSafetyLatchProcessor,
     fun_identity_pre: FunctionIdentityPreProcessor,
-    fun_ema_pre: FunctionEMAPreProcessor,
     fun_std_pre: FunctionStandardPreProcessor,
     graph_proc: GraphProcessor,
     fun_duty_thresh_post: FunctionDutyThresholdPostProcessor,
@@ -86,7 +85,6 @@ impl GraphProfileCommander {
                 ProcessorCollection {
                     fun_safety_latch: FunctionSafetyLatchProcessor::new(),
                     fun_identity_pre: FunctionIdentityPreProcessor::new(all_devices.clone()),
-                    fun_ema_pre: FunctionEMAPreProcessor::new(all_devices.clone()),
                     fun_std_pre,
                     graph_proc: GraphProcessor::new(),
                     fun_duty_thresh_post: FunctionDutyThresholdPostProcessor::new(),
@@ -247,7 +245,6 @@ impl GraphProfileCommander {
         }
         .apply(&self.processors.fun_safety_latch)
         .apply(&self.processors.fun_identity_pre)
-        .apply(&self.processors.fun_ema_pre)
         .apply(&self.processors.fun_std_pre)
         .apply(&self.processors.graph_proc)
         .apply(&self.processors.fun_duty_thresh_post)
