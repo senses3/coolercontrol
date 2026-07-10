@@ -146,7 +146,7 @@ const handleRedIssue = (newColor: Color): void => {
         </PopoverTrigger>
         <PopoverContent side="bottom" align="start" class="z-50" @click.stop>
             <div
-                class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color"
+                class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color shadow-overlay"
                 @click.stop
             >
                 <div>

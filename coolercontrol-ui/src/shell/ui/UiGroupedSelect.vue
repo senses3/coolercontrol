@@ -98,7 +98,7 @@ const selectedLabel = computed((): string | undefined => {
                     :groups="groups"
                     :filter="filter"
                     :filter-placeholder="filterPlaceholder"
-                    class="max-h-96 w-72 overflow-hidden shadow-md"
+                    class="max-h-96 w-72 overflow-hidden shadow-overlay"
                 />
             </PopoverContent>
         </PopoverPortal>

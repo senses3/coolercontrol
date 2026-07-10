@@ -229,6 +229,10 @@ module.exports = {
                 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'spin-slow': 'spin 2s linear infinite',
             },
+            boxShadow: {
+                // Elevation for floating overlays; shadow-md is invisible on dark surfaces.
+                overlay: '0 4px 8px -1px rgb(0 0 0 / 0.5), 0 10px 24px -6px rgb(0 0 0 / 0.4)',
+            },
             // This seems to confict with our setup. Don't use:
             //colors: {},
         },

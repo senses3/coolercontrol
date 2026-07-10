@@ -69,7 +69,7 @@ const isPopupOpen = ref(false)
             </popover-trigger>
             <popover-content side="bottom" class="z-10">
                 <div
-                    class="w-full bg-bg-two border border-border-one p-1 rounded-lg text-text-color drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
+                    class="w-full bg-bg-two border border-border-one p-1 rounded-lg text-text-color shadow-overlay"
                 >
                     <table>
                         <thead>
