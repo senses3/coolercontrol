@@ -717,9 +717,10 @@ watch(settingsStore.allUIDeviceSettings, () => {
             :autoresize="true"
             :manual-update="true"
         />
+        <!-- Centered like the Graph editor's info icon above the chart. -->
         <div
-            class="absolute right-3 top-2 text-text-color-secondary"
-            v-tooltip.left="t('views.profiles.targetHint')"
+            class="absolute left-1/2 top-2 -translate-x-1/2 text-text-color-secondary"
+            v-tooltip.top="t('views.profiles.targetHint')"
         >
             <svg-icon type="mdi" :path="mdiInformationSlabCircleOutline" :size="18" />
         </div>

@@ -42,7 +42,7 @@ const groupModel = computed<string>({
     <ToggleGroupRoot
         v-model="groupModel"
         type="single"
-        class="inline-flex h-10 items-center rounded-lg border border-border-one bg-bg-two p-0.5"
+        class="inline-flex h-10 items-center rounded-lg border border-border-one bg-control p-0.5"
     >
         <ToggleGroupItem
             v-for="option in options"

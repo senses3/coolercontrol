@@ -82,7 +82,7 @@ const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 
 
 <template>
     <span
-        class="inline-flex h-10 items-stretch overflow-hidden rounded-lg border border-border-one bg-bg-one"
+        class="inline-flex h-10 items-stretch overflow-hidden rounded-lg border border-border-one bg-control"
         :class="{ 'pointer-events-none opacity-50': disabled }"
     >
         <button

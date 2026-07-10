@@ -47,7 +47,7 @@ defineExpose({ focus: () => inputRef.value?.focus() })
             :type="revealed ? 'text' : 'password'"
             :placeholder="placeholder"
             :disabled="disabled"
-            class="h-10 w-full rounded-lg border bg-bg-one px-3 pr-10 text-base text-text-color outline-none focus:ring-2 focus:ring-accent disabled:pointer-events-none disabled:opacity-50"
+            class="h-10 w-full rounded-lg border bg-control px-3 pr-10 text-base text-text-color outline-none focus:ring-2 focus:ring-accent disabled:pointer-events-none disabled:opacity-50"
             :class="invalid ? 'border-error' : 'border-border-one'"
         />
         <button
