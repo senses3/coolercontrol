@@ -246,9 +246,10 @@ const deleteMode = (): void => {
                 />
             </div>
         </div>
-        <div class="flex flex-row items-center">
-            <div
-                class="p-2 flex leading-none items-center cursor-pointer"
+        <div class="flex flex-row items-center gap-x-1">
+            <UiButton
+                variant="ghost"
+                size="icon"
                 v-tooltip.top="t('views.modes.updateToCurrent')"
                 @click="updateModeWithCurrentSettings"
             >
@@ -257,9 +258,10 @@ const deleteMode = (): void => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.25)"
                 />
-            </div>
-            <div
-                class="p-2 flex leading-none items-center cursor-pointer"
+            </UiButton>
+            <UiButton
+                variant="ghost"
+                size="icon"
                 v-tooltip.top="t('views.modes.duplicateMode')"
                 @click="duplicateMode"
             >
@@ -268,9 +270,10 @@ const deleteMode = (): void => {
                     :path="mdiContentDuplicate"
                     :size="deviceStore.getREMSize(1.25)"
                 />
-            </div>
-            <div
-                class="p-2 flex leading-none items-center cursor-pointer"
+            </UiButton>
+            <UiButton
+                variant="ghost"
+                size="icon"
                 v-tooltip.top="t('views.modes.deleteMode')"
                 @click="deleteMode"
             >
@@ -279,7 +282,7 @@ const deleteMode = (): void => {
                     :path="mdiDeleteOutline"
                     :size="deviceStore.getREMSize(1.25)"
                 />
-            </div>
+            </UiButton>
             <div
                 class="p-2"
                 v-tooltip.top="{ value: t('views.mode.currentlyActive'), disabled: !isActivated }"

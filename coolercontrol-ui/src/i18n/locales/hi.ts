@@ -728,6 +728,7 @@ export default {
             createAlert: 'अलर्ट बनाएं',
             editAlert: 'अलर्ट संपादित करें',
             deleteAlert: 'अलर्ट हटाएं',
+            duplicateAlert: 'अलर्ट डुप्लिकेट करें',
             noAlerts: 'कोई अलर्ट कॉन्फ़िगर नहीं है',
             alertsOverview: 'अलर्ट अवलोकन',
             alertLogs: 'अलर्ट लॉग',

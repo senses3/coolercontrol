@@ -726,6 +726,7 @@ export default {
             createAlert: 'إنشاء تنبيه',
             editAlert: 'تعديل التنبيه',
             deleteAlert: 'حذف التنبيه',
+            duplicateAlert: 'تكرار التنبيه',
             noAlerts: 'لا توجد تنبيهات مكونة',
             alertsOverview: 'نظرة عامة على التنبيهات',
             alertLogs: 'سجلات التنبيهات',

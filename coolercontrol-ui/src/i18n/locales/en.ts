@@ -731,6 +731,7 @@ export default {
             createAlert: 'Create Alert',
             editAlert: 'Edit Alert',
             deleteAlert: 'Delete Alert',
+            duplicateAlert: 'Duplicate Alert',
             noAlerts: 'No alerts configured',
             alertsOverview: 'Alerts Overview',
             alertLogs: 'Alert Logs',

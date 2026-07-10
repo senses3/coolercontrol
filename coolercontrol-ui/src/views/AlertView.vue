@@ -19,7 +19,12 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiAlertOutline, mdiContentSaveOutline, mdiTrashCanOutline } from '@mdi/js'
+import {
+    mdiAlertOutline,
+    mdiContentDuplicate,
+    mdiContentSaveOutline,
+    mdiTrashCanOutline,
+} from '@mdi/js'
 import { computed, onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -215,6 +220,29 @@ const saveAlert = async (): Promise<void> => {
     } else {
         const successful = await settingsStore.updateAlert(alert.uid)
         if (successful) contextIsDirty.value = false
+    }
+}
+
+const duplicateAlert = async (): Promise<void> => {
+    const copy = new Alert(
+        `${alert.name} ${t('common.copy')}`,
+        new ChannelSource(
+            alert.channel_source.device_uid,
+            alert.channel_source.channel_name,
+            alert.channel_source.channel_metric,
+        ),
+        alert.min,
+        alert.max,
+        alert.warmup_duration,
+    )
+    copy.desktop_notify = alert.desktop_notify
+    copy.desktop_notify_recovery = alert.desktop_notify_recovery
+    copy.desktop_notify_audio = alert.desktop_notify_audio
+    copy.shutdown_on_activation = alert.shutdown_on_activation
+    const successful = await settingsStore.createAlert(copy)
+    if (successful) {
+        await settingsStore.loadAlertsAndLogs()
+        await router.push({ name: 'monitoring-alert', params: { alertUID: copy.uid } })
     }
 }
 
@@ -441,22 +469,33 @@ onMounted(async () => {
 <template>
     <div class="flex items-center justify-between px-2 pt-2">
         <entity-title-rename :current-name="chosenName" :save-name-function="saveNameFunction" />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div v-if="!shouldCreateAlert" class="p-2 pr-0">
-                <UiButton
-                    variant="outline"
-                    size="icon"
-                    v-tooltip.top="t('views.alerts.deleteAlert')"
-                    @click="deleteAlert"
-                >
-                    <svg-icon
-                        class="outline-0"
-                        type="mdi"
-                        :path="mdiTrashCanOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-            </div>
+        <div class="flex flex-wrap items-center gap-x-1 justify-end">
+            <UiButton
+                v-if="!shouldCreateAlert"
+                variant="ghost"
+                size="icon"
+                v-tooltip.top="t('views.alerts.duplicateAlert')"
+                @click="duplicateAlert"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiContentDuplicate"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </UiButton>
+            <UiButton
+                v-if="!shouldCreateAlert"
+                variant="ghost"
+                size="icon"
+                v-tooltip.top="t('views.alerts.deleteAlert')"
+                @click="deleteAlert"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiTrashCanOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </UiButton>
             <div class="p-2">
                 <UiButton
                     class="w-32"

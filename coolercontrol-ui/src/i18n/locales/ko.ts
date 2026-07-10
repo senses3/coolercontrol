@@ -725,6 +725,7 @@ export default {
             createAlert: '경고 생성',
             editAlert: '경고 편집',
             deleteAlert: '경고 삭제',
+            duplicateAlert: '경고 복제',
             noAlerts: '구성된 경고 없음',
             alertsOverview: '경고 개요',
             alertLogs: '경고 로그',

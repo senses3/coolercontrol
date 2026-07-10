@@ -738,6 +738,7 @@ export default {
             createAlert: 'Создать оповещение',
             editAlert: 'Редактировать оповещение',
             deleteAlert: 'Удалить оповещение',
+            duplicateAlert: 'Дублировать оповещение',
             noAlerts: 'Нет настроенных оповещений',
             alertsOverview: 'Обзор оповещений',
             alertLogs: 'Логи оповещений',

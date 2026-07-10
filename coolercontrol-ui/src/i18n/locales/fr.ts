@@ -752,6 +752,7 @@ export default {
             createAlert: 'Créer une Alerte',
             editAlert: "Modifier l'Alerte",
             deleteAlert: "Supprimer l'Alerte",
+            duplicateAlert: "Dupliquer l'Alerte",
             noAlerts: 'Aucune alerte configurée',
             alertsOverview: 'Aperçu des Alertes',
             alertLogs: "Journaux d'Alertes",

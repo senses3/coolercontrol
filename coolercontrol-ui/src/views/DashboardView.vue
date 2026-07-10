@@ -499,9 +499,10 @@ onUnmounted(() => {
                 />
             </div>
             <template v-if="!sensorMode">
-                <div
-                    class="p-2 flex leading-none items-center cursor-pointer"
-                    :class="{ 'text-accent': isHome }"
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    :class="{ '!text-accent': isHome }"
                     v-tooltip.top="t('views.dashboard.setAsHome')"
                     @click="setHome"
                 >
@@ -510,9 +511,10 @@ onUnmounted(() => {
                         :path="isHome ? mdiHome : mdiHomeOutline"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </div>
-                <div
-                    class="p-2 flex leading-none items-center cursor-pointer"
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
                     v-tooltip.top="t('views.dashboard.duplicateDashboard')"
                     @click="duplicateDashboard"
                 >
@@ -521,10 +523,11 @@ onUnmounted(() => {
                         :path="mdiContentCopy"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </div>
-                <div
+                </UiButton>
+                <UiButton
                     v-if="settingsStore.dashboards.length > 1"
-                    class="p-2 flex leading-none items-center cursor-pointer"
+                    variant="ghost"
+                    size="icon"
                     v-tooltip.top="t('views.dashboard.deleteDashboard')"
                     @click="deleteDashboard"
                 >
@@ -533,14 +536,15 @@ onUnmounted(() => {
                         :path="mdiTrashCanOutline"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </div>
-                <div
-                    class="p-2 flex leading-none items-center cursor-pointer"
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
                     v-tooltip.top="t('views.dashboard.fullPage')"
                     @click="toggleFullPage"
                 >
                     <svg-icon type="mdi" :path="mdiOverscan" :size="deviceStore.getREMSize(1.25)" />
-                </div>
+                </UiButton>
             </template>
             <div v-if="!sensorMode && settingsStore.tags.size > 0" class="p-2 pr-0 flex flex-row">
                 <span v-tooltip.top="t('views.dashboard.filterByTag')">

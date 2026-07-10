@@ -655,21 +655,20 @@ onMounted(async () => {
 <template>
     <div class="flex items-center justify-between px-2 pt-2">
         <entity-title-rename :current-name="currentName" :save-name-function="saveNameFunction" />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div v-if="!shouldCreateSensor" class="p-2 pr-0">
-                <UiButton
-                    variant="outline"
-                    v-tooltip.top="t('views.customSensors.deleteCustomSensor')"
-                    @click="deleteSensor"
-                >
-                    <svg-icon
-                        class="outline-0"
-                        type="mdi"
-                        :path="mdiTrashCanOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-            </div>
+        <div class="flex flex-wrap items-center gap-x-1 justify-end">
+            <UiButton
+                v-if="!shouldCreateSensor"
+                variant="ghost"
+                size="icon"
+                v-tooltip.top="t('views.customSensors.deleteCustomSensor')"
+                @click="deleteSensor"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="mdiTrashCanOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
+            </UiButton>
 
             <div class="p-2">
                 <UiButton
