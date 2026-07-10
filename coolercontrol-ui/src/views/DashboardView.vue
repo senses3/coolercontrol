@@ -486,7 +486,7 @@ onUnmounted(() => {
             :current-name="sensorMode ? channelLabel : dashboard.name"
             :save-name-function="saveNameFunction"
         />
-        <div class="flex flex-wrap gap-x-1 justify-end">
+        <div class="flex flex-wrap items-center gap-x-1 justify-end">
             <div
                 v-if="dashboard.chartType == ChartType.TIME_CHART"
                 class="p-2 flex leading-none items-center"
