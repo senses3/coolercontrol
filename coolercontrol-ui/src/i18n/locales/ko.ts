@@ -208,6 +208,8 @@ export default {
                 activate: '활성화',
                 noModes:
                     '아직 저장된 모드가 없습니다. 모드는 빠른 전환을 위해 모든 채널 설정을 스냅샷합니다.',
+                miniCurveHint:
+                    '할당된 프로파일 곡선입니다. 점은 현재 소스 온도에서의 목표 듀티를 나타내며, 채널의 기능이 실제 듀티를 결정합니다.',
                 chain: {
                     tempSource: '온도 소스',
                     profile: '프로파일',
@@ -757,6 +759,10 @@ export default {
                 '경고가 발생하면 시스템을 종료합니다.\n시스템 종료는 경고 발생 후 1분 후에 시작되며,\n경고가 복구되면 취소됩니다.',
         },
         profiles: {
+            targetDuty: '목표',
+            actualDuty: '실제',
+            targetHint:
+                '목표는 채널의 기능이 적용되기 전, 현재 온도로부터 계산된 값입니다. 스무딩과 히스테리시스로 인해 실제 듀티는 다를 수 있습니다.',
             createProfile: '프로파일 생성',
             editProfile: '프로파일 편집',
             deleteProfile: '프로파일 삭제',

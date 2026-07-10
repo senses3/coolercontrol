@@ -214,6 +214,8 @@ export default {
                 activate: 'Activer',
                 noModes:
                     'Aucun mode enregistré pour le moment. Les modes capturent tous les paramètres des canaux pour un basculement rapide.',
+                miniCurveHint:
+                    'Courbe du profil assigné. Le point marque la cible à la température actuelle de la source ; la Fonction du canal détermine la valeur réelle.',
                 chain: {
                     tempSource: 'Source de température',
                     profile: 'Profil',
@@ -785,6 +787,10 @@ export default {
                 "Activer l'arrêt du système lorsque l'alerte est déclenchée.\nL'arrêt du système commencera une minute après le déclenchement de l'alerte\net sera annulé si l'alerte récupère.",
         },
         profiles: {
+            targetDuty: 'Cible',
+            actualDuty: 'Réel',
+            targetHint:
+                'La cible est calculée à partir des températures actuelles, avant l’application de la Fonction du canal. Le lissage et l’hystérésis peuvent faire différer la valeur réelle.',
             createProfile: 'Créer un profil',
             editProfile: 'Modifier le profil',
             deleteProfile: 'Supprimer le profil',

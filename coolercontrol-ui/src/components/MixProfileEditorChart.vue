@@ -17,6 +17,9 @@
   -->
 
 <script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiInformationSlabCircleOutline } from '@mdi/js'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -48,6 +51,11 @@ echarts.use([
 interface Props {
     profiles: Array<Profile>
     mixFunctionType: ProfileMixFunctionType
+    // Optional channel context (set when embedded in a channel page): adds a
+    // live Actual duty line so the pre-Function Target and the fan's real
+    // output can be compared directly.
+    channelDeviceUID?: string
+    channelName?: string
 }
 
 const props = defineProps<Props>()
@@ -121,6 +129,7 @@ for (let i = 0; i < graphProfiles.length; i++) {
     graphLineData.push([])
 }
 const calculatedDutyLineData: [LineData, LineData] = [{ value: [] }, { value: [] }]
+const actualDutyLineData: [LineData, LineData] = [{ value: [] }, { value: [] }]
 
 const getTempLineColor = (profileIndex: number): string => {
     const profile = graphProfiles[profileIndex]
@@ -434,6 +443,9 @@ for (let i = 0; i < graphProfiles.length; i++) {
         },
     )
 }
+// The Target line is the pre-Function mix result calculated from current
+// temps; it is dashed and labeled so it does not read as the fan's real
+// output (the channel's Function shapes the actual duty).
 // @ts-ignore
 option.series.push({
     id: 'calculatedDutyLine',
@@ -442,8 +454,8 @@ option.series.push({
     symbol: 'none',
     lineStyle: {
         color: `${colors.themeColors.accent}`,
-        width: 4,
-        type: 'solid',
+        width: 3,
+        type: 'dashed',
     },
     emphasis: {
         disabled: true,
@@ -453,12 +465,15 @@ option.series.push({
         symbolSize: 0,
         label: {
             position: getDutyPosition(calculateDuty()),
+            align: 'left',
             fontSize: deviceStore.getREMSize(1.0),
             color: colors.themeColors.accent,
             formatter: (params: any): string => {
                 if (params.value == null) return ''
-                return Number(params.value).toFixed(0) + '%'
+                return t('views.profiles.targetDuty') + ' ' + Number(params.value).toFixed(0) + '%'
             },
+            shadowColor: colors.themeColors.bg_one,
+            shadowBlur: 10,
         },
         data: [
             {
@@ -483,6 +498,82 @@ option.series.push({
     z: 100,
     silent: true,
 })
+
+// ----- live Actual duty (channel context only) -----
+
+const hasChannelContext = props.channelDeviceUID != null && props.channelName != null
+
+const actualDutyColor = (): string =>
+    (hasChannelContext
+        ? settingsStore.allUIDeviceSettings
+              .get(props.channelDeviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.color
+        : undefined) || colors.themeColors.text_color
+
+const getActualDuty = (): number | undefined => {
+    if (!hasChannelContext) return undefined
+    const duty = deviceStore.currentDeviceStatus
+        .get(props.channelDeviceUID!)
+        ?.get(props.channelName!)?.duty
+    if (duty == null) return undefined
+    const value = Number.parseFloat(duty)
+    return Number.isNaN(value) ? undefined : value
+}
+
+const setActualDutyLine = (): number | undefined => {
+    const duty = getActualDuty()
+    if (duty == null) {
+        actualDutyLineData[0].value = []
+        actualDutyLineData[1].value = []
+        return undefined
+    }
+    actualDutyLineData[0].value = [axisXTempMin, duty]
+    actualDutyLineData[1].value = [axisXTempMax, duty]
+    return duty
+}
+
+const actualDutyMarkData = (duty: number | undefined): Array<object> =>
+    duty == null ? [] : [{ coord: [axisXTempMax - 5, duty], value: duty }]
+
+if (hasChannelContext) {
+    const initialActualDuty = setActualDutyLine()
+    // @ts-ignore
+    option.series.push({
+        id: 'actualDutyLine',
+        type: 'line',
+        smooth: false,
+        symbol: 'none',
+        lineStyle: {
+            color: actualDutyColor(),
+            width: 2,
+            type: 'solid',
+        },
+        emphasis: {
+            disabled: true,
+        },
+        data: actualDutyLineData,
+        markPoint: {
+            symbolSize: 0,
+            label: {
+                position: getDutyPosition(initialActualDuty ?? 0),
+                align: 'right',
+                fontSize: deviceStore.getREMSize(1.0),
+                color: actualDutyColor(),
+                formatter: (params: any): string => {
+                    if (params.value == null) return ''
+                    return (
+                        t('views.profiles.actualDuty') + ' ' + Number(params.value).toFixed(0) + '%'
+                    )
+                },
+                shadowColor: colors.themeColors.bg_one,
+                shadowBlur: 10,
+            },
+            data: actualDutyMarkData(initialActualDuty),
+        },
+        z: 101,
+        silent: true,
+    })
+}
 
 const setGraphData = (profileIndex: number) => {
     const profile = graphProfiles[profileIndex]
@@ -541,6 +632,21 @@ watch(rawStore.currentDeviceStatus, () => {
             },
         ],
     })
+    if (hasChannelContext) {
+        const actualDuty = setActualDutyLine()
+        mixGraph.value?.setOption({
+            series: [
+                {
+                    id: 'actualDutyLine',
+                    data: actualDutyLineData,
+                    markPoint: {
+                        data: actualDutyMarkData(actualDuty),
+                        label: { position: getDutyPosition(actualDuty ?? 0) },
+                    },
+                },
+            ],
+        })
+    }
     for (let i = 0; i < graphProfiles.length; i++) {
         if (graphProfiles[i].p_type === ProfileType.Fixed) continue
         const temp = getTemp(i)
@@ -602,14 +708,22 @@ watch(settingsStore.allUIDeviceSettings, () => {
 </script>
 
 <template>
-    <v-chart
-        id="control-graph"
-        class="pt-6 pr-11 pl-4 pb-6"
-        ref="mixGraph"
-        :option="option"
-        :autoresize="true"
-        :manual-update="true"
-    />
+    <div class="relative h-full w-full">
+        <v-chart
+            id="control-graph"
+            class="pt-6 pr-11 pl-4 pb-6"
+            ref="mixGraph"
+            :option="option"
+            :autoresize="true"
+            :manual-update="true"
+        />
+        <div
+            class="absolute right-3 top-2 text-text-color-secondary"
+            v-tooltip.left="t('views.profiles.targetHint')"
+        >
+            <svg-icon type="mdi" :path="mdiInformationSlabCircleOutline" :size="18" />
+        </div>
+    </div>
 </template>
 
 <style scoped lang="scss">

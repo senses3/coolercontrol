@@ -448,6 +448,8 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         ref="editorRef"
                         :key="selectedProfileUID"
                         :profile-u-i-d="selectedProfileUID"
+                        :channel-device-u-i-d="deviceUID"
+                        :channel-name="channelName"
                         graph-height="clamp(30rem, calc(100vh - 26rem), 44rem)"
                         hide-save
                     />

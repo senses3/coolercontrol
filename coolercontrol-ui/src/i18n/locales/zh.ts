@@ -205,6 +205,8 @@ export default {
                 previousMode: '上一个',
                 activate: '激活',
                 noModes: '尚未保存模式。模式会快照所有通道设置，以便快速切换。',
+                miniCurveHint:
+                    '已分配配置文件的曲线。圆点表示当前来源温度下的目标占空比；通道的功能决定实际占空比。',
                 chain: {
                     tempSource: '温度源',
                     profile: '配置文件',
@@ -735,6 +737,10 @@ export default {
                 '当警报触发时启用系统关机。\n系统将在警报触发一分钟后开始关机，\n如果警报恢复则取消关机。',
         },
         profiles: {
+            targetDuty: '目标',
+            actualDuty: '实际',
+            targetHint:
+                '目标是在应用通道功能之前，根据当前温度计算得出的。平滑和滞后可能使实际占空比有所不同。',
             createProfile: '创建配置文件',
             editProfile: '编辑配置文件',
             deleteProfile: '删除配置文件',

@@ -205,6 +205,8 @@ export default {
                 previousMode: '先前',
                 activate: '啟用',
                 noModes: '尚未儲存任何模式。模式會擷取所有通道設定的快照，以便快速切換。',
+                miniCurveHint:
+                    '已指派設定檔的曲線。圓點表示目前來源溫度下的目標佔空比；通道的功能決定實際佔空比。',
                 chain: {
                     tempSource: '溫度來源',
                     profile: '設定檔',
@@ -737,6 +739,10 @@ export default {
                 '當警報觸發時啟用系統關機。\n系統將在警報觸發一分鐘後開始關機，\n如果警報恢復則取消關機。',
         },
         profiles: {
+            targetDuty: '目標',
+            actualDuty: '實際',
+            targetHint:
+                '目標是在套用通道功能之前，依據目前溫度計算得出的。平滑與遲滯可能使實際佔空比有所不同。',
             createProfile: '建立設定檔',
             editProfile: '編輯設定檔',
             deleteProfile: '刪除設定檔',
