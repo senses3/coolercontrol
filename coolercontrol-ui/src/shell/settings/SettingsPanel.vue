@@ -57,7 +57,7 @@ const isActive = (tab: string): boolean => {
             v-for="entry in tabs"
             :key="entry.tab"
             :to="{ name: 'settings', params: { tabNumber: entry.tab } }"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             :class="isActive(entry.tab) ? 'bg-surface-hover text-accent' : 'text-text-color'"
         >
             <svg-icon

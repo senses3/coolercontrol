@@ -174,7 +174,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
         >
             <div v-for="device in devicesList" :key="device.uid" class="flex flex-col gap-0.5">
                 <div
-                    class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
                         :to="{ name: 'devices-device', params: { deviceUID: device.uid } }"
@@ -224,7 +224,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                         name: link.kind === 'lighting' ? 'device-lighting' : 'device-lcd',
                         params: { deviceUID: link.deviceUID, channelName: link.channelName },
                     }"
-                    class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                    class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                     exact-active-class="bg-surface-hover !text-accent"
                 >
                     <svg-icon
@@ -251,7 +251,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                         <div
                             v-for="sensorName in sensorNamesByDevice.get(device.uid) ?? []"
                             :key="`custom-${sensorName}`"
-                            class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                            class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                         >
                             <RouterLink
                                 :to="{
@@ -331,7 +331,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                     </VueDraggable>
                     <RouterLink
                         :to="{ name: 'device-custom-sensor-new' }"
-                        class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus:ring-2 focus:ring-accent"
+                        class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                     >
                         <svg-icon type="mdi" :path="mdiPlus" :size="14" class="shrink-0" />
                         <span class="truncate">
@@ -348,7 +348,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                 v-for="setting in disabledDevices"
                 :key="`disabled-${setting.uid}`"
                 :to="{ name: 'devices-device', params: { deviceUID: setting.uid } }"
-                class="block truncate rounded-lg px-2 py-1.5 text-text-color-secondary outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                class="block truncate rounded-lg px-2 py-1.5 text-text-color-secondary outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                 exact-active-class="bg-surface-hover !text-accent"
             >
                 {{ setting.name }}

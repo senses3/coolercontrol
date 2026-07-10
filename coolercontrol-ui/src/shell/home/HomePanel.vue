@@ -151,7 +151,7 @@ const persistPinnedOrder = (): void => {
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <RouterLink
             :to="{ name: 'section-home' }"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             exact-active-class="bg-surface-hover !text-accent"
         >
             <svg-icon
@@ -164,7 +164,7 @@ const persistPinnedOrder = (): void => {
         </RouterLink>
         <RouterLink
             :to="{ name: 'home-logs' }"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             exact-active-class="bg-surface-hover !text-accent"
         >
             <svg-icon
@@ -190,7 +190,7 @@ const persistPinnedOrder = (): void => {
                     v-for="row in pinnedRows"
                     :key="row.key"
                     :to="row.to"
-                    class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+                    class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                     exact-active-class="!text-accent"
                 >
                     <span

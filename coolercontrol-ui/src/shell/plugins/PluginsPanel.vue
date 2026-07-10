@@ -116,7 +116,7 @@ const actionButtonClasses =
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <RouterLink
             :to="{ name: 'plugins-overview' }"
-            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus:ring-2 focus:ring-accent"
+            class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             exact-active-class="bg-surface-hover !text-accent"
         >
             <svg-icon
@@ -140,7 +140,7 @@ const actionButtonClasses =
             <div
                 v-for="plugin in pluginRows"
                 :key="plugin.id"
-                class="group flex items-center rounded-lg hover:bg-surface-hover focus-within:bg-surface-hover focus-within:ring-2 focus-within:ring-accent"
+                class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
             >
                 <RouterLink
                     :to="{ name: 'plugin-page', params: { pluginId: plugin.id } }"
