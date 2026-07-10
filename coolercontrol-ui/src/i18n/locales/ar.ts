@@ -890,12 +890,6 @@ export default {
             stepSizeMaxDecreasing: 'الحد الأقصى للنقصان',
             stepSizeMaxDecreasingTooltip:
                 'الحد الأقصى لحجم الخطوة عندما تنخفض سرعة المروحة.\nيحد من سرعة تباطؤ المراوح لكل تحديث.',
-            windowSize: 'حجم النافذة',
-            windowSizeTooltip:
-                'حجم عينة درجة حرارة النافذة المستخدم في حساب المتوسط المتحرك الأسي.\nقيم أصغر = استجابة أسرع، أكثر تفاعلاً مع ذروات درجة الحرارة.\nقيم أكبر = استجابة أبطأ، انتقالات سرعة مروحة أكثر سلاسة.\nنصيحة: استخدم وظيفة قياسية للتحكم الدقيق في توقيت الاستجابة.',
-            emaCustomSensorAvailableNote:
-                'EMA متاحة أيضاً كنوع مستشعر مخصص، مما يتيح لك رسم درجة الحرارة المنعمة مباشرة.',
-            emaDeprecatedWarning: 'نوع وظيفة EMA مهمل. يرجى التبديل إلى نوع المستشعر المخصص EMA.',
             hysteresis: 'تخلف متقدم',
             hysteresisThreshold: 'العتبة',
             hysteresisThresholdTooltip:
@@ -1620,7 +1614,6 @@ export default {
             functionType: {
                 identity: 'هوية',
                 standard: 'قياسي',
-                exponentialMovingAvg: 'متوسط متحرك أسي',
             },
             mixFunctionType: {
                 min: 'الحد الأدنى',

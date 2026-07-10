@@ -893,13 +893,6 @@ export default {
             stepSizeMaxDecreasing: 'अधिकतम कमी',
             stepSizeMaxDecreasingTooltip:
                 'पंखा गति घटने पर अधिकतम स्टेप साइज़।\nप्रति अपडेट पंखे कितनी तेजी से धीमे हो सकते हैं इसे सीमित करता है।',
-            windowSize: 'विंडो आकार',
-            windowSizeTooltip:
-                'एक्सपोनेंशियल मूविंग एवरेज गणना में उपयोग किया जाने वाला विंडो तापमान सैंपल आकार।\nछोटे मान = तेज प्रतिक्रिया, तापमान स्पाइक्स के प्रति अधिक संवेदनशील।\nबड़े मान = धीमी प्रतिक्रिया, सुचारू पंखा गति संक्रमण।\nसुझाव: प्रतिक्रिया समय पर सटीक नियंत्रण के लिए मानक फ़ंक्शन का उपयोग करें।',
-            emaCustomSensorAvailableNote:
-                'EMA कस्टम सेंसर प्रकार के रूप में भी उपलब्ध है, जो आपको स्मूथ किए गए तापमान को सीधे ग्राफ़ करने देता है।',
-            emaDeprecatedWarning:
-                'EMA फ़ंक्शन प्रकार अप्रचलित है। कृपया EMA कस्टम सेंसर प्रकार पर स्विच करें।',
             hysteresis: 'उन्नत हिस्टैरिसिस',
             hysteresisThreshold: 'थ्रेशोल्ड',
             hysteresisThresholdTooltip:
@@ -1633,7 +1626,6 @@ export default {
             functionType: {
                 identity: 'पहचान',
                 standard: 'मानक',
-                exponentialMovingAvg: 'एक्सपोनेंशियल मूविंग एवरेज',
             },
             mixFunctionType: {
                 min: 'न्यूनतम',

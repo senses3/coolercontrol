@@ -31,7 +31,6 @@ use toml_edit::{ArrayOfTables, DocumentMut, Formatted, Item, Table, Value};
 use crate::api::CCError;
 use crate::cc_fs;
 use crate::device::{ChannelName, Duty, Temp, UID};
-use crate::engine::processors::functions::TMA_DEFAULT_WINDOW_SIZE;
 use crate::repositories::repository::DeviceLock;
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, ChannelExtensions, CoolerControlSettings, CustomSensor,
@@ -43,6 +42,8 @@ use crate::setting::{
 };
 
 const DEFAULT_CONFIG_FILE_BYTES: &[u8] = include_bytes!("../resources/config-default.toml");
+/// The `f_type` written by pre-4.4.0 daemons for the removed EMA Function type.
+const REMOVED_EMA_FUNCTION_TYPE: &str = "ExponentialMovingAvg";
 
 pub struct Config {
     path: PathBuf,
@@ -1842,22 +1843,37 @@ impl Config {
             .ok_or(anyhow!("Function not found"))
     }
 
-    /// Logs a one-time deprecation warning for each Function still using the deprecated EMA type.
-    /// Called once at startup so the per-channel config reads do not spam the log.
-    pub fn log_deprecated_function_warnings(&self) {
-        let Ok(functions) = self.get_current_functions() else {
+    /// Logs a one-time warning for each Function converted from the removed
+    /// `ExponentialMovingAvg` type. Called once at startup so the per-channel config reads do
+    /// not spam the log; the conversion itself happens silently at parse time and persists
+    /// whenever the config is next saved. Inspects the raw document because parsed Functions
+    /// are already converted to Identity.
+    pub fn log_converted_function_warnings(&self) {
+        let document = self.document.borrow();
+        let Some(functions_item) = document.get("functions") else {
             return;
         };
-        for function in &functions {
-            if function.f_type() == FunctionType::ExponentialMovingAvg {
-                warn!(
-                    "Function '{}' ({}) uses the deprecated ExponentialMovingAvg type, \
-                     please change this and use a EMA Custom Sensor for temperature smoothing, \
-                     which has improved controls and visibility.
-                     The EMA Function type will be removed in a future release.",
-                    function.name, function.uid
-                );
+        let Some(functions_array) = functions_item.as_array_of_tables() else {
+            return;
+        };
+        for function_table in functions_array {
+            let f_type = function_table.get("f_type").and_then(|item| item.as_str());
+            if f_type != Some(REMOVED_EMA_FUNCTION_TYPE) {
+                continue;
             }
+            let name = function_table
+                .get("name")
+                .and_then(|item| item.as_str())
+                .unwrap_or("unknown");
+            let uid = function_table
+                .get("uid")
+                .and_then(|item| item.as_str())
+                .unwrap_or("unknown");
+            warn!(
+                "Function '{name}' ({uid}) uses the removed ExponentialMovingAvg type and has \
+                 been converted to Identity. For temperature smoothing, use an EMA Custom \
+                 Sensor as the Profile's temperature source."
+            );
         }
     }
 
@@ -1886,8 +1902,16 @@ impl Config {
                     .with_context(|| "Function type should be present")?
                     .as_str()
                     .with_context(|| "Function type should be a string")?;
-                let f_type = FunctionType::from_str(f_type_str)
-                    .with_context(|| "Function type should be a valid member")?;
+                // Permanent upgrade migration: the ExponentialMovingAvg Function type was
+                // removed in 4.4.0 in favor of the EMA Custom Sensor. Upgrades may skip
+                // several releases, so unlike downgrade shims this conversion never expires.
+                // `log_converted_function_warnings` reports it once at startup.
+                let f_type = if f_type_str == REMOVED_EMA_FUNCTION_TYPE {
+                    FunctionType::Identity
+                } else {
+                    FunctionType::from_str(f_type_str)
+                        .with_context(|| "Function type should be a valid member")?
+                };
                 let duty_minimum: u8 = if let Some(duty_minimum_value) =
                     function_table.get("duty_minimum")
                 {
@@ -1984,23 +2008,6 @@ impl Config {
                     } else {
                         None
                     };
-                let sample_window =
-                    if let Some(sample_window_value) = function_table.get("sample_window") {
-                        let s_window: u8 = sample_window_value
-                            .as_integer()
-                            .with_context(|| "sample_window should be an integer")?
-                            .try_into()
-                            .ok()
-                            .with_context(|| "sample_window should be a value between 1-16")?;
-                        let validated_sample_window = if (1..=16).contains(&s_window) {
-                            s_window
-                        } else {
-                            TMA_DEFAULT_WINDOW_SIZE
-                        };
-                        Some(validated_sample_window)
-                    } else {
-                        None
-                    };
                 let threshold_hopping = if let Some(threshold_hopping_value) =
                     function_table.get("threshold_hopping")
                 {
@@ -2026,9 +2033,6 @@ impl Config {
                         only_downward,
                         response_delay,
                     },
-                    FunctionType::ExponentialMovingAvg => {
-                        FunctionKind::ExponentialMovingAvg { sample_window }
-                    }
                 };
                 let function = Function {
                     uid,
@@ -2165,7 +2169,6 @@ impl Config {
         let response_delay = function.response_delay();
         let deviance = function.deviance();
         let only_downward = function.only_downward();
-        let sample_window = function.sample_window();
         function_table["uid"] = Item::Value(Value::String(Formatted::new(function.uid)));
         function_table["name"] = Item::Value(Value::String(Formatted::new(function.name)));
         function_table["f_type"] = Item::Value(Value::String(Formatted::new(f_type.to_string())));
@@ -2198,17 +2201,9 @@ impl Config {
         } else {
             function_table["only_downward"] = Item::None;
         }
-        if let Some(sample_window) = sample_window {
-            let validated_window = if (1..=16).contains(&sample_window) {
-                sample_window
-            } else {
-                TMA_DEFAULT_WINDOW_SIZE
-            };
-            function_table["sample_window"] =
-                Item::Value(Value::Integer(Formatted::new(i64::from(validated_window))));
-        } else {
-            function_table["sample_window"] = Item::None;
-        }
+        // The removed EMA type leaves a stale sample_window key in tables converted to
+        // Identity; clearing it on every write completes the migration.
+        function_table["sample_window"] = Item::None;
         function_table["threshold_hopping"] =
             Item::Value(Value::Boolean(Formatted::new(function.threshold_hopping)));
         function_table["bypass_min_at_extremes"] = Item::Value(Value::Boolean(Formatted::new(
@@ -3183,17 +3178,9 @@ offset = 5
                 },
             ))
             .unwrap();
-        config
-            .set_function(make(
-                "ema",
-                FunctionKind::ExponentialMovingAvg {
-                    sample_window: Some(10),
-                },
-            ))
-            .unwrap();
 
         let functions = config.get_current_functions().unwrap();
-        assert_eq!(functions.len(), 3);
+        assert_eq!(functions.len(), 2);
         assert!(matches!(functions[0].kind, FunctionKind::Identity));
         assert_eq!(
             functions[1].kind,
@@ -3203,12 +3190,53 @@ offset = 5
                 response_delay: Some(4),
             }
         );
-        assert!(matches!(
-            functions[2].kind,
-            FunctionKind::ExponentialMovingAvg {
-                sample_window: Some(10)
-            }
-        ));
+    }
+
+    // A config written by a pre-4.4.0 daemon with the removed ExponentialMovingAvg Function type
+    // must load as Identity (permanent upgrade migration), and re-saving the function must scrub
+    // the stale sample_window key from the stored table.
+    #[test]
+    fn function_removed_ema_type_converts_to_identity() {
+        use crate::setting::FunctionKind;
+        use std::str::FromStr;
+
+        let legacy_toml = r#"
+[[functions]]
+uid = "ema-fn"
+name = "My EMA"
+f_type = "ExponentialMovingAvg"
+duty_minimum = 2
+duty_maximum = 100
+sample_window = 10
+"#;
+        let config = Config {
+            path: Path::new("/tmp/fn-ema-convert.toml").to_path_buf(),
+            path_ui: Path::new("/tmp/fn-ema-convert-ui.json").to_path_buf(),
+            document: RefCell::new(DocumentMut::from_str(legacy_toml).unwrap()),
+            generation: Cell::new(0),
+        };
+
+        let functions = config.get_current_functions().unwrap();
+        assert_eq!(functions.len(), 1);
+        assert!(matches!(functions[0].kind, FunctionKind::Identity));
+        assert_eq!(functions[0].name, "My EMA");
+        // Shared fields survive the conversion.
+        assert_eq!(functions[0].step_size_min, 2);
+
+        // Re-saving the converted function persists Identity and scrubs the stale key.
+        config.update_function(functions[0].clone()).unwrap();
+        let document = config.document.borrow();
+        let table = &document["functions"]
+            .as_array_of_tables()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap();
+        assert_eq!(
+            table.get("f_type").and_then(|i| i.as_str()),
+            Some("Identity")
+        );
+        assert!(table.get("sample_window").is_none());
     }
 
     // Updating a Standard function to Identity must scrub the Standard-only keys from the stored

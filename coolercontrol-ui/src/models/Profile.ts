@@ -201,7 +201,6 @@ export class ProfilesDTO {
 export enum FunctionType {
     Identity = 'Identity',
     Standard = 'Standard',
-    ExponentialMovingAvg = 'ExponentialMovingAvg',
 }
 
 /**
@@ -214,8 +213,6 @@ export function getFunctionTypeDisplayName(type: FunctionType): string {
             return t('models.profile.functionType.identity')
         case FunctionType.Standard:
             return t('models.profile.functionType.standard')
-        case FunctionType.ExponentialMovingAvg:
-            return t('models.profile.functionType.exponentialMovingAvg')
         default:
             return type
     }
@@ -276,11 +273,6 @@ export class Function {
     only_downward?: boolean
 
     /**
-     * The sample window size this function should use for EMA
-     */
-    sample_window?: number
-
-    /**
      * Whether to temporarily bypass thresholds when fan speed remains unchanged for 30+ seconds to meet curve target.
      */
     threshold_hopping: boolean = true
@@ -298,7 +290,6 @@ export class Function {
         response_delay: number | undefined = undefined,
         deviance: number | undefined = undefined,
         only_downward: boolean | undefined = undefined,
-        sample_window: number | undefined = undefined,
     ) {
         this.name = name
         this.f_type = f_type
@@ -307,7 +298,6 @@ export class Function {
         this.response_delay = response_delay
         this.deviance = deviance
         this.only_downward = only_downward
-        this.sample_window = sample_window
     }
 
     static createDefault(): Function {

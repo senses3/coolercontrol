@@ -888,13 +888,6 @@ export default {
             stepSizeMaxDecreasing: '최대 감소',
             stepSizeMaxDecreasingTooltip:
                 '팬 속도가 감소할 때의 최대 단계 크기입니다.\n업데이트당 팬 속도가 느려지는 속도를 제한합니다.',
-            windowSize: '창 크기',
-            windowSizeTooltip:
-                '지수 이동 평균 계산에 사용되는 창 온도 샘플 크기입니다.\n값이 작을수록 = 반응 속도가 빠르고 온도 급변에 더 민감하게 반응합니다.\n값이 클수록 = 반응 속도는 느리지만 팬 속도 전환이 더 부드러워집니다.\n팁: 응답 시간을 정밀하게 제어하려면 표준 함수를 사용하세요.',
-            emaCustomSensorAvailableNote:
-                'EMA는 사용자 지정 센서 유형으로도 사용할 수 있어 스무딩된 온도를 직접 그래프로 표시할 수 있습니다.',
-            emaDeprecatedWarning:
-                '함수 유형 EMA는 더 이상 사용되지 않습니다. EMA 사용자 지정 센서 유형으로 전환하세요.',
             hysteresis: '고급 이력 현상',
             hysteresisThreshold: '임계값',
             hysteresisThresholdTooltip:
@@ -1623,7 +1616,6 @@ export default {
             functionType: {
                 identity: '항등',
                 standard: '표준',
-                exponentialMovingAvg: '지수 이동 평균',
             },
             mixFunctionType: {
                 min: '최소',
