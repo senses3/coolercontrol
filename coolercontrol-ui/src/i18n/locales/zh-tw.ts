@@ -707,6 +707,7 @@ export default {
             createAlert: '創建警報',
             editAlert: '編輯警報',
             deleteAlert: '刪除警報',
+            duplicateAlert: '複製警報',
             noAlerts: '尚未配置警報',
             alertsOverview: '警報概覽',
             alertLogs: '警報日誌',

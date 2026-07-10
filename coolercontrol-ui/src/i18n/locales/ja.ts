@@ -732,6 +732,7 @@ export default {
             createAlert: 'アラートを作成',
             editAlert: 'アラートを編集',
             deleteAlert: 'アラートを削除',
+            duplicateAlert: 'アラートを複製',
             noAlerts: 'アラートが設定されていません',
             alertsOverview: 'アラート概要',
             alertLogs: 'アラートログ',

@@ -740,6 +740,7 @@ export default {
             createAlert: 'Crear Alerta',
             editAlert: 'Editar Alerta',
             deleteAlert: 'Eliminar Alerta',
+            duplicateAlert: 'Duplicar Alerta',
             noAlerts: 'No hay alertas configuradas',
             alertsOverview: 'Resumen de Alertas',
             alertLogs: 'Registros de Alertas',

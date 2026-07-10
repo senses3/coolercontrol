@@ -396,9 +396,10 @@ onUnmounted(() => {
             :current-name="currentFunction.name"
             :save-name-function="saveNameFunction"
         />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div
-                class="p-2 flex leading-none items-center cursor-pointer"
+        <div class="flex flex-wrap items-center gap-x-1 justify-end">
+            <UiButton
+                variant="ghost"
+                size="icon"
                 v-tooltip.top="t('components.wizards.functionApply.applyFunction')"
                 @click="openFunctionApplyWizard(currentFunction.uid)"
             >
@@ -407,9 +408,10 @@ onUnmounted(() => {
                     :path="mdiExportVariant"
                     :size="deviceStore.getREMSize(1.25)"
                 />
-            </div>
-            <div
-                class="p-2 flex leading-none items-center cursor-pointer"
+            </UiButton>
+            <UiButton
+                variant="ghost"
+                size="icon"
                 v-tooltip.top="t('layout.menu.tooltips.duplicate')"
                 @click="duplicateFunction"
             >
@@ -418,10 +420,11 @@ onUnmounted(() => {
                     :path="mdiContentDuplicate"
                     :size="deviceStore.getREMSize(1.25)"
                 />
-            </div>
-            <div
+            </UiButton>
+            <UiButton
                 v-if="currentFunction.uid !== '0'"
-                class="p-2 flex leading-none items-center cursor-pointer"
+                variant="ghost"
+                size="icon"
                 v-tooltip.top="t('views.functions.deleteFunction')"
                 @click="deleteFunction"
             >
@@ -430,7 +433,7 @@ onUnmounted(() => {
                     :path="mdiDeleteOutline"
                     :size="deviceStore.getREMSize(1.25)"
                 />
-            </div>
+            </UiButton>
             <div class="p-2">
                 <UiButton
                     class="w-32"

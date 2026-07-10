@@ -2212,10 +2212,11 @@ defineExpose({ saveProfileState, contextIsDirty })
             :current-name="currentProfile.name"
             :save-name-function="saveNameFunction"
         />
-        <div class="flex flex-wrap gap-x-1 justify-end">
+        <div class="flex flex-wrap items-center gap-x-1 justify-end">
             <template v-if="!hideSave">
-                <div
-                    class="p-2 flex leading-none items-center cursor-pointer"
+                <UiButton
+                    variant="ghost"
+                    size="icon"
                     v-tooltip.top="t('components.wizards.profileApply.applyProfile')"
                     @click="openProfileApplyWizard(currentProfile.uid)"
                 >
@@ -2224,9 +2225,10 @@ defineExpose({ saveProfileState, contextIsDirty })
                         :path="mdiExportVariant"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </div>
-                <div
-                    class="p-2 flex leading-none items-center cursor-pointer"
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
                     v-tooltip.top="t('layout.menu.tooltips.duplicate')"
                     @click="duplicateProfile"
                 >
@@ -2235,10 +2237,11 @@ defineExpose({ saveProfileState, contextIsDirty })
                         :path="mdiContentDuplicate"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </div>
-                <div
+                </UiButton>
+                <UiButton
                     v-if="currentProfile.uid !== '0'"
-                    class="p-2 flex leading-none items-center cursor-pointer"
+                    variant="ghost"
+                    size="icon"
                     v-tooltip.top="t('views.profiles.deleteProfile')"
                     @click="deleteProfile"
                 >
@@ -2247,7 +2250,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                         :path="mdiDeleteOutline"
                         :size="deviceStore.getREMSize(1.25)"
                     />
-                </div>
+                </UiButton>
             </template>
             <div class="p-2 pr-0">
                 <span

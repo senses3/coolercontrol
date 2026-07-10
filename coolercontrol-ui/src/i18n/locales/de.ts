@@ -741,6 +741,7 @@ export default {
             createAlert: 'Warnung erstellen',
             editAlert: 'Warnung bearbeiten',
             deleteAlert: 'Warnung löschen',
+            duplicateAlert: 'Warnung duplizieren',
             noAlerts: 'Keine Warnungen konfiguriert',
             alertsOverview: 'Warnungsübersicht',
             alertLogs: 'Warnungsprotokolle',
