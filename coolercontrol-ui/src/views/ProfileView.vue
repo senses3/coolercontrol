@@ -1387,9 +1387,9 @@ const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
 }
 
-// Auto-place the table in whichever corner is clearer so it doesn't cover the
-// curve points. Only moves when the current corner is actually covered, so a
-// clear manual choice (via the swap button) is left alone.
+// On the initial draw, place the table in whichever corner is clearer so it
+// doesn't cover the curve points. During editing the user relocates it with the
+// manual swap button; re-evaluating on every chart change was too costly.
 const pointsTable = ref<HTMLElement | null>(null)
 const cornerCoversPoints = (
     position: TablePosition,
@@ -2207,7 +2207,6 @@ onMounted(async () => {
 
     // handle the graphics on graph resize & zoom
     controlGraph.value?.chart?.on('dataZoom', updatePosition)
-    controlGraph.value?.chart?.on('finished', scheduleTablePlacement)
     window.addEventListener('resize', updatePosition)
     setTimeout(updateKnobSize)
     window.addEventListener('resize', updateKnobSize)
