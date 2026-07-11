@@ -163,18 +163,39 @@ const chainPills = computed<ChainPill[]>(() => {
     const pills: ChainPill[] = []
     const source = selectedProfile.value.temp_source
     if (source != null) {
-        const label =
-            settingsStore.allUIDeviceSettings
-                .get(source.device_uid)
-                ?.sensorsAndChannels.get(source.temp_name)?.name ?? source.temp_name
-        pills.push({ kind: 'tempSource', label })
+        const custom = customSensor(source.device_uid, source.temp_name)
+        pills.push({
+            kind: 'tempSource',
+            label: tempSourceLabel(source.device_uid, source.temp_name),
+            to:
+                custom != null
+                    ? { name: 'device-custom-sensor', params: { customSensorID: source.temp_name } }
+                    : {
+                          name: 'monitoring-sensor',
+                          params: {
+                              deviceUID: source.device_uid,
+                              channelName: source.temp_name,
+                          },
+                      },
+        })
     }
-    pills.push({ kind: 'profile', label: selectedProfile.value.name })
+    pills.push({
+        kind: 'profile',
+        label: selectedProfile.value.name,
+        to:
+            selectedProfile.value.uid !== '0'
+                ? { name: 'profiles', params: { profileUID: selectedProfile.value.uid } }
+                : undefined,
+    })
     const fun = settingsStore.functions.find(
         (candidate) => candidate.uid === selectedProfile.value?.function_uid,
     )
     if (fun != null && fun.uid !== '0') {
-        pills.push({ kind: 'function', label: fun.name })
+        pills.push({
+            kind: 'function',
+            label: fun.name,
+            to: { name: 'functions', params: { functionUID: fun.uid } },
+        })
     }
     return pills
 })
@@ -223,13 +244,6 @@ const flowTree = computed<FlowNode | null>(() => {
 })
 const flowRows = computed(() => (flowTree.value != null ? flattenFlow(flowTree.value) : []))
 const flowExpandable = computed(() => flowTree.value != null && isFlowExpandable(flowTree.value))
-
-const profileSection = ref<HTMLElement>()
-const editorSection = ref<HTMLElement>()
-const onPillClick = (kind: ChainPill['kind']): void => {
-    const target = kind === 'profile' ? profileSection.value : editorSection.value
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 
 // ----- apply / fork -----
 const applying = ref(false)
@@ -388,7 +402,6 @@ if (channelDashboard.value.dataTypes.length > 0) {
             :pills="chainPills"
             :expandable="flowExpandable"
             :expanded="flowExpanded"
-            @pill-click="onPillClick"
             @toggle-expand="flowExpanded = !flowExpanded"
         />
         <ControlFlowTree v-if="flowExpanded && flowExpandable" :rows="flowRows" />
@@ -470,7 +483,6 @@ if (channelDashboard.value.dataTypes.length > 0) {
             <!-- Profile -->
             <div v-else class="flex flex-col gap-4">
                 <div
-                    ref="profileSection"
                     class="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-lg border border-border-one p-3"
                 >
                     <div class="flex flex-col gap-1">
@@ -502,11 +514,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     </div>
                 </div>
 
-                <div
-                    v-if="selectedProfileUID != null"
-                    ref="editorSection"
-                    class="rounded-lg border border-border-one"
-                >
+                <div v-if="selectedProfileUID != null" class="rounded-lg border border-border-one">
                     <ProfileEditor
                         ref="editorRef"
                         :key="selectedProfileUID"
