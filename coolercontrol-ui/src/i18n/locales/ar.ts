@@ -187,6 +187,13 @@ export default {
                 landingHint: 'حدد مروحة أو مضخة لعرض تبريدها وضبطه.',
                 noChannels: 'لم يتم اكتشاف قنوات مراوح أو مضخات قابلة للتحكم.',
                 guidedSetup: 'إعداد موجّه',
+                setupMenu: {
+                    autoCreateThisFan: 'إنشاء تلقائي لهذه المروحة',
+                    createProfile: 'إنشاء ملف جديد',
+                    calibrateThisFan: 'معايرة هذه المروحة',
+                    autoCreateAllFans: 'إنشاء تلقائي لكل المراوح',
+                    calibrateAllFans: 'معايرة كل المراوح',
+                },
                 manualAt: 'يدوي {duty}%',
                 manualDuty: 'دورة التشغيل اليدوية',
                 modeProfile: 'ملف شخصي',

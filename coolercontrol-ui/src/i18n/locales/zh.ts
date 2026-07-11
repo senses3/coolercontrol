@@ -187,6 +187,13 @@ export default {
                 landingHint: '选择一个风扇或水泵以查看和调整其冷却。',
                 noChannels: '未检测到可控制的风扇或水泵通道。',
                 guidedSetup: '引导设置',
+                setupMenu: {
+                    autoCreateThisFan: '为此风扇自动创建',
+                    createProfile: '创建新配置文件',
+                    calibrateThisFan: '校准此风扇',
+                    autoCreateAllFans: '为所有风扇自动创建',
+                    calibrateAllFans: '校准所有风扇',
+                },
                 manualAt: '手动 {duty}%',
                 manualDuty: '手动风扇转速',
                 modeProfile: '配置文件',

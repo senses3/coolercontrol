@@ -187,6 +187,13 @@ export default {
                 landingHint: '팬 또는 펌프를 선택하여 냉각을 확인하고 조정하세요.',
                 noChannels: '제어 가능한 팬 또는 펌프 채널이 감지되지 않았습니다.',
                 guidedSetup: '가이드 설정',
+                setupMenu: {
+                    autoCreateThisFan: '이 팬 자동 생성',
+                    createProfile: '새 프로필 생성',
+                    calibrateThisFan: '이 팬 보정',
+                    autoCreateAllFans: '모든 팬 자동 생성',
+                    calibrateAllFans: '모든 팬 보정',
+                },
                 manualAt: '수동 {duty}%',
                 manualDuty: '수동 점유',
                 modeProfile: '프로파일',

@@ -193,6 +193,13 @@ export default {
                     'Sélectionnez un ventilateur ou une pompe pour afficher et ajuster son refroidissement.',
                 noChannels: "Aucun canal de ventilateur ou de pompe contrôlable n'a été détecté.",
                 guidedSetup: 'Configuration guidée',
+                setupMenu: {
+                    autoCreateThisFan: 'Créer automatiquement pour ce ventilateur',
+                    createProfile: 'Créer un nouveau profil',
+                    calibrateThisFan: 'Étalonner ce ventilateur',
+                    autoCreateAllFans: 'Créer automatiquement pour tous les ventilateurs',
+                    calibrateAllFans: 'Étalonner tous les ventilateurs',
+                },
                 manualAt: 'Manuel {duty} %',
                 manualDuty: 'Cycle manuel',
                 modeProfile: 'Profil',

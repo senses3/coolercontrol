@@ -188,6 +188,13 @@ export default {
                 landingHint: 'कूलिंग देखने और समायोजित करने के लिए एक पंखा या पंप चुनें।',
                 noChannels: 'कोई नियंत्रण योग्य पंखा या पंप चैनल नहीं मिला।',
                 guidedSetup: 'निर्देशित सेटअप',
+                setupMenu: {
+                    autoCreateThisFan: 'इस पंखे के लिए स्वतः बनाएँ',
+                    createProfile: 'नई प्रोफ़ाइल बनाएँ',
+                    calibrateThisFan: 'इस पंखे को कैलिब्रेट करें',
+                    autoCreateAllFans: 'सभी पंखों के लिए स्वतः बनाएँ',
+                    calibrateAllFans: 'सभी पंखे कैलिब्रेट करें',
+                },
                 manualAt: 'मैनुअल {duty}%',
                 manualDuty: 'मैनुअल ड्यूटी',
                 modeProfile: 'प्रोफ़ाइल',
