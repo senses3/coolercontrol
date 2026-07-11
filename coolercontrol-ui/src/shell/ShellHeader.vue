@@ -19,9 +19,15 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiBookmarkCheck, mdiBookmarkMultipleOutline, mdiBookmarkOutline, mdiTune } from '@mdi/js'
+import {
+    mdiBookmarkCheck,
+    mdiBookmarkMultipleOutline,
+    mdiBookmarkOutline,
+    mdiDockLeft,
+    mdiTune,
+} from '@mdi/js'
 import { DropdownMenuItem, DropdownMenuSeparator } from 'reka-ui'
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
@@ -52,6 +58,9 @@ const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
 )
 
+// Provided by ShellLayout; toggles the reka splitter panel (desktop only).
+const toggleMainMenu = inject<() => void>('toggleMainMenu')
+
 const itemClass =
     'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-base ' +
     'text-text-color outline-none data-[highlighted]:bg-surface-hover'
@@ -59,6 +68,21 @@ const itemClass =
 
 <template>
     <header class="flex h-12 shrink-0 items-center gap-2.5 px-3">
+        <UiTooltip
+            :text="
+                settingsStore.collapsedMainMenu
+                    ? t('layout.topbar.expandMenu')
+                    : t('layout.topbar.collapseMenu')
+            "
+        >
+            <button
+                type="button"
+                class="flex items-center justify-center rounded-lg p-1.5 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                @click="toggleMainMenu?.()"
+            >
+                <svg-icon type="mdi" :path="mdiDockLeft" :size="deviceStore.getREMSize(1.25)" />
+            </button>
+        </UiTooltip>
         <UiTooltip :text="daemonState.status">
             <RouterLink
                 :to="{ name: 'section-home' }"
