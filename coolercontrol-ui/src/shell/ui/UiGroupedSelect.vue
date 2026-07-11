@@ -92,7 +92,7 @@ const selectedLabel = computed((): string | undefined => {
             </span>
         </PopoverTrigger>
         <PopoverPortal>
-            <PopoverContent side="bottom" align="start" :side-offset="4" class="z-[1300]">
+            <PopoverContent side="bottom" align="start" :side-offset="2" class="z-[1300]">
                 <UiGroupedListbox
                     v-model="listModel"
                     :groups="groups"
