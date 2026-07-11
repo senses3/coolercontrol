@@ -23,6 +23,7 @@ import {
     mdiAlert,
     mdiChartMultiple,
     mdiDragVertical,
+    mdiFan,
     mdiFunction,
     mdiPinOff,
     mdiPinOutline,
@@ -54,6 +55,7 @@ import {
     sortEntitiesByGroup,
 } from '@/shell/panelOrder.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
+import { channelSpins } from '@/shell/channelIcon.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -224,13 +226,22 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
-                            :style="{
-                                backgroundColor: channelColor(
-                                    channel.deviceUID,
-                                    channel.channelName,
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiFan"
+                            :size="14"
+                            class="shrink-0"
+                            :class="{
+                                'animate-spin-slow': channelSpins(
+                                    'fan',
+                                    liveFor(channel.deviceUID, channel.channelName),
+                                    settingsStore.eyeCandy,
                                 ),
+                            }"
+                            :style="{
+                                color:
+                                    channelColor(channel.deviceUID, channel.channelName) ||
+                                    undefined,
                             }"
                         />
                         <span class="truncate">
@@ -320,13 +331,22 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
-                            :style="{
-                                backgroundColor: channelColor(
-                                    channel.deviceUID,
-                                    channel.channelName,
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiFan"
+                            :size="14"
+                            class="shrink-0"
+                            :class="{
+                                'animate-spin-slow': channelSpins(
+                                    'fan',
+                                    liveFor(channel.deviceUID, channel.channelName),
+                                    settingsStore.eyeCandy,
                                 ),
+                            }"
+                            :style="{
+                                color:
+                                    channelColor(channel.deviceUID, channel.channelName) ||
+                                    undefined,
                             }"
                         />
                         <span class="truncate">

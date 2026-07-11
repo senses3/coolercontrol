@@ -27,6 +27,7 @@ import {
     mdiPinOutline,
     mdiPlus,
     mdiTelevision,
+    mdiThermometer,
 } from '@mdi/js'
 import { VueDraggable } from 'vue-draggable-plus'
 import { computed, ref, watchEffect } from 'vue'
@@ -46,6 +47,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { customSensorNames, deviceChannelLinks, hardwareDevices } from '@/shell/devices/devices.ts'
+import { deviceTypeIcon } from '@/shell/deviceIcon.ts'
 import { pinId } from '@/shell/cooling/channels.ts'
 import { setDeviceChildrenSubset, setTopLevelOrder } from '@/shell/panelOrder.ts'
 
@@ -181,9 +183,12 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
-                            :style="{ backgroundColor: dotColor(device.uid) }"
+                        <svg-icon
+                            type="mdi"
+                            :path="deviceTypeIcon(device.type)"
+                            :size="14"
+                            class="shrink-0"
+                            :style="{ color: dotColor(device.uid) }"
                         />
                         <span class="truncate">{{ deviceLabel(device.uid) }}</span>
                         <span
@@ -261,10 +266,13 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none"
                                 exact-active-class="!text-accent"
                             >
-                                <span
-                                    class="h-2 w-2 shrink-0 rounded-full"
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiThermometer"
+                                    :size="14"
+                                    class="shrink-0"
                                     :style="{
-                                        backgroundColor: sensorDotColor(device.uid, sensorName),
+                                        color: sensorDotColor(device.uid, sensorName) || undefined,
                                     }"
                                 />
                                 <span class="truncate">
