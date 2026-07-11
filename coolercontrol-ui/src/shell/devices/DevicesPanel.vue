@@ -21,11 +21,18 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlert,
+    mdiChip,
+    mdiCpu64Bit,
     mdiDragVertical,
+    mdiExpansionCard,
+    mdiFlaskRoundBottom,
     mdiLightbulbOutline,
+    mdiMemory,
     mdiPinOff,
     mdiPinOutline,
     mdiPlus,
+    mdiPump,
+    mdiPuzzle,
     mdiTelevision,
     mdiThermometer,
 } from '@mdi/js'
@@ -103,6 +110,25 @@ const dotColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || 'rgb(var(--colors-text-color))'
 const pickerColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || `rgb(${colorStore.themeColors.text_color})`
+
+const deviceTypeIcon = (type: DeviceType): string => {
+    switch (type) {
+        case DeviceType.CPU:
+            return mdiCpu64Bit
+        case DeviceType.GPU:
+            return mdiExpansionCard
+        case DeviceType.LIQUIDCTL:
+            return mdiPump
+        case DeviceType.HWMON:
+            return mdiChip
+        case DeviceType.CUSTOM_SENSORS:
+            return mdiFlaskRoundBottom
+        case DeviceType.SERVICE_PLUGIN:
+            return mdiPuzzle
+        default:
+            return mdiMemory
+    }
+}
 
 const sensorDotColor = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.color ||
@@ -182,9 +208,12 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
-                            :style="{ backgroundColor: dotColor(device.uid) }"
+                        <svg-icon
+                            type="mdi"
+                            :path="deviceTypeIcon(device.type)"
+                            :size="14"
+                            class="shrink-0"
+                            :style="{ color: dotColor(device.uid) }"
                         />
                         <span class="truncate">{{ deviceLabel(device.uid) }}</span>
                         <span
