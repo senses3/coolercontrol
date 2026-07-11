@@ -1387,6 +1387,59 @@ const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
 }
 
+// Auto-place the table in whichever corner is clearer so it doesn't cover the
+// curve points. Only moves when the current corner is actually covered, so a
+// clear manual choice (via the swap button) is left alone.
+const pointsTable = ref<HTMLElement | null>(null)
+const cornerCoversPoints = (
+    position: TablePosition,
+    graphRect: DOMRect,
+    tableW: number,
+    tableH: number,
+    points: Array<{ x: number; y: number }>,
+): number => {
+    const rem = deviceStore.getREMSize(1)
+    const left =
+        position === 'top-left' ? graphRect.left + 5.5 * rem : graphRect.right - 7 * rem - tableW
+    const top =
+        position === 'top-left' ? graphRect.top + 4 * rem : graphRect.bottom - 4 * rem - tableH
+    let count = 0
+    for (const p of points) {
+        if (p.x >= left && p.x <= left + tableW && p.y >= top && p.y <= top + tableH) count += 1
+    }
+    return count
+}
+const pickBestTablePosition = (): void => {
+    const chart = controlGraph.value
+    const graphEl = document.getElementById('control-graph')
+    const tableEl = pointsTable.value
+    const canvas = graphEl?.querySelector('canvas')
+    if (chart?.convertToPixel == null || graphEl == null || tableEl == null || canvas == null) {
+        return
+    }
+    const graphRect = graphEl.getBoundingClientRect()
+    const canvasRect = canvas.getBoundingClientRect()
+    const points: Array<{ x: number; y: number }> = []
+    for (const point of data) {
+        const px = chart.convertToPixel('grid', point.value) as number[] | undefined
+        if (px != null) points.push({ x: canvasRect.left + px[0], y: canvasRect.top + px[1] })
+    }
+    const tableW = tableEl.offsetWidth
+    const tableH = tableEl.offsetHeight
+    const current = cornerCoversPoints(tablePosition.value, graphRect, tableW, tableH, points)
+    if (current === 0) return
+    const alternate: TablePosition =
+        tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
+    if (cornerCoversPoints(alternate, graphRect, tableW, tableH, points) < current) {
+        tablePosition.value = alternate
+    }
+}
+let placementTimer: ReturnType<typeof setTimeout> | undefined
+const scheduleTablePlacement = (): void => {
+    if (placementTimer != null) clearTimeout(placementTimer)
+    placementTimer = setTimeout(pickBestTablePosition, 200)
+}
+
 const selectPointFromTable = (idx: number) => {
     tempDutyTextWatchStopper()
     selectedPointIndex.value = idx
@@ -2140,10 +2193,12 @@ onMounted(async () => {
     setTimeout(() => {
         updateResponsiveGraphHeight()
         graphReady.value = true
+        scheduleTablePlacement()
     })
 
     // handle the graphics on graph resize & zoom
     controlGraph.value?.chart?.on('dataZoom', updatePosition)
+    controlGraph.value?.chart?.on('finished', scheduleTablePlacement)
     window.addEventListener('resize', updatePosition)
     setTimeout(updateKnobSize)
     window.addEventListener('resize', updateKnobSize)
@@ -2512,6 +2567,7 @@ defineExpose({ saveProfileState, contextIsDirty })
             />
             <!-- Points Table Overlay -->
             <div
+                ref="pointsTable"
                 class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
                 :class="tablePositionClasses"
             >
