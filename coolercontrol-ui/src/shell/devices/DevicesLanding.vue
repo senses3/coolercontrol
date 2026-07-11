@@ -28,6 +28,7 @@ import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
+import { deviceTypeIcon } from '@/shell/deviceIcon.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -114,9 +115,12 @@ const counts = (device: Device): string => {
                     class="flex flex-col gap-1 rounded-lg border border-border-one bg-bg-two p-4 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                 >
                     <div class="flex items-center gap-2">
-                        <span
-                            class="h-2.5 w-2.5 shrink-0 rounded-full"
-                            :style="{ backgroundColor: deviceColor(device.uid) }"
+                        <svg-icon
+                            type="mdi"
+                            :path="deviceTypeIcon(device.type)"
+                            :size="18"
+                            class="shrink-0"
+                            :style="{ color: deviceColor(device.uid) }"
                         />
                         <span class="truncate text-base font-medium">
                             {{ deviceLabel(device.uid) }}

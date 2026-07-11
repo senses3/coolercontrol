@@ -21,18 +21,11 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlert,
-    mdiChip,
-    mdiCpu64Bit,
     mdiDragVertical,
-    mdiExpansionCard,
-    mdiFlaskRoundBottom,
     mdiLightbulbOutline,
-    mdiMemory,
     mdiPinOff,
     mdiPinOutline,
     mdiPlus,
-    mdiPump,
-    mdiPuzzle,
     mdiTelevision,
     mdiThermometer,
 } from '@mdi/js'
@@ -54,6 +47,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { customSensorNames, deviceChannelLinks, hardwareDevices } from '@/shell/devices/devices.ts'
+import { deviceTypeIcon } from '@/shell/deviceIcon.ts'
 import { pinId } from '@/shell/cooling/channels.ts'
 import { setDeviceChildrenSubset, setTopLevelOrder } from '@/shell/panelOrder.ts'
 
@@ -110,25 +104,6 @@ const dotColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || 'rgb(var(--colors-text-color))'
 const pickerColor = (deviceUID: UID): string =>
     deviceColor(deviceUID) || `rgb(${colorStore.themeColors.text_color})`
-
-const deviceTypeIcon = (type: DeviceType): string => {
-    switch (type) {
-        case DeviceType.CPU:
-            return mdiCpu64Bit
-        case DeviceType.GPU:
-            return mdiExpansionCard
-        case DeviceType.LIQUIDCTL:
-            return mdiPump
-        case DeviceType.HWMON:
-            return mdiChip
-        case DeviceType.CUSTOM_SENSORS:
-            return mdiFlaskRoundBottom
-        case DeviceType.SERVICE_PLUGIN:
-            return mdiPuzzle
-        default:
-            return mdiMemory
-    }
-}
 
 const sensorDotColor = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.color ||
