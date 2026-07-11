@@ -23,7 +23,7 @@ import { mdiAutoFix, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -37,10 +37,20 @@ import {
     DeviceSettingWriteProfileDTO,
 } from '@/models/DaemonSettings.ts'
 import type { Device, UID } from '@/models/Device.ts'
+import { DeviceType } from '@/models/Device.ts'
+import type { CustomSensor } from '@/models/CustomSensor.ts'
 import { Profile } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
+import ControlFlowTree from '@/shell/cooling/ControlFlowTree.vue'
+import { controlFlowExpanded as flowExpanded } from '@/shell/cooling/controlFlowState.ts'
+import {
+    buildFlowTree,
+    flattenFlow,
+    isFlowExpandable,
+    type FlowNode,
+} from '@/shell/cooling/controlFlow.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
@@ -153,28 +163,87 @@ const chainPills = computed<ChainPill[]>(() => {
     const pills: ChainPill[] = []
     const source = selectedProfile.value.temp_source
     if (source != null) {
-        const label =
-            settingsStore.allUIDeviceSettings
-                .get(source.device_uid)
-                ?.sensorsAndChannels.get(source.temp_name)?.name ?? source.temp_name
-        pills.push({ kind: 'tempSource', label })
+        const custom = customSensor(source.device_uid, source.temp_name)
+        pills.push({
+            kind: 'tempSource',
+            label: tempSourceLabel(source.device_uid, source.temp_name),
+            to:
+                custom != null
+                    ? { name: 'device-custom-sensor', params: { customSensorID: source.temp_name } }
+                    : {
+                          name: 'monitoring-sensor',
+                          params: {
+                              deviceUID: source.device_uid,
+                              channelName: source.temp_name,
+                          },
+                      },
+        })
     }
-    pills.push({ kind: 'profile', label: selectedProfile.value.name })
+    pills.push({
+        kind: 'profile',
+        label: selectedProfile.value.name,
+        to:
+            selectedProfile.value.uid !== '0'
+                ? { name: 'profiles', params: { profileUID: selectedProfile.value.uid } }
+                : undefined,
+    })
     const fun = settingsStore.functions.find(
         (candidate) => candidate.uid === selectedProfile.value?.function_uid,
     )
     if (fun != null && fun.uid !== '0') {
-        pills.push({ kind: 'function', label: fun.name })
+        pills.push({
+            kind: 'function',
+            label: fun.name,
+            to: { name: 'functions', params: { functionUID: fun.uid } },
+        })
     }
     return pills
 })
 
-const profileSection = ref<HTMLElement>()
-const editorSection = ref<HTMLElement>()
-const onPillClick = (kind: ChainPill['kind']): void => {
-    const target = kind === 'profile' ? profileSection.value : editorSection.value
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+// Full influence tree behind the compact chain, revealed on demand for
+// composite (Mix/Overlay) profiles whose members carry their own inputs.
+const customSensorsByID = ref<Map<string, CustomSensor>>(new Map())
+const customSensorsDeviceUID = computed<string | undefined>(() => {
+    for (const device of deviceStore.allDevices()) {
+        if (device.type === DeviceType.CUSTOM_SENSORS) return device.uid
+    }
+    return undefined
+})
+onMounted(async () => {
+    const sensors = await settingsStore.getCustomSensors()
+    const map = new Map<string, CustomSensor>()
+    for (const sensor of sensors) map.set(sensor.id, sensor)
+    customSensorsByID.value = map
+})
+const functionByUID = (uid: string): { uid: string; name: string } | undefined => {
+    if (uid === '0') return undefined
+    const fun = settingsStore.functions.find((candidate) => candidate.uid === uid)
+    return fun != null ? { uid: fun.uid, name: fun.name } : undefined
 }
+const tempSourceLabel = (deviceUID: string, channelName: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.name ??
+    channelName
+const customSensor = (deviceUID: string, channelName: string): CustomSensor | undefined =>
+    deviceUID === customSensorsDeviceUID.value
+        ? customSensorsByID.value.get(channelName)
+        : undefined
+const flowTree = computed<FlowNode | null>(() => {
+    if (
+        controlMode.value === 'manual' ||
+        controlMode.value === 'unmanaged' ||
+        selectedProfile.value == null
+    ) {
+        return null
+    }
+    return buildFlowTree(selectedProfile.value, {
+        profiles: settingsStore.profiles,
+        functionByUID,
+        sensorLabel: tempSourceLabel,
+        customSensor,
+    })
+})
+const flowRows = computed(() => (flowTree.value != null ? flattenFlow(flowTree.value) : []))
+const flowExpandable = computed(() => flowTree.value != null && isFlowExpandable(flowTree.value))
 
 // ----- apply / fork -----
 const applying = ref(false)
@@ -328,7 +397,14 @@ if (channelDashboard.value.dataTypes.length > 0) {
 
         <HealthWarning kind="channel" :device-uid="deviceUID" :channel-name="channelName" />
 
-        <ChainStrip :channel-label="channelLabel" :pills="chainPills" @pill-click="onPillClick" />
+        <ChainStrip
+            :channel-label="channelLabel"
+            :pills="chainPills"
+            :expandable="flowExpandable"
+            :expanded="flowExpanded"
+            @toggle-expand="flowExpanded = !flowExpanded"
+        />
+        <ControlFlowTree v-if="flowExpanded && flowExpandable" :rows="flowRows" />
 
         <template v-if="controllable">
             <div class="flex flex-wrap items-center gap-3">
@@ -407,7 +483,6 @@ if (channelDashboard.value.dataTypes.length > 0) {
             <!-- Profile -->
             <div v-else class="flex flex-col gap-4">
                 <div
-                    ref="profileSection"
                     class="flex flex-wrap items-end gap-x-4 gap-y-3 rounded-lg border border-border-one p-3"
                 >
                     <div class="flex flex-col gap-1">
@@ -439,11 +514,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     </div>
                 </div>
 
-                <div
-                    v-if="selectedProfileUID != null"
-                    ref="editorSection"
-                    class="rounded-lg border border-border-one"
-                >
+                <div v-if="selectedProfileUID != null" class="rounded-lg border border-border-one">
                     <ProfileEditor
                         ref="editorRef"
                         :key="selectedProfileUID"
