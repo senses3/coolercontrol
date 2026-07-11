@@ -52,7 +52,7 @@ const itemClass =
 </script>
 
 <template>
-    <UiDropdownMenu align="start" :side-offset="2">
+    <UiDropdownMenu align="start">
         <template #trigger>
             <slot name="trigger" />
         </template>

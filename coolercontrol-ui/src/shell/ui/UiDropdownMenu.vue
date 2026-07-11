@@ -26,7 +26,7 @@ import {
 
 withDefaults(defineProps<{ align?: 'start' | 'center' | 'end'; sideOffset?: number }>(), {
     align: 'end',
-    sideOffset: 4,
+    sideOffset: 2,
 })
 </script>
 

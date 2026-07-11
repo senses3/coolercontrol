@@ -158,7 +158,7 @@ const inputClasses =
             <PopoverContent
                 side="bottom"
                 align="start"
-                :side-offset="4"
+                :side-offset="2"
                 class="z-50 w-72 rounded-lg border border-border-one bg-bg-two p-3 text-base text-text-color shadow-overlay"
             >
                 <div class="pb-2 text-sm font-medium">
