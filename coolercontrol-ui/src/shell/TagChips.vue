@@ -17,6 +17,9 @@
   -->
 
 <script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiTag } from '@mdi/js'
 import { computed } from 'vue'
 import type { UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -34,14 +37,16 @@ const tagColor = (name: string): string => {
 </script>
 
 <template>
-    <div v-if="tags.length > 0" class="flex min-w-0 shrink items-center gap-1">
-        <span
+    <div v-if="tags.length > 0" class="flex shrink-0 items-center gap-0.5">
+        <svg-icon
             v-for="name in tags"
             :key="name"
-            class="max-w-24 shrink-0 truncate rounded border px-1 py-0.5 text-xs leading-none"
-            :style="{ color: tagColor(name), borderColor: tagColor(name) }"
-        >
-            {{ name }}
-        </span>
+            v-tooltip.top="name"
+            type="mdi"
+            :path="mdiTag"
+            :size="14"
+            class="shrink-0"
+            :style="{ color: tagColor(name) }"
+        />
     </div>
 </template>
