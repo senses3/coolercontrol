@@ -2090,9 +2090,10 @@ const updateResponsiveGraphHeight = (): void => {
     }
     if (graphEl != null && controlPanel != null) {
         // Fill the viewport from wherever the graph starts (works inside the
-        // shell content area), leaving room for the duty/temp bar below it.
+        // shell content area). The small bottom inset mirrors the chart's side
+        // padding so the axes sit roughly equidistant from the pane edges.
         const top = Math.ceil(graphEl.getBoundingClientRect().top)
-        graphEl.style.height = `max(calc(100vh - ${top}px - 4.75rem), 20rem)`
+        graphEl.style.height = `max(calc(100vh - ${top}px - 1rem), 20rem)`
     }
 }
 const updatePosition = (): void => {
@@ -2493,7 +2494,7 @@ defineExpose({ saveProfileState, contextIsDirty })
         <div v-else-if="showGraph" class="relative">
             <v-chart
                 id="control-graph"
-                class="pt-6 pr-11 pl-4 pb-6"
+                class="pt-6 pr-11 pl-4 pb-4"
                 ref="controlGraph"
                 :option="option"
                 :autoresize="true"
