@@ -398,16 +398,31 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                         <span
                             class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
+                            :class="{
+                                '!hidden':
+                                    openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
+                            }"
                         >
                             {{ liveValue(sensor) }}
                         </span>
                     </RouterLink>
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        :class="{
+                            '!flex': openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
+                        }"
                     >
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
+                        <TagPopover
+                            :device-u-i-d="sensor.deviceUID"
+                            :channel-name="sensor.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`pin-${sensor.deviceUID}-${sensor.channelName}`, open)
+                            "
+                        />
                         <button
                             v-if="alertKind(sensor) != null"
                             type="button"
