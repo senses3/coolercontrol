@@ -44,6 +44,7 @@ import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import { UniversalTransition } from 'echarts/features'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { pointsTableClearPosition } from '@/components/pointsTablePlacement.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useI18n } from 'vue-i18n'
 import type { GraphicComponentLooseOption } from 'echarts/types/dist/shared'
@@ -730,6 +731,19 @@ const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
 }
 
+// On the initial draw, place the table in whichever corner is clearer of the
+// points. During editing the user relocates it with the manual swap button.
+const pointsTable = ref<HTMLElement | null>(null)
+const placePointsTable = (): void => {
+    tablePosition.value = pointsTableClearPosition(
+        controlGraph.value,
+        pointsTable.value,
+        tablePosition.value,
+        data,
+        deviceStore.getREMSize(1),
+    )
+}
+
 // Select point from table
 const selectPointFromTable = (idx: number): void => {
     dutyOffsetTextWatchStopper()
@@ -1099,6 +1113,7 @@ onMounted(async () => {
     })
     window.addEventListener('resize', updateResponsiveGraphHeight)
     setTimeout(updateResponsiveGraphHeight)
+    setTimeout(placePointsTable, 200)
 
     // handle the graphics on graph resize & zoom
     controlGraph.value?.chart?.on('dataZoom', updatePosition)
@@ -1164,6 +1179,7 @@ onUnmounted(() => {
             />
             <!-- Points Table Overlay -->
             <div
+                ref="pointsTable"
                 class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
                 :class="tablePositionClasses"
             >
