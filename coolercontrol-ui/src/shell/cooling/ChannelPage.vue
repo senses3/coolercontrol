@@ -23,7 +23,7 @@ import { mdiAutoFix, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -41,6 +41,13 @@ import { Profile } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
+import ControlFlowTree from '@/shell/cooling/ControlFlowTree.vue'
+import {
+    buildFlowTree,
+    flattenFlow,
+    isFlowExpandable,
+    type FlowNode,
+} from '@/shell/cooling/controlFlow.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
@@ -168,6 +175,35 @@ const chainPills = computed<ChainPill[]>(() => {
     }
     return pills
 })
+
+// Full influence tree behind the compact chain, revealed on demand for
+// composite (Mix/Overlay) profiles whose members carry their own inputs.
+const functionName = (uid: string): string | undefined => {
+    if (uid === '0') return undefined
+    return settingsStore.functions.find((fun) => fun.uid === uid)?.name
+}
+const tempSourceLabel = (deviceUID: string, tempName: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(tempName)?.name ??
+    tempName
+const flowTree = computed<FlowNode | null>(() => {
+    if (
+        controlMode.value === 'manual' ||
+        controlMode.value === 'unmanaged' ||
+        selectedProfile.value == null
+    ) {
+        return null
+    }
+    return buildFlowTree(
+        selectedProfile.value,
+        settingsStore.profiles,
+        functionName,
+        tempSourceLabel,
+    )
+})
+const flowRows = computed(() => (flowTree.value != null ? flattenFlow(flowTree.value) : []))
+const flowExpandable = computed(() => flowTree.value != null && isFlowExpandable(flowTree.value))
+const flowExpanded = ref(false)
+watch(selectedProfileUID, () => (flowExpanded.value = false))
 
 const profileSection = ref<HTMLElement>()
 const editorSection = ref<HTMLElement>()
@@ -328,7 +364,15 @@ if (channelDashboard.value.dataTypes.length > 0) {
 
         <HealthWarning kind="channel" :device-uid="deviceUID" :channel-name="channelName" />
 
-        <ChainStrip :channel-label="channelLabel" :pills="chainPills" @pill-click="onPillClick" />
+        <ChainStrip
+            :channel-label="channelLabel"
+            :pills="chainPills"
+            :expandable="flowExpandable"
+            :expanded="flowExpanded"
+            @pill-click="onPillClick"
+            @toggle-expand="flowExpanded = !flowExpanded"
+        />
+        <ControlFlowTree v-if="flowExpanded && flowRows.length > 0" :rows="flowRows" />
 
         <template v-if="controllable">
             <div class="flex flex-wrap items-center gap-3">

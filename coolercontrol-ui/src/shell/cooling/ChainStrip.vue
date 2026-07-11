@@ -19,7 +19,15 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiArrowRight, mdiChartMultiple, mdiFan, mdiFunction, mdiThermometer } from '@mdi/js'
+import {
+    mdiArrowRight,
+    mdiChartMultiple,
+    mdiChevronDown,
+    mdiChevronUp,
+    mdiFan,
+    mdiFunction,
+    mdiThermometer,
+} from '@mdi/js'
 import { useI18n } from 'vue-i18n'
 
 export interface ChainPill {
@@ -30,8 +38,13 @@ export interface ChainPill {
 defineProps<{
     channelLabel: string
     pills: ChainPill[]
+    expandable?: boolean
+    expanded?: boolean
 }>()
-const emit = defineEmits<{ (e: 'pill-click', kind: ChainPill['kind']): void }>()
+const emit = defineEmits<{
+    (e: 'pill-click', kind: ChainPill['kind']): void
+    (e: 'toggle-expand'): void
+}>()
 const { t } = useI18n()
 
 const pillIcon = (kind: ChainPill['kind']): string => {
@@ -71,5 +84,13 @@ const pillIcon = (kind: ChainPill['kind']): string => {
             <svg-icon type="mdi" :path="mdiFan" :size="14" />
             <span class="max-w-40 truncate">{{ channelLabel }}</span>
         </span>
+        <button
+            v-if="expandable"
+            type="button"
+            class="inline-flex items-center rounded-full p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+            @click="emit('toggle-expand')"
+        >
+            <svg-icon type="mdi" :path="expanded ? mdiChevronUp : mdiChevronDown" :size="18" />
+        </button>
     </div>
 </template>
