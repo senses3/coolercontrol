@@ -33,6 +33,9 @@ export interface FanControlWizardData {
     channelName: string
     // '0' = unmanaged, undefined = manual, else the assigned profile uid.
     selectedProfileUID?: UID
+    // Opens the wizard directly at this step (e.g. 3 = New Profile), skipping
+    // the initial action menu. Read by Wizard.vue's currentStep init.
+    initialStep?: number
 }
 
 export function useFanControlWizard() {

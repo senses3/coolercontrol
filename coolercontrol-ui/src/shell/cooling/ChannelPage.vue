@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAutoFix, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
+import { mdiAutoFix, mdiChevronDown, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
@@ -30,7 +30,6 @@ import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
 import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
 import TimeChart from '@/components/TimeChart.vue'
-import { useFanControlWizard } from '@/composables/useFanControlWizard.ts'
 import { Dashboard, DashboardDeviceChannel } from '@/models/Dashboard.ts'
 import {
     DeviceSettingWriteManualDTO,
@@ -43,6 +42,7 @@ import { Profile } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
+import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
 import ControlFlowTree from '@/shell/cooling/ControlFlowTree.vue'
 import { controlFlowExpanded as flowExpanded } from '@/shell/cooling/controlFlowState.ts'
 import {
@@ -68,7 +68,6 @@ const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
-const wizard = useFanControlWizard()
 
 const device = computed<Device | undefined>(() => {
     for (const candidate of deviceStore.allDevices()) {
@@ -338,19 +337,6 @@ const onPageWheelCapture = (event: WheelEvent): void => {
     if (!event.ctrlKey) event.stopPropagation()
 }
 
-const openWizard = (): void => {
-    wizard.open({
-        deviceUID: props.deviceUID,
-        channelName: props.channelName,
-        selectedProfileUID:
-            controlMode.value === 'manual'
-                ? undefined
-                : controlMode.value === 'unmanaged'
-                  ? '0'
-                  : selectedProfileUID.value,
-    })
-}
-
 // ----- live chart -----
 const createChannelDashboard = (): Dashboard => {
     const dash = new Dashboard(channelLabel.value)
@@ -409,10 +395,15 @@ if (channelDashboard.value.dataTypes.length > 0) {
         <template v-if="controllable">
             <div class="flex flex-wrap items-center gap-3">
                 <UiToggleGroup v-model="controlMode" :options="controlModeOptions" />
-                <UiButton variant="outline" @click="openWizard">
-                    <svg-icon type="mdi" :path="mdiAutoFix" :size="16" />
-                    {{ t('layout.shell.coolingPage.guidedSetup') }}
-                </UiButton>
+                <ChannelSetupMenu :device-u-i-d="deviceUID" :channel-name="channelName">
+                    <template #trigger>
+                        <UiButton variant="outline">
+                            <svg-icon type="mdi" :path="mdiAutoFix" :size="16" />
+                            {{ t('layout.shell.coolingPage.guidedSetup') }}
+                            <svg-icon type="mdi" :path="mdiChevronDown" :size="16" />
+                        </UiButton>
+                    </template>
+                </ChannelSetupMenu>
                 <ChannelExtensionSettings
                     ref="extensionSettingsRef"
                     :device-u-i-d="deviceUID"

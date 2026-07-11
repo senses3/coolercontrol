@@ -61,6 +61,12 @@ const { openCalibrationWizard } = useToolWizards()
 
 const step: Ref<number> = ref(1)
 
+// A single-channel preselect scopes the whole wizard to just that fan; when
+// absent it enumerates every controllable fan (whole-system).
+const preselect = dialogRef.value.data?.preselect as
+    | { deviceUID: string; channelName: string }
+    | undefined
+
 // Step 1: assign each controllable fan a role (or leave unset to skip).
 interface FanRow {
     deviceUID: string
@@ -78,6 +84,12 @@ const fillFans = (): void => {
         if (deviceSettings == null) continue
         for (const [channelName, channelInfo] of device.info.channels.entries()) {
             if (!(channelInfo.speed_options?.fixed_enabled ?? false)) continue
+            if (
+                preselect != null &&
+                (device.uid !== preselect.deviceUID || channelName !== preselect.channelName)
+            ) {
+                continue
+            }
             const sc = deviceSettings.sensorsAndChannels.get(channelName)
             fanRows.value.push({
                 deviceUID: device.uid,

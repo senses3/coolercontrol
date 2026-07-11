@@ -187,6 +187,13 @@ export default {
                 landingHint: 'Select a fan or pump to view and adjust its cooling.',
                 noChannels: 'No controllable fan or pump channels were detected.',
                 guidedSetup: 'Guided Setup',
+                setupMenu: {
+                    autoCreateThisFan: 'Auto-Create for This Fan',
+                    createProfile: 'Create a New Profile',
+                    calibrateThisFan: 'Calibrate This Fan',
+                    autoCreateAllFans: 'Auto-Create All Fans',
+                    calibrateAllFans: 'Calibrate All Fans',
+                },
                 manualAt: 'Manual {duty}%',
                 manualDuty: 'Manual duty',
                 modeProfile: 'Profile',
