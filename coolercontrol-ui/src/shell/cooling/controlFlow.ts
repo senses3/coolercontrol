@@ -126,13 +126,17 @@ function profileDetail(profile: Profile): string | undefined {
     return undefined
 }
 
+// A connector segment per ancestor depth, drawn as CSS lines by the tree view:
+// 'through' = an ancestor's vertical passing this row, 'blank' = a gap, and the
+// final segment is this node's own elbow ('branch' has siblings below, 'end' is last).
+export type FlowConnector = 'through' | 'blank' | 'branch' | 'end'
+
 export interface FlowRow {
     kind: FlowKind
     label: string
     detail?: string
     to?: RouteLocationRaw
-    // Box-drawing prefix that renders the tree connector lines for this row.
-    guide: string
+    connectors: Array<FlowConnector>
 }
 
 export function flattenFlow(root: FlowNode): Array<FlowRow> {
@@ -143,11 +147,18 @@ export function flattenFlow(root: FlowNode): Array<FlowRow> {
         isLast: boolean,
         isRoot: boolean,
     ): void => {
-        const guide = isRoot
-            ? ''
-            : prefix.map((continues) => (continues ? '│  ' : '   ')).join('') +
-              (isLast ? '└─ ' : '├─ ')
-        rows.push({ kind: node.kind, label: node.label, detail: node.detail, to: node.to, guide })
+        const connectors: Array<FlowConnector> = []
+        if (!isRoot) {
+            for (const continues of prefix) connectors.push(continues ? 'through' : 'blank')
+            connectors.push(isLast ? 'end' : 'branch')
+        }
+        rows.push({
+            kind: node.kind,
+            label: node.label,
+            detail: node.detail,
+            to: node.to,
+            connectors,
+        })
         const childPrefix = isRoot ? [] : [...prefix, !isLast]
         node.children.forEach((child, index) =>
             walk(child, childPrefix, index === node.children.length - 1, false),
