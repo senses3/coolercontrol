@@ -74,7 +74,12 @@ import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useToast } from '@/shell/toast'
 import { $enum } from 'ts-enum-util'
 import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
+import {
+    onBeforeRouteLeave,
+    onBeforeRouteUpdate,
+    type RouteLocationRaw,
+    useRouter,
+} from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import _ from 'lodash'
@@ -2028,28 +2033,48 @@ const deleteProfile = (): void => {
 const { openProfileApplyWizard } = useToolWizards()
 
 // Channels currently driven by this profile (where-used).
-const usedByChannels = computed(
-    (): Array<{ deviceUID: string; channelName: string; label: string }> => {
-        const channels: Array<{ deviceUID: string; channelName: string; label: string }> = []
-        for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
-            for (const channelSetting of setting.settings.values()) {
-                if (channelSetting.profile_uid === currentProfile.value.uid) {
-                    const label =
-                        settingsStore.allUIDeviceSettings
-                            .get(deviceUID)
-                            ?.sensorsAndChannels.get(channelSetting.channel_name)?.name ??
-                        channelSetting.channel_name
-                    channels.push({
-                        deviceUID,
-                        channelName: channelSetting.channel_name,
-                        label,
-                    })
-                }
+// Where-used: speed channels driven by this profile, plus Mix/Overlay profiles
+// that reference it as a member or base (both stored in member_profile_uids).
+interface UsedByItem {
+    key: string
+    label: string
+    to: RouteLocationRaw
+}
+const usedByItems = computed((): UsedByItem[] => {
+    const items: UsedByItem[] = []
+    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+        for (const channelSetting of setting.settings.values()) {
+            if (channelSetting.profile_uid === currentProfile.value.uid) {
+                const label =
+                    settingsStore.allUIDeviceSettings
+                        .get(deviceUID)
+                        ?.sensorsAndChannels.get(channelSetting.channel_name)?.name ??
+                    channelSetting.channel_name
+                items.push({
+                    key: `channel-${deviceUID}-${channelSetting.channel_name}`,
+                    label,
+                    to: {
+                        name: 'cooling-channel',
+                        params: { deviceUID, channelName: channelSetting.channel_name },
+                    },
+                })
             }
         }
-        return channels
-    },
-)
+    }
+    for (const profile of settingsStore.profiles) {
+        if (
+            profile.uid !== currentProfile.value.uid &&
+            profile.member_profile_uids.includes(currentProfile.value.uid)
+        ) {
+            items.push({
+                key: `profile-${profile.uid}`,
+                label: profile.name,
+                to: { name: 'profiles', params: { profileUID: profile.uid } },
+            })
+        }
+    }
+    return items
+})
 
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
@@ -2377,21 +2402,19 @@ defineExpose({ saveProfileState, contextIsDirty })
         </div>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
         <div
-            v-if="!hideSave && usedByChannels.length > 0"
-            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-text-color-secondary"
+            v-if="!hideSave && usedByItems.length > 0"
+            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
         >
             <span>{{ t('views.profiles.usedBy') }}:</span>
-            <RouterLink
-                v-for="channel in usedByChannels"
-                :key="`${channel.deviceUID}-${channel.channelName}`"
-                :to="{
-                    name: 'cooling-channel',
-                    params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
-                }"
-                class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
-            >
-                {{ channel.label }}
-            </RouterLink>
+            <span v-for="(item, index) in usedByItems" :key="item.key" class="whitespace-nowrap">
+                <RouterLink
+                    :to="item.to"
+                    class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    {{ item.label }}
+                </RouterLink>
+                <span v-if="index < usedByItems.length - 1">,</span>
+            </span>
         </div>
         <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
     </div>

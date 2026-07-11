@@ -453,17 +453,22 @@ onUnmounted(() => {
         </div>
         <div
             v-if="usedByProfiles.length > 0"
-            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-text-color-secondary"
+            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
         >
             <span>{{ t('views.functions.usedBy') }}:</span>
-            <RouterLink
-                v-for="profile in usedByProfiles"
+            <span
+                v-for="(profile, index) in usedByProfiles"
                 :key="profile.uid"
-                :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-                class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                class="whitespace-nowrap"
             >
-                {{ profile.name }}
-            </RouterLink>
+                <RouterLink
+                    :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
+                    class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    {{ profile.name }}
+                </RouterLink>
+                <span v-if="index < usedByProfiles.length - 1">,</span>
+            </span>
         </div>
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
