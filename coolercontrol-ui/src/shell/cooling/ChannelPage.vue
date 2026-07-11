@@ -23,7 +23,7 @@ import { mdiAutoFix, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -44,6 +44,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
 import ControlFlowTree from '@/shell/cooling/ControlFlowTree.vue'
+import { controlFlowExpanded as flowExpanded } from '@/shell/cooling/controlFlowState.ts'
 import {
     buildFlowTree,
     flattenFlow,
@@ -222,8 +223,6 @@ const flowTree = computed<FlowNode | null>(() => {
 })
 const flowRows = computed(() => (flowTree.value != null ? flattenFlow(flowTree.value) : []))
 const flowExpandable = computed(() => flowTree.value != null && isFlowExpandable(flowTree.value))
-const flowExpanded = ref(false)
-watch(selectedProfileUID, () => (flowExpanded.value = false))
 
 const profileSection = ref<HTMLElement>()
 const editorSection = ref<HTMLElement>()
@@ -392,7 +391,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
             @pill-click="onPillClick"
             @toggle-expand="flowExpanded = !flowExpanded"
         />
-        <ControlFlowTree v-if="flowExpanded && flowRows.length > 0" :rows="flowRows" />
+        <ControlFlowTree v-if="flowExpanded && flowExpandable" :rows="flowRows" />
 
         <template v-if="controllable">
             <div class="flex flex-wrap items-center gap-3">
