@@ -222,7 +222,10 @@ const persistPinnedOrder = (): void => {
                         class="shrink-0 text-text-color-secondary"
                     />
                     <span class="truncate">{{ row.label }}</span>
-                    <span v-if="row.sublabel" class="truncate text-xs text-text-color-secondary">
+                    <span
+                        v-if="row.sublabel"
+                        class="shrink-[20] truncate text-xs text-text-color-secondary"
+                    >
                         {{ row.sublabel }}
                     </span>
                     <span

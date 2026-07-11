@@ -393,7 +393,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             :device-u-i-d="sensor.deviceUID"
                             :channel-name="sensor.channelName"
                         />
-                        <span class="truncate text-xs text-text-color-secondary">
+                        <span class="shrink-[20] truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(sensor.deviceUID) }}
                         </span>
                         <span
