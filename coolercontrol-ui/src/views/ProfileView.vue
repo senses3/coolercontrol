@@ -76,6 +76,7 @@ import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useToast } from '@/shell/toast'
 import { $enum } from 'ts-enum-util'
 import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
+import { pointsTableClearPosition } from '@/components/pointsTablePlacement.ts'
 import {
     onBeforeRouteLeave,
     onBeforeRouteUpdate,
@@ -1391,57 +1392,14 @@ const cycleTablePosition = () => {
 // doesn't cover the curve points. During editing the user relocates it with the
 // manual swap button; re-evaluating on every chart change was too costly.
 const pointsTable = ref<HTMLElement | null>(null)
-const cornerCoversPoints = (
-    position: TablePosition,
-    graphRect: DOMRect,
-    tableW: number,
-    tableH: number,
-    points: Array<{ x: number; y: number }>,
-): number => {
-    const rem = deviceStore.getREMSize(1)
-    // Expand the hit area well beyond the table: a point cannot be dragged under
-    // it (it intercepts pointer events), so treat one that gets near it as an
-    // overlap and move out of the way.
-    const margin = 3 * rem
-    const left =
-        (position === 'top-left'
-            ? graphRect.left + 5.5 * rem
-            : graphRect.right - 7 * rem - tableW) - margin
-    const top =
-        (position === 'top-left' ? graphRect.top + 4 * rem : graphRect.bottom - 4 * rem - tableH) -
-        margin
-    const width = tableW + 2 * margin
-    const height = tableH + 2 * margin
-    let count = 0
-    for (const p of points) {
-        if (p.x >= left && p.x <= left + width && p.y >= top && p.y <= top + height) count += 1
-    }
-    return count
-}
 const pickBestTablePosition = (): void => {
-    const chart = controlGraph.value
-    const graphEl = document.getElementById('control-graph')
-    const tableEl = pointsTable.value
-    const canvas = graphEl?.querySelector('canvas')
-    if (chart?.convertToPixel == null || graphEl == null || tableEl == null || canvas == null) {
-        return
-    }
-    const graphRect = graphEl.getBoundingClientRect()
-    const canvasRect = canvas.getBoundingClientRect()
-    const points: Array<{ x: number; y: number }> = []
-    for (const point of data) {
-        const px = chart.convertToPixel('grid', point.value) as number[] | undefined
-        if (px != null) points.push({ x: canvasRect.left + px[0], y: canvasRect.top + px[1] })
-    }
-    const tableW = tableEl.offsetWidth
-    const tableH = tableEl.offsetHeight
-    const current = cornerCoversPoints(tablePosition.value, graphRect, tableW, tableH, points)
-    if (current === 0) return
-    const alternate: TablePosition =
-        tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
-    if (cornerCoversPoints(alternate, graphRect, tableW, tableH, points) < current) {
-        tablePosition.value = alternate
-    }
+    tablePosition.value = pointsTableClearPosition(
+        controlGraph.value,
+        pointsTable.value,
+        tablePosition.value,
+        data,
+        deviceStore.getREMSize(1),
+    )
 }
 let placementTimer: ReturnType<typeof setTimeout> | undefined
 const scheduleTablePlacement = (): void => {
