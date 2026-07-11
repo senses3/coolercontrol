@@ -33,14 +33,13 @@ import PanelHeader from '@/shell/PanelHeader.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
-import { computed, ref, watch, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ChannelValues } from '@/stores/DeviceStore.ts'
 import type { Color, UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { HealthEntityType } from '@/models/DeviceHealth.ts'
 import { useLibraryWizards } from '@/composables/useLibraryWizards.ts'
 import {
@@ -62,7 +61,6 @@ import TagChips from '@/shell/TagChips.vue'
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
-const colorStore = useThemeColorsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
 
 // Mutable copy so rows are drag-sortable; rebuilt when devices change.
@@ -143,33 +141,6 @@ const persistPinnedOrder = (): void => {
     )
 }
 
-// Tag filter: click a pill to show only fans carrying that tag (drag disabled
-// while active). Transient, and cleared if its tag is deleted.
-const activeTag = ref<string | null>(null)
-const tagEntries = computed(() => Array.from(settingsStore.tags.keys()))
-const tagColorHex = (name: string): string => {
-    const color = settingsStore.tags.get(name)?.color
-    return color ? colorStore.rgbToHex(color) : 'rgb(var(--colors-text-color-secondary))'
-}
-const toggleTagFilter = (name: string): void => {
-    activeTag.value = activeTag.value === name ? null : name
-}
-const channelMatchesFilter = (channel: CoolingChannel): boolean =>
-    activeTag.value == null ||
-    settingsStore.getChannelTags(channel.deviceUID, channel.channelName).includes(activeTag.value)
-const groupHasMatch = (group: CoolingDeviceGroup): boolean =>
-    group.channels.some((channel) => channelMatchesFilter(channel))
-const pinnedHasMatch = computed(() => pinnedChannels.value.some(channelMatchesFilter))
-watch(
-    () => settingsStore.tags,
-    () => {
-        if (activeTag.value != null && !settingsStore.tags.has(activeTag.value)) {
-            activeTag.value = null
-        }
-    },
-    { deep: true },
-)
-
 const setChannelColor = (channel: CoolingChannel, newColor: Color): void => {
     const setting = settingsStore.allUIDeviceSettings
         .get(channel.deviceUID)
@@ -231,40 +202,17 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
 
 <template>
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
-        <div v-if="tagEntries.length > 0" class="mb-1 flex flex-wrap items-center gap-1 px-1">
-            <button
-                v-for="name in tagEntries"
-                :key="name"
-                type="button"
-                class="rounded border px-1.5 py-0.5 text-xs leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent"
-                :style="
-                    activeTag === name
-                        ? {
-                              backgroundColor: tagColorHex(name),
-                              borderColor: tagColorHex(name),
-                              color: '#fff',
-                          }
-                        : { color: tagColorHex(name), borderColor: tagColorHex(name) }
-                "
-                @click="toggleTagFilter(name)"
-            >
-                {{ name }}
-            </button>
-        </div>
         <template v-if="pinnedChannels.length > 0">
-            <PanelHeader v-show="pinnedHasMatch" :label="t('layout.shell.coolingPanel.pinned')" />
+            <PanelHeader :label="t('layout.shell.coolingPanel.pinned')" />
             <VueDraggable
-                v-show="pinnedHasMatch"
                 v-model="pinnedChannels"
                 handle=".drag-handle"
                 :animation="150"
-                :disabled="activeTag != null"
                 class="flex flex-col gap-0.5"
                 @end="persistPinnedOrder"
             >
                 <div
                     v-for="channel in pinnedChannels"
-                    v-show="channelMatchesFilter(channel)"
                     :key="`pin-${channel.deviceUID}-${channel.channelName}`"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
@@ -357,27 +305,23 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     </div>
                 </div>
             </VueDraggable>
-            <UiSeparator v-show="pinnedHasMatch" class="my-1" />
+            <UiSeparator class="my-1" />
         </template>
 
         <template v-for="group in groups" :key="group.deviceUID">
             <PanelHeader
-                v-show="groupHasMatch(group)"
                 :label="deviceLabel(group.deviceUID)"
                 :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
             />
             <VueDraggable
-                v-show="groupHasMatch(group)"
                 v-model="group.channels"
                 handle=".drag-handle"
                 :animation="150"
-                :disabled="activeTag != null"
                 class="flex flex-col gap-0.5"
                 @end="persistChannelOrder(group)"
             >
                 <div
                     v-for="channel in group.channels"
-                    v-show="channelMatchesFilter(channel)"
                     :key="channel.channelName"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
