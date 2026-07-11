@@ -274,7 +274,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                             />
                         </UiTooltip>
                         <span
-                            class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
+                            class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{
                                 '!hidden':
                                     openTagRow === `${channel.deviceUID}-${channel.channelName}`,
@@ -295,7 +295,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
@@ -395,7 +395,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                             />
                         </UiTooltip>
                         <span
-                            class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
+                            class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{
                                 '!hidden':
                                     openTagRow === `${channel.deviceUID}-${channel.channelName}`,
@@ -416,7 +416,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"

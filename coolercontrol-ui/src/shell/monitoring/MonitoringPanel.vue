@@ -342,7 +342,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="truncate">{{ dashboard.name }}</span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                     >
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -397,7 +397,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             {{ deviceLabel(sensor.deviceUID) }}
                         </span>
                         <span
-                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
+                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{
                                 '!hidden':
                                     openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
@@ -407,7 +407,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                         :class="{
                             '!flex': openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
                         }"
@@ -500,7 +500,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                     />
                 </RouterLink>
                 <div
-                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                 >
                     <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                         <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -636,7 +636,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                             />
                         </UiTooltip>
                         <span
-                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-focus-within:hidden"
+                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{
                                 '!hidden':
                                     openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
@@ -646,7 +646,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                         :class="{
                             '!flex': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
                         }"
