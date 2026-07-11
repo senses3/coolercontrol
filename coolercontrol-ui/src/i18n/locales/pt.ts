@@ -190,6 +190,13 @@ export default {
                     'Selecione um ventilador ou bomba para ver e ajustar seu resfriamento.',
                 noChannels: 'Nenhum canal de ventilador ou bomba controlável foi detectado.',
                 guidedSetup: 'Configuração Guiada',
+                setupMenu: {
+                    autoCreateThisFan: 'Criar automaticamente para este ventilador',
+                    createProfile: 'Criar um novo perfil',
+                    calibrateThisFan: 'Calibrar este ventilador',
+                    autoCreateAllFans: 'Criar automaticamente para todos os ventiladores',
+                    calibrateAllFans: 'Calibrar todos os ventiladores',
+                },
                 manualAt: 'Manual {duty}%',
                 manualDuty: 'Duty manual',
                 modeProfile: 'Perfil',

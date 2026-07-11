@@ -191,6 +191,13 @@ export default {
                     'Wählen Sie einen Lüfter oder eine Pumpe, um dessen Kühlung anzuzeigen und anzupassen.',
                 noChannels: 'Keine steuerbaren Lüfter- oder Pumpenkanäle erkannt.',
                 guidedSetup: 'Geführte Einrichtung',
+                setupMenu: {
+                    autoCreateThisFan: 'Für diesen Lüfter automatisch erstellen',
+                    createProfile: 'Neues Profil erstellen',
+                    calibrateThisFan: 'Diesen Lüfter kalibrieren',
+                    autoCreateAllFans: 'Für alle Lüfter automatisch erstellen',
+                    calibrateAllFans: 'Alle Lüfter kalibrieren',
+                },
                 manualAt: 'Manuell {duty}%',
                 manualDuty: 'Manuelle Auslastung',
                 modeProfile: 'Profil',

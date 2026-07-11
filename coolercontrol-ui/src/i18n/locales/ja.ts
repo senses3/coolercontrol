@@ -187,6 +187,13 @@ export default {
                 landingHint: 'ファンまたはポンプを選択して冷却を表示・調整します。',
                 noChannels: '制御可能なファンまたはポンプのチャンネルが検出されませんでした。',
                 guidedSetup: 'ガイド付きセットアップ',
+                setupMenu: {
+                    autoCreateThisFan: 'このファンの自動作成',
+                    createProfile: '新しいプロファイルを作成',
+                    calibrateThisFan: 'このファンをキャリブレーション',
+                    autoCreateAllFans: 'すべてのファンの自動作成',
+                    calibrateAllFans: 'すべてのファンをキャリブレーション',
+                },
                 manualAt: '手動 {duty}%',
                 manualDuty: '手動デューティ',
                 modeProfile: 'プロファイル',
