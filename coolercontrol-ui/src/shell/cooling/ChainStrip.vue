@@ -26,6 +26,7 @@ import {
     mdiChevronUp,
     mdiFan,
     mdiFunction,
+    mdiSitemapOutline,
     mdiThermometer,
 } from '@mdi/js'
 import { useI18n } from 'vue-i18n'
@@ -87,10 +88,11 @@ const pillIcon = (kind: ChainPill['kind']): string => {
         <button
             v-if="expandable"
             type="button"
-            class="inline-flex items-center rounded-full p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+            class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-accent px-2.5 py-1 text-accent outline-none transition-colors hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-accent"
             @click="emit('toggle-expand')"
         >
-            <svg-icon type="mdi" :path="expanded ? mdiChevronUp : mdiChevronDown" :size="18" />
+            <svg-icon type="mdi" :path="mdiSitemapOutline" :size="16" />
+            <svg-icon type="mdi" :path="expanded ? mdiChevronUp : mdiChevronDown" :size="14" />
         </button>
     </div>
 </template>

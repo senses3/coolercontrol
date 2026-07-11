@@ -23,7 +23,7 @@ import { mdiAutoFix, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -37,6 +37,8 @@ import {
     DeviceSettingWriteProfileDTO,
 } from '@/models/DaemonSettings.ts'
 import type { Device, UID } from '@/models/Device.ts'
+import { DeviceType } from '@/models/Device.ts'
+import type { CustomSensor } from '@/models/CustomSensor.ts'
 import { Profile } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -178,13 +180,31 @@ const chainPills = computed<ChainPill[]>(() => {
 
 // Full influence tree behind the compact chain, revealed on demand for
 // composite (Mix/Overlay) profiles whose members carry their own inputs.
-const functionName = (uid: string): string | undefined => {
+const customSensorsByID = ref<Map<string, CustomSensor>>(new Map())
+const customSensorsDeviceUID = computed<string | undefined>(() => {
+    for (const device of deviceStore.allDevices()) {
+        if (device.type === DeviceType.CUSTOM_SENSORS) return device.uid
+    }
+    return undefined
+})
+onMounted(async () => {
+    const sensors = await settingsStore.getCustomSensors()
+    const map = new Map<string, CustomSensor>()
+    for (const sensor of sensors) map.set(sensor.id, sensor)
+    customSensorsByID.value = map
+})
+const functionByUID = (uid: string): { uid: string; name: string } | undefined => {
     if (uid === '0') return undefined
-    return settingsStore.functions.find((fun) => fun.uid === uid)?.name
+    const fun = settingsStore.functions.find((candidate) => candidate.uid === uid)
+    return fun != null ? { uid: fun.uid, name: fun.name } : undefined
 }
-const tempSourceLabel = (deviceUID: string, tempName: string): string =>
-    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(tempName)?.name ??
-    tempName
+const tempSourceLabel = (deviceUID: string, channelName: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.name ??
+    channelName
+const customSensor = (deviceUID: string, channelName: string): CustomSensor | undefined =>
+    deviceUID === customSensorsDeviceUID.value
+        ? customSensorsByID.value.get(channelName)
+        : undefined
 const flowTree = computed<FlowNode | null>(() => {
     if (
         controlMode.value === 'manual' ||
@@ -193,12 +213,12 @@ const flowTree = computed<FlowNode | null>(() => {
     ) {
         return null
     }
-    return buildFlowTree(
-        selectedProfile.value,
-        settingsStore.profiles,
-        functionName,
-        tempSourceLabel,
-    )
+    return buildFlowTree(selectedProfile.value, {
+        profiles: settingsStore.profiles,
+        functionByUID,
+        sensorLabel: tempSourceLabel,
+        customSensor,
+    })
 })
 const flowRows = computed(() => (flowTree.value != null ? flattenFlow(flowTree.value) : []))
 const flowExpandable = computed(() => flowTree.value != null && isFlowExpandable(flowTree.value))

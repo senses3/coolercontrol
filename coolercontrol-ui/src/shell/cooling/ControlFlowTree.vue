@@ -27,6 +27,7 @@ defineProps<{ rows: Array<FlowRow> }>()
 const rowIcon = (kind: FlowRow['kind']): string => {
     switch (kind) {
         case 'tempSource':
+        case 'sensor':
             return mdiThermometer
         case 'function':
             return mdiFunction
@@ -38,21 +39,35 @@ const rowIcon = (kind: FlowRow['kind']): string => {
 
 <template>
     <div
-        class="flex w-fit flex-col gap-1 rounded-lg border border-border-one bg-bg-two p-2.5 text-sm"
+        class="flex w-fit max-w-full flex-col gap-1.5 rounded-lg border border-border-one bg-bg-two px-4 py-3.5 text-sm"
     >
         <div
             v-for="(row, index) in rows"
-            :key="`${row.kind}-${index}`"
+            :key="index"
             class="flex items-center gap-1.5 text-text-color"
-            :style="{ paddingLeft: `${row.depth * 1.25}rem` }"
         >
+            <span
+                v-if="row.guide"
+                class="shrink-0 whitespace-pre font-mono leading-none text-text-color-secondary"
+                >{{ row.guide }}</span
+            >
             <svg-icon
                 type="mdi"
                 :path="rowIcon(row.kind)"
                 :size="14"
                 class="shrink-0 text-text-color-secondary"
             />
-            <span class="truncate">{{ row.label }}</span>
+            <component
+                :is="row.to ? 'RouterLink' : 'span'"
+                :to="row.to"
+                class="truncate rounded outline-none"
+                :class="
+                    row.to
+                        ? 'text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent'
+                        : 'text-text-color'
+                "
+                >{{ row.label }}</component
+            >
             <span v-if="row.detail" class="shrink-0 text-xs text-text-color-secondary">
                 {{ row.detail }}
             </span>
