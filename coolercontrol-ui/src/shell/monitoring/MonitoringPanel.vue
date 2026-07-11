@@ -36,7 +36,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import type { Color, UID } from '@/models/Device.ts'
+import type { Color, Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import { AlertState } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
@@ -51,6 +51,7 @@ import {
     setGroupOrder,
 } from '@/shell/panelOrder.ts'
 import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sensors.ts'
+import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
@@ -99,6 +100,30 @@ const sensorLabel = (deviceUID: UID, channelName: string): string =>
 const sensorColor = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.color ??
     ''
+
+const devicesByUid = computed(() => {
+    const map = new Map<UID, Device>()
+    for (const device of deviceStore.allDevices()) map.set(device.uid, device)
+    return map
+})
+const sensorValues = (sensor: MonitoringSensor) =>
+    currentDeviceStatus.value.get(sensor.deviceUID)?.get(sensor.channelName)
+const sensorIcon = (sensor: MonitoringSensor): string =>
+    channelKindIcon(
+        channelKind(
+            devicesByUid.value.get(sensor.deviceUID),
+            sensor.channelName,
+            sensorValues(sensor),
+        ),
+    )
+const sensorSpins = (sensor: MonitoringSensor): boolean => {
+    const values = sensorValues(sensor)
+    return channelSpins(
+        channelKind(devicesByUid.value.get(sensor.deviceUID), sensor.channelName, values),
+        values,
+        settingsStore.eyeCandy,
+    )
+}
 
 // Primary live value: temp > watts > freq > load(duty) > rpm; formats follow
 // SensorTable's conventions.
@@ -349,10 +374,15 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
+                        <svg-icon
+                            type="mdi"
+                            :path="sensorIcon(sensor)"
+                            :size="14"
+                            class="shrink-0"
+                            :class="{ 'animate-spin-slow': sensorSpins(sensor) }"
                             :style="{
-                                backgroundColor: sensorColor(sensor.deviceUID, sensor.channelName),
+                                color:
+                                    sensorColor(sensor.deviceUID, sensor.channelName) || undefined,
                             }"
                         />
                         <span class="truncate">
@@ -556,10 +586,15 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
-                        <span
-                            class="h-2 w-2 shrink-0 rounded-full"
+                        <svg-icon
+                            type="mdi"
+                            :path="sensorIcon(sensor)"
+                            :size="14"
+                            class="shrink-0"
+                            :class="{ 'animate-spin-slow': sensorSpins(sensor) }"
                             :style="{
-                                backgroundColor: sensorColor(sensor.deviceUID, sensor.channelName),
+                                color:
+                                    sensorColor(sensor.deviceUID, sensor.channelName) || undefined,
                             }"
                         />
                         <span class="truncate">

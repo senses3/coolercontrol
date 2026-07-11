@@ -27,6 +27,7 @@ import {
     mdiPinOutline,
     mdiPlus,
     mdiTelevision,
+    mdiThermometer,
 } from '@mdi/js'
 import { VueDraggable } from 'vue-draggable-plus'
 import { computed, ref, watchEffect } from 'vue'
@@ -261,10 +262,13 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none"
                                 exact-active-class="!text-accent"
                             >
-                                <span
-                                    class="h-2 w-2 shrink-0 rounded-full"
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiThermometer"
+                                    :size="14"
+                                    class="shrink-0"
                                     :style="{
-                                        backgroundColor: sensorDotColor(device.uid, sensorName),
+                                        color: sensorDotColor(device.uid, sensorName) || undefined,
                                     }"
                                 />
                                 <span class="truncate">

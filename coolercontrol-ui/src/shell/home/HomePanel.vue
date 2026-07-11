@@ -21,6 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiDragVertical,
+    mdiFan,
     mdiHomeOutline,
     mdiTextBoxOutline,
     mdiViewDashboardOutline,
@@ -29,7 +30,7 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { UID } from '@/models/Device.ts'
+import type { Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -37,6 +38,7 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels, pinId } from '@/shell/cooling/channels.ts'
 import { reorderSubset } from '@/shell/panelOrder.ts'
 import { monitoringSensors } from '@/shell/monitoring/sensors.ts'
+import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
@@ -52,6 +54,8 @@ interface PinnedRow {
     sublabel?: string
     color?: string
     value?: string
+    icon?: string
+    spins?: boolean
     to: object
 }
 
@@ -88,6 +92,8 @@ const buildPinnedRows = (): PinnedRow[] => {
     const dashboardsByUid = new Map<string, Dashboard>(
         settingsStore.dashboards.map((dashboard) => [dashboard.uid, dashboard]),
     )
+    const devicesByUid = new Map<UID, Device>()
+    for (const device of deviceStore.allDevices()) devicesByUid.set(device.uid, device)
     const fanIds = new Set(
         coolingChannels(deviceStore.allDevices()).flatMap((group) =>
             group.channels.map((channel) => pinId(channel.deviceUID, channel.channelName)),
@@ -114,6 +120,7 @@ const buildPinnedRows = (): PinnedRow[] => {
         if (separator === -1) continue
         const deviceUID = id.slice(0, separator)
         const channelName = id.slice(separator + 1)
+        const values = currentDeviceStatus.value.get(deviceUID)?.get(channelName)
         const base = {
             key: id,
             label: label(deviceUID, channelName),
@@ -124,11 +131,16 @@ const buildPinnedRows = (): PinnedRow[] => {
         if (fanIds.has(id)) {
             rows.push({
                 ...base,
+                icon: mdiFan,
+                spins: channelSpins('fan', values, settingsStore.eyeCandy),
                 to: { name: 'cooling-channel', params: { deviceUID, channelName } },
             })
         } else if (sensorIds.has(id)) {
             rows.push({
                 ...base,
+                icon: channelKindIcon(
+                    channelKind(devicesByUid.get(deviceUID), channelName, values),
+                ),
                 to: { name: 'monitoring-sensor', params: { deviceUID, channelName } },
             })
         }
@@ -193,10 +205,14 @@ const persistPinnedOrder = (): void => {
                     class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                     exact-active-class="!text-accent"
                 >
-                    <span
-                        v-if="row.color"
-                        class="h-2 w-2 shrink-0 rounded-full"
-                        :style="{ backgroundColor: row.color }"
+                    <svg-icon
+                        v-if="row.icon"
+                        type="mdi"
+                        :path="row.icon"
+                        :size="14"
+                        class="shrink-0"
+                        :class="{ 'animate-spin-slow': row.spins }"
+                        :style="{ color: row.color || undefined }"
                     />
                     <svg-icon
                         v-else
