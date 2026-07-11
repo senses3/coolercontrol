@@ -163,13 +163,13 @@ const actionButtonClasses =
                     />
                     <span
                         v-if="plugin.disabled"
-                        class="ml-auto text-xs group-hover:hidden group-focus-within:hidden"
+                        class="ml-auto text-xs group-hover:hidden group-has-[:focus-visible]:hidden"
                     >
                         {{ t('models.pluginStatus.disabled') }}
                     </span>
                 </RouterLink>
                 <div
-                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                 >
                     <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                         <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
