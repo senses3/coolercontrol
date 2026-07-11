@@ -17,10 +17,10 @@
  */
 
 import {
-    mdiChip,
     mdiCpu64Bit,
     mdiExpansionCard,
     mdiFlaskRoundBottom,
+    mdiLinux,
     mdiMemory,
     mdiPuzzle,
     mdiWater,
@@ -36,7 +36,7 @@ export function deviceTypeIcon(type: DeviceType): string {
         case DeviceType.LIQUIDCTL:
             return mdiWater
         case DeviceType.HWMON:
-            return mdiChip
+            return mdiLinux
         case DeviceType.CUSTOM_SENSORS:
             return mdiFlaskRoundBottom
         case DeviceType.SERVICE_PLUGIN:
