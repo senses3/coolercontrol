@@ -1399,13 +1399,22 @@ const cornerCoversPoints = (
     points: Array<{ x: number; y: number }>,
 ): number => {
     const rem = deviceStore.getREMSize(1)
+    // Expand the hit area well beyond the table: a point cannot be dragged under
+    // it (it intercepts pointer events), so treat one that gets near it as an
+    // overlap and move out of the way.
+    const margin = 3 * rem
     const left =
-        position === 'top-left' ? graphRect.left + 5.5 * rem : graphRect.right - 7 * rem - tableW
+        (position === 'top-left'
+            ? graphRect.left + 5.5 * rem
+            : graphRect.right - 7 * rem - tableW) - margin
     const top =
-        position === 'top-left' ? graphRect.top + 4 * rem : graphRect.bottom - 4 * rem - tableH
+        (position === 'top-left' ? graphRect.top + 4 * rem : graphRect.bottom - 4 * rem - tableH) -
+        margin
+    const width = tableW + 2 * margin
+    const height = tableH + 2 * margin
     let count = 0
     for (const p of points) {
-        if (p.x >= left && p.x <= left + tableW && p.y >= top && p.y <= top + tableH) count += 1
+        if (p.x >= left && p.x <= left + width && p.y >= top && p.y <= top + height) count += 1
     }
     return count
 }
