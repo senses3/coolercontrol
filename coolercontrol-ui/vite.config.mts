@@ -65,11 +65,11 @@ function reflectMetadataPlugin(): Plugin {
 }
 
 // Experimental UI features gated to specific branch builds. Each feature lists
-// the git branches it is enabled on; any other branch (and builds where the
-// branch cannot be detected) leaves it off, so main and release builds stay
-// clean. Consumed at runtime via src/features.ts.
+// the git branches it is enabled on, or '*' to enable it on every branch. Any
+// other branch (and builds where the branch cannot be detected) leaves it off,
+// so main and release builds stay clean. Consumed at runtime via src/features.ts.
 const FEATURE_BRANCHES: Record<string, string[]> = {
-    coolingWizard: ['cooling-wizard', 'compio-base', 'feat/ui-shell', 'dev'],
+    coolingWizard: ['*'],
 }
 
 function currentGitBranch(): string {
@@ -89,7 +89,7 @@ function buildFeatureFlags(): Record<string, boolean> {
     return Object.fromEntries(
         Object.entries(FEATURE_BRANCHES).map(([feature, branches]) => [
             feature,
-            branches.includes(branch),
+            branches.includes('*') || branches.includes(branch),
         ]),
     )
 }
