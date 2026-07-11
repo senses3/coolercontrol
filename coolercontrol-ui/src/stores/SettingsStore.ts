@@ -140,7 +140,6 @@ export const useSettingsStore = defineStore('settings', () => {
     const expandedMenuIds: Ref<Array<string> | undefined> = ref()
     const pinnedIds: Ref<Array<string>> = ref([])
     const collapsedMainMenu: Ref<boolean> = ref(false)
-    const hideMenuCollapseIcon: Ref<boolean> = ref(false)
     const mainMenuWidthRem: Ref<number> = ref(24)
     const frequencyPrecision: Ref<number> = ref(1)
     const customTheme: CustomThemeSettings = reactive({
@@ -248,7 +247,6 @@ export const useSettingsStore = defineStore('settings', () => {
         pinnedIds.value = uiSettings.pinnedIds
         collapsedMainMenu.value = uiSettings.collapsedMainMenu
         mainMenuWidthRem.value = uiSettings.mainMenuWidthRem
-        hideMenuCollapseIcon.value = uiSettings.hideMenuCollapseIcon
         frequencyPrecision.value = uiSettings.frequencyPrecision
         customTheme.accent = uiSettings.customTheme.accent
         customTheme.bgOne = uiSettings.customTheme.bgOne
@@ -1063,7 +1061,6 @@ export const useSettingsStore = defineStore('settings', () => {
                 expandedMenuIds,
                 pinnedIds,
                 collapsedMainMenu,
-                hideMenuCollapseIcon,
                 mainMenuWidthRem,
                 frequencyPrecision,
                 customTheme,
@@ -1118,7 +1115,6 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.expandedMenuIds = expandedMenuIds.value
                     uiSettings.pinnedIds = pinnedIds.value
                     uiSettings.collapsedMainMenu = collapsedMainMenu.value
-                    uiSettings.hideMenuCollapseIcon = hideMenuCollapseIcon.value
                     uiSettings.mainMenuWidthRem = mainMenuWidthRem.value
                     uiSettings.frequencyPrecision = frequencyPrecision.value
                     uiSettings.customTheme.accent = customTheme.accent
@@ -1474,7 +1470,6 @@ export const useSettingsStore = defineStore('settings', () => {
         expandedMenuIds,
         pinnedIds,
         collapsedMainMenu,
-        hideMenuCollapseIcon,
         mainMenuWidthRem,
         frequencyPrecision,
         customTheme,

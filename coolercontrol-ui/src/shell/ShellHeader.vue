@@ -69,7 +69,6 @@ const itemClass =
 <template>
     <header class="flex h-12 shrink-0 items-center gap-2.5 px-3">
         <UiTooltip
-            v-if="!settingsStore.hideMenuCollapseIcon"
             :text="
                 settingsStore.collapsedMainMenu
                     ? t('layout.topbar.expandMenu')

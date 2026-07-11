@@ -215,7 +215,6 @@ export class UISettingsDTO {
     expandedMenuIds: Array<string> | undefined
     pinnedIds: Array<string> = []
     collapsedMainMenu: boolean = false
-    hideMenuCollapseIcon: boolean = false
     mainMenuWidthRem: number = 24
     frequencyPrecision: number = 1
     customTheme: CustomThemeSettings = {
