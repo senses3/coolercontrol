@@ -61,6 +61,15 @@ const pillIcon = (kind: ChainPill['kind']): string => {
 
 <template>
     <div class="flex flex-wrap items-center gap-1.5 text-base">
+        <button
+            v-if="expandable"
+            type="button"
+            class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-accent px-2.5 py-1 text-accent outline-none transition-colors hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-accent"
+            @click="emit('toggle-expand')"
+        >
+            <svg-icon type="mdi" :path="mdiSitemapOutline" :size="16" />
+            <svg-icon type="mdi" :path="expanded ? mdiChevronUp : mdiChevronDown" :size="14" />
+        </button>
         <template v-for="(pill, index) in pills" :key="`${pill.kind}-${index}`">
             <component
                 :is="pill.to ? 'RouterLink' : 'span'"
@@ -89,14 +98,5 @@ const pillIcon = (kind: ChainPill['kind']): string => {
             <svg-icon type="mdi" :path="mdiFan" :size="14" />
             <span class="max-w-40 truncate">{{ channelLabel }}</span>
         </span>
-        <button
-            v-if="expandable"
-            type="button"
-            class="inline-flex cursor-pointer items-center gap-1 rounded-full border border-accent px-2.5 py-1 text-accent outline-none transition-colors hover:bg-accent/10 focus-visible:ring-2 focus-visible:ring-accent"
-            @click="emit('toggle-expand')"
-        >
-            <svg-icon type="mdi" :path="mdiSitemapOutline" :size="16" />
-            <svg-icon type="mdi" :path="expanded ? mdiChevronUp : mdiChevronDown" :size="14" />
-        </button>
     </div>
 </template>
