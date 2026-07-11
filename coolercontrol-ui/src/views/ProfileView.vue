@@ -22,10 +22,12 @@ import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiAlertOutline,
     mdiArrowTopRightBottomLeft,
+    mdiChartMultiple,
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiDeleteOutline,
     mdiExportVariant,
+    mdiFan,
     mdiInformationSlabCircleOutline,
     mdiMinus,
     mdiPlus,
@@ -2038,6 +2040,7 @@ const { openProfileApplyWizard } = useToolWizards()
 interface UsedByItem {
     key: string
     label: string
+    icon: string
     to: RouteLocationRaw
 }
 const usedByItems = computed((): UsedByItem[] => {
@@ -2053,6 +2056,7 @@ const usedByItems = computed((): UsedByItem[] => {
                 items.push({
                     key: `channel-${deviceUID}-${channelSetting.channel_name}`,
                     label,
+                    icon: mdiFan,
                     to: {
                         name: 'cooling-channel',
                         params: { deviceUID, channelName: channelSetting.channel_name },
@@ -2069,6 +2073,7 @@ const usedByItems = computed((): UsedByItem[] => {
             items.push({
                 key: `profile-${profile.uid}`,
                 label: profile.name,
+                icon: mdiChartMultiple,
                 to: { name: 'profiles', params: { profileUID: profile.uid } },
             })
         }
@@ -2409,8 +2414,14 @@ defineExpose({ saveProfileState, contextIsDirty })
             <span v-for="(item, index) in usedByItems" :key="item.key" class="whitespace-nowrap">
                 <RouterLink
                     :to="item.to"
-                    class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                    class="inline-flex items-center gap-1 rounded align-middle text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
                 >
+                    <svg-icon
+                        type="mdi"
+                        :path="item.icon"
+                        :size="14"
+                        class="shrink-0 text-text-color-secondary"
+                    />
                     {{ item.label }}
                 </RouterLink>
                 <span v-if="index < usedByItems.length - 1">,</span>

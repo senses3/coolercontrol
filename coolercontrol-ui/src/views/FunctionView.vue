@@ -26,6 +26,7 @@ import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watc
 import { useToast } from '@/shell/toast'
 import {
     mdiAlertOutline,
+    mdiChartMultiple,
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiDeleteOutline,
@@ -463,8 +464,14 @@ onUnmounted(() => {
             >
                 <RouterLink
                     :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-                    class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                    class="inline-flex items-center gap-1 rounded align-middle text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
                 >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiChartMultiple"
+                        :size="14"
+                        class="shrink-0 text-text-color-secondary"
+                    />
                     {{ profile.name }}
                 </RouterLink>
                 <span v-if="index < usedByProfiles.length - 1">,</span>
