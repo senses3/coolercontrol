@@ -2081,6 +2081,9 @@ const usedByItems = computed((): UsedByItem[] => {
     return items
 })
 
+// Hidden until the first measurement sizes it, so the initial fit-to-window
+// happens off-screen and fades in rather than showing as a resize flash.
+const graphReady = ref(false)
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
     const controlPanel = document.getElementById('control-panel')
@@ -2134,7 +2137,10 @@ onMounted(async () => {
         })
     })
     window.addEventListener('resize', updateResponsiveGraphHeight)
-    setTimeout(updateResponsiveGraphHeight)
+    setTimeout(() => {
+        updateResponsiveGraphHeight()
+        graphReady.value = true
+    })
 
     // handle the graphics on graph resize & zoom
     controlGraph.value?.chart?.on('dataZoom', updatePosition)
@@ -2494,7 +2500,8 @@ defineExpose({ saveProfileState, contextIsDirty })
         <div v-else-if="showGraph" class="relative">
             <v-chart
                 id="control-graph"
-                class="pt-6 pr-11 pl-4 pb-4"
+                class="pt-6 pr-11 pl-4 pb-4 transition-opacity duration-200"
+                :class="{ 'opacity-0': !graphReady }"
                 ref="controlGraph"
                 :option="option"
                 :autoresize="true"
