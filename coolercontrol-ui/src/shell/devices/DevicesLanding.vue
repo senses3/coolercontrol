@@ -103,9 +103,15 @@ const counts = (device: Device): string => {
         </div>
         <section v-for="group in typeGroups" :key="group.type" class="px-4 pt-4">
             <h2
-                class="truncate pb-2 text-sm font-medium uppercase tracking-wide text-text-color-secondary"
+                class="flex items-center gap-1.5 pb-2 text-sm font-medium uppercase tracking-wide text-text-color-secondary"
             >
-                {{ getDeviceTypeDisplayName(group.type) }}
+                <svg-icon
+                    type="mdi"
+                    :path="deviceTypeIcon(group.type)"
+                    :size="16"
+                    class="shrink-0"
+                />
+                <span class="truncate">{{ getDeviceTypeDisplayName(group.type) }}</span>
             </h2>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 <RouterLink
