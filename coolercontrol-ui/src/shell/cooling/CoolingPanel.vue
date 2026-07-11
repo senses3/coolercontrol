@@ -56,6 +56,8 @@ import {
 } from '@/shell/panelOrder.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import { channelSpins } from '@/shell/channelIcon.ts'
+import TagChips from '@/shell/TagChips.vue'
+import TagPopover from '@/shell/monitoring/TagPopover.vue'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -145,6 +147,12 @@ const setChannelColor = (channel: CoolingChannel, newColor: Color): void => {
         .get(channel.deviceUID)
         ?.sensorsAndChannels.get(channel.channelName)
     if (setting != null) setting.userColor = newColor
+}
+
+// Keeps a fan row's hover actions visible while its tag popover is open.
+const openTagRow = ref<string | null>(null)
+const onTagOpen = (rowKey: string, open: boolean): void => {
+    openTagRow.value = open ? rowKey : null
 }
 
 const profileLinks = ref<typeof settingsStore.profiles>([])
@@ -247,6 +255,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate">
                             {{ channelLabel(channel.deviceUID, channel.channelName) }}
                         </span>
+                        <TagChips
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                        />
                         <span class="truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(channel.deviceUID) }}
                         </span>
@@ -263,6 +275,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </UiTooltip>
                         <span
                             class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
+                            :class="{
+                                '!hidden':
+                                    openTagRow === `${channel.deviceUID}-${channel.channelName}`,
+                            }"
                         >
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
@@ -280,6 +296,9 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     </RouterLink>
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        :class="{
+                            '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
+                        }"
                     >
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -288,6 +307,14 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                             :model-value="channelColor(channel.deviceUID, channel.channelName)"
                             :size="1.25"
                             @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                        />
+                        <TagPopover
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
+                            "
                         />
                         <button
                             type="button"
@@ -352,6 +379,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate">
                             {{ channelLabel(channel.deviceUID, channel.channelName) }}
                         </span>
+                        <TagChips
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                        />
                         <UiTooltip
                             v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
                             :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
@@ -365,6 +396,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </UiTooltip>
                         <span
                             class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-focus-within:hidden"
+                            :class="{
+                                '!hidden':
+                                    openTagRow === `${channel.deviceUID}-${channel.channelName}`,
+                            }"
                         >
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
@@ -382,6 +417,9 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     </RouterLink>
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-focus-within:flex"
+                        :class="{
+                            '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
+                        }"
                     >
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -390,6 +428,14 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                             :model-value="channelColor(channel.deviceUID, channel.channelName)"
                             :size="1.25"
                             @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                        />
+                        <TagPopover
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
+                            "
                         />
                         <button
                             type="button"
