@@ -356,10 +356,11 @@ const deleteFunction = (): void => {
 const { openFunctionApplyWizard } = useToolWizards()
 
 // Profiles currently using this function (where-used).
-const usedByProfiles = computed((): string[] =>
-    settingsStore.profiles
-        .filter((profile) => profile.function_uid === currentFunction.value.uid)
-        .map((profile) => profile.name),
+const usedByProfiles = computed(
+    (): Array<{ uid: string; name: string }> =>
+        settingsStore.profiles
+            .filter((profile) => profile.function_uid === currentFunction.value.uid)
+            .map((profile) => ({ uid: profile.uid, name: profile.name })),
 )
 
 onMounted(async () => {
@@ -452,9 +453,22 @@ onUnmounted(() => {
         </div>
         <div
             v-if="usedByProfiles.length > 0"
-            class="w-full mx-4 mb-2 text-sm text-text-color-secondary"
+            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
         >
-            {{ t('views.functions.usedBy') }}: {{ usedByProfiles.join(', ') }}
+            <span>{{ t('views.functions.usedBy') }}:</span>
+            <span
+                v-for="(profile, index) in usedByProfiles"
+                :key="profile.uid"
+                class="whitespace-nowrap"
+            >
+                <RouterLink
+                    :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
+                    class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    {{ profile.name }}
+                </RouterLink>
+                <span v-if="index < usedByProfiles.length - 1">,</span>
+            </span>
         </div>
     </div>
     <ScrollAreaRoot style="--scrollbar-size: 10px">
