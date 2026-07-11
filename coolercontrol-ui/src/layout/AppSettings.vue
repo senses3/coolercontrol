@@ -645,7 +645,7 @@ onUnmounted(() => {
                 </UiSettingRow>
                 <UiSettingRow
                     v-tooltip.top="t('layout.settings.tooltips.sidebarCollapse')"
-                    :label="t('layout.settings.sidebarToCollapse')"
+                    :label="t('layout.settings.hideMenuCollapseIcon')"
                 >
                     <UiSwitch v-model="settingsStore.hideMenuCollapseIcon" />
                 </UiSettingRow>

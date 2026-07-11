@@ -18,7 +18,7 @@
 
 <script setup lang="ts">
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui'
-import { computed, onMounted, ref, onUnmounted } from 'vue'
+import { computed, onMounted, provide, ref, onUnmounted } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -62,6 +62,15 @@ onMounted(() => {
         setTimeout(() => panelRef.value?.collapse())
     }
 })
+
+// The header collapse button toggles the splitter directly (provide/inject);
+// that fires the panel's @collapse/@expand, which persists collapsedMainMenu.
+const toggleMainMenu = (): void => {
+    if (panelRef.value == null) return
+    if (panelRef.value.isCollapsed) panelRef.value.expand()
+    else panelRef.value.collapse()
+}
+provide('toggleMainMenu', toggleMainMenu)
 
 // Section hotkeys. Browsers reserve Ctrl+number for tab switching, so the
 // Ctrl+Alt variants exist for web use; plain Ctrl+number works in the Qt app.
