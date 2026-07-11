@@ -2028,21 +2028,28 @@ const deleteProfile = (): void => {
 const { openProfileApplyWizard } = useToolWizards()
 
 // Channels currently driven by this profile (where-used).
-const usedByChannels = computed((): string[] => {
-    const labels: string[] = []
-    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
-        for (const channelSetting of setting.settings.values()) {
-            if (channelSetting.profile_uid === currentProfile.value.uid) {
-                labels.push(
-                    settingsStore.allUIDeviceSettings
-                        .get(deviceUID)!
-                        .sensorsAndChannels.get(channelSetting.channel_name)!.name,
-                )
+const usedByChannels = computed(
+    (): Array<{ deviceUID: string; channelName: string; label: string }> => {
+        const channels: Array<{ deviceUID: string; channelName: string; label: string }> = []
+        for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+            for (const channelSetting of setting.settings.values()) {
+                if (channelSetting.profile_uid === currentProfile.value.uid) {
+                    const label =
+                        settingsStore.allUIDeviceSettings
+                            .get(deviceUID)
+                            ?.sensorsAndChannels.get(channelSetting.channel_name)?.name ??
+                        channelSetting.channel_name
+                    channels.push({
+                        deviceUID,
+                        channelName: channelSetting.channel_name,
+                        label,
+                    })
+                }
             }
         }
-    }
-    return labels
-})
+        return channels
+    },
+)
 
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
@@ -2371,9 +2378,20 @@ defineExpose({ saveProfileState, contextIsDirty })
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
         <div
             v-if="!hideSave && usedByChannels.length > 0"
-            class="w-full mx-4 mb-2 text-sm text-text-color-secondary"
+            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-text-color-secondary"
         >
-            {{ t('views.profiles.usedBy') }}: {{ usedByChannels.join(', ') }}
+            <span>{{ t('views.profiles.usedBy') }}:</span>
+            <RouterLink
+                v-for="channel in usedByChannels"
+                :key="`${channel.deviceUID}-${channel.channelName}`"
+                :to="{
+                    name: 'cooling-channel',
+                    params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
+                }"
+                class="rounded text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+            >
+                {{ channel.label }}
+            </RouterLink>
         </div>
         <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
     </div>
