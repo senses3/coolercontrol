@@ -26,8 +26,8 @@ import { useI18n } from 'vue-i18n'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { useFanControlWizard } from '@/composables/useFanControlWizard.ts'
 import ChannelMiniGraph from '@/shell/cooling/ChannelMiniGraph.vue'
+import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
 import type { CoolingChannel } from '@/shell/cooling/channels.ts'
 
 const props = defineProps<{ channel: CoolingChannel }>()
@@ -36,7 +36,6 @@ const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
-const wizard = useFanControlWizard()
 
 const uiSetting = computed(() =>
     settingsStore.allUIDeviceSettings
@@ -95,17 +94,6 @@ const isUnhealthy = computed(() =>
             ref.device_uid === props.channel.deviceUID && ref.name === props.channel.channelName,
     ),
 )
-
-const openWizard = (): void => {
-    wizard.open({
-        deviceUID: props.channel.deviceUID,
-        channelName: props.channel.channelName,
-        selectedProfileUID:
-            daemonSetting.value?.speed_fixed != null
-                ? undefined
-                : (daemonSetting.value?.profile_uid ?? '0'),
-    })
-}
 </script>
 
 <template>
@@ -132,15 +120,22 @@ const openWizard = (): void => {
                 </div>
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>
-            <button
+            <ChannelSetupMenu
                 v-if="channel.controllable"
-                type="button"
-                class="ml-auto hidden shrink-0 rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block"
-                v-tooltip.top="t('layout.shell.coolingPage.guidedSetup')"
-                @click.stop.prevent="openWizard"
+                :device-u-i-d="channel.deviceUID"
+                :channel-name="channel.channelName"
             >
-                <svg-icon type="mdi" :path="mdiAutoFix" :size="18" />
-            </button>
+                <template #trigger>
+                    <button
+                        type="button"
+                        class="ml-auto hidden shrink-0 rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block"
+                        v-tooltip.top="t('layout.shell.coolingPage.guidedSetup')"
+                        @click.stop.prevent
+                    >
+                        <svg-icon type="mdi" :path="mdiAutoFix" :size="18" />
+                    </button>
+                </template>
+            </ChannelSetupMenu>
         </div>
         <div class="flex items-end justify-between gap-2">
             <div>

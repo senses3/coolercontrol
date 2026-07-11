@@ -59,7 +59,9 @@ export function useToolWizards() {
             data: { preselect },
         })
     }
-    const openGenerateWizard = (): void => {
+    // A single-channel preselect scopes the wizard to just that fan; omitted =
+    // all controllable fans (whole-system).
+    const openGenerateWizard = (preselect?: CalibrationPreselect): void => {
         dialog.open(generateWizard, {
             props: {
                 header: t('components.wizards.generate.title'),
@@ -67,7 +69,7 @@ export function useToolWizards() {
                 modal: true,
                 dismissableMask: true,
             },
-            data: {},
+            data: { preselect },
         })
     }
     const openModeWizard = (): void => {
