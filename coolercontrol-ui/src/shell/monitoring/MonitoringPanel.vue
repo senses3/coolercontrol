@@ -54,6 +54,7 @@ import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sen
 import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
+import TagChips from '@/shell/TagChips.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
@@ -388,6 +389,10 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="truncate">
                             {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
                         </span>
+                        <TagChips
+                            :device-u-i-d="sensor.deviceUID"
+                            :channel-name="sensor.channelName"
+                        />
                         <span class="truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(sensor.deviceUID) }}
                         </span>
@@ -600,6 +605,10 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="truncate">
                             {{ sensorLabel(sensor.deviceUID, sensor.channelName) }}
                         </span>
+                        <TagChips
+                            :device-u-i-d="sensor.deviceUID"
+                            :channel-name="sensor.channelName"
+                        />
                         <UiTooltip
                             v-if="isUnhealthy(sensor.deviceUID, sensor.channelName)"
                             :text="failsafeTooltip(sensor.deviceUID, sensor.channelName)"

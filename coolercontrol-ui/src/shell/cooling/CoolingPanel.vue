@@ -56,6 +56,7 @@ import {
 } from '@/shell/panelOrder.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import { channelSpins } from '@/shell/channelIcon.ts'
+import TagChips from '@/shell/TagChips.vue'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -247,6 +248,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate">
                             {{ channelLabel(channel.deviceUID, channel.channelName) }}
                         </span>
+                        <TagChips
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                        />
                         <span class="truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(channel.deviceUID) }}
                         </span>
@@ -352,6 +357,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         <span class="truncate">
                             {{ channelLabel(channel.deviceUID, channel.channelName) }}
                         </span>
+                        <TagChips
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                        />
                         <UiTooltip
                             v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
                             :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
