@@ -70,6 +70,13 @@ const pillIcon = (kind: ChainPill['kind']): string => {
             <svg-icon type="mdi" :path="mdiSitemapOutline" :size="16" />
             <svg-icon type="mdi" :path="expanded ? mdiChevronUp : mdiChevronDown" :size="14" />
         </button>
+        <svg-icon
+            v-if="expandable"
+            type="mdi"
+            :path="mdiArrowRight"
+            :size="14"
+            class="text-text-color-secondary"
+        />
         <template v-for="(pill, index) in pills" :key="`${pill.kind}-${index}`">
             <component
                 :is="pill.to ? 'RouterLink' : 'span'"
