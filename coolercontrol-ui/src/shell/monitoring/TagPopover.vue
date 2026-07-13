@@ -147,7 +147,18 @@ const inputClasses =
 
 <template>
     <PopoverRoot v-model:open="open">
+        <!-- Custom trigger (e.g. the assigned-tag chips). Rendered as a span so
+             it can nest inside a row's RouterLink; stop+prevent avoids navigating. -->
         <PopoverTrigger
+            v-if="$slots.trigger"
+            as="span"
+            class="cursor-pointer rounded outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            @click.stop.prevent
+        >
+            <slot name="trigger" />
+        </PopoverTrigger>
+        <PopoverTrigger
+            v-else
             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
             v-tooltip.top="t('components.menuTagAssign.title')"
             @click.prevent
@@ -159,7 +170,7 @@ const inputClasses =
                 side="bottom"
                 align="start"
                 :side-offset="2"
-                class="z-50 w-72 rounded-lg border border-border-one bg-bg-two p-3 text-base text-text-color shadow-overlay"
+                class="z-50 w-72 rounded-lg border border-border-one bg-bg-two p-3 text-base text-text-color shadow-overlay outline-none"
             >
                 <div class="pb-2 text-sm font-medium">
                     {{ t('components.menuTagAssign.title') }}
