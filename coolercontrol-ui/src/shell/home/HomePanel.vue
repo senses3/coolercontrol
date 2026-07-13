@@ -30,7 +30,7 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Device, UID } from '@/models/Device.ts'
+import { DeviceType, type Device, type UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -47,7 +47,8 @@ const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
 
 // The Home panel shows everything pinned anywhere: fans open their cooling
-// page, sensors their monitoring page, dashboards their dashboard.
+// page, custom sensors their editor under Devices, other sensors their
+// monitoring page, dashboards their dashboard.
 interface PinnedRow {
     key: string
     label: string
@@ -136,12 +137,17 @@ const buildPinnedRows = (): PinnedRow[] => {
                 to: { name: 'cooling-channel', params: { deviceUID, channelName } },
             })
         } else if (sensorIds.has(id)) {
+            // Custom sensors are user-configured, so link to their editor under
+            // Devices rather than a read-only monitoring page.
+            const isCustomSensor = devicesByUid.get(deviceUID)?.type === DeviceType.CUSTOM_SENSORS
             rows.push({
                 ...base,
                 icon: channelKindIcon(
                     channelKind(devicesByUid.get(deviceUID), channelName, values),
                 ),
-                to: { name: 'monitoring-sensor', params: { deviceUID, channelName } },
+                to: isCustomSensor
+                    ? { name: 'device-custom-sensor', params: { customSensorID: channelName } }
+                    : { name: 'monitoring-sensor', params: { deviceUID, channelName } },
             })
         }
     }
