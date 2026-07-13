@@ -588,7 +588,7 @@ onUnmounted(() => {
                     :suffix="t('common.minuteAbbr')"
                     v-tooltip.top="t('views.dashboard.timeRange')"
                 />
-                <axis-options class="h-[2.375rem] ml-3" :dashboard="dashboard" />
+                <axis-options class="h-10 ml-3" :dashboard="dashboard" />
             </div>
             <div
                 v-if="dashboard.chartType == ChartType.TABLE"
