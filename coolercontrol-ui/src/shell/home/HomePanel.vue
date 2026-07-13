@@ -222,9 +222,11 @@ const persistPinnedOrder = (): void => {
                         class="shrink-0 text-text-color-secondary"
                     />
                     <span class="truncate">{{ row.label }}</span>
+                    <!-- Huge shrink so the sublabel (device name) fully collapses
+                         before the label (truncate, shrink-1) gives up any space. -->
                     <span
                         v-if="row.sublabel"
-                        class="shrink-[20] truncate text-xs text-text-color-secondary"
+                        class="shrink-[9999] truncate text-xs text-text-color-secondary"
                     >
                         {{ row.sublabel }}
                     </span>
