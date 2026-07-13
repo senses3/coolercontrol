@@ -259,7 +259,9 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                             :device-u-i-d="channel.deviceUID"
                             :channel-name="channel.channelName"
                         />
-                        <span class="shrink-[20] truncate text-xs text-text-color-secondary">
+                        <!-- Huge shrink so the device name fully collapses before
+                             the channel name (truncate, shrink-1) gives up any space. -->
+                        <span class="shrink-[9999] truncate text-xs text-text-color-secondary">
                             {{ deviceLabel(channel.deviceUID) }}
                         </span>
                         <UiTooltip
