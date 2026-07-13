@@ -76,6 +76,11 @@ const badgeColor = computed((): string => {
             return 'text-error'
     }
 })
+// Device health has no daemon-graded severity; it is presence-of-issues.
+// Mirror the card's warning-colored rows: green when clear, warning otherwise.
+const healthDotColor = computed((): string =>
+    healthRows.value.length === 0 ? 'text-success' : 'text-warning',
+)
 const getDaemonStatusTranslationKey = (daemonStatus: DaemonStatus) =>
     $enum.visitValue(daemonStatus).with<string>({
         [DaemonStatus.OK]: () => 'ok',
@@ -332,7 +337,10 @@ const shortcutClasses =
 
             <!-- Device health -->
             <div :class="cardClasses">
-                <span :class="cardTitleClasses">{{ t('views.appInfo.deviceHealth') }}</span>
+                <span class="flex items-center gap-2" :class="cardTitleClasses">
+                    {{ t('views.appInfo.deviceHealth') }}
+                    <svg-icon type="mdi" :path="mdiCircle" :size="12" :class="healthDotColor" />
+                </span>
                 <div
                     v-if="healthRows.length === 0"
                     class="pt-3 text-base text-text-color-secondary"
