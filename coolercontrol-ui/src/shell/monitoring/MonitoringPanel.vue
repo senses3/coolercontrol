@@ -23,6 +23,7 @@ import {
     mdiAlert,
     mdiBellOutline,
     mdiBellPlusOutline,
+    mdiBellRingOutline,
     mdiDragVertical,
     mdiFanAlert,
     mdiHome,
@@ -573,9 +574,12 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
                 exact-active-class="bg-surface-hover !text-accent"
             >
-                <span
-                    class="h-2 w-2 shrink-0 rounded-full"
-                    :class="alert.state === AlertState.Active ? 'bg-error' : 'bg-success'"
+                <svg-icon
+                    type="mdi"
+                    :path="alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline"
+                    :size="14"
+                    class="shrink-0"
+                    :class="alert.state === AlertState.Active ? 'text-error' : 'text-success'"
                 />
                 <span class="truncate">{{ alert.name }}</span>
                 <span
