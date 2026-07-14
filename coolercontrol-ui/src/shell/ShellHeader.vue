@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
+    mdiArrowLeft,
     mdiBookmarkCheck,
     mdiBookmarkMultipleOutline,
     mdiBookmarkOutline,
@@ -68,6 +69,17 @@ const itemClass =
 
 <template>
     <header class="flex h-12 shrink-0 items-center gap-2.5 px-3">
+        <!-- The Qt app has no browser back button, so provide one. It sits at the
+             far left, where a browser's back button would be. -->
+        <UiTooltip v-if="deviceStore.isQtApp()" :text="t('layout.topbar.back')">
+            <button
+                type="button"
+                class="flex items-center justify-center rounded-lg p-1.5 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                @click="router.back()"
+            >
+                <svg-icon type="mdi" :path="mdiArrowLeft" :size="deviceStore.getREMSize(1.25)" />
+            </button>
+        </UiTooltip>
         <UiTooltip
             :text="
                 settingsStore.collapsedMainMenu
