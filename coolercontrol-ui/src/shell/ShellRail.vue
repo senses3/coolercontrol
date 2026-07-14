@@ -24,6 +24,7 @@ import {
     mdiLockOutline,
     mdiLogin,
     mdiLogout,
+    mdiOpenInNew,
     mdiPower,
     mdiRefresh,
     mdiShieldOutline,
@@ -59,6 +60,11 @@ const logoutAndReload = async (): Promise<void> => {
 const quitDesktopApp = (): void => {
     // @ts-ignore
     window.ipc.forceQuit()
+}
+
+// In the Qt app a target=_blank opens the user's default external browser.
+const openInBrowser = (): void => {
+    window.open(deviceStore.daemonClient.daemonURL, '_blank')
 }
 
 const itemClass =
@@ -144,6 +150,14 @@ const itemClass =
                     </span>
                 </button>
             </template>
+            <DropdownMenuItem
+                v-if="deviceStore.isQtApp()"
+                :class="itemClass"
+                @select="openInBrowser"
+            >
+                <svg-icon type="mdi" :path="mdiOpenInNew" :size="15" />
+                {{ t('layout.topbar.openInBrowser') }}
+            </DropdownMenuItem>
             <DropdownMenuItem :class="itemClass" @select="deviceStore.reloadUI()">
                 <svg-icon type="mdi" :path="mdiRefresh" :size="15" />
                 {{ t('layout.topbar.restartUI') }}
