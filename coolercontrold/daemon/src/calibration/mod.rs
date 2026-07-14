@@ -39,13 +39,14 @@ pub use batch::{BatchBeginError, BatchEntry, BatchEntryPhase, CalibrationBatchSt
 pub use curve::DutySample;
 pub use curve::{effective_speed_options, Calibration, CalibrationWarning, CurveKind};
 pub use diagnoser::{
-    run_diagnosis, DiagnosisFailure, DiagnosisHost, DiagnosisPhase, DiagnosisProgress,
-    DiagnosisSettings, SettingsSnapshot, SnapshotKind,
+    others_over_limit_note, run_diagnosis, DiagnosisFailure, DiagnosisHost, DiagnosisPhase,
+    DiagnosisProgress, DiagnosisSettings, HottestTemp, SettingsSnapshot, SnapshotKind,
+    CALIBRATION_TEMP_HINT,
 };
 pub use dispatch::{dispatch, DutyWriter, RepoWriter};
 pub use registry::DiagnosisRegistry;
 pub use state::FanStateMap;
-pub use store::{CalibrationEntry, CalibrationStore};
+pub use store::{validate, CalibrationEntry, CalibrationStore};
 
 use crate::device::{ChannelName, DeviceUID};
 
