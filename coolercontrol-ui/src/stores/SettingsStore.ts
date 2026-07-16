@@ -193,6 +193,18 @@ export const useSettingsStore = defineStore('settings', () => {
                 if (device.info.thinkpad_fan_control != null) {
                     thinkPadFanControlEnabled.value = device.info.thinkpad_fan_control
                 }
+                // The Monitoring panel lists sensors from device.info, so every
+                // info temp/channel needs a settings entry. Otherwise an info-only
+                // sensor (e.g. a plugin temp not currently in status) has no color
+                // and blanks the panel.
+                for (const tempName of device.info.temps.keys()) {
+                    if (!deviceSettings.sensorsAndChannels.has(tempName)) {
+                        deviceSettings.sensorsAndChannels.set(
+                            tempName,
+                            new SensorAndChannelSettings(),
+                        )
+                    }
+                }
                 for (const [channelName, channelInfo] of device.info.channels.entries()) {
                     if (channelInfo.speed_options != null) {
                         deviceSettings.sensorsAndChannels.set(
@@ -205,6 +217,11 @@ export const useSettingsStore = defineStore('settings', () => {
                             new SensorAndChannelSettings(),
                         )
                     } else if (channelInfo.lcd_modes.length > 0) {
+                        deviceSettings.sensorsAndChannels.set(
+                            channelName,
+                            new SensorAndChannelSettings(),
+                        )
+                    } else if (!deviceSettings.sensorsAndChannels.has(channelName)) {
                         deviceSettings.sensorsAndChannels.set(
                             channelName,
                             new SensorAndChannelSettings(),
