@@ -133,12 +133,12 @@ export const useThemeColorsStore = defineStore('theme-colors', () => {
         if (isHexColor(rgb)) {
             return rgb
         }
-        const matches = rgb.match(/\d+/g)!.map((x) => parseInt(x, 10))
+        const matches = rgb.match(/\d+/g)
         if (matches == null) {
-            console.error(`Invalid RGB color: ${rgb}`)
+            if (rgb.length > 0) console.error(`Invalid RGB color: ${rgb}`)
             return rgb
         }
-        const [r, g, b] = matches
+        const [r, g, b] = matches.map((x) => parseInt(x, 10))
         return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
     }
 
