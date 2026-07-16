@@ -351,6 +351,8 @@ struct SourceOutcomes {
     /// Messages for sources currently Active; only collected when a silence-expiry
     /// catch-up, shutdown re-arm, or repeat notification could consume them.
     out_of_range: Vec<AlertLogMessage>,
+    /// A calibration-suppression reset changed a source state this tick.
+    suppressed: bool,
 }
 
 impl SourceOutcomes {
@@ -718,6 +720,8 @@ impl AlertController {
             let outcomes = self.evaluate_sources(alert);
             if let Some(event) = Self::build_transition_event(alert, &outcomes) {
                 events.push(event);
+            } else if let Some(event) = Self::build_suppression_event(alert, &outcomes) {
+                events.push(event);
             } else if let Some(event) = Self::build_quiet_event(alert, &outcomes) {
                 events.push(event);
             }
@@ -750,6 +754,7 @@ impl AlertController {
                         source.channel_name
                     );
                     *state = AlertState::Inactive;
+                    outcomes.suppressed = true;
                 }
                 continue;
             }
@@ -939,6 +944,35 @@ impl AlertController {
         })
     }
 
+    /// Handles a tick whose only change was a calibration-suppression reset:
+    /// updates the aggregate bookkeeping and cancels a pending shutdown when no
+    /// other source holds the alert active. Never logs or notifies; the reset
+    /// itself stays silent by design.
+    fn build_suppression_event(alert: &mut Alert, outcomes: &SourceOutcomes) -> Option<AlertEvent> {
+        if outcomes.suppressed.not() {
+            return None;
+        }
+        alert.state = alert.worst_of_visible();
+        if alert.state != AlertState::Inactive {
+            return None;
+        }
+        alert.notified = false;
+        if alert.shutdown_scheduled.not() {
+            return None;
+        }
+        alert.shutdown_scheduled = false;
+        Some(AlertEvent {
+            alert: alert.clone(),
+            message: AlertLogMessage::new(),
+            kind: AlertEventKind::Resolved,
+            silenced: false,
+            notify_desktop: false,
+            fire_shutdown: false,
+            cancel_shutdown: true,
+            log: false,
+        })
+    }
+
     /// Handles ticks with no state transition: the notify-on-silence-expiry catch-up
     /// (including the shutdown re-arm) plus periodic repeat notifications.
     fn build_quiet_event(alert: &mut Alert, outcomes: &SourceOutcomes) -> Option<AlertEvent> {
@@ -949,10 +983,11 @@ impl AlertController {
         if strictly_active.not() {
             return None;
         }
-        debug_assert!(outcomes.out_of_range.is_empty().not());
         let needs_announce = alert.notified.not();
         let needs_shutdown = alert.shutdown_on_activation && alert.shutdown_scheduled.not();
         if needs_announce || needs_shutdown {
+            // The collect_active gate in evaluate_sources covers exactly these paths.
+            debug_assert!(outcomes.out_of_range.is_empty().not());
             alert.notified = true;
             if needs_shutdown {
                 alert.shutdown_scheduled = true;
@@ -977,6 +1012,7 @@ impl AlertController {
                 Local::now().signed_duration_since(last).as_seconds_f64() >= alert.repeat_interval
             });
             if due {
+                debug_assert!(outcomes.out_of_range.is_empty().not());
                 alert.last_notified = Some(Local::now());
                 return Some(AlertEvent {
                     alert: alert.clone(),
@@ -2010,5 +2046,242 @@ mod tests {
             "timestamp":"2025-01-01T00:00:00+00:00"}"#;
         let log: AlertLog = serde_json::from_str(json).unwrap();
         assert!(!log.silenced);
+    }
+
+    // -- calibration suppression tests (controller-level) --
+
+    use crate::device::{ChannelStatus, Device, DeviceInfo, DeviceType, Status, TempStatus};
+    use std::collections::HashMap;
+
+    /// A device with a `temp1` sensor plus the given fan channels and rpm values.
+    fn make_test_device(fans: &[(&str, u32)], temp: f64) -> Device {
+        let mut device = Device::new(
+            "alert-test-device".to_string(),
+            DeviceType::Hwmon,
+            0,
+            None,
+            DeviceInfo::default(),
+            Some("alert-test-id".to_string()),
+            1.0,
+        );
+        device.initialize_status_history_with(
+            Status {
+                timestamp: Local::now(),
+                temps: vec![TempStatus {
+                    name: "temp1".to_string(),
+                    temp,
+                }],
+                channels: fans
+                    .iter()
+                    .map(|(name, rpm)| ChannelStatus {
+                        name: (*name).to_string(),
+                        duty: Some(50.0),
+                        rpm: Some(*rpm),
+                        freq: None,
+                        watts: None,
+                        pwm_mode: None,
+                    })
+                    .collect(),
+            },
+            1.0,
+        );
+        device
+    }
+
+    /// A controller with one device and an externally-held diagnosis registry;
+    /// bypasses init() so no config files are touched.
+    fn make_test_controller(device: Device, registry: &Rc<DiagnosisRegistry>) -> AlertController {
+        let mut devices = HashMap::new();
+        devices.insert(device.uid.clone(), Rc::new(RefCell::new(device)));
+        AlertController {
+            all_devices: Rc::new(devices),
+            overrides: Rc::new(OverridesController::empty()),
+            diagnosis_registry: Rc::clone(registry),
+            alerts: RefCell::new(IndexMap::new()),
+            alert_handle: RefCell::new(None),
+            notification_handle: RefCell::new(None),
+            logs: RefCell::new(VecDeque::with_capacity(LOG_BUFFER_SIZE)),
+            logs_dirty: Cell::new(false),
+            last_log_flush: Cell::new(Instant::now()),
+        }
+    }
+
+    /// An RPM alert over the given fan channels with warmup 0 (two-tick fire).
+    fn rpm_alert(device_uid: &str, channels: &[&str], min: f64, max: f64) -> Alert {
+        let mut alert = make_alert("rpm-alert", min, max, AlertState::Inactive);
+        alert.channel_sources = channels
+            .iter()
+            .map(|name| ChannelSource {
+                device_uid: device_uid.to_string(),
+                channel_name: (*name).to_string(),
+                channel_metric: ChannelMetric::RPM,
+            })
+            .collect();
+        alert.normalize_sources();
+        alert
+    }
+
+    #[test]
+    fn suppression_blocks_rpm_alert_during_sweep() {
+        // Goal: verify an RPM source on a channel under calibration is never
+        // evaluated: rpm 0 during the sweep produces no warmup, no event, no
+        // shutdown, and no log entries.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 0)], 30.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let mut alert = rpm_alert(&device_uid, &["fan1"], 500.0, 10_000.0);
+        alert.shutdown_on_activation = true;
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+        let _token = registry.register((device_uid, "fan1".to_string()));
+
+        for _ in 0..3 {
+            controller.process_alerts();
+        }
+        let alerts = controller.alerts.borrow();
+        let alert = alerts.get("rpm-alert").unwrap();
+        assert_eq!(alert.state, AlertState::Inactive);
+        assert_eq!(alert.source_states[0], AlertState::Inactive);
+        assert!(!alert.shutdown_scheduled);
+        assert!(controller.logs.borrow().is_empty());
+    }
+
+    #[test]
+    fn suppression_leaves_temp_sources_live() {
+        // Goal: verify Temp sources are exempt from calibration suppression even
+        // when a sweep is registered under the same channel name; the temp alert
+        // still warms up and fires.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 1000)], 90.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let mut alert = make_alert("temp-alert", 0.0, 80.0, AlertState::Inactive);
+        alert.channel_sources = vec![ChannelSource {
+            device_uid: device_uid.clone(),
+            channel_name: "temp1".to_string(),
+            channel_metric: ChannelMetric::Temp,
+        }];
+        alert.normalize_sources();
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+        let _token = registry.register((device_uid, "temp1".to_string()));
+
+        // Tick 1: Inactive -> WarmUp, silent.
+        assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+        // Tick 2: WarmUp -> Active fires despite the registered sweep.
+        let events = controller.process_and_collect_alerts_to_fire();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0].kind, AlertEventKind::Triggered));
+    }
+
+    #[test]
+    fn suppression_only_hits_the_swept_channel() {
+        // Goal: verify that with two RPM sources and only one under calibration,
+        // the other still fires and the event names only the live channel. This
+        // also covers queued-but-not-running batch entries, which are absent
+        // from the registry.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 0), ("fan2", 0)], 30.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let alert = rpm_alert(&device_uid, &["fan1", "fan2"], 500.0, 10_000.0);
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+        let _token = registry.register((device_uid, "fan1".to_string()));
+
+        assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+        let events = controller.process_and_collect_alerts_to_fire();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0].kind, AlertEventKind::Triggered));
+        assert!(events[0].message.contains("fan2"));
+        assert!(!events[0].message.contains("fan1"));
+        let alerts = controller.alerts.borrow();
+        let alert = alerts.get("rpm-alert").unwrap();
+        assert_eq!(
+            alert.source_states[0],
+            AlertState::Inactive,
+            "swept channel stays quiet"
+        );
+        assert_eq!(alert.source_states[1], AlertState::Active);
+    }
+
+    #[test]
+    fn sweep_start_cancels_pending_shutdown_silently() {
+        // Goal: verify a calibration starting on the channel of an already-Active
+        // shutdown alert resets the source, cancels the pending shutdown via a
+        // non-logging event, and stays quiet on further suppressed ticks.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 0)], 30.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let mut alert = rpm_alert(&device_uid, &["fan1"], 500.0, 10_000.0);
+        alert.shutdown_on_activation = true;
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+
+        // Two ticks: WarmUp, then Active with a shutdown scheduled.
+        assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+        let events = controller.process_and_collect_alerts_to_fire();
+        assert_eq!(events.len(), 1);
+        assert!(events[0].fire_shutdown);
+
+        let _token = registry.register((device_uid, "fan1".to_string()));
+        let events = controller.process_and_collect_alerts_to_fire();
+        assert_eq!(events.len(), 1);
+        let event = &events[0];
+        assert!(event.cancel_shutdown);
+        assert!(!event.log);
+        assert!(!event.notify_desktop);
+        {
+            let alerts = controller.alerts.borrow();
+            let alert = alerts.get("rpm-alert").unwrap();
+            assert_eq!(alert.state, AlertState::Inactive);
+            assert!(!alert.shutdown_scheduled);
+            assert!(!alert.notified);
+        }
+        // Further suppressed ticks stay completely quiet.
+        assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+    }
+
+    #[test]
+    fn post_sweep_rearm_goes_through_warmup() {
+        // Goal: verify that after the sweep ends, a still-failing source re-arms
+        // through the normal WarmUp path and fires fresh, with a new shutdown.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 0)], 30.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let mut alert = rpm_alert(&device_uid, &["fan1"], 500.0, 10_000.0);
+        alert.shutdown_on_activation = true;
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+
+        // Fire, then suppress via a sweep (cancels the shutdown).
+        assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+        assert_eq!(controller.process_and_collect_alerts_to_fire().len(), 1);
+        let _token = registry.register((device_uid.clone(), "fan1".to_string()));
+        assert_eq!(controller.process_and_collect_alerts_to_fire().len(), 1);
+
+        // Sweep ends; the fan is still failing.
+        registry.clear(&(device_uid, "fan1".to_string()));
+        // Tick 1 after the sweep: Inactive -> WarmUp, silent.
+        assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+        // Tick 2: WarmUp -> Active, a fresh Triggered with a new shutdown.
+        let events = controller.process_and_collect_alerts_to_fire();
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0].kind, AlertEventKind::Triggered));
+        assert!(events[0].fire_shutdown);
+        assert!(events[0].notify_desktop);
     }
 }
