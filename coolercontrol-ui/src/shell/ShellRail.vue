@@ -47,9 +47,11 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
 // Settings is docked at the rail bottom (below), so it is dropped from the top list.
+// Plugins is always shown so its overview (a getting-started page) stays discoverable
+// even before any plugin is installed.
 const railSections = computed(() => {
     const sections = SHELL_SECTIONS.filter((section) => section.id !== 'settings')
-    return deviceStore.plugins.length > 0 ? [...sections, PLUGINS_SECTION] : sections
+    return [...sections, PLUGINS_SECTION]
 })
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.svg' : '/logo.svg'))
