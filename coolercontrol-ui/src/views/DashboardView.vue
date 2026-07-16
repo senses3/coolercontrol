@@ -449,10 +449,13 @@ const updateResponsiveGraphHeight = (): void => {
             graphEl.style.height = 'calc(100vh - 1rem)'
             return
         }
-        // Fill the viewport from wherever the chart starts; works both at the
-        // page top and inside the shell content area.
+        // Fill the viewport from wherever the chart starts; works both at the page
+        // top and inside the shell content area. On mobile the bottom nav sits at the
+        // viewport foot, so subtract its height or the chart runs under it.
         const top = Math.ceil(graphEl.getBoundingClientRect().top)
-        graphEl.style.height = `calc(100vh - ${top + 12}px)`
+        const bottomNav = document.getElementById('shell-bottom-nav')
+        const bottomNavHeight = bottomNav ? Math.ceil(bottomNav.getBoundingClientRect().height) : 0
+        graphEl.style.height = `calc(100vh - ${top + 12 + bottomNavHeight}px)`
     }
 }
 
@@ -508,8 +511,8 @@ onUnmounted(() => {
             :current-name="sensorMode ? channelLabel : dashboard.name"
             :save-name-function="saveNameFunction"
         />
-        <span v-else class="p-2">
-            <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-44" />
+        <span v-else class="w-full p-2">
+            <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-full" />
         </span>
         <div class="flex flex-wrap items-center gap-x-1 justify-end">
             <div
