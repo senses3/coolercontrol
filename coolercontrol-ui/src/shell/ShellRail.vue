@@ -20,6 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
+    mdiCog,
     mdiKeyOutline,
     mdiLockOutline,
     mdiLogin,
@@ -45,9 +46,11 @@ const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
-const railSections = computed(() =>
-    deviceStore.plugins.length > 0 ? [...SHELL_SECTIONS, PLUGINS_SECTION] : SHELL_SECTIONS,
-)
+// Settings is docked at the rail bottom (below), so it is dropped from the top list.
+const railSections = computed(() => {
+    const sections = SHELL_SECTIONS.filter((section) => section.id !== 'settings')
+    return deviceStore.plugins.length > 0 ? [...sections, PLUGINS_SECTION] : sections
+})
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.svg' : '/logo.svg'))
 const { restartDaemonAndUI } = useSystemActions()
@@ -97,6 +100,19 @@ const itemClass =
             <span class="text-[0.8125rem] leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
         <div class="flex-1" />
+        <RouterLink
+            id="rail-settings"
+            :to="{ name: 'settings' }"
+            class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            :class="
+                activeSection === 'settings'
+                    ? 'text-accent'
+                    : 'text-text-color-secondary hover:text-text-color'
+            "
+        >
+            <svg-icon type="mdi" :path="mdiCog" :size="deviceStore.getREMSize(1.5)" />
+            <span class="text-[0.8125rem] leading-tight">{{ t('layout.shell.settings') }}</span>
+        </RouterLink>
         <UiDropdownMenu>
             <template #trigger>
                 <button
