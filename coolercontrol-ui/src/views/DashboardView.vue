@@ -52,6 +52,7 @@ import _ from 'lodash'
 import { component as Fullscreen } from 'vue-fullscreen'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useWindowSize } from '@vueuse/core'
 import { useConfirm } from '@/shell/confirm'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
@@ -141,6 +142,26 @@ const isHome = computed(() => settingsStore.homeDashboard === dashboard.uid)
 const setHome = (): void => {
     settingsStore.homeDashboard = dashboard.uid
 }
+
+// Mobile has no side panel, so the dashboard toolbar carries the dashboard switcher
+// (plus an Alerts entry) that the Monitoring panel provides on desktop.
+const { width } = useWindowSize()
+const isMobile = computed(() => width.value < 768)
+const ALERTS_NAV = '__alerts__'
+const dashboardNavOptions = computed(() => [
+    ...settingsStore.dashboards.map((d) => ({ label: d.name, value: d.uid })),
+    { label: t('layout.menu.alerts'), value: ALERTS_NAV },
+])
+const dashboardNav = computed<string>({
+    get: () => dashboard.uid,
+    set: (value) => {
+        if (value === ALERTS_NAV) {
+            router.push({ name: 'monitoring-alerts' })
+        } else if (value !== dashboard.uid) {
+            router.push({ name: 'monitoring-dashboard', params: { dashboardUID: value } })
+        }
+    },
+})
 const duplicateDashboard = (): void => {
     const copy = new Dashboard(`${dashboard.name} (copy)`)
     copy.chartType = dashboard.chartType
@@ -483,9 +504,13 @@ onUnmounted(() => {
 <template>
     <div id="control-panel" class="flex flex-wrap items-center justify-between px-2 pt-2">
         <entity-title-rename
+            v-if="sensorMode || !isMobile"
             :current-name="sensorMode ? channelLabel : dashboard.name"
             :save-name-function="saveNameFunction"
         />
+        <span v-else class="p-2">
+            <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-44" />
+        </span>
         <div class="flex flex-wrap items-center gap-x-1 justify-end">
             <div
                 v-if="dashboard.chartType == ChartType.TIME_CHART"
