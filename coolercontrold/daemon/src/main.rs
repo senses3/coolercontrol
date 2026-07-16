@@ -373,6 +373,7 @@ fn main() -> Result<()> {
                     AlertController::init(
                         Rc::clone(&all_devices),
                         Rc::clone(&overrides_controller),
+                        engine.diagnosis_registry(),
                     )
                     .await?,
                 );

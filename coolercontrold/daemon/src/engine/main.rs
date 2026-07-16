@@ -1785,6 +1785,11 @@ impl Engine {
         self.diagnosis_registry.is_in_flight(key)
     }
 
+    /// Shared handle for calibration-aware callers (alert suppression).
+    pub fn diagnosis_registry(&self) -> Rc<DiagnosisRegistry> {
+        Rc::clone(&self.diagnosis_registry)
+    }
+
     /// Validate and install a calibration batch without running it; the
     /// actor spawns `drive_calibration_batch` next. Maps the state
     /// machine's typed rejection onto a daemon error for the boundary.
