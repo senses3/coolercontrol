@@ -49,7 +49,7 @@ const railSections = computed(() =>
     deviceStore.plugins.length > 0 ? [...SHELL_SECTIONS, PLUGINS_SECTION] : SHELL_SECTIONS,
 )
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
-const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.gif' : '/logo.svg'))
+const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.svg' : '/logo.svg'))
 const { restartDaemonAndUI } = useSystemActions()
 
 const logoutAndReload = async (): Promise<void> => {

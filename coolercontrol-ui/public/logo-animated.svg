@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  - CoolerControl - monitor and control your cooling and other devices
+  - Copyright (c) 2021-2025  Guy Boldon and contributors
+  -
+  - This program is free software: you can redistribute it and/or modify
+  - it under the terms of the GNU General Public License as published by
+  - the Free Software Foundation, either version 3 of the License, or
+  - (at your option) any later version.
+  -
+  - This program is distributed in the hope that it will be useful,
+  - but WITHOUT ANY WARRANTY; without even the implied warranty of
+  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  - GNU General Public License for more details.
+  -
+  - You should have received a copy of the GNU General Public License
+  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<!--
+  - Animated variant of logo.svg used under the Eye Candy setting. The glyphs are
+  - static; only the gradient hue cycles, matching the original animated GIF at a
+  - fraction of the cost (a vector filter vs. decoding a 256px GIF every frame).
+  -->
+
+<svg
+   width="256"
+   height="256"
+   viewBox="72 72 256 256"
+   version="1.1"
+   id="svg2"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <style type="text/css">
+    #path2 {
+      animation: cc-hue-rotate 3s linear infinite;
+    }
+    @keyframes cc-hue-rotate {
+      from { filter: hue-rotate(0deg); }
+      to { filter: hue-rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #path2 { animation: none; }
+    }
+  </style>
+  <defs
+     id="defs3">
+    <linearGradient
+       id="linearGradient3">
+      <stop
+         style="stop-color:#4d8cff;stop-opacity:1;"
+         offset="0"
+         id="stop3" />
+      <stop
+         style="stop-color:#ff21ff;stop-opacity:1;"
+         offset="1"
+         id="stop4" />
+    </linearGradient>
+    <linearGradient
+       xlink:href="#linearGradient3"
+       id="linearGradient4"
+       x1="20"
+       y1="41.894"
+       x2="66.666"
+       y2="41.894"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1.5,0,0,1.5,-21.6665,-20.947)" />
+  </defs>
+  <g
+     transform="translate(73 77.38)scale(2.91954)"
+     id="g2"
+     style="stroke-width:1.00015756;stroke-dasharray:none">
+    <rect
+       width="87"
+       height="84"
+       fill="url(#a)"
+       ry="10"
+       id="rect2"
+       style="stroke-width:1.00016;stroke-dasharray:none;fill:#000000;fill-opacity:0"
+       x="0"
+       y="0"
+       rx="0.00034251972" />
+    <path
+       d="m 8.3335,20.1965 c 0,-6.12 5.022,-11.1435 11.1435,-11.1435 1.491,0 2.7465,1.2555 2.7465,2.7465 0,1.491 -1.2555,2.7465 -2.7465,2.7465 -3.1395,0 -5.6505,2.511 -5.6505,5.6505 0,3.1395 2.511,5.6505 5.6505,5.6505 a 5.625,5.625 0 0 0 5.6505,-5.6505 c 0,-1.491 1.2555,-2.7465 2.745,-2.7465 1.4895,0 2.748,1.2555 2.748,2.7465 0,5.1795 -3.6105,9.5745 -8.397,10.83 v 40.965 c 0,1.4895 -1.2555,2.745 -2.7465,2.745 -1.491,0 -2.7465,-1.2555 -2.7465,-2.745 V 31.0265 C 11.944,29.771 8.3335,25.376 8.3335,20.1965 m 32.175,-8.397 v 40.965 a 11.19,11.19 0 0 0 -8.397,10.83 c 0,6.12 5.022,11.142 11.1435,11.142 6.1215,0 11.1435,-5.022 11.1435,-11.1435 0,-1.491 -1.2555,-2.745 -2.7465,-2.745 -1.491,0 -2.7465,1.254 -2.7465,2.745 0,3.1395 -2.511,5.6505 -5.6505,5.6505 -3.1395,0 -5.6505,-2.511 -5.6505,-5.6505 0,-3.1395 2.511,-5.6505 5.6505,-5.6505 1.491,0 2.7465,-1.2555 2.7465,-2.745 V 11.798 c 0,-1.491 -1.2555,-2.7465 -2.7465,-2.7465 -1.491,0 -2.7465,1.1775 -2.7465,2.7465 m 26.6025,2.7465 c 1.491,0 2.7465,-1.2555 2.7465,-2.745 0,-1.4895 -1.254,-2.7465 -2.745,-2.7465 -6.1215,0 -11.145,5.022 -11.145,11.1435 0,5.1795 3.6105,9.5745 8.397,10.83 v 40.965 c 0,1.4895 1.2555,2.745 2.7465,2.745 1.491,0 2.7465,-1.2555 2.7465,-2.745 v -40.965 c 4.866,-1.2555 8.475,-5.6505 8.475,-10.83 0,-1.491 -1.254,-2.7465 -2.745,-2.7465 -1.491,0 -2.748,1.2555 -2.748,2.7465 0,3.1395 -2.511,5.6505 -5.649,5.6505 -3.138,0 -5.6505,-2.511 -5.6505,-5.6505 0,-3.1395 2.511,-5.6505 5.571,-5.6505"
+       id="path2"
+       style="fill:url(#linearGradient4);stroke-width:1.50024;stroke-dasharray:none" />
+  </g>
+</svg>
