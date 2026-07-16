@@ -52,3 +52,13 @@ use crate::device::{ChannelName, DeviceUID};
 
 /// Identifies a calibratable channel uniquely within the daemon.
 pub type ChannelKey = (DeviceUID, ChannelName);
+
+/// Preflight gate: an alert already Active on a channel blocks calibrating it.
+/// Suppression only exists for alerts a sweep would cause; one that fired
+/// beforehand means the fan itself is suspect. Implemented by the alert
+/// controller; tests install a stub.
+pub trait CalibrationAlertGate {
+    /// The name of an enabled, unsilenced alert currently Active on the
+    /// channel via a non-Temp source, if any.
+    fn active_alert_for_channel(&self, device_uid: &str, channel_name: &str) -> Option<String>;
+}

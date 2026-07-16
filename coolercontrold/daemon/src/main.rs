@@ -391,6 +391,7 @@ fn main() -> Result<()> {
                 let notification_handle = notifier::NotificationHandle::new(run_token.clone());
                 alert_controller.set_notification_handle(notification_handle.clone());
                 engine.set_notification_handle(notification_handle.clone());
+                engine.set_alert_gate(alert_controller.clone());
                 let device_listener_enabled = config
                     .get_settings()
                     .map_or(true, |s| s.device_listener_enabled);

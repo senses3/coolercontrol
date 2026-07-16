@@ -1907,6 +1907,70 @@ mod engine_tests {
 
     #[test]
     #[serial]
+    fn start_calibration_diagnosis_blocked_by_active_alert() {
+        // Goal: an alert already Active on the channel aborts the sweep in
+        // preflight: the alert was not caused by calibration, so the fan
+        // itself is suspect. Nothing is persisted or registered.
+        cc_fs::test_runtime(async {
+            use crate::calibration::{CalibrationAlertGate, DiagnosisFailure};
+            struct StubGate;
+            impl CalibrationAlertGate for StubGate {
+                fn active_alert_for_channel(
+                    &self,
+                    _device_uid: &str,
+                    channel_name: &str,
+                ) -> Option<String> {
+                    (channel_name == "fan1").then(|| "Fan Alarm".to_string())
+                }
+            }
+            let (device, engine, calibration_store) = setup_calibrated_device();
+            let device_uid = device.borrow().uid.clone();
+            engine.set_alert_gate(Rc::new(StubGate));
+            let err = engine
+                .start_calibration_diagnosis(device_uid.clone(), "fan1".to_string())
+                .await
+                .expect_err("active alert blocks the sweep");
+            assert!(matches!(err, DiagnosisFailure::BlockedByAlert { .. }));
+            let key: crate::calibration::ChannelKey = (device_uid, "fan1".to_string());
+            assert!(!calibration_store.has(&key));
+            assert!(!engine.is_calibration_in_progress(&key));
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn calibration_batch_begin_rejects_active_alert() {
+        // Goal: a batch listing a channel with an Active alert is rejected
+        // upfront, naming the offending alert, and no batch is installed; a
+        // batch on an unblocked channel still begins.
+        cc_fs::test_runtime(async {
+            use crate::calibration::CalibrationAlertGate;
+            struct StubGate;
+            impl CalibrationAlertGate for StubGate {
+                fn active_alert_for_channel(
+                    &self,
+                    _device_uid: &str,
+                    channel_name: &str,
+                ) -> Option<String> {
+                    (channel_name == "fan1").then(|| "Fan Alarm".to_string())
+                }
+            }
+            let (device, engine, _calibration_store) = setup_calibrated_device();
+            let device_uid = device.borrow().uid.clone();
+            engine.set_alert_gate(Rc::new(StubGate));
+            let err = engine
+                .begin_calibration_batch(vec![(device_uid.clone(), "fan1".to_string())], 1)
+                .expect_err("blocked channel rejects the batch");
+            assert!(err.to_string().contains("Fan Alarm"));
+            // The rejected batch was never installed, so a clean one begins.
+            engine
+                .begin_calibration_batch(vec![(device_uid, "fan2".to_string())], 1)
+                .expect("unblocked channel begins");
+        });
+    }
+
+    #[test]
+    #[serial]
     fn calibration_batch_drives_each_channel_to_terminal() {
         // Goal: begin + drive a batch end to end. With a hot system every
         // sweep short-circuits in preflight, so the driver marks each

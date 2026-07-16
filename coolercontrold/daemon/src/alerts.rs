@@ -18,7 +18,7 @@
 
 use crate::api::actor::AlertHandle;
 use crate::api::CCError;
-use crate::calibration::DiagnosisRegistry;
+use crate::calibration::{CalibrationAlertGate, DiagnosisRegistry};
 use crate::device::UID;
 use crate::notifier::{self, NotificationHandle, NotificationIcon};
 use crate::overrides::OverridesController;
@@ -1191,6 +1191,37 @@ impl AlertController {
     }
 }
 
+impl CalibrationAlertGate for AlertController {
+    /// A visibly Active (incl. Cooldown), enabled, unsilenced, non-Temp source
+    /// on the channel blocks calibration. Silenced or disabled alerts do not:
+    /// the user has explicitly quieted them.
+    fn active_alert_for_channel(&self, device_uid: &str, channel_name: &str) -> Option<String> {
+        for alert in self.alerts.borrow().values() {
+            if alert.enabled.not() {
+                continue;
+            }
+            if alert.is_silenced() {
+                continue;
+            }
+            for (source, state) in alert.channel_sources.iter().zip(alert.source_states.iter()) {
+                if source.channel_metric == ChannelMetric::Temp {
+                    continue;
+                }
+                if source.device_uid != device_uid {
+                    continue;
+                }
+                if source.channel_name != channel_name {
+                    continue;
+                }
+                if state.visible() == AlertState::Active {
+                    return Some(alert.name.clone());
+                }
+            }
+        }
+        None
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AlertConfigFile {
     alerts: Vec<Alert>,
@@ -2250,6 +2281,99 @@ mod tests {
         }
         // Further suppressed ticks stay completely quiet.
         assert!(controller.process_and_collect_alerts_to_fire().is_empty());
+    }
+
+    // -- calibration preflight gate (active_alert_for_channel) tests --
+
+    #[test]
+    fn gate_reports_active_alert_on_channel() {
+        // Goal: verify an enabled, unsilenced alert with a visibly Active
+        // non-Temp source on the channel blocks calibration (returns its name),
+        // including a Cooldown source (the episode is not over), and only for
+        // the matching channel.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 0)], 30.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let mut alert = rpm_alert(&device_uid, &["fan1"], 500.0, 10_000.0);
+        alert.source_states = vec![AlertState::Active];
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+
+        assert_eq!(
+            controller.active_alert_for_channel(&device_uid, "fan1"),
+            Some("Alert-rpm-alert".to_string())
+        );
+        assert!(controller
+            .active_alert_for_channel(&device_uid, "fan2")
+            .is_none());
+        controller
+            .alerts
+            .borrow_mut()
+            .get_mut("rpm-alert")
+            .unwrap()
+            .source_states = vec![AlertState::Cooldown(Local::now())];
+        assert!(controller
+            .active_alert_for_channel(&device_uid, "fan1")
+            .is_some());
+    }
+
+    #[test]
+    fn gate_ignores_quiet_and_irrelevant_alerts() {
+        // Goal: verify disabled, silenced, not-yet-Active, and Temp-source
+        // alerts do not block calibration.
+        let registry = Rc::new(DiagnosisRegistry::new());
+        let device = make_test_device(&[("fan1", 0)], 30.0);
+        let device_uid = device.uid.clone();
+        let controller = make_test_controller(device, &registry);
+        let mut alert = rpm_alert(&device_uid, &["fan1"], 500.0, 10_000.0);
+        alert.source_states = vec![AlertState::Active];
+        alert.enabled = false;
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(alert.uid.clone(), alert);
+        assert!(controller
+            .active_alert_for_channel(&device_uid, "fan1")
+            .is_none());
+
+        {
+            let mut alerts = controller.alerts.borrow_mut();
+            let alert = alerts.get_mut("rpm-alert").unwrap();
+            alert.enabled = true;
+            alert.silenced_until = Some(Local::now() + Duration::seconds(600));
+        }
+        assert!(controller
+            .active_alert_for_channel(&device_uid, "fan1")
+            .is_none());
+
+        {
+            let mut alerts = controller.alerts.borrow_mut();
+            let alert = alerts.get_mut("rpm-alert").unwrap();
+            alert.silenced_until = None;
+            alert.source_states = vec![AlertState::WarmUp(Local::now())];
+        }
+        assert!(controller
+            .active_alert_for_channel(&device_uid, "fan1")
+            .is_none());
+
+        let mut temp_alert = make_alert("temp-alert", 0.0, 20.0, AlertState::Active);
+        temp_alert.channel_sources = vec![ChannelSource {
+            device_uid: device_uid.clone(),
+            channel_name: "temp1".to_string(),
+            channel_metric: ChannelMetric::Temp,
+        }];
+        temp_alert.normalize_sources();
+        temp_alert.source_states = vec![AlertState::Active];
+        controller
+            .alerts
+            .borrow_mut()
+            .insert(temp_alert.uid.clone(), temp_alert);
+        assert!(controller
+            .active_alert_for_channel(&device_uid, "temp1")
+            .is_none());
     }
 
     #[test]
