@@ -25,18 +25,24 @@ import {
     mdiBookmarkMultipleOutline,
     mdiBookmarkOutline,
     mdiDockLeft,
+    mdiDotsVertical,
     mdiTune,
 } from '@mdi/js'
 import { DropdownMenuItem, DropdownMenuSeparator } from 'reka-ui'
 import { computed, inject } from 'vue'
+import { useWindowSize } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { PLUGINS_SECTION } from '@/shell/sections.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
+import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
+import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
+import { dropdownItemClass } from '@/shell/ui/dropdownItemClass.ts'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -62,9 +68,11 @@ const activeModeName = computed<string | undefined>(
 // Provided by ShellLayout; toggles the reka splitter panel (desktop only).
 const toggleMainMenu = inject<() => void>('toggleMainMenu')
 
-const itemClass =
-    'flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-base ' +
-    'text-text-color outline-none data-[highlighted]:bg-surface-hover'
+// The main-menu panel and the Access/Power menus live in the desktop rail, which
+// mobile does not render. Mirror ShellLayout's breakpoint so the header can hide the
+// panel-collapse button on mobile and surface those menus in an overflow instead.
+const { width } = useWindowSize()
+const isMobile = computed(() => width.value < 768)
 </script>
 
 <template>
@@ -81,6 +89,7 @@ const itemClass =
             </button>
         </UiTooltip>
         <UiTooltip
+            v-if="!isMobile"
             :text="
                 settingsStore.collapsedMainMenu
                     ? t('layout.topbar.expandMenu')
@@ -121,7 +130,7 @@ const itemClass =
             <DropdownMenuItem
                 v-for="mode in settingsStore.modes"
                 :key="mode.uid"
-                :class="itemClass"
+                :class="dropdownItemClass"
                 @select="settingsStore.activateMode(mode.uid)"
             >
                 <svg-icon
@@ -147,10 +156,39 @@ const itemClass =
                 {{ t('layout.shell.noModes') }}
             </div>
             <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
-            <DropdownMenuItem :class="itemClass" @select="router.push({ name: 'cooling-modes' })">
+            <DropdownMenuItem
+                :class="dropdownItemClass"
+                @select="router.push({ name: 'cooling-modes' })"
+            >
                 <svg-icon type="mdi" :path="mdiTune" :size="15" class="text-text-color-secondary" />
                 {{ t('layout.shell.manageModes') }}
             </DropdownMenuItem>
+        </UiDropdownMenu>
+        <!-- Mobile has no rail, so its Plugins/Access/Power entries live here. -->
+        <UiDropdownMenu v-if="isMobile">
+            <template #trigger>
+                <button
+                    type="button"
+                    class="flex items-center justify-center rounded-lg p-1.5 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDotsVertical"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </button>
+            </template>
+            <DropdownMenuItem
+                :class="dropdownItemClass"
+                @select="router.push({ name: PLUGINS_SECTION.routeName })"
+            >
+                <svg-icon type="mdi" :path="PLUGINS_SECTION.icon" :size="15" />
+                {{ t(PLUGINS_SECTION.labelKey) }}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            <ShellAccessMenuItems />
+            <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            <ShellPowerMenuItems />
         </UiDropdownMenu>
     </header>
 </template>

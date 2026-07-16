@@ -32,7 +32,10 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
 </script>
 
 <template>
-    <nav class="flex h-14 shrink-0 items-stretch justify-around border-t border-border-one">
+    <nav
+        id="shell-bottom-nav"
+        class="flex h-14 shrink-0 items-stretch justify-around border-t border-border-one"
+    >
         <RouterLink
             v-for="section in SHELL_SECTIONS"
             :key="section.id"

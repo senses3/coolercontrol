@@ -259,7 +259,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="xl:col-span-2">
+    <div class="xl:col-span-2 min-w-0">
         <div class="bg-bg-two border border-border-one p-4 rounded-lg text-text-color">
             <div class="flex flex-row justify-between items-center mb-4">
                 <div class="flex flex-row items-center gap-2">
@@ -275,242 +275,246 @@ onMounted(async () => {
                     >{{ t('views.appInfo.stopAll') }}</UiButton
                 >
             </div>
-            <table class="border-separate border-spacing-y-2">
-                <tbody>
-                    <!-- CPU Stress -->
-                    <tr>
-                        <td class="pr-4">
-                            <span class="font-bold text-lg">{{
-                                t('views.appInfo.cpuStress')
-                            }}</span>
-                        </td>
-                        <td class="pr-4">
-                            <UiNumberInput
-                                v-model="cpuDuration"
-                                :min="15"
-                                :max="600"
-                                :step="15"
-                                :disabled="cpuActive"
-                                suffix="s"
-                            />
-                        </td>
-                        <td class="pr-4">
-                            <UiButton
-                                v-if="!cpuActive"
-                                :disabled="ramActive"
-                                @click="startCpuStress"
-                                >{{ t('views.appInfo.start') }}</UiButton
-                            >
-                            <UiButton v-else variant="danger" @click="stopCpuStress">{{
-                                t('views.appInfo.stop')
-                            }}</UiButton>
-                        </td>
-                        <td>
-                            <div class="flex items-center gap-2">
-                                <svg-icon
-                                    type="mdi"
-                                    :class="
-                                        cpuActive ? 'text-success' : 'text-text-color-secondary'
-                                    "
-                                    :path="mdiCircle"
-                                    :size="deviceStore.getREMSize(0.75)"
-                                />
-                                <span class="text-sm">{{
-                                    cpuActive
-                                        ? t('views.appInfo.active')
-                                        : t('views.appInfo.inactive')
+            <div class="overflow-x-auto">
+                <table class="border-separate border-spacing-y-2">
+                    <tbody>
+                        <!-- CPU Stress -->
+                        <tr>
+                            <td class="pr-4">
+                                <span class="font-bold text-lg">{{
+                                    t('views.appInfo.cpuStress')
                                 }}</span>
-                                <stress-backend-select
-                                    v-if="stressNgAvailable && !cpuActive"
-                                    v-model="settingsStore.cpuStressBackend"
-                                    class="ml-1 stress-backend-select"
-                                />
-                                <span
-                                    v-else
-                                    class="text-xs text-text-color-secondary ml-1 opacity-70"
-                                    >[{{ backendLabel(cpuBackend) }}]</span
-                                >
-                            </div>
-                        </td>
-                    </tr>
-                    <!-- GPU Stress -->
-                    <tr>
-                        <td class="pr-4">
-                            <stress-test-label
-                                :label="t('views.appInfo.gpuStress')"
-                                :tooltip="t('views.appInfo.gpuStressTooltip')"
-                            />
-                        </td>
-                        <td class="pr-4">
-                            <UiNumberInput
-                                v-model="gpuDuration"
-                                :min="15"
-                                :max="600"
-                                :step="15"
-                                :disabled="gpuActive"
-                                suffix="s"
-                            />
-                        </td>
-                        <td class="pr-4">
-                            <UiButton v-if="!gpuActive" @click="startGpuStress">{{
-                                t('views.appInfo.start')
-                            }}</UiButton>
-                            <UiButton v-else variant="danger" @click="stopGpuStress">{{
-                                t('views.appInfo.stop')
-                            }}</UiButton>
-                        </td>
-                        <td>
-                            <div class="flex items-center gap-2">
-                                <svg-icon
-                                    type="mdi"
-                                    :class="
-                                        gpuActive ? 'text-success' : 'text-text-color-secondary'
-                                    "
-                                    :path="mdiCircle"
-                                    :size="deviceStore.getREMSize(0.75)"
-                                />
-                                <span class="text-sm">{{
-                                    gpuActive
-                                        ? t('views.appInfo.active')
-                                        : t('views.appInfo.inactive')
-                                }}</span>
-                                <stress-backend-select
-                                    v-if="stressNgAvailable && !gpuActive"
-                                    v-model="settingsStore.gpuStressBackend"
-                                    class="ml-1 stress-backend-select"
-                                />
-                                <span
-                                    v-else
-                                    class="text-xs text-text-color-secondary ml-1 opacity-70"
-                                    >[{{ backendLabel(gpuBackend) }}]</span
-                                >
-                            </div>
-                        </td>
-                    </tr>
-                    <!-- RAM Stress -->
-                    <tr>
-                        <td class="pr-4">
-                            <span class="font-bold text-lg">{{
-                                t('views.appInfo.ramStress')
-                            }}</span>
-                        </td>
-                        <td class="pr-4">
-                            <UiNumberInput
-                                v-model="ramDuration"
-                                :min="15"
-                                :max="600"
-                                :step="15"
-                                :disabled="ramActive"
-                                suffix="s"
-                            />
-                        </td>
-                        <td class="pr-4">
-                            <UiButton
-                                v-if="!ramActive"
-                                :disabled="cpuActive"
-                                @click="startRamStress"
-                                >{{ t('views.appInfo.start') }}</UiButton
-                            >
-                            <UiButton v-else variant="danger" @click="stopRamStress">{{
-                                t('views.appInfo.stop')
-                            }}</UiButton>
-                        </td>
-                        <td>
-                            <div class="flex items-center gap-2">
-                                <svg-icon
-                                    type="mdi"
-                                    :class="
-                                        ramActive ? 'text-success' : 'text-text-color-secondary'
-                                    "
-                                    :path="mdiCircle"
-                                    :size="deviceStore.getREMSize(0.75)"
-                                />
-                                <span class="text-sm">{{
-                                    ramActive
-                                        ? t('views.appInfo.active')
-                                        : t('views.appInfo.inactive')
-                                }}</span>
-                                <stress-backend-select
-                                    v-if="stressNgAvailable && !ramActive"
-                                    v-model="settingsStore.ramStressBackend"
-                                    class="ml-1 stress-backend-select"
-                                />
-                                <span
-                                    v-else
-                                    class="text-xs text-text-color-secondary ml-1 opacity-70"
-                                    >[{{ backendLabel(ramBackend) }}]</span
-                                >
-                            </div>
-                        </td>
-                    </tr>
-                    <!-- Drive Stress -->
-                    <tr>
-                        <td class="pr-4">
-                            <stress-test-label
-                                :label="t('views.appInfo.driveStress')"
-                                :tooltip="t('views.appInfo.driveStressTooltip')"
-                            />
-                        </td>
-                        <td class="pr-4">
-                            <div class="flex items-center gap-2">
+                            </td>
+                            <td class="pr-4">
                                 <UiNumberInput
-                                    v-model="driveDuration"
+                                    v-model="cpuDuration"
                                     :min="15"
                                     :max="600"
                                     :step="15"
-                                    :disabled="driveActive"
+                                    :disabled="cpuActive"
                                     suffix="s"
                                 />
-                                <UiSelect
-                                    v-model="selectedDrive"
-                                    :options="driveOptions"
-                                    :placeholder="t('views.appInfo.selectDrive')"
-                                    class="w-64"
-                                    :disabled="driveActive || availableDrives.length === 0"
-                                />
-                            </div>
-                        </td>
-                        <td class="pr-4">
-                            <UiButton
-                                v-if="!driveActive"
-                                :disabled="!selectedDrive || availableDrives.length === 0"
-                                @click="startDriveStress"
-                                >{{ t('views.appInfo.start') }}</UiButton
-                            >
-                            <UiButton v-else variant="danger" @click="stopDriveStress">{{
-                                t('views.appInfo.stop')
-                            }}</UiButton>
-                        </td>
-                        <td>
-                            <div class="flex items-center gap-2">
-                                <svg-icon
-                                    type="mdi"
-                                    :class="
-                                        driveActive ? 'text-success' : 'text-text-color-secondary'
-                                    "
-                                    :path="mdiCircle"
-                                    :size="deviceStore.getREMSize(0.75)"
-                                />
-                                <span class="text-sm">{{
-                                    driveActive
-                                        ? t('views.appInfo.active')
-                                        : t('views.appInfo.inactive')
-                                }}</span>
-                                <stress-backend-select
-                                    v-if="stressNgAvailable && !driveActive"
-                                    v-model="settingsStore.driveStressBackend"
-                                    class="ml-1 stress-backend-select"
-                                />
-                                <span
-                                    v-else
-                                    class="text-xs text-text-color-secondary ml-1 opacity-70"
-                                    >[{{ backendLabel(driveBackend) }}]</span
+                            </td>
+                            <td class="pr-4">
+                                <UiButton
+                                    v-if="!cpuActive"
+                                    :disabled="ramActive"
+                                    @click="startCpuStress"
+                                    >{{ t('views.appInfo.start') }}</UiButton
                                 >
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                                <UiButton v-else variant="danger" @click="stopCpuStress">{{
+                                    t('views.appInfo.stop')
+                                }}</UiButton>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <svg-icon
+                                        type="mdi"
+                                        :class="
+                                            cpuActive ? 'text-success' : 'text-text-color-secondary'
+                                        "
+                                        :path="mdiCircle"
+                                        :size="deviceStore.getREMSize(0.75)"
+                                    />
+                                    <span class="text-sm">{{
+                                        cpuActive
+                                            ? t('views.appInfo.active')
+                                            : t('views.appInfo.inactive')
+                                    }}</span>
+                                    <stress-backend-select
+                                        v-if="stressNgAvailable && !cpuActive"
+                                        v-model="settingsStore.cpuStressBackend"
+                                        class="ml-1 stress-backend-select"
+                                    />
+                                    <span
+                                        v-else
+                                        class="text-xs text-text-color-secondary ml-1 opacity-70"
+                                        >[{{ backendLabel(cpuBackend) }}]</span
+                                    >
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- GPU Stress -->
+                        <tr>
+                            <td class="pr-4">
+                                <stress-test-label
+                                    :label="t('views.appInfo.gpuStress')"
+                                    :tooltip="t('views.appInfo.gpuStressTooltip')"
+                                />
+                            </td>
+                            <td class="pr-4">
+                                <UiNumberInput
+                                    v-model="gpuDuration"
+                                    :min="15"
+                                    :max="600"
+                                    :step="15"
+                                    :disabled="gpuActive"
+                                    suffix="s"
+                                />
+                            </td>
+                            <td class="pr-4">
+                                <UiButton v-if="!gpuActive" @click="startGpuStress">{{
+                                    t('views.appInfo.start')
+                                }}</UiButton>
+                                <UiButton v-else variant="danger" @click="stopGpuStress">{{
+                                    t('views.appInfo.stop')
+                                }}</UiButton>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <svg-icon
+                                        type="mdi"
+                                        :class="
+                                            gpuActive ? 'text-success' : 'text-text-color-secondary'
+                                        "
+                                        :path="mdiCircle"
+                                        :size="deviceStore.getREMSize(0.75)"
+                                    />
+                                    <span class="text-sm">{{
+                                        gpuActive
+                                            ? t('views.appInfo.active')
+                                            : t('views.appInfo.inactive')
+                                    }}</span>
+                                    <stress-backend-select
+                                        v-if="stressNgAvailable && !gpuActive"
+                                        v-model="settingsStore.gpuStressBackend"
+                                        class="ml-1 stress-backend-select"
+                                    />
+                                    <span
+                                        v-else
+                                        class="text-xs text-text-color-secondary ml-1 opacity-70"
+                                        >[{{ backendLabel(gpuBackend) }}]</span
+                                    >
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- RAM Stress -->
+                        <tr>
+                            <td class="pr-4">
+                                <span class="font-bold text-lg">{{
+                                    t('views.appInfo.ramStress')
+                                }}</span>
+                            </td>
+                            <td class="pr-4">
+                                <UiNumberInput
+                                    v-model="ramDuration"
+                                    :min="15"
+                                    :max="600"
+                                    :step="15"
+                                    :disabled="ramActive"
+                                    suffix="s"
+                                />
+                            </td>
+                            <td class="pr-4">
+                                <UiButton
+                                    v-if="!ramActive"
+                                    :disabled="cpuActive"
+                                    @click="startRamStress"
+                                    >{{ t('views.appInfo.start') }}</UiButton
+                                >
+                                <UiButton v-else variant="danger" @click="stopRamStress">{{
+                                    t('views.appInfo.stop')
+                                }}</UiButton>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <svg-icon
+                                        type="mdi"
+                                        :class="
+                                            ramActive ? 'text-success' : 'text-text-color-secondary'
+                                        "
+                                        :path="mdiCircle"
+                                        :size="deviceStore.getREMSize(0.75)"
+                                    />
+                                    <span class="text-sm">{{
+                                        ramActive
+                                            ? t('views.appInfo.active')
+                                            : t('views.appInfo.inactive')
+                                    }}</span>
+                                    <stress-backend-select
+                                        v-if="stressNgAvailable && !ramActive"
+                                        v-model="settingsStore.ramStressBackend"
+                                        class="ml-1 stress-backend-select"
+                                    />
+                                    <span
+                                        v-else
+                                        class="text-xs text-text-color-secondary ml-1 opacity-70"
+                                        >[{{ backendLabel(ramBackend) }}]</span
+                                    >
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Drive Stress -->
+                        <tr>
+                            <td class="pr-4">
+                                <stress-test-label
+                                    :label="t('views.appInfo.driveStress')"
+                                    :tooltip="t('views.appInfo.driveStressTooltip')"
+                                />
+                            </td>
+                            <td class="pr-4">
+                                <div class="flex items-center gap-2">
+                                    <UiNumberInput
+                                        v-model="driveDuration"
+                                        :min="15"
+                                        :max="600"
+                                        :step="15"
+                                        :disabled="driveActive"
+                                        suffix="s"
+                                    />
+                                    <UiSelect
+                                        v-model="selectedDrive"
+                                        :options="driveOptions"
+                                        :placeholder="t('views.appInfo.selectDrive')"
+                                        class="w-64"
+                                        :disabled="driveActive || availableDrives.length === 0"
+                                    />
+                                </div>
+                            </td>
+                            <td class="pr-4">
+                                <UiButton
+                                    v-if="!driveActive"
+                                    :disabled="!selectedDrive || availableDrives.length === 0"
+                                    @click="startDriveStress"
+                                    >{{ t('views.appInfo.start') }}</UiButton
+                                >
+                                <UiButton v-else variant="danger" @click="stopDriveStress">{{
+                                    t('views.appInfo.stop')
+                                }}</UiButton>
+                            </td>
+                            <td>
+                                <div class="flex items-center gap-2">
+                                    <svg-icon
+                                        type="mdi"
+                                        :class="
+                                            driveActive
+                                                ? 'text-success'
+                                                : 'text-text-color-secondary'
+                                        "
+                                        :path="mdiCircle"
+                                        :size="deviceStore.getREMSize(0.75)"
+                                    />
+                                    <span class="text-sm">{{
+                                        driveActive
+                                            ? t('views.appInfo.active')
+                                            : t('views.appInfo.inactive')
+                                    }}</span>
+                                    <stress-backend-select
+                                        v-if="stressNgAvailable && !driveActive"
+                                        v-model="settingsStore.driveStressBackend"
+                                        class="ml-1 stress-backend-select"
+                                    />
+                                    <span
+                                        v-else
+                                        class="text-xs text-text-color-secondary ml-1 opacity-70"
+                                        >[{{ backendLabel(driveBackend) }}]</span
+                                    >
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </template>
