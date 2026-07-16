@@ -287,11 +287,11 @@ const shortcutClasses =
         <div class="grid grid-cols-1 gap-4 pt-4 xl:grid-cols-2">
             <!-- Daemon status -->
             <div :class="cardClasses">
-                <div class="flex items-center justify-between pb-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3">
                     <span class="text-lg font-medium text-text-color">
                         {{ t('views.appInfo.daemonStatus') }}
                     </span>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <UiButton
                             size="sm"
                             variant="outline"
