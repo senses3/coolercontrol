@@ -304,10 +304,22 @@ let isZoomed: boolean = false
 let rafId: number | null = null
 let rafPaused: boolean = false // rAF stopped due to user interaction
 let userZoomed: boolean = false // user has made a zoom selection
+// New data arrives roughly once a second, so a full-canvas redraw on every display
+// frame is wasted work. Throttle the scroll redraw to a fixed, lower cadence.
+const rafFrameIntervalMs = 1000 / 30
+let lastRafDrawMs = 0
+// Skip animating while the chart is scrolled out of view (dashboards can stack
+// several charts, only some of them visible at a time).
+let chartOnScreen = true
+let visibilityObserver: IntersectionObserver | null = null
 const startRaf = () => {
-    if (rafId !== null || chart === null) return
+    if (rafId !== null || chart === null || !chartOnScreen) return
     const animate = () => {
-        const now = Date.now() / 1000
+        rafId = requestAnimationFrame(animate)
+        const nowMs = Date.now()
+        if (nowMs - lastRafDrawMs < rafFrameIntervalMs) return
+        lastRafDrawMs = nowMs
+        const now = nowMs / 1000
         chart!.setData(uSeriesData, false)
         // Snap the right edge to a whole device-pixel boundary so the x-axis only
         // advances in integer-pixel steps. This stabilizes the dash/dot phase between
@@ -315,7 +327,6 @@ const startRaf = () => {
         const pxPerSec = chart!.bbox.width / timeRangeSeconds
         const snappedNow = pxPerSec > 0 ? Math.round(now * pxPerSec) / pxPerSec : now
         chart!.setScale('x', { min: snappedNow - timeRangeSeconds, max: snappedNow })
-        rafId = requestAnimationFrame(animate)
     }
     rafId = requestAnimationFrame(animate)
 }
@@ -329,6 +340,7 @@ const stopRaf = () => {
 
 onUnmounted(() => {
     stopRaf()
+    visibilityObserver?.disconnect()
 })
 
 // @ts-ignore
@@ -740,6 +752,23 @@ onMounted(async () => {
         chart!.setSize(getChartSize())
     })
     resizeObserver.observe(uChartElement)
+
+    // Pause the scroll animation whenever the chart leaves the viewport, and
+    // re-sync the (skipped) data before resuming when it returns.
+    visibilityObserver = new IntersectionObserver(
+        (entries) => {
+            chartOnScreen = entries[0]?.isIntersecting ?? true
+            if (!chartOnScreen) {
+                stopRaf()
+            } else if (settingsStore.eyeCandy && !rafPaused && rafId === null) {
+                initUSeriesData()
+                chart!.setData(uSeriesData, false)
+                startRaf()
+            }
+        },
+        { threshold: 0 },
+    )
+    visibilityObserver.observe(uChartElement)
 
     uChartElement.addEventListener('mousedown', (event: MouseEvent) => {
         if (
