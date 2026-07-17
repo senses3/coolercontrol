@@ -327,6 +327,11 @@ pub struct AlertLog {
     /// clients update state from it but raise no toast.
     #[serde(default)]
     pub silenced: bool,
+
+    /// The change was a source recovery; clients toast it as informational
+    /// even when other sources keep the alert Active.
+    #[serde(default)]
+    pub resolved: bool,
 }
 
 impl Default for AlertLog {
@@ -338,6 +343,7 @@ impl Default for AlertLog {
             message: "Unknown".to_string(),
             timestamp: Local::now(),
             silenced: false,
+            resolved: false,
         }
     }
 }
@@ -672,6 +678,7 @@ impl AlertController {
                     event.alert.state,
                     event.message,
                     event.silenced,
+                    event.kind == AlertEventKind::Resolved,
                 );
                 if let Some(handle) = self.alert_handle.borrow().as_ref() {
                     handle.broadcast_alert_state_change(log);
@@ -843,7 +850,10 @@ impl AlertController {
         let Some(device) = self.all_devices.get(&source.device_uid) else {
             return Err("Device not found");
         };
-        let Some(most_recent_status) = device.borrow().status_current() else {
+        let device_borrow = device.borrow();
+        // Read the newest status in place: cloning the full Status per source
+        // per tick would be hot-path allocation for a single scalar.
+        let Some(most_recent_status) = device_borrow.status_history.back() else {
             return Err("Device has no current status");
         };
         if source.channel_metric == ChannelMetric::Temp {
@@ -915,18 +925,29 @@ impl AlertController {
             AlertEventKind::Triggered | AlertEventKind::SourceError => {
                 silenced.not() && alert.desktop_notify
             }
-            // Recovery only notifies for an episode the user was informed about.
+            // Recovery only notifies once every source is back in range, for an
+            // episode the user was informed about; a partial recovery is logged
+            // but must not announce "resolved" while other sources still fire.
             _ => {
                 silenced.not()
                     && alert.desktop_notify
                     && alert.desktop_notify_recovery
                     && alert.notified
+                    && alert.state == AlertState::Inactive
             }
         };
         if kind == AlertEventKind::Triggered && silenced.not() {
             alert.notified = true;
         }
+        if fire_shutdown {
+            // The shutdown warning is delivered for any event kind, so a fired
+            // shutdown always counts as announcing the episode.
+            alert.notified = true;
+        }
         if notify_desktop {
+            alert.last_notified = Some(Local::now());
+        }
+        if fire_shutdown && alert.desktop_notify {
             alert.last_notified = Some(Local::now());
         }
         if alert.state == AlertState::Inactive {
@@ -1079,6 +1100,7 @@ impl AlertController {
         state: AlertState,
         message: AlertLogMessage,
         silenced: bool,
+        resolved: bool,
     ) -> AlertLog {
         let log = AlertLog {
             uid,
@@ -1087,6 +1109,7 @@ impl AlertController {
             message,
             timestamp: Local::now(),
             silenced,
+            resolved,
         };
         let mut logs_lock = self.logs.borrow_mut();
         while logs_lock.len() >= LOG_BUFFER_SIZE {
@@ -1099,17 +1122,12 @@ impl AlertController {
 
     /// Executes an event's decided side effects: shutdown commands, then the
     /// desktop notification. All decisions were made when the event was built.
+    /// A fired shutdown always delivers the shutdown warning, whatever the
+    /// event kind that carried it.
     fn send_notifications(&self, event: &AlertEvent) {
         let alert = &event.alert;
         if event.kind == AlertEventKind::SourceError {
             warn!("Alert in Error State: {} = {}", alert.name, event.message);
-        }
-        if event.fire_shutdown {
-            Self::fire_command(COMMAND_SHUTDOWN);
-            info!(
-                "Shutdown Alert Triggered: {} - Shutdown will commence in 1 Minute",
-                alert.name
-            );
         }
         if event.cancel_shutdown {
             Self::fire_command(COMMAND_SHUTDOWN_CANCEL);
@@ -1118,6 +1136,26 @@ impl AlertController {
                 alert.name
             );
         }
+        if event.fire_shutdown {
+            Self::fire_command(COMMAND_SHUTDOWN);
+            info!(
+                "Shutdown Alert Triggered: {} - Shutdown will commence in 1 Minute",
+                alert.name
+            );
+            if alert.desktop_notify {
+                let title = format!("Shutdown Alert Triggered: {}!", alert.name);
+                let body = format!("Shutdown will commence in 1 Minute.\n{}", event.message);
+                notifier::notify_all_sessions(
+                    &title,
+                    &body,
+                    NotificationIcon::Shutdown,
+                    alert.desktop_notify_audio,
+                    Some(2),
+                    self.notification_handle.borrow().as_ref(),
+                );
+            }
+            return;
+        }
         if event.notify_desktop.not() {
             return;
         }
@@ -1125,32 +1163,19 @@ impl AlertController {
         let handle = handle_ref.as_ref();
         match event.kind {
             AlertEventKind::Triggered | AlertEventKind::StillActive | AlertEventKind::Repeat => {
-                if event.fire_shutdown {
-                    let title = format!("Shutdown Alert Triggered: {}!", alert.name);
-                    let body = format!("Shutdown will commence in 1 Minute.\n{}", event.message);
-                    notifier::notify_all_sessions(
-                        &title,
-                        &body,
-                        NotificationIcon::Shutdown,
-                        alert.desktop_notify_audio,
-                        Some(2),
-                        handle,
-                    );
+                let title = if event.kind == AlertEventKind::Triggered {
+                    format!("Alert Triggered: {}!", alert.name)
                 } else {
-                    let title = if event.kind == AlertEventKind::Triggered {
-                        format!("Alert Triggered: {}!", alert.name)
-                    } else {
-                        format!("Alert Still Active: {}!", alert.name)
-                    };
-                    notifier::notify_all_sessions(
-                        &title,
-                        &event.message,
-                        NotificationIcon::Triggered,
-                        alert.desktop_notify_audio,
-                        None,
-                        handle,
-                    );
-                }
+                    format!("Alert Still Active: {}!", alert.name)
+                };
+                notifier::notify_all_sessions(
+                    &title,
+                    &event.message,
+                    NotificationIcon::Triggered,
+                    alert.desktop_notify_audio,
+                    None,
+                    handle,
+                );
             }
             AlertEventKind::Resolved => {
                 let title = format!("Alert Resolved: {}", alert.name);
@@ -1646,6 +1671,37 @@ mod tests {
         assert!(matches!(event.kind, AlertEventKind::Resolved));
         assert_eq!(event.alert.state, AlertState::Active);
         assert!(alert.notified, "episode continues until all sources clear");
+        assert!(
+            !event.notify_desktop,
+            "a partial recovery must not announce resolved while still firing"
+        );
+        assert!(event.log, "the per-source recovery still reaches the log");
+    }
+
+    #[test]
+    fn build_transition_event_shutdown_fires_with_warning_on_resolved_kind() {
+        // Goal: verify the silence-expiry edge: the silence lapses on the tick
+        // one of two Active sources recovers. The shutdown fires even though
+        // the event kind is Resolved, and the episode counts as announced
+        // because send_notifications delivers the shutdown warning for any
+        // event kind.
+        let mut alert = make_alert("a", 0.0, 1000.0, AlertState::Active);
+        alert.shutdown_on_activation = true;
+        alert.channel_sources = vec![
+            make_source("fan1", ChannelMetric::RPM),
+            make_source("fan2", ChannelMetric::RPM),
+        ];
+        alert.source_states = vec![AlertState::Active, AlertState::Inactive];
+        alert.notified = false;
+        let outcomes = SourceOutcomes {
+            resolved: vec!["fan2: back in range".to_string()],
+            ..Default::default()
+        };
+        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        assert!(matches!(event.kind, AlertEventKind::Resolved));
+        assert!(event.fire_shutdown);
+        assert!(alert.shutdown_scheduled);
+        assert!(alert.notified, "the shutdown warning announces the episode");
     }
 
     #[test]
@@ -1898,7 +1954,7 @@ mod tests {
 
     #[test]
     fn alert_state_serialize_cooldown_as_active() {
-        // Goal: verify Cooldown serializes as "Active" — the source never
+        // Goal: verify Cooldown serializes as "Active": the source never
         // stopped firing from the outside, and the wire keeps 3 states.
         let json = serde_json::to_string(&AlertState::Cooldown(Local::now())).unwrap();
         assert_eq!(json, "\"Active\"");
@@ -2003,6 +2059,7 @@ mod tests {
             message: "Over threshold".to_string(),
             timestamp: Local::now(),
             silenced: false,
+            resolved: false,
         }];
         let file = AlertLogsFile { logs };
         let json = serde_json::to_string(&file).unwrap();
@@ -2077,6 +2134,7 @@ mod tests {
             "timestamp":"2025-01-01T00:00:00+00:00"}"#;
         let log: AlertLog = serde_json::from_str(json).unwrap();
         assert!(!log.silenced);
+        assert!(!log.resolved);
     }
 
     // -- calibration suppression tests (controller-level) --
