@@ -314,6 +314,9 @@ const alertMenuIconClass = (alert: Alert): string => {
     if (!alert.enabled) return 'text-text-color-secondary'
     return alert.state === AlertState.Active ? 'text-error' : 'text-success'
 }
+// Keeps a row's hover actions rendered while its silence menu is open: the
+// modal menu suppresses :hover, and a hidden trigger cannot anchor the menu.
+const openAlertMenuUid = ref<UID | null>(null)
 // Hover quick actions: silence and enable act on the saved alert directly.
 const silenceAlert = async (alert: Alert, minutes: number): Promise<void> => {
     alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
@@ -613,10 +616,18 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 />
                 <span class="truncate">{{ alert.name }}</span>
                 <span
-                    class="ml-auto hidden items-center gap-0.5 group-hover:inline-flex"
+                    class="ml-auto items-center gap-0.5"
+                    :class="
+                        openAlertMenuUid === alert.uid
+                            ? 'inline-flex'
+                            : 'hidden group-hover:inline-flex'
+                    "
                     @click.prevent.stop
                 >
-                    <UiDropdownMenu v-if="alert.enabled">
+                    <UiDropdownMenu
+                        v-if="alert.enabled"
+                        @update:open="(open) => (openAlertMenuUid = open ? alert.uid : null)"
+                    >
                         <template #trigger>
                             <button
                                 type="button"
