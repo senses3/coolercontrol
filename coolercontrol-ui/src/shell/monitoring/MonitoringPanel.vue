@@ -35,6 +35,9 @@ import {
     mdiViewDashboardOutline,
 } from '@mdi/js'
 import { VueDraggable } from 'vue-draggable-plus'
+import { DropdownMenuItem } from 'reka-ui'
+import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
+import { dropdownItemClass } from '@/shell/ui/dropdownItemClass.ts'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -310,6 +313,19 @@ const alertMenuIcon = (alert: Alert): string => {
 const alertMenuIconClass = (alert: Alert): string => {
     if (!alert.enabled) return 'text-text-color-secondary'
     return alert.state === AlertState.Active ? 'text-error' : 'text-success'
+}
+// Hover quick actions: silence and enable act on the saved alert directly.
+const silenceAlert = async (alert: Alert, minutes: number): Promise<void> => {
+    alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
+    await settingsStore.updateAlert(alert.uid)
+}
+const unsilenceAlert = async (alert: Alert): Promise<void> => {
+    alert.silenced_until = undefined
+    await settingsStore.updateAlert(alert.uid)
+}
+const toggleAlertEnabled = async (alert: Alert): Promise<void> => {
+    alert.enabled = !alert.enabled
+    await settingsStore.updateAlert(alert.uid)
 }
 
 // Keeps a row's hover actions visible while its tag popover is open.
@@ -597,7 +613,70 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                 />
                 <span class="truncate">{{ alert.name }}</span>
                 <span
-                    class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
+                    class="ml-auto hidden items-center gap-0.5 group-hover:inline-flex"
+                    @click.prevent.stop
+                >
+                    <UiDropdownMenu v-if="alert.enabled">
+                        <template #trigger>
+                            <button
+                                type="button"
+                                class="rounded p-0.5 text-text-color-secondary hover:text-text-color"
+                                v-tooltip.top="t('views.alerts.silenceTooltip')"
+                            >
+                                <svg-icon type="mdi" :path="mdiBellSleepOutline" :size="14" />
+                            </button>
+                        </template>
+                        <DropdownMenuItem
+                            :class="dropdownItemClass"
+                            @select="silenceAlert(alert, 15)"
+                        >
+                            {{ t('views.alerts.silence15m') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :class="dropdownItemClass"
+                            @select="silenceAlert(alert, 60)"
+                        >
+                            {{ t('views.alerts.silence1h') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :class="dropdownItemClass"
+                            @select="silenceAlert(alert, 480)"
+                        >
+                            {{ t('views.alerts.silence8h') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            :class="dropdownItemClass"
+                            @select="silenceAlert(alert, 1440)"
+                        >
+                            {{ t('views.alerts.silence24h') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            v-if="alertIsSilenced(alert)"
+                            :class="dropdownItemClass"
+                            @select="unsilenceAlert(alert)"
+                        >
+                            {{ t('views.alerts.unsilence') }}
+                        </DropdownMenuItem>
+                    </UiDropdownMenu>
+                    <button
+                        type="button"
+                        class="rounded p-0.5 text-text-color-secondary hover:text-text-color"
+                        v-tooltip.top="
+                            alert.enabled
+                                ? t('views.alerts.disableAlert')
+                                : t('views.alerts.enableAlert')
+                        "
+                        @click="toggleAlertEnabled(alert)"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="alert.enabled ? mdiBellOffOutline : mdiBellOutline"
+                            :size="14"
+                        />
+                    </button>
+                </span>
+                <span
+                    class="drag-handle hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
                     <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
                 </span>

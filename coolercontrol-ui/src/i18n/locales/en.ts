@@ -774,6 +774,8 @@ export default {
             silence8h: 'Silence for 8 hours',
             silence24h: 'Silence for 24 hours',
             unsilence: 'Unsilence now',
+            enableAlert: 'Enable Alert',
+            disableAlert: 'Disable Alert',
             silencedUntil: 'Silenced until {time}',
             disabledLabel: 'Disabled',
             greaterThan: 'Greater Than',
