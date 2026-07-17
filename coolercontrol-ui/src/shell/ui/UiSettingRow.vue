@@ -26,7 +26,9 @@ withDefaults(defineProps<{ label?: string; description?: string }>(), {
 <template>
     <div class="flex items-center justify-between gap-6 px-4 py-3">
         <div class="flex min-w-0 flex-col">
-            <span class="inline-flex items-center gap-1.5 text-base text-text-color">
+            <!-- Plain span so long labels wrap; inline-flex made the text an
+                 anonymous flex item that refused to shrink and overflowed. -->
+            <span class="text-base text-text-color">
                 <slot name="label">{{ label }}</slot>
             </span>
             <span v-if="description" class="pt-0.5 text-sm text-text-color-secondary">
