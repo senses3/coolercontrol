@@ -27,13 +27,7 @@ import {
     mdiPower,
     mdiVolumeHigh,
 } from '@mdi/js'
-import {
-    DropdownMenuItem,
-    ScrollAreaRoot,
-    ScrollAreaScrollbar,
-    ScrollAreaThumb,
-    ScrollAreaViewport,
-} from 'reka-ui'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import {
     Alert,
@@ -51,8 +45,7 @@ import {
 import UiTag from '@/shell/ui/UiTag.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
-import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
-import { dropdownItemClass } from '@/shell/ui/dropdownItemClass.ts'
+import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -154,18 +147,6 @@ const silencedUntilText = (alert: Alert): string =>
         hour: '2-digit',
         minute: '2-digit',
     })
-const silenceAlert = async (alert: Alert, minutes: number): Promise<void> => {
-    alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
-    await settingsStore.updateAlert(alert.uid)
-}
-const unsilenceAlert = async (alert: Alert): Promise<void> => {
-    alert.silenced_until = undefined
-    await settingsStore.updateAlert(alert.uid)
-}
-const toggleEnabled = async (alert: Alert, enabled: boolean): Promise<void> => {
-    alert.enabled = enabled
-    await settingsStore.updateAlert(alert.uid)
-}
 // Latest log entry per alert: the moment it entered its current state.
 const lastLogTimes = computed(() => {
     const latest = new Map<string, string>()
@@ -316,7 +297,7 @@ const lastLogTimes = computed(() => {
                                     :size="14"
                                     v-tooltip.top="t('views.alerts.shutdownOnActivation')"
                                 />
-                                <UiDropdownMenu v-if="alert.enabled">
+                                <AlertSilenceMenu v-if="alert.enabled" :alert="alert">
                                     <template #trigger>
                                         <UiButton
                                             variant="ghost"
@@ -331,45 +312,15 @@ const lastLogTimes = computed(() => {
                                             />
                                         </UiButton>
                                     </template>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(alert, 15)"
-                                    >
-                                        {{ t('views.alerts.silence15m') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(alert, 60)"
-                                    >
-                                        {{ t('views.alerts.silence1h') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(alert, 480)"
-                                    >
-                                        {{ t('views.alerts.silence8h') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(alert, 1440)"
-                                    >
-                                        {{ t('views.alerts.silence24h') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        v-if="alertIsSilenced(alert)"
-                                        :class="dropdownItemClass"
-                                        @select="unsilenceAlert(alert)"
-                                    >
-                                        {{ t('views.alerts.unsilence') }}
-                                    </DropdownMenuItem>
-                                </UiDropdownMenu>
+                                </AlertSilenceMenu>
                                 <!-- Wrapper span: UiSwitch roots at a component, so the
                                      tooltip directive needs a plain element to attach to. -->
                                 <span v-tooltip.top="t('views.alerts.enabledTooltip')">
                                     <UiSwitch
                                         :model-value="alert.enabled"
                                         @update:model-value="
-                                            (value: boolean) => toggleEnabled(alert, value)
+                                            (value: boolean) =>
+                                                settingsStore.setAlertEnabled(alert.uid, value)
                                         "
                                     />
                                 </span>

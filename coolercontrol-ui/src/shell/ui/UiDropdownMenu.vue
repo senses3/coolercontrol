@@ -28,14 +28,10 @@ withDefaults(defineProps<{ align?: 'start' | 'center' | 'end'; sideOffset?: numb
     align: 'end',
     sideOffset: 2,
 })
-// Forwarded so hover-revealed triggers can stay rendered while the menu is
-// open (the modal menu suppresses :hover; a display:none anchor collapses
-// the positioning rect to the page origin).
-const emit = defineEmits<{ (e: 'update:open', open: boolean): void }>()
 </script>
 
 <template>
-    <DropdownMenuRoot @update:open="(open) => emit('update:open', open)">
+    <DropdownMenuRoot>
         <DropdownMenuTrigger as-child>
             <slot name="trigger" />
         </DropdownMenuTrigger>

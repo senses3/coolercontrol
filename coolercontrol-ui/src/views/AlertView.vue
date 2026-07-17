@@ -29,13 +29,7 @@ import {
 import { computed, onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import {
-    DropdownMenuItem,
-    ScrollAreaRoot,
-    ScrollAreaScrollbar,
-    ScrollAreaThumb,
-    ScrollAreaViewport,
-} from 'reka-ui'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import AlertLogTable from '@/components/AlertLogTable.vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
@@ -45,8 +39,7 @@ import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
 import { Alert, alertIsSilenced, alertSources } from '@/models/Alert.ts'
 import UiTag from '@/shell/ui/UiTag.vue'
-import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
-import { dropdownItemClass } from '@/shell/ui/dropdownItemClass.ts'
+import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -309,16 +302,6 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     return false
 }
 
-// Silencing acts on the saved alert immediately (like the overview cards);
-// unsaved form edits stay pending in their refs.
-const silenceAlert = async (minutes: number): Promise<void> => {
-    alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
-    await settingsStore.updateAlert(alert.uid)
-}
-const unsilenceAlert = async (): Promise<void> => {
-    alert.silenced_until = undefined
-    await settingsStore.updateAlert(alert.uid)
-}
 const silencedUntilText = (): string =>
     new Date(alert.silenced_until!).toLocaleString([], {
         day: 'numeric',
@@ -620,7 +603,7 @@ onMounted(async () => {
                                     "
                                     severity="warn"
                                 />
-                                <UiDropdownMenu>
+                                <AlertSilenceMenu :alert="alert">
                                     <template #trigger>
                                         <UiButton variant="ghost" size="icon">
                                             <svg-icon
@@ -630,38 +613,7 @@ onMounted(async () => {
                                             />
                                         </UiButton>
                                     </template>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(15)"
-                                    >
-                                        {{ t('views.alerts.silence15m') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(60)"
-                                    >
-                                        {{ t('views.alerts.silence1h') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(480)"
-                                    >
-                                        {{ t('views.alerts.silence8h') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        :class="dropdownItemClass"
-                                        @select="silenceAlert(1440)"
-                                    >
-                                        {{ t('views.alerts.silence24h') }}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        v-if="alertIsSilenced(alert)"
-                                        :class="dropdownItemClass"
-                                        @select="unsilenceAlert()"
-                                    >
-                                        {{ t('views.alerts.unsilence') }}
-                                    </DropdownMenuItem>
-                                </UiDropdownMenu>
+                                </AlertSilenceMenu>
                             </div>
                         </UiSettingRow>
                     </UiSettingsCard>

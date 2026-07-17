@@ -1028,6 +1028,39 @@ export const useSettingsStore = defineStore('settings', () => {
         }
     }
 
+    // Alert quiet controls. These own the silence/enable contract (timestamp
+    // math, unsilence = undefined) and roll the optimistic mutation back if
+    // the daemon rejects the update.
+    async function silenceAlert(alertUID: UID, minutes: number): Promise<boolean> {
+        const alert = alerts.value.find((entry) => entry.uid === alertUID)
+        if (alert == null) return false
+        const previous = alert.silenced_until
+        alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
+        const successful = await updateAlert(alertUID)
+        if (!successful) alert.silenced_until = previous
+        return successful
+    }
+
+    async function unsilenceAlert(alertUID: UID): Promise<boolean> {
+        const alert = alerts.value.find((entry) => entry.uid === alertUID)
+        if (alert == null) return false
+        const previous = alert.silenced_until
+        alert.silenced_until = undefined
+        const successful = await updateAlert(alertUID)
+        if (!successful) alert.silenced_until = previous
+        return successful
+    }
+
+    async function setAlertEnabled(alertUID: UID, enabled: boolean): Promise<boolean> {
+        const alert = alerts.value.find((entry) => entry.uid === alertUID)
+        if (alert == null) return false
+        const previous = alert.enabled
+        alert.enabled = enabled
+        const successful = await updateAlert(alertUID)
+        if (!successful) alert.enabled = previous
+        return successful
+    }
+
     async function deleteAlert(alertUID: UID): Promise<boolean> {
         console.debug('Deleting Alert')
         const response = await deviceStore.daemonClient.deleteAlert(alertUID)
@@ -1538,6 +1571,9 @@ export const useSettingsStore = defineStore('settings', () => {
         loadAlertsAndLogs,
         createAlert,
         updateAlert,
+        silenceAlert,
+        unsilenceAlert,
+        setAlertEnabled,
         deleteAlert,
         healthFailsafe,
         healthMissing,
