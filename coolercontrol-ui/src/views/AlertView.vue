@@ -21,6 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiAlertOutline,
+    mdiBellSleepOutline,
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiTrashCanOutline,
@@ -28,7 +29,13 @@ import {
 import { computed, onMounted, ref, toRaw, type Ref, watch } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
+import {
+    DropdownMenuItem,
+    ScrollAreaRoot,
+    ScrollAreaScrollbar,
+    ScrollAreaThumb,
+    ScrollAreaViewport,
+} from 'reka-ui'
 import AlertLogTable from '@/components/AlertLogTable.vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
@@ -36,7 +43,10 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import UiGroupedListbox from '@/shell/ui/UiGroupedListbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
-import { Alert, alertSources } from '@/models/Alert.ts'
+import { Alert, alertIsSilenced, alertSources } from '@/models/Alert.ts'
+import UiTag from '@/shell/ui/UiTag.vue'
+import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
+import { dropdownItemClass } from '@/shell/ui/dropdownItemClass.ts'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -299,6 +309,24 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     return false
 }
 
+// Silencing acts on the saved alert immediately (like the overview cards);
+// unsaved form edits stay pending in their refs.
+const silenceAlert = async (minutes: number): Promise<void> => {
+    alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
+    await settingsStore.updateAlert(alert.uid)
+}
+const unsilenceAlert = async (): Promise<void> => {
+    alert.silenced_until = undefined
+    await settingsStore.updateAlert(alert.uid)
+}
+const silencedUntilText = (): string =>
+    new Date(alert.silenced_until!).toLocaleString([], {
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
+
 const updateValues = (): void => {
     for (const channelDevice of channelSources.value) {
         for (const channel of channelDevice.channels) {
@@ -560,10 +588,7 @@ onMounted(async () => {
                     />
                 </div>
                 <div class="flex w-96 flex-col">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.alerts.triggerConditions') }}
-                    </small>
-                    <UiSettingsCard class="mb-0 mt-1">
+                    <UiSettingsCard class="mb-0" :title="t('views.alerts.sectionGeneral')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.enabledTooltip')"
                             :label="t('views.alerts.enabled')"
@@ -572,6 +597,67 @@ onMounted(async () => {
                                 <UiSwitch v-model="chosenEnabled" />
                             </div>
                         </UiSettingRow>
+                        <UiSettingRow
+                            v-if="!shouldCreateAlert"
+                            v-tooltip.top="t('views.alerts.silenceTooltip')"
+                            :label="t('views.alerts.silence')"
+                        >
+                            <div class="flex items-center justify-end gap-2">
+                                <UiTag
+                                    v-if="alertIsSilenced(alert)"
+                                    :value="
+                                        t('views.alerts.silencedUntil', {
+                                            time: silencedUntilText(),
+                                        })
+                                    "
+                                    severity="warn"
+                                />
+                                <UiDropdownMenu>
+                                    <template #trigger>
+                                        <UiButton variant="ghost" size="icon">
+                                            <svg-icon
+                                                type="mdi"
+                                                :path="mdiBellSleepOutline"
+                                                :size="deviceStore.getREMSize(1.25)"
+                                            />
+                                        </UiButton>
+                                    </template>
+                                    <DropdownMenuItem
+                                        :class="dropdownItemClass"
+                                        @select="silenceAlert(15)"
+                                    >
+                                        {{ t('views.alerts.silence15m') }}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        :class="dropdownItemClass"
+                                        @select="silenceAlert(60)"
+                                    >
+                                        {{ t('views.alerts.silence1h') }}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        :class="dropdownItemClass"
+                                        @select="silenceAlert(480)"
+                                    >
+                                        {{ t('views.alerts.silence8h') }}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        :class="dropdownItemClass"
+                                        @select="silenceAlert(1440)"
+                                    >
+                                        {{ t('views.alerts.silence24h') }}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        v-if="alertIsSilenced(alert)"
+                                        :class="dropdownItemClass"
+                                        @select="unsilenceAlert()"
+                                    >
+                                        {{ t('views.alerts.unsilence') }}
+                                    </DropdownMenuItem>
+                                </UiDropdownMenu>
+                            </div>
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard class="mt-4" :title="t('views.alerts.triggerConditions')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.maxValueTooltip')"
                             :label="t('views.alerts.greaterThan')"
@@ -672,6 +758,8 @@ onMounted(async () => {
                                 />
                             </div>
                         </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard class="mt-4" :title="t('views.alerts.sectionNotifications')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.desktopNotifyTooltip')"
                             :label="t('views.alerts.desktopNotify')"
@@ -717,6 +805,8 @@ onMounted(async () => {
                                 />
                             </div>
                         </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard class="mt-4" :title="t('views.alerts.sectionActions')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.shutdownOnActivationTooltip')"
                             :label="t('views.alerts.shutdownOnActivation')"

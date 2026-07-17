@@ -763,6 +763,10 @@ export default {
                 'Re-send the desktop notification at this interval while the alert stays active.\n0 disables repeat notifications.',
             enabled: 'enabled',
             enabledTooltip: 'A disabled alert is not evaluated at all.',
+            sectionGeneral: 'General',
+            sectionNotifications: 'Notifications',
+            sectionActions: 'Actions',
+            silence: 'silence',
             silenceTooltip:
                 'Silence: suppress notifications and shutdown for a while.\nThe alert still evaluates and shows its state.',
             silence15m: 'Silence for 15 minutes',
