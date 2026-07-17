@@ -76,8 +76,20 @@ const onInput = (event: Event): void => {
     const value = Number((event.target as HTMLInputElement).value)
     if (!Number.isNaN(value)) model.value = clamp(value)
 }
+// Fractional steps keep a fixed precision: 10.5 + 0.5 reads 11.0, not 11.
+// A finer value typed by hand keeps its own precision.
+const decimalsOf = (value: number | undefined): number => {
+    const text = String(value ?? '')
+    const dot = text.indexOf('.')
+    return dot === -1 ? 0 : text.length - dot - 1
+}
+const displayValue = computed(() => {
+    if (model.value == null) return ''
+    const digits = Math.max(decimalsOf(props.step), decimalsOf(model.value))
+    return digits > 0 ? model.value.toFixed(digits) : String(model.value)
+})
 // Size the input to its content so the suffix hugs the number.
-const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 1) + 1}ch`)
+const inputWidth = computed(() => `${Math.max(displayValue.value.length, 1) + 1}ch`)
 </script>
 
 <template>
@@ -101,7 +113,7 @@ const inputWidth = computed(() => `${Math.max(String(model.value ?? '').length, 
             </span>
             <input
                 type="number"
-                :value="model"
+                :value="displayValue"
                 :min="min"
                 :max="max"
                 :step="step"
