@@ -299,8 +299,8 @@ const persistAlertOrder = (): void => {
 const activeAlertCount = computed(
     () => settingsStore.alerts.filter((alert) => alert.state === AlertState.Active).length,
 )
-// Menu glyph priority: disabled > silenced > active > watching, matching the
-// overview cards so a silenced or disabled alert is obvious at a glance.
+// Menu glyph: shape encodes silenced/disabled, color keeps the live state
+// (silenced alerts still evaluate; a red sleep bell means firing-but-muted).
 const alertMenuIcon = (alert: Alert): string => {
     if (!alert.enabled) return mdiBellOffOutline
     if (alertIsSilenced(alert)) return mdiBellSleepOutline
@@ -308,7 +308,6 @@ const alertMenuIcon = (alert: Alert): string => {
 }
 const alertMenuIconClass = (alert: Alert): string => {
     if (!alert.enabled) return 'text-text-color-secondary'
-    if (alertIsSilenced(alert)) return 'text-yellow'
     return alert.state === AlertState.Active ? 'text-error' : 'text-success'
 }
 

@@ -197,17 +197,14 @@ const lastLogTimes = computed(() => {
                         @click="onRowSelect(alert.uid)"
                     >
                         <div class="flex items-center gap-2">
-                            <!-- Silence wins the icon: the sleep bell in the tag's yellow
-                                 makes silenced alerts obvious at a glance. -->
+                            <!-- Shape encodes silenced, color keeps the live state:
+                                 a red sleep bell means firing-but-muted. -->
                             <svg-icon
                                 type="mdi"
                                 class="shrink-0"
                                 :class="{
-                                    'text-yellow': alert.enabled && alertIsSilenced(alert),
                                     'text-error':
-                                        alert.enabled &&
-                                        !alertIsSilenced(alert) &&
-                                        alert.state === AlertState.Active,
+                                        alert.enabled && alert.state === AlertState.Active,
                                 }"
                                 :path="
                                     alert.enabled && alertIsSilenced(alert)
