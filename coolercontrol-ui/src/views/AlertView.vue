@@ -571,14 +571,16 @@ onMounted(async () => {
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
             <div class="flex flex-col-reverse items-start lg:flex-row mt-0 w-full">
-                <div class="flex w-96 flex-col self-stretch mr-4">
+                <!-- Stacked (below lg) the listbox needs its own height: the
+                     flex-1/basis-0 fill only works next to the settings column. -->
+                <div class="flex w-full max-w-96 flex-col self-stretch mt-4 lg:mt-0 lg:mr-4">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.channelSources') }}
                     </small>
                     <UiGroupedListbox
                         :model-value="chosenChannelKeys"
                         multiple
-                        class="mt-1 min-h-0 flex-1 basis-0"
+                        class="mt-1 h-96 min-h-0 lg:h-auto lg:flex-1 lg:basis-0"
                         :groups="sourceGroups"
                         filter
                         :filter-placeholder="t('common.search')"
@@ -587,7 +589,7 @@ onMounted(async () => {
                         @update:model-value="onSourcesChange"
                     />
                 </div>
-                <div class="flex w-96 flex-col">
+                <div class="flex w-full max-w-96 flex-col">
                     <UiSettingsCard class="mb-0" :title="t('views.alerts.sectionGeneral')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.enabledTooltip')"
