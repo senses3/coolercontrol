@@ -266,6 +266,7 @@ const inputClasses =
                         color-format="hex"
                         :default-color="DEFAULT_TAG_COLOR"
                         :size="1.5"
+                        @reset="newTagColor = DEFAULT_TAG_COLOR"
                     />
                     <input
                         v-model="newTagName"
