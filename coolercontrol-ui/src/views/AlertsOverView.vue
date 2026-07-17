@@ -349,13 +349,16 @@ const lastLogTimes = computed(() => {
                                         {{ t('views.alerts.unsilence') }}
                                     </DropdownMenuItem>
                                 </UiDropdownMenu>
-                                <UiSwitch
-                                    :model-value="alert.enabled"
-                                    v-tooltip.top="t('views.alerts.enabledTooltip')"
-                                    @update:model-value="
-                                        (value: boolean) => toggleEnabled(alert, value)
-                                    "
-                                />
+                                <!-- Wrapper span: UiSwitch roots at a component, so the
+                                     tooltip directive needs a plain element to attach to. -->
+                                <span v-tooltip.top="t('views.alerts.enabledTooltip')">
+                                    <UiSwitch
+                                        :model-value="alert.enabled"
+                                        @update:model-value="
+                                            (value: boolean) => toggleEnabled(alert, value)
+                                        "
+                                    />
+                                </span>
                             </span>
                         </div>
                     </div>
