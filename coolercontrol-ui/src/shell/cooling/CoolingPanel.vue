@@ -297,7 +297,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
@@ -418,7 +418,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"

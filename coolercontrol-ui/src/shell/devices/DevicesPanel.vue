@@ -210,7 +210,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                         </UiTooltip>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                     >
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -291,7 +291,7 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                                 </UiTooltip>
                             </RouterLink>
                             <div
-                                class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                                class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                                 :class="{
                                     '!flex': openTagRow === `${device.uid}-${sensorName}`,
                                 }"
