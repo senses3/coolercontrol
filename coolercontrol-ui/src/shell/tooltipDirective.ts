@@ -161,7 +161,12 @@ export const tooltipDirective: Directive<
 > = {
     mounted(host, binding) {
         host.$ccTooltip = parseOptions(binding)
-        host.$ccTooltipShow = () => show(host)
+        // Focus shows the tooltip only for keyboard-driven focus. Mouse
+        // clicks, and the focus a dropdown restores to its trigger on close,
+        // leave the pointer elsewhere and must stay quiet.
+        host.$ccTooltipShow = () => {
+            if (host.matches(':focus-visible')) show(host)
+        }
         host.$ccTooltipShowDelayed = () => scheduleShow(host)
         host.$ccTooltipHide = () => {
             cancelShow(host)
