@@ -176,6 +176,10 @@ export const tooltipDirective: Directive<
         host.addEventListener('mouseleave', host.$ccTooltipHide)
         host.addEventListener('focusin', host.$ccTooltipShow)
         host.addEventListener('focusout', host.$ccTooltipHide)
+        // Activation dismisses the tooltip: it has served its purpose, and it
+        // stays hidden until the pointer leaves and re-enters (no mouseenter
+        // fires while the pointer stays put).
+        host.addEventListener('pointerdown', host.$ccTooltipHide)
     },
     updated(host, binding) {
         const options = parseOptions(binding)
@@ -201,6 +205,7 @@ export const tooltipDirective: Directive<
         if (host.$ccTooltipHide != null) {
             host.removeEventListener('mouseleave', host.$ccTooltipHide)
             host.removeEventListener('focusout', host.$ccTooltipHide)
+            host.removeEventListener('pointerdown', host.$ccTooltipHide)
         }
     },
 }
