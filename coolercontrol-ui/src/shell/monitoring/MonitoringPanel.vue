@@ -21,9 +21,11 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlert,
+    mdiBellOffOutline,
     mdiBellOutline,
     mdiBellPlusOutline,
     mdiBellRingOutline,
+    mdiBellSleepOutline,
     mdiDragVertical,
     mdiFanAlert,
     mdiHome,
@@ -39,7 +41,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Color, Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
-import { AlertState } from '@/models/Alert.ts'
+import { Alert, alertIsSilenced, AlertState } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -297,6 +299,18 @@ const persistAlertOrder = (): void => {
 const activeAlertCount = computed(
     () => settingsStore.alerts.filter((alert) => alert.state === AlertState.Active).length,
 )
+// Menu glyph priority: disabled > silenced > active > watching, matching the
+// overview cards so a silenced or disabled alert is obvious at a glance.
+const alertMenuIcon = (alert: Alert): string => {
+    if (!alert.enabled) return mdiBellOffOutline
+    if (alertIsSilenced(alert)) return mdiBellSleepOutline
+    return alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline
+}
+const alertMenuIconClass = (alert: Alert): string => {
+    if (!alert.enabled) return 'text-text-color-secondary'
+    if (alertIsSilenced(alert)) return 'text-yellow'
+    return alert.state === AlertState.Active ? 'text-error' : 'text-success'
+}
 
 // Keeps a row's hover actions visible while its tag popover is open.
 const openTagRow = ref<string | null>(null)
@@ -576,10 +590,10 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             >
                 <svg-icon
                     type="mdi"
-                    :path="alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline"
+                    :path="alertMenuIcon(alert)"
                     :size="14"
                     class="shrink-0"
-                    :class="alert.state === AlertState.Active ? 'text-error' : 'text-success'"
+                    :class="alertMenuIconClass(alert)"
                 />
                 <span class="truncate">{{ alert.name }}</span>
                 <span
