@@ -128,7 +128,7 @@ const isUnhealthy = computed(() =>
                 <template #trigger>
                     <button
                         type="button"
-                        class="ml-auto hidden shrink-0 rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block"
+                        class="ml-auto hidden shrink-0 rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block data-[state=open]:block"
                         v-tooltip.top="t('layout.shell.coolingPage.guidedSetup')"
                         @click.stop.prevent
                     >

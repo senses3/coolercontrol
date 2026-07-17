@@ -42,9 +42,9 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
     (e: 'open', value: boolean): void
-    // The Reset button (shown only when default-color is provided) closes the
-    // popup; the parent applies the actual reset, typically by clearing the
-    // stored user color so the non-user-defined color takes over again.
+    // Emitted instead of a save when the chosen color equals default-color:
+    // the parent clears its stored user color so the non-user-defined color
+    // takes over again (and keeps tracking future palette changes).
     (e: 'reset'): void
 }>()
 
@@ -79,22 +79,29 @@ const popoverOpen = ref(false)
 // used to help determine closing behavior, whether closed by OK or clicking away/cancel.
 let newColorApplied: boolean = false
 
-const closeAndReset = (): void => {
-    if (props.defaultColor != null) {
-        currentColor.value = colorStore.rgbToHex(props.defaultColor)
-    }
-    newColorApplied = true
-    emit('reset')
-    popoverOpen.value = false
+// Preview only: shows the default in the picker and stays open for review;
+// nothing applies until Save.
+const resetToDefault = (): void => {
+    if (props.defaultColor == null) return
+    currentColor.value = colorStore.rgbToHex(props.defaultColor)
 }
 const closeAndSave = (): void => {
     if (!colorStore.isValidHex(currentColor.value)) return
     newColorApplied = true
-    colorModel.value =
-        colorFormat.value === ColorFormat.HEX
-            ? currentColor.value
-            : colorStore.hexToRgbString(currentColor.value)
-    // note: the color model is updated with a reactive delay, so logging is error-prone
+    if (
+        props.defaultColor != null &&
+        currentColor.value.toLowerCase() === colorStore.rgbToHex(props.defaultColor).toLowerCase()
+    ) {
+        // Saving the exact default clears the user override instead of
+        // pinning the default as a new user color.
+        emit('reset')
+    } else {
+        colorModel.value =
+            colorFormat.value === ColorFormat.HEX
+                ? currentColor.value
+                : colorStore.hexToRgbString(currentColor.value)
+        // note: the color model is updated with a reactive delay, so logging is error-prone
+    }
     popoverOpen.value = false
 }
 // Close on Escape regardless of where focus sits: clicking the picker
@@ -196,7 +203,7 @@ const handleRedIssue = (newColor: Color): void => {
                                 v-if="defaultColor != null"
                                 variant="outline"
                                 class="mr-4"
-                                @click.stop="closeAndReset"
+                                @click.stop="resetToDefault"
                             >
                                 {{ t('common.reset') }}
                             </UiButton>
