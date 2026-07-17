@@ -18,7 +18,7 @@
 
 import { UID } from '@/models/Device.ts'
 import { Type } from 'class-transformer'
-import { ChannelSource } from '@/models/ChannelSource.ts'
+import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import { v4 as uuidV4 } from 'uuid'
 import i18n from '@/i18n'
 import { mdiAlertCircle, mdiBellOutline, mdiBellRingOutline, mdiHelp } from '@mdi/js'
@@ -57,8 +57,11 @@ export class Alert {
         warmup_duration: number,
     ) {
         this.name = name
-        this.channel_sources = channel_sources
-        this.channel_source = channel_sources[0]
+        // class-transformer instantiates with no arguments and assigns the
+        // payload fields afterwards, so every argument may be undefined here.
+        this.channel_sources = channel_sources ?? []
+        this.channel_source =
+            this.channel_sources[0] ?? new ChannelSource('', '', ChannelMetric.Temp)
         this.min = min
         this.max = max
         this.warmup_duration = warmup_duration
