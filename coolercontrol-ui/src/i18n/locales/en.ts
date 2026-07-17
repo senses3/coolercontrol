@@ -734,7 +734,7 @@ export default {
         },
         alerts: {
             range: 'Range: {min} to {max}{unit}',
-            since: 'since {time}',
+            stateSince: '{state} since {time}',
             createAlert: 'Create Alert',
             editAlert: 'Edit Alert',
             deleteAlert: 'Delete Alert',

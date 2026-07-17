@@ -276,9 +276,15 @@ const lastLogTimes = computed(() => {
                         <div
                             class="mt-auto flex items-center gap-2 text-sm text-text-color-secondary"
                         >
-                            <span v-if="lastLogTimes.get(alert.uid) != null" class="truncate">
+                            <!-- The latest state transition: when the alert entered its
+                                 current state. Meaningless while disabled (not evaluated). -->
+                            <span
+                                v-if="alert.enabled && lastLogTimes.get(alert.uid) != null"
+                                class="truncate"
+                            >
                                 {{
-                                    t('views.alerts.since', {
+                                    t('views.alerts.stateSince', {
+                                        state: getAlertStateDisplayName(alert.state!),
                                         time: new Date(
                                             lastLogTimes.get(alert.uid)!,
                                         ).toLocaleString(),
