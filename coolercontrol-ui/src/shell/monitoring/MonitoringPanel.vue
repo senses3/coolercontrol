@@ -189,9 +189,10 @@ const createAlert = (sensor: MonitoringSensor): void => {
     }
     if (kind === 'fan') {
         query.metric = ChannelMetric.RPM
-        // Alert when the fan drops to 0 rpm; the upper bound is effectively open.
+        // Alert when the fan drops to 0 rpm; the upper bound is effectively
+        // open (the editor's RPM ceiling, above any real fan).
         query.min = '1'
-        query.max = '100000'
+        query.max = '30000'
         query.name = `${sensorLabel(sensor.deviceUID, sensor.channelName)} ${t('layout.shell.monitoringPanel.failAlertSuffix')}`
     } else {
         query.metric = ChannelMetric.Temp
