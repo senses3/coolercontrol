@@ -712,7 +712,7 @@ onMounted(async () => {
                 </span>
             </div>
             <div class="w-full flex flex-col lg:flex-row">
-                <div class="mt-0 mr-4 w-96">
+                <div class="mt-0 lg:mr-4 w-full max-w-96">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.sensorType') }}
                     </small>
@@ -734,7 +734,10 @@ onMounted(async () => {
                         </template>
                     </UiListbox>
                 </div>
-                <div v-if="selectedSensorType === CustomSensorType.Mix" class="mt-0 w-96">
+                <div
+                    v-if="selectedSensorType === CustomSensorType.Mix"
+                    class="mt-4 lg:mt-0 w-full max-w-96"
+                >
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.mixFunction') }}
                     </small>
@@ -748,7 +751,7 @@ onMounted(async () => {
                 </div>
                 <div
                     v-if="selectedSensorType === CustomSensorType.Offset"
-                    class="flex flex-col mt-1 w-96 mb-28"
+                    class="flex flex-col mt-1 w-full max-w-96 mb-28"
                 >
                     <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.offset') }}
@@ -768,7 +771,7 @@ onMounted(async () => {
                         selectedSensorType === CustomSensorType.TimeAverage ||
                         selectedSensorType === CustomSensorType.ExponentialMovingAvg
                     "
-                    class="flex flex-col mt-1 w-96 mb-28"
+                    class="flex flex-col mt-1 w-full max-w-96 mb-28"
                 >
                     <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.timeWindow') }}
@@ -790,7 +793,7 @@ onMounted(async () => {
                 </div>
                 <div
                     v-else-if="selectedSensorType === CustomSensorType.File"
-                    class="flex flex-col w-96 mt-1"
+                    class="flex flex-col w-full max-w-96 mt-1"
                 >
                     <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempFile') }}
@@ -823,7 +826,7 @@ onMounted(async () => {
                 v-if="selectedSensorType === CustomSensorType.Mix"
                 class="flex flex-col lg:flex-row mt-0 w-full"
             >
-                <div class="w-96 mr-4">
+                <div class="w-full max-w-xl lg:mr-4">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempSources') }}
                     </small>
@@ -843,7 +846,7 @@ onMounted(async () => {
                 </div>
                 <div
                     v-if="selectedMixFunction === CustomSensorMixFunctionType.WeightedAvg"
-                    class="w-96"
+                    class="w-full max-w-xl mt-4 lg:mt-0"
                     v-tooltip.top="t('views.customSensors.tempWeights')"
                 >
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
@@ -884,7 +887,7 @@ onMounted(async () => {
                 v-if="selectedSensorType === CustomSensorType.Offset"
                 class="flex flex-col lg:flex-row mt-0 w-full"
             >
-                <div class="w-96 mr-4">
+                <div class="w-full max-w-xl lg:mr-4">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempSource') }}
                     </small>
@@ -902,7 +905,7 @@ onMounted(async () => {
                 v-if="selectedSensorType === CustomSensorType.TimeAverage"
                 class="flex flex-col lg:flex-row mt-0 w-full"
             >
-                <div class="w-96 mr-4">
+                <div class="w-full max-w-xl lg:mr-4">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempSource') }}
                     </small>
@@ -920,7 +923,7 @@ onMounted(async () => {
                 v-if="selectedSensorType === CustomSensorType.ExponentialMovingAvg"
                 class="flex flex-col lg:flex-row mt-0 w-full"
             >
-                <div class="w-96 mr-4">
+                <div class="w-full max-w-xl lg:mr-4">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.customSensors.tempSource') }}
                     </small>
