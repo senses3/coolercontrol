@@ -85,7 +85,7 @@ const summary = computed((): string => {
                     multiple
                     :filter="filter"
                     :filter-placeholder="filterPlaceholder"
-                    class="max-h-96 w-72 overflow-hidden shadow-overlay"
+                    class="max-h-96 w-72 overflow-hidden shadow-overlay-lg"
                 />
             </PopoverContent>
         </PopoverPortal>

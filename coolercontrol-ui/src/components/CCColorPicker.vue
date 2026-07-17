@@ -23,7 +23,7 @@ import { mdiPalette } from '@mdi/js'
 import { Color } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { ChromePicker, CompactPicker } from 'vue-color'
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import { computed, nextTick, ref, Ref, watch } from 'vue'
@@ -144,49 +144,51 @@ const handleRedIssue = (newColor: Color): void => {
                 />
             </div>
         </PopoverTrigger>
-        <PopoverContent side="bottom" align="start" class="z-50" @click.stop>
-            <div
-                class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color shadow-overlay"
-                @click.stop
-            >
-                <div>
-                    <ChromePicker
-                        v-model="currentColor"
-                        disable-alpha
-                        disable-fields
-                        class="!w-[32rem]"
-                        @click.stop
-                    />
-                    <CompactPicker
-                        v-model="currentColor"
-                        class="!w-[32rem]"
-                        :palette="settingsStore.predefinedColorOptions"
-                        @update:modelValue="handleRedIssue"
-                        @click.stop
-                    />
-                </div>
-                <div class="flex flex-row justify-between mt-4 w-full">
-                    <UiInput
-                        id="property-color"
-                        v-model="currentColor"
-                        class="w-32"
-                        :class="{ '!border-error': !colorStore.isValidHex(currentColor) }"
-                        @keydown.enter.prevent="closeAndSave"
-                    />
-                    <div class="text-right justify-end">
-                        <UiButton variant="outline" class="mr-4" @click.stop="closeAndReset">
-                            {{ t('common.reset') }}
-                        </UiButton>
-                        <UiButton
-                            :disabled="!colorStore.isValidHex(currentColor)"
-                            @click.stop="closeAndSave"
-                        >
-                            {{ t('common.save') }}
-                        </UiButton>
+        <PopoverPortal>
+            <PopoverContent side="bottom" align="start" class="z-[1300]" @click.stop>
+                <div
+                    class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color shadow-overlay-lg"
+                    @click.stop
+                >
+                    <div>
+                        <ChromePicker
+                            v-model="currentColor"
+                            disable-alpha
+                            disable-fields
+                            class="!w-[32rem]"
+                            @click.stop
+                        />
+                        <CompactPicker
+                            v-model="currentColor"
+                            class="!w-[32rem]"
+                            :palette="settingsStore.predefinedColorOptions"
+                            @update:modelValue="handleRedIssue"
+                            @click.stop
+                        />
+                    </div>
+                    <div class="flex flex-row justify-between mt-4 w-full">
+                        <UiInput
+                            id="property-color"
+                            v-model="currentColor"
+                            class="w-32"
+                            :class="{ '!border-error': !colorStore.isValidHex(currentColor) }"
+                            @keydown.enter.prevent="closeAndSave"
+                        />
+                        <div class="text-right justify-end">
+                            <UiButton variant="outline" class="mr-4" @click.stop="closeAndReset">
+                                {{ t('common.reset') }}
+                            </UiButton>
+                            <UiButton
+                                :disabled="!colorStore.isValidHex(currentColor)"
+                                @click.stop="closeAndSave"
+                            >
+                                {{ t('common.save') }}
+                            </UiButton>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </PopoverContent>
+            </PopoverContent>
+        </PopoverPortal>
     </PopoverRoot>
 </template>
 
