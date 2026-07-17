@@ -558,9 +558,6 @@ onMounted(async () => {
                         v-tooltip.top="t('views.alerts.channelSourcesTooltip')"
                         @update:model-value="onSourcesChange"
                     />
-                    <small class="ml-3 mt-1 text-xs text-text-color-secondary">
-                        {{ t('views.alerts.sameMetricHint') }}
-                    </small>
                 </div>
                 <div class="flex w-96 flex-col">
                     <small class="ml-3 font-light text-sm text-text-color-secondary">

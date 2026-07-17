@@ -748,8 +748,8 @@ export default {
             deleteAlertConfirm: 'Are you sure you want to delete: "{name}"?',
             saveAlert: 'Save Alert',
             channelSources: 'Channel Sources for Alert',
-            channelSourcesTooltip: 'The channel sources watched by this Alert',
-            sameMetricHint: 'One sensor type per Alert: the first pick filters the rest.',
+            channelSourcesTooltip:
+                'The channel sources watched by this Alert.\nOne sensor type per Alert: the first pick filters the rest.',
             triggerConditions: 'Trigger Conditions',
             maxValueTooltip: 'Values above this will trigger the alert.',
             minValueTooltip: 'Values below this will trigger the alert.',
