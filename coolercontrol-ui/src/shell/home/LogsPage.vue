@@ -21,10 +21,12 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
 
 const deviceStore = useDeviceStore()
+const daemonState = useDaemonState()
 const route = useRoute()
 const { t } = useI18n({ useScope: 'global' })
 
@@ -97,6 +99,13 @@ onMounted(() => {
             </h1>
             <span class="flex items-center gap-3">
                 <UiToggleGroup v-model="levelFilter" :options="levelOptions" />
+                <UiButton
+                    variant="outline"
+                    :disabled="daemonState.status === DaemonStatus.OK"
+                    @click="daemonState.acknowledgeLogIssues()"
+                >
+                    {{ t('views.appInfo.acknowledgeIssues') }}
+                </UiButton>
                 <a :href="downloadLogHref" :download="downloadLogFileName">
                     <UiButton variant="outline">
                         {{ t('views.appInfo.downloadCurrentLog') }}

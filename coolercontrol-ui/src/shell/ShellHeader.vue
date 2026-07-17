@@ -60,6 +60,12 @@ const statusColor = computed(() => {
             return 'bg-error'
     }
 })
+// A degraded status jumps straight to the logs, pre-filtered to warnings.
+const statusTarget = computed(() =>
+    daemonState.status === DaemonStatus.OK
+        ? { name: 'section-home' }
+        : { name: 'home-logs', query: { level: 'warn' } },
+)
 
 const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
@@ -106,7 +112,7 @@ const isMobile = computed(() => width.value < 768)
         </UiTooltip>
         <UiTooltip :text="daemonState.status">
             <RouterLink
-                :to="{ name: 'section-home' }"
+                :to="statusTarget"
                 class="flex items-center gap-2.5 rounded-lg px-1 py-0.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <span class="h-2.5 w-2.5 rounded-full" :class="statusColor" />
