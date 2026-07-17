@@ -353,7 +353,9 @@ const valueMax = (metric: ChannelMetric | undefined): number => {
         case ChannelMetric.Duty:
         case ChannelMetric.Load:
             return 100
+        // Small server fans (40/60mm Delta, San Ace) reach ~20k RPM.
         case ChannelMetric.RPM:
+            return 30_000
         case ChannelMetric.Freq:
             return 10_000
         case ChannelMetric.Temp:
