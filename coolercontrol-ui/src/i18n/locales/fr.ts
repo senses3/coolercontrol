@@ -754,8 +754,9 @@ export default {
             proceed: 'Continuer',
         },
         alerts: {
-            range: 'Plage : {min} à {max}{unit}',
-            since: 'depuis {time}',
+            triggersOutside: 'se déclenche en dessous de {min} ou au-dessus de {max}{unit}',
+            triggersAbove: 'se déclenche au-dessus de {max}{unit}',
+            stateSince: '{state} depuis {time}',
             createAlert: 'Créer une Alerte',
             editAlert: "Modifier l'Alerte",
             deleteAlert: "Supprimer l'Alerte",
@@ -767,13 +768,37 @@ export default {
             alertRecovered: 'Alerte Récupérée',
             deleteAlertConfirm: 'Êtes-vous sûr de vouloir supprimer : "{name}" ?',
             saveAlert: "Enregistrer l'Alerte",
-            channelSource: "Source de Canal pour l'Alerte",
-            channelSourceTooltip: "La source de canal à utiliser pour l'Alerte",
+            channelSources: "Sources de Canal pour l'Alerte",
+            channelSourcesTooltip:
+                'Les sources de canal surveillées par cette Alerte.\nUn type de capteur par Alerte : la première sélection filtre les autres.',
             triggerConditions: 'Conditions de Déclenchement',
             maxValueTooltip: "Les valeurs au-dessus de ceci déclencheront l'alerte.",
             minValueTooltip: "Les valeurs en dessous de ceci déclencheront l'alerte.",
             warmupDurationTooltip:
                 "Durée pendant laquelle une condition doit être active avant que l'alerte soit considérée comme active.\nCette durée est vérifiée uniquement à intervalles réguliers\net peut donc varier.",
+            cooldownDurationTooltip:
+                "Durée pendant laquelle la valeur doit rester dans la plage avant que l'alerte récupère.\nÉvite les allers-retours rapides entre déclenchée et résolue.",
+            cooldownLessThan: 'condition récupérée plus longtemps que',
+            repeatInterval: 'Répéter la notification toutes les',
+            repeatIntervalTooltip:
+                "Renvoyer la notification de bureau à cet intervalle tant que l'alerte reste active.\n0 désactive les notifications répétées.",
+            enabled: 'Activée',
+            enabledTooltip: "Une alerte désactivée n'est pas évaluée du tout.",
+            sectionGeneral: 'Général',
+            sectionNotifications: 'Notifications',
+            sectionActions: 'Actions',
+            silence: 'Mettre en sourdine',
+            silenceTooltip:
+                "Mettre en sourdine : supprime les notifications et l'arrêt pendant un moment.\nL'alerte continue d'être évaluée et affiche son état.",
+            silence15m: 'Sourdine pendant 15 minutes',
+            silence1h: 'Sourdine pendant 1 heure',
+            silence8h: 'Sourdine pendant 8 heures',
+            silence24h: 'Sourdine pendant 24 heures',
+            unsilence: 'Désactiver la sourdine maintenant',
+            enableAlert: "Activer l'Alerte",
+            disableAlert: "Désactiver l'Alerte",
+            silencedUntil: "En sourdine jusqu'à {time}",
+            disabledLabel: 'Désactivée',
             greaterThan: 'supérieur à',
             lessThan: 'inférieur à',
             newAlert: 'Nouvelle Alerte',
@@ -1275,6 +1300,9 @@ export default {
                 noFans: 'Aucun ventilateur contrôlable détecté.',
                 selectAll: 'Tout sélectionner',
                 calibratedBadge: 'étalonné',
+                blockedByAlert: "bloqué : l'alerte '{name}' est active",
+                alertsPausedNote:
+                    '{count} alerte(s) surveillent les ventilateurs sélectionnés et sont mises en pause pendant le balayage de chaque ventilateur.',
                 idleNote:
                     "L'étalonnage fait varier chaque ventilateur sur toute sa plage. À exécuter de préférence au repos : c'est bruyant et prend quelques minutes par ventilateur.",
                 concurrencyLabel: 'Ventilateurs à la fois',
@@ -1411,6 +1439,10 @@ export default {
                 description:
                     "Faites parcourir au ventilateur sa plage complète pour obtenir sa véritable courbe rapport cyclique/RPM, puis pilotez le canal en rapport cyclique réel normalisé par les RPM.\nSupprime les zones mortes à bas rapport cyclique et la saturation à haut rapport cyclique.\nLe coup d'envoi est aussi géré automatiquement quand le ventilateur est étalonné : une brève impulsion de démarrage le lance depuis l'arrêt avant qu'il ne se stabilise à la valeur cible.\nLe balayage prend généralement plusieurs minutes, et peut durer sensiblement plus longtemps pour des ventilateurs à réaction lente. Le canal est réglé à 0 % au début.",
                 statusNotCalibrated: 'Non étalonné',
+                blockedByAlert:
+                    "L'étalonnage est bloqué : l'alerte '{name}' est active sur ce ventilateur.",
+                alertsPausedNote:
+                    'Les alertes surveillant ce ventilateur sont mises en pause pendant le balayage.',
                 statusInProgress: 'Étalonnage en cours : {stage} ({percent} %)',
                 statusCompleted: 'Étalonné (lisse, mappage actif)',
                 statusCompletedStepped: 'Étalonné (courbe en marches, mappage désactivé)',

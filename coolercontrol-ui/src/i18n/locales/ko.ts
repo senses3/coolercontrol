@@ -727,8 +727,9 @@ export default {
             proceed: '계속',
         },
         alerts: {
-            range: '범위: {min} ~ {max}{unit}',
-            since: '{time}부터',
+            triggersOutside: '{min} 미만 또는 {max}{unit} 초과 시 발생',
+            triggersAbove: '{max}{unit} 초과 시 발생',
+            stateSince: '{time}부터 {state}',
             createAlert: '경고 생성',
             editAlert: '경고 편집',
             deleteAlert: '경고 삭제',
@@ -740,13 +741,37 @@ export default {
             alertRecovered: '경고 복구됨',
             deleteAlertConfirm: '다음을 삭제할까요: "{name}" 맞나요?',
             saveAlert: '경고 저장',
-            channelSource: '경고 채널 소스',
-            channelSourceTooltip: '경고에 사용할 채널 소스',
+            channelSources: '경고 채널 소스',
+            channelSourcesTooltip:
+                '이 경고가 감시하는 채널 소스입니다.\n경고당 센서 유형은 하나입니다. 첫 선택이 나머지를 필터링합니다.',
             triggerConditions: '발생 조건',
             maxValueTooltip: '이 값보다 크면 경고가 발생합니다.',
             minValueTooltip: '이 값보다 작으면 경고가 발생합니다.',
             warmupDurationTooltip:
                 '경고가 활성화되기 전에 특정 조건이 얼마나 오랫동안 지속되어야 하는지를 나타냅니다.\n이 값은 정기적인 폴링 간격으로만 확인되므로\n정확히 이 시간과 일치하지 않을 수 있습니다.',
+            cooldownDurationTooltip:
+                '경고가 복구되기 전에 값이 범위 내로 돌아와 유지되어야 하는 시간입니다.\n발생과 복구가 빠르게 반복되는 것을 방지합니다.',
+            cooldownLessThan: '조건 복구가 더 오래 지속됨',
+            repeatInterval: '알림 반복 간격',
+            repeatIntervalTooltip:
+                '경고가 활성 상태인 동안 이 간격으로 데스크톱 알림을 다시 보냅니다.\n0은 반복 알림을 비활성화합니다.',
+            enabled: '활성화됨',
+            enabledTooltip: '비활성화된 경고는 전혀 평가되지 않습니다.',
+            sectionGeneral: '일반',
+            sectionNotifications: '알림',
+            sectionActions: '동작',
+            silence: '무음',
+            silenceTooltip:
+                '무음: 알림과 시스템 종료를 잠시 중지합니다.\n경고는 계속 평가되며 상태도 표시됩니다.',
+            silence15m: '15분 동안 무음',
+            silence1h: '1시간 동안 무음',
+            silence8h: '8시간 동안 무음',
+            silence24h: '24시간 동안 무음',
+            unsilence: '지금 무음 해제',
+            enableAlert: '경고 활성화',
+            disableAlert: '경고 비활성화',
+            silencedUntil: '{time}까지 무음',
+            disabledLabel: '비활성화됨',
             greaterThan: '보다 큰',
             lessThan: '보다 작은',
             newAlert: '새 경고',
@@ -1232,6 +1257,9 @@ export default {
                 noFans: '제어 가능한 팬이 감지되지 않았습니다.',
                 selectAll: '모두 선택',
                 calibratedBadge: '보정됨',
+                blockedByAlert: "차단됨: 경고 '{name}'이(가) 활성 상태입니다",
+                alertsPausedNote:
+                    '{count}개의 경고가 선택한 팬을 감시하고 있으며 각 팬의 스윕 동안 일시 중지됩니다.',
                 idleNote:
                     '보정은 각 팬을 전체 범위에 걸쳐 가동합니다. 유휴 상태에서 실행하는 것이 가장 좋습니다. 소음이 크고 팬당 몇 분이 걸립니다.',
                 concurrencyLabel: '동시 보정 팬 수',
@@ -1364,6 +1392,9 @@ export default {
                 description:
                     '팬의 실제 듀티 대 RPM 곡선을 학습하기 위해 팬을 스윕한 다음, 채널을 RPM 정규화된 실제 듀티로 제어합니다.\n낮은 듀티의 무효 구간과 높은 듀티의 포화 구간을 제거합니다.\n팬이 보정되면 시동 부스트도 자동으로 처리됩니다. 정지 상태에서 잠시 시동 부스트로 팬을 돌린 뒤 목표 듀티에서 안정시킵니다.\n스윕은 일반적으로 몇 분이 걸리며, 반응이 느린 팬에서는 상당히 더 오래 걸릴 수 있습니다. 시작 시 채널은 0 %로 설정됩니다.',
                 statusNotCalibrated: '보정되지 않음',
+                blockedByAlert:
+                    "보정이 차단되었습니다: 경고 '{name}'이(가) 이 팬에서 활성 상태입니다.",
+                alertsPausedNote: '이 팬을 감시하는 경고는 스윕 동안 일시 중지됩니다.',
                 statusInProgress: '보정 중: {stage} ({percent} %)',
                 statusCompleted: '보정됨 (매끄러움, 매핑 활성)',
                 statusCompletedStepped: '보정됨 (계단형 곡선, 매핑 비활성)',
