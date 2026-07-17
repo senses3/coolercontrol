@@ -138,6 +138,15 @@ const liveValue = (source: ChannelSource): string => {
             return values.temp ?? ''
     }
 }
+// Phrase the thresholds as the firing condition (the inverse of the OK
+// range); min is validated >= 0, so a 0 floor cannot fire and is omitted.
+const triggerText = (alert: Alert): string => {
+    const unit = valueSuffix(alertSources(alert)[0].channel_metric)
+    if (alert.min > 0) {
+        return t('views.alerts.triggersOutside', { min: alert.min, max: alert.max, unit })
+    }
+    return t('views.alerts.triggersAbove', { max: alert.max, unit })
+}
 const silencedUntilText = (alert: Alert): string =>
     new Date(alert.silenced_until!).toLocaleString([], {
         day: 'numeric',
@@ -264,14 +273,7 @@ const lastLogTimes = computed(() => {
                         <div class="text-sm text-text-color-secondary">
                             {{
                                 getChannelMetricDisplayName(alertSources(alert)[0].channel_metric)
-                            }}:
-                            {{
-                                t('views.alerts.range', {
-                                    min: alert.min,
-                                    max: alert.max,
-                                    unit: valueSuffix(alertSources(alert)[0].channel_metric),
-                                })
-                            }}
+                            }}: {{ triggerText(alert) }}
                         </div>
                         <div
                             class="mt-auto flex items-center gap-2 text-sm text-text-color-secondary"

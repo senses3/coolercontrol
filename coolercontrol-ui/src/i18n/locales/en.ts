@@ -733,7 +733,8 @@ export default {
             proceed: 'Proceed',
         },
         alerts: {
-            range: 'Range: {min} to {max}{unit}',
+            triggersOutside: 'triggers below {min} or above {max}{unit}',
+            triggersAbove: 'triggers above {max}{unit}',
             stateSince: '{state} since {time}',
             createAlert: 'Create Alert',
             editAlert: 'Edit Alert',
