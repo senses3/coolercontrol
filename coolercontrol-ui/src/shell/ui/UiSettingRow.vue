@@ -24,18 +24,21 @@ withDefaults(defineProps<{ label?: string; description?: string }>(), {
 </script>
 
 <template>
-    <div class="flex items-center justify-between gap-6 px-4 py-3">
-        <div class="flex min-w-0 flex-col">
-            <!-- Plain span so long labels wrap; inline-flex made the text an
-                 anonymous flex item that refused to shrink and overflowed. -->
-            <span class="text-base text-text-color">
+    <!-- flex-wrap: when the label cannot fit beside the control (basis-40 is
+         its minimum), the control drops to its own right-aligned line rather
+         than ever overlapping the text. -->
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <div class="flex min-w-0 flex-1 basis-40 flex-col">
+            <!-- Plain span (not inline-flex) with explicit whitespace-normal
+                 so long labels always wrap within the label column. -->
+            <span class="whitespace-normal break-words text-base text-text-color">
                 <slot name="label">{{ label }}</slot>
             </span>
             <span v-if="description" class="pt-0.5 text-sm text-text-color-secondary">
                 {{ description }}
             </span>
         </div>
-        <div class="flex shrink-0 items-center justify-end">
+        <div class="ml-auto flex shrink-0 items-center justify-end">
             <slot />
         </div>
     </div>
