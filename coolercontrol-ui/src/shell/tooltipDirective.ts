@@ -34,7 +34,7 @@ interface TooltipOptions {
 
 interface TooltipHost extends Element {
     $ccTooltip?: TooltipOptions
-    $ccTooltipShow?: () => void
+    $ccTooltipShow?: (event: Event) => void
     $ccTooltipShowDelayed?: () => void
     $ccTooltipHide?: () => void
 }
@@ -163,9 +163,18 @@ export const tooltipDirective: Directive<
         host.$ccTooltip = parseOptions(binding)
         // Focus shows the tooltip only for keyboard-driven focus. Mouse
         // clicks, and the focus a dropdown restores to its trigger on close,
-        // leave the pointer elsewhere and must stay quiet.
-        host.$ccTooltipShow = () => {
-            if (host.matches(':focus-visible')) show(host)
+        // leave the pointer elsewhere and must stay quiet. focusin bubbles,
+        // so also accept a focus-visible CHILD: many hosts are non-focusable
+        // wrappers around the actual control.
+        host.$ccTooltipShow = (event: Event) => {
+            if (host.matches(':focus-visible')) {
+                show(host)
+                return
+            }
+            const target = event.target as Element | null
+            if (target != null && target !== host && target.matches(':focus-visible')) {
+                show(host)
+            }
         }
         host.$ccTooltipShowDelayed = () => scheduleShow(host)
         host.$ccTooltipHide = () => {
