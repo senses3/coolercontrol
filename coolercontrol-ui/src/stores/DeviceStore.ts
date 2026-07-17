@@ -1067,16 +1067,19 @@ export const useDeviceStore = defineStore('device', () => {
                     if (foundAlert) {
                         foundAlert.state = alertMessage.state
                     }
+                    // A silenced state change still updates state; only the toast is muted.
                     if (alertMessage.state === AlertState.Active) {
                         if (!settingsStore.alertsActive.includes(alertMessage.uid)) {
                             settingsStore.alertsActive.push(alertMessage.uid)
                         }
-                        toast.add({
-                            severity: 'error',
-                            summary: t('views.alerts.alertTriggered'),
-                            detail: `${alertMessage.name} - ${alertMessage.message}`,
-                            life: 5000,
-                        })
+                        if (!alertMessage.silenced) {
+                            toast.add({
+                                severity: 'error',
+                                summary: t('views.alerts.alertTriggered'),
+                                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                                life: 5000,
+                            })
+                        }
                     } else {
                         const activeIndex = settingsStore.alertsActive.findIndex(
                             (uid) => uid === alertMessage.uid,
@@ -1084,12 +1087,14 @@ export const useDeviceStore = defineStore('device', () => {
                         if (activeIndex > -1) {
                             settingsStore.alertsActive.splice(activeIndex, 1)
                         }
-                        toast.add({
-                            severity: 'info',
-                            summary: t('views.alerts.alertRecovered'),
-                            detail: `${alertMessage.name} - ${alertMessage.message}`,
-                            life: 3000,
-                        })
+                        if (!alertMessage.silenced) {
+                            toast.add({
+                                severity: 'info',
+                                summary: t('views.alerts.alertRecovered'),
+                                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                                life: 3000,
+                            })
+                        }
                     }
                 },
                 async onclose() {

@@ -746,13 +746,31 @@ export default {
             alertRecovered: 'Alert Recovered',
             deleteAlertConfirm: 'Are you sure you want to delete: "{name}"?',
             saveAlert: 'Save Alert',
-            channelSource: 'Channel Source for Alert',
-            channelSourceTooltip: 'The Channel source to be used for the Alert',
+            channelSources: 'Channel Sources for Alert',
+            channelSourcesTooltip: 'The channel sources watched by this Alert',
+            sameMetricHint: 'One sensor type per Alert: the first pick filters the rest.',
             triggerConditions: 'Trigger Conditions',
             maxValueTooltip: 'Values above this will trigger the alert.',
             minValueTooltip: 'Values below this will trigger the alert.',
             warmupDurationTooltip:
                 'How long a condition must be active before the alert is considered active.\nIt is checked only at regular poll-rate intervals\nand so may not be exactly this length.',
+            cooldownDurationTooltip:
+                'How long the value must stay back in range before the alert recovers.\nPrevents rapid triggered and resolved flapping.',
+            cooldownLessThan: 'condition recovered longer than',
+            repeatInterval: 'repeat notification every',
+            repeatIntervalTooltip:
+                'Re-send the desktop notification at this interval while the alert stays active.\n0 disables repeat notifications.',
+            enabled: 'enabled',
+            enabledTooltip: 'A disabled alert is not evaluated at all.',
+            silenceTooltip:
+                'Silence: suppress notifications and shutdown for a while.\nThe alert still evaluates and shows its state.',
+            silence15m: 'Silence for 15 minutes',
+            silence1h: 'Silence for 1 hour',
+            silence8h: 'Silence for 8 hours',
+            silence24h: 'Silence for 24 hours',
+            unsilence: 'Unsilence now',
+            silencedUntil: 'Silenced until {time}',
+            disabledLabel: 'Disabled',
             greaterThan: 'greater than',
             lessThan: 'less than',
             newAlert: 'New Alert',
@@ -1241,6 +1259,9 @@ export default {
                 noFans: 'No controllable fans were detected.',
                 selectAll: 'Select all',
                 calibratedBadge: 'calibrated',
+                blockedByAlert: "blocked: alert '{name}' is active",
+                alertsPausedNote:
+                    '{count} alert(s) watch the selected fans and are paused while each fan sweeps.',
                 idleNote:
                     'Calibration ramps each fan across its range. Best run at idle: it is noisy and takes a few minutes per fan.',
                 concurrencyLabel: 'Fans at a time',
@@ -1373,6 +1394,8 @@ export default {
                 description:
                     'Sweep the fan to learn its actual duty-to-RPM curve, then control the channel as RPM-normalized true-duty.\nRemoves dead zones at low duty and saturation at high duty.\nKick-in is also handled automatically when the fan is calibrated: a brief startup boost spins the fan up from rest before settling to the target duty.\nThe sweep typically takes several minutes, and can run noticeably longer for slow-to-respond fans. The channel is written to 0% at the start.',
                 statusNotCalibrated: 'Not calibrated',
+                blockedByAlert: "Calibration is blocked: alert '{name}' is active on this fan.",
+                alertsPausedNote: 'Alerts watching this fan are paused during the sweep.',
                 statusInProgress: 'Calibrating: {stage} ({percent}%)',
                 statusCompleted: 'Calibrated (smooth, mapping active)',
                 statusCompletedStepped: 'Calibrated (step-curve, mapping disabled)',

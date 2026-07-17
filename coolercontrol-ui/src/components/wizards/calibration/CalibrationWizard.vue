@@ -39,6 +39,7 @@ import { useToast } from '@/shell/toast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
+import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import type { CalibrationBatchEntry, CalibrationStage } from '@/models/Calibration.ts'
 
@@ -49,12 +50,15 @@ const toast = useToast()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
+const { blockingAlertName, watchingAlertCount } = useAlertCalibrationGuard()
 
 // The daemon owns the batch, so on open we resume an in-progress run
 // rather than always starting at the picker.
 const batchActive = (): boolean => calibrationStore.batchStatus?.active === true
 const step: Ref<number> = ref(batchActive() ? 2 : 1)
 onMounted(async () => {
+    // Refresh alert states so the active-alert blocking hints are current.
+    settingsStore.loadAlertsAndLogs().catch(() => {})
     await calibrationStore.ensureBatchPolling()
     if (batchActive()) step.value = 2
 })
@@ -105,14 +109,30 @@ const fillFans = (): void => {
 }
 fillFans()
 
-const selectedRows = computed(() => fanRows.value.filter((row) => row.selected))
-const allSelected = computed(
-    () => fanRows.value.length > 0 && fanRows.value.every((row) => row.selected),
+// A fan with a currently Active alert cannot be calibrated; the daemon
+// rejects it, so the picker keeps it out of the selection.
+const rowBlockedBy = (row: FanRow): string | undefined =>
+    blockingAlertName(row.deviceUID, row.channelName)
+const selectedRows = computed(() =>
+    fanRows.value.filter((row) => row.selected && rowBlockedBy(row) == null),
 )
+const allSelected = computed(() => {
+    const selectable = fanRows.value.filter((row) => rowBlockedBy(row) == null)
+    return selectable.length > 0 && selectable.every((row) => row.selected)
+})
 const toggleAll = (): void => {
     const target = !allSelected.value
-    for (const row of fanRows.value) row.selected = target
+    for (const row of fanRows.value) {
+        if (rowBlockedBy(row) != null) {
+            row.selected = false
+            continue
+        }
+        row.selected = target
+    }
 }
+// Alerts watching the selected fans are paused only while each fan's own
+// sweep runs; this is the informational note under the picker.
+const pausedAlertCount = computed(() => watchingAlertCount(selectedRows.value))
 // Master "select all" checkbox: indeterminate when only some are selected,
 // and clicking it (any state) toggles the whole list.
 const partiallySelected = computed(() => selectedRows.value.length > 0 && !allSelected.value)
@@ -245,7 +265,10 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                     :key="row.deviceUID + row.channelName"
                     class="flex items-center gap-x-2 ml-1"
                 >
-                    <UiCheckbox v-model="fanRows[index].selected" />
+                    <UiCheckbox
+                        v-model="fanRows[index].selected"
+                        :disabled="rowBlockedBy(row) != null"
+                    />
                     <svg-icon
                         type="mdi"
                         :path="mdiMinus"
@@ -253,7 +276,14 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                         :style="{ color: row.color }"
                     />
                     <span class="truncate">{{ row.label }}</span>
-                    <span v-if="row.alreadyCalibrated" class="text-xs text-accent">
+                    <span v-if="rowBlockedBy(row) != null" class="text-xs text-warning">
+                        {{
+                            t('components.wizards.calibration.blockedByAlert', {
+                                name: rowBlockedBy(row),
+                            })
+                        }}
+                    </span>
+                    <span v-else-if="row.alreadyCalibrated" class="text-xs text-accent">
                         {{ t('components.wizards.calibration.calibratedBadge') }}
                     </span>
                 </div>
@@ -269,6 +299,21 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                     {{ t('components.wizards.calibration.concurrencyNote') }}
                 </span>
             </template>
+            <div v-if="pausedAlertCount > 0" class="flex items-start gap-x-2 ml-1 mt-1">
+                <svg-icon
+                    type="mdi"
+                    class="shrink-0 mt-0.5"
+                    :path="mdiInformationSlabCircleOutline"
+                    :size="deviceStore.getREMSize(1.2)"
+                />
+                <span class="text-sm">
+                    {{
+                        t('components.wizards.calibration.alertsPausedNote', {
+                            count: pausedAlertCount,
+                        })
+                    }}
+                </span>
+            </div>
             <div class="flex items-start gap-x-2 ml-1 mt-1">
                 <svg-icon
                     type="mdi"
