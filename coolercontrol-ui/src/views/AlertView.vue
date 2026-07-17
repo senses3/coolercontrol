@@ -573,7 +573,9 @@ onMounted(async () => {
             <div class="flex flex-col-reverse items-start lg:flex-row mt-0 w-full">
                 <!-- Stacked (below lg) the listbox needs its own height: the
                      flex-1/basis-0 fill only works next to the settings column. -->
-                <div class="flex w-full max-w-96 flex-col self-stretch mt-4 lg:mt-0 lg:mr-4">
+                <div
+                    class="flex w-full flex-col self-stretch mt-4 lg:mt-0 lg:mr-4 lg:w-96 lg:shrink-0"
+                >
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
                         {{ t('views.alerts.channelSources') }}
                     </small>
@@ -589,8 +591,12 @@ onMounted(async () => {
                         @update:model-value="onSourcesChange"
                     />
                 </div>
-                <div class="flex w-full max-w-96 flex-col">
-                    <UiSettingsCard class="mb-0" :title="t('views.alerts.sectionGeneral')">
+                <!-- Responsive card grid: full-width cards when narrow, two
+                     columns when wide, like the overview pages. -->
+                <div
+                    class="grid w-full max-w-4xl flex-1 grid-cols-1 items-start gap-4 xl:grid-cols-2"
+                >
+                    <UiSettingsCard :title="t('views.alerts.sectionGeneral')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.enabledTooltip')"
                             :label="t('views.alerts.enabled')"
@@ -659,7 +665,7 @@ onMounted(async () => {
                             </div>
                         </UiSettingRow>
                     </UiSettingsCard>
-                    <UiSettingsCard class="mt-4" :title="t('views.alerts.triggerConditions')">
+                    <UiSettingsCard :title="t('views.alerts.triggerConditions')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.maxValueTooltip')"
                             :label="t('views.alerts.greaterThan')"
@@ -761,7 +767,7 @@ onMounted(async () => {
                             </div>
                         </UiSettingRow>
                     </UiSettingsCard>
-                    <UiSettingsCard class="mt-4" :title="t('views.alerts.sectionNotifications')">
+                    <UiSettingsCard :title="t('views.alerts.sectionNotifications')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.desktopNotifyTooltip')"
                             :label="t('views.alerts.desktopNotify')"
@@ -808,7 +814,7 @@ onMounted(async () => {
                             </div>
                         </UiSettingRow>
                     </UiSettingsCard>
-                    <UiSettingsCard class="mt-4" :title="t('views.alerts.sectionActions')">
+                    <UiSettingsCard :title="t('views.alerts.sectionActions')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.shutdownOnActivationTooltip')"
                             :label="t('views.alerts.shutdownOnActivation')"
