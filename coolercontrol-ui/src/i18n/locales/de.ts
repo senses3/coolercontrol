@@ -755,6 +755,7 @@ export default {
             alertLogs: 'Warnungsprotokolle',
             alertTriggered: 'Warnung ausgelöst',
             alertRecovered: 'Warnung wiederhergestellt',
+            alertError: 'Warnungsfehler',
             deleteAlertConfirm: 'Sind Sie sicher, dass Sie löschen möchten: "{name}"?',
             saveAlert: 'Warnung speichern',
             channelSources: 'Kanalquellen für Warnung',

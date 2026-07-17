@@ -745,6 +745,7 @@ export default {
             alertLogs: 'Alert Logs',
             alertTriggered: 'Alert Triggered',
             alertRecovered: 'Alert Recovered',
+            alertError: 'Alert Error',
             deleteAlertConfirm: 'Are you sure you want to delete: "{name}"?',
             saveAlert: 'Save Alert',
             channelSources: 'Channel Sources for Alert',

@@ -766,6 +766,7 @@ export default {
             alertLogs: "Journaux d'Alertes",
             alertTriggered: 'Alerte Déclenchée',
             alertRecovered: 'Alerte Récupérée',
+            alertError: "Erreur d'alerte",
             deleteAlertConfirm: 'Êtes-vous sûr de vouloir supprimer : "{name}" ?',
             saveAlert: "Enregistrer l'Alerte",
             channelSources: "Sources de Canal pour l'Alerte",

@@ -129,6 +129,9 @@ export class AlertLog {
     timestamp: string
     /** The change happened while silenced; update state but raise no toast. */
     silenced: boolean = false
+    /** The change was a source recovery; toast it as informational even
+     *  when other sources keep the alert Active. */
+    resolved: boolean = false
 
     constructor(uid: UID, name: string, state: AlertState, message: string, timestamp: string) {
         this.uid = uid

@@ -746,6 +746,7 @@ export default {
             alertLogs: 'アラートログ',
             alertTriggered: 'アラートがトリガーされました',
             alertRecovered: 'アラートが回復しました',
+            alertError: 'アラートエラー',
             deleteAlertConfirm: '削除してもよろしいですか："{name}"？',
             saveAlert: 'アラートを保存',
             channelSources: 'アラートのチャネルソース',

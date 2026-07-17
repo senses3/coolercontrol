@@ -753,6 +753,7 @@ export default {
             alertLogs: 'Logs de Alertas',
             alertTriggered: 'Alerta Acionado',
             alertRecovered: 'Alerta Recuperado',
+            alertError: 'Erro de alerta',
             deleteAlertConfirm: 'Tem certeza que deseja excluir: "{name}"?',
             saveAlert: 'Salvar Alerta',
             channelSources: 'Fontes de Canal para o Alerta',

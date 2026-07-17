@@ -752,6 +752,7 @@ export default {
             alertLogs: 'Логи оповещений',
             alertTriggered: 'Оповещение сработало',
             alertRecovered: 'Оповещение восстановлено',
+            alertError: 'Ошибка оповещения',
             deleteAlertConfirm: 'Вы уверены, что хотите удалить: "{name}"?',
             saveAlert: 'Сохранить оповещение',
             channelSources: 'Источники каналов для оповещения',

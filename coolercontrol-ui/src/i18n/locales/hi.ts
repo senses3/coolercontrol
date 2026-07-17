@@ -742,6 +742,7 @@ export default {
             alertLogs: 'अलर्ट लॉग',
             alertTriggered: 'अलर्ट ट्रिगर हुआ',
             alertRecovered: 'अलर्ट रिकवर हुआ',
+            alertError: 'अलर्ट त्रुटि',
             deleteAlertConfirm: 'क्या आप वाकई हटाना चाहते हैं: "{name}"?',
             saveAlert: 'अलर्ट सहेजें',
             channelSources: 'अलर्ट के लिए चैनल स्रोत',

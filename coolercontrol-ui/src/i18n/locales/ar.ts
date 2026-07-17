@@ -740,6 +740,7 @@ export default {
             alertLogs: 'سجلات التنبيهات',
             alertTriggered: 'تم تنشيط التنبيه',
             alertRecovered: 'تم استعادة التنبيه',
+            alertError: 'خطأ في التنبيه',
             deleteAlertConfirm: 'هل أنت متأكد من رغبتك في حذف: "{name}"؟',
             saveAlert: 'حفظ التنبيه',
             channelSources: 'مصادر القنوات للتنبيه',

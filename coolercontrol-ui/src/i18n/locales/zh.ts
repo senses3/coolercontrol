@@ -719,6 +719,7 @@ export default {
             alertLogs: '警报日志',
             alertTriggered: '警报触发',
             alertRecovered: '警报已恢复',
+            alertError: '警报错误',
             deleteAlertConfirm: '您确定要删除："{name}"吗？',
             saveAlert: '保存警报',
             channelSources: '警报通道源',
