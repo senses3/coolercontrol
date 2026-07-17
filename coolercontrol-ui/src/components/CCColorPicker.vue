@@ -26,7 +26,7 @@ import { ChromePicker, CompactPicker } from 'vue-color'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
-import { computed, nextTick, ref, Ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, Ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
@@ -42,6 +42,10 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
     (e: 'open', value: boolean): void
+    // The Reset button (shown only when default-color is provided) closes the
+    // popup; the parent applies the actual reset, typically by clearing the
+    // stored user color so the non-user-defined color takes over again.
+    (e: 'reset'): void
 }>()
 
 enum ColorFormat {
@@ -76,10 +80,11 @@ const popoverOpen = ref(false)
 let newColorApplied: boolean = false
 
 const closeAndReset = (): void => {
-    if (!props.defaultColor) return
-    currentColor.value = colorStore.rgbToHex(props.defaultColor)
+    if (props.defaultColor != null) {
+        currentColor.value = colorStore.rgbToHex(props.defaultColor)
+    }
     newColorApplied = true
-    colorModel.value = props.defaultColor
+    emit('reset')
     popoverOpen.value = false
 }
 const closeAndSave = (): void => {
@@ -92,12 +97,24 @@ const closeAndSave = (): void => {
     // note: the color model is updated with a reactive delay, so logging is error-prone
     popoverOpen.value = false
 }
+// Close on Escape regardless of where focus sits: clicking the picker
+// canvases drops focus to body, which reka's own escape handling misses.
+const onDocumentKeydown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return
+    event.stopPropagation()
+    popoverOpen.value = false
+}
 watch(popoverOpen, (open) => {
     if (open) {
+        document.addEventListener('keydown', onDocumentKeydown, { capture: true })
         emit('open', true)
     } else {
+        document.removeEventListener('keydown', onDocumentKeydown, { capture: true })
         popoverClose()
     }
+})
+onUnmounted(() => {
+    document.removeEventListener('keydown', onDocumentKeydown, { capture: true })
 })
 
 const popoverClose = (): void => {
@@ -175,7 +192,12 @@ const handleRedIssue = (newColor: Color): void => {
                             @keydown.enter.prevent="closeAndSave"
                         />
                         <div class="text-right justify-end">
-                            <UiButton variant="outline" class="mr-4" @click.stop="closeAndReset">
+                            <UiButton
+                                v-if="defaultColor != null"
+                                variant="outline"
+                                class="mr-4"
+                                @click.stop="closeAndReset"
+                            >
                                 {{ t('common.reset') }}
                             </UiButton>
                             <UiButton

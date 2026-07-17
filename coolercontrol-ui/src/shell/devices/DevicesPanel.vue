@@ -147,6 +147,16 @@ const setSensorColor = (deviceUID: UID, channelName: string, newColor: Color): v
         ?.sensorsAndChannels.get(channelName)
     if (setting != null) setting.userColor = newColor
 }
+const sensorDefaultColor = (deviceUID: UID, channelName: string): Color | undefined =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)
+        ?.defaultColor
+// Reset clears the user override so the non-user-defined color applies again.
+const resetSensorColor = (deviceUID: UID, channelName: string): void => {
+    const setting = settingsStore.allUIDeviceSettings
+        .get(deviceUID)
+        ?.sensorsAndChannels.get(channelName)
+    if (setting != null) setting.userColor = undefined
+}
 
 const isPinned = (deviceUID: UID, channelName: string): boolean =>
     settingsStore.pinnedIds.includes(pinId(deviceUID, channelName))
@@ -301,10 +311,12 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                                 </span>
                                 <CCColorPicker
                                     :model-value="sensorPickerColor(device.uid, sensorName)"
+                                    :default-color="sensorDefaultColor(device.uid, sensorName)"
                                     :size="1.25"
                                     @update:model-value="
                                         (c: Color) => setSensorColor(device.uid, sensorName, c)
                                     "
+                                    @reset="resetSensorColor(device.uid, sensorName)"
                                 />
                                 <TagPopover
                                     :device-u-i-d="device.uid"

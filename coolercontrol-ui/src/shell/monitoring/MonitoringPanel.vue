@@ -250,6 +250,16 @@ const setSensorColor = (sensor: MonitoringSensor, newColor: Color): void => {
         ?.sensorsAndChannels.get(sensor.channelName)
     if (setting != null) setting.userColor = newColor
 }
+const sensorDefaultColor = (deviceUID: UID, channelName: string): Color | undefined =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)
+        ?.defaultColor
+// Reset clears the user override so the non-user-defined color applies again.
+const resetSensorColor = (sensor: MonitoringSensor): void => {
+    const setting = settingsStore.allUIDeviceSettings
+        .get(sensor.deviceUID)
+        ?.sensorsAndChannels.get(sensor.channelName)
+    if (setting != null) setting.userColor = undefined
+}
 
 // Explicit drag order wins; otherwise home dashboard first, then store order.
 const orderedDashboards = ref<Dashboard[]>([])
@@ -451,6 +461,15 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
+                        <CCColorPicker
+                            :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                            :default-color="
+                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                            "
+                            :size="1.25"
+                            @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                            @reset="resetSensorColor(sensor)"
+                        />
                         <TagPopover
                             :device-u-i-d="sensor.deviceUID"
                             :channel-name="sensor.channelName"
@@ -766,8 +785,12 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                         <CCColorPicker
                             :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                            :default-color="
+                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                            "
                             :size="1.25"
                             @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                            @reset="resetSensorColor(sensor)"
                         />
                         <TagPopover
                             :device-u-i-d="sensor.deviceUID"
