@@ -302,7 +302,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
             <div v-if="pausedAlertCount > 0" class="flex items-start gap-x-2 ml-1 mt-1">
                 <svg-icon
                     type="mdi"
-                    class="shrink-0 mt-0.5"
+                    class="shrink-0 mt-0.5 text-warning"
                     :path="mdiInformationSlabCircleOutline"
                     :size="deviceStore.getREMSize(1.2)"
                 />
@@ -317,7 +317,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
             <div class="flex items-start gap-x-2 ml-1 mt-1">
                 <svg-icon
                     type="mdi"
-                    class="shrink-0 mt-0.5"
+                    class="shrink-0 mt-0.5 text-warning"
                     :path="mdiInformationSlabCircleOutline"
                     :size="deviceStore.getREMSize(1.2)"
                 />
