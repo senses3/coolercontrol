@@ -63,7 +63,8 @@ class MainWindow final : public QMainWindow {
 
   void acknowledgeDaemonErrors() const;
 
-  void requestAllAlerts() const;
+  // Set by the UI over IPC: whether any enabled, active, unsilenced alert exists.
+  void setAlertsActive(bool active) const;
 
  signals:
   void forceQuitSignal();
@@ -81,6 +82,8 @@ class MainWindow final : public QMainWindow {
   void setTrayMenuModesSignal(const QString& modesJson) const;
 
   void acknowledgeDaemonErrorsSignal() const;
+
+  void setAlertsActiveSignal(bool active) const;
 
  protected:
   void closeEvent(QCloseEvent* event) override;
@@ -112,7 +115,8 @@ class MainWindow final : public QMainWindow {
   mutable bool m_changeAddress{false};
   mutable bool m_daemonHasErrors{false};
   mutable bool m_daemonHasWarnings{false};
-  mutable int m_alertCount{0};
+  // Pushed from the UI over IPC; the UI is the source of truth for alert state.
+  mutable bool m_uiAlertsActive{false};
   int m_uiLoadRetryCount{0};
   static constexpr int MAX_UI_LOAD_RETRIES = 3;
 
@@ -149,8 +153,6 @@ class MainWindow final : public QMainWindow {
   void watchModeActivation() const;
 
   void watchNotifications() const;
-
-  void watchAlerts() const;
 
   void showVersionMismatchDialog(const QString& daemonVersion) const;
 

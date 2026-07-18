@@ -68,6 +68,8 @@ class IPC final : public QObject {
 
   void acknowledgeDaemonIssues() const;
 
+  void setAlertsActive(bool active) const;
+
   void forceQuit() const;
 
   void forceRefresh() const;
