@@ -44,6 +44,7 @@ import type { Color, Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import { Alert, alertIsSilenced, AlertState } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
+import { useFailAlert } from '@/composables/useFailAlert.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -64,6 +65,7 @@ import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const { createFailAlert } = useFailAlert()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
@@ -184,21 +186,22 @@ const alertKind = (sensor: MonitoringSensor): AlertKind | null => {
 const createAlert = (sensor: MonitoringSensor): void => {
     const kind = alertKind(sensor)
     if (kind == null) return
-    const query: Record<string, string> = {
-        device: sensor.deviceUID,
-        channel: sensor.channelName,
-    }
     if (kind === 'fan') {
-        query.metric = ChannelMetric.RPM
-        // Alert when the fan drops to 0 rpm; the upper bound is effectively
-        // open (the editor's RPM ceiling, above any real fan).
-        query.min = '1'
-        query.max = '30000'
-        query.name = `${sensorLabel(sensor.deviceUID, sensor.channelName)} ${t('layout.shell.monitoringPanel.failAlertSuffix')}`
-    } else {
-        query.metric = ChannelMetric.Temp
+        createFailAlert(
+            sensor.deviceUID,
+            sensor.channelName,
+            sensorLabel(sensor.deviceUID, sensor.channelName),
+        )
+        return
     }
-    router.push({ name: 'monitoring-alert-new', query })
+    router.push({
+        name: 'monitoring-alert-new',
+        query: {
+            device: sensor.deviceUID,
+            channel: sensor.channelName,
+            metric: ChannelMetric.Temp,
+        },
+    })
 }
 
 const isDashboardPinned = (dashboard: Dashboard): boolean =>
