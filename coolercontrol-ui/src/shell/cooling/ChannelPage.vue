@@ -528,7 +528,9 @@ if (channelDashboard.value.dataTypes.length > 0) {
             {{ t('layout.shell.coolingPage.notControllable') }}
         </p>
 
-        <div class="shrink-0" style="--time-chart-height: 24rem">
+        <!-- relative lifts this above the ProfileEditor's empty overhang box,
+             which otherwise swallows pointer events on the link and chart top. -->
+        <div class="relative shrink-0" style="--time-chart-height: 24rem">
             <div class="mb-1 flex justify-center">
                 <RouterLink
                     :to="{ name: 'monitoring-sensor', params: { deviceUID, channelName } }"
