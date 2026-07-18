@@ -344,7 +344,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
             <div
                 v-for="entry in entries"
                 :key="entry.device_uid + entry.channel_name"
-                class="flex items-center justify-between gap-x-3 ml-1"
+                class="flex items-start justify-between gap-x-3 ml-1"
             >
                 <div class="flex items-center gap-x-2 min-w-0">
                     <!-- overflow-hidden clips the running spinner's rotation to its own box so it
@@ -361,7 +361,7 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                         entryLabel(entry.device_uid, entry.channel_name)
                     }}</span>
                 </div>
-                <div class="text-right text-sm shrink-0">
+                <div class="text-right text-sm flex-1 min-w-0 break-words">
                     <span v-if="entry.phase === 'running'" class="text-accent">{{
                         runningText(entry)
                     }}</span>
