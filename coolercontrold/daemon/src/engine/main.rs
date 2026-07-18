@@ -1696,12 +1696,26 @@ impl Engine {
         }
         let status = match &outcome {
             Ok(calibration) => {
+                let warning_detail = if calibration.warnings.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ": {}",
+                        calibration
+                            .warnings
+                            .iter()
+                            .map(describe_warning)
+                            .collect::<Vec<_>>()
+                            .join("; ")
+                    )
+                };
                 info!(
-                    "Calibration completed for {} (curve_kind={:?}, rpm_max={}, warnings={})",
+                    "Calibration completed for {} (curve_kind={:?}, rpm_max={}, warnings={}{})",
                     self.log_device_channel(&key.0, &key.1),
                     calibration.curve_kind,
                     calibration.rpm_max,
-                    calibration.warnings.len()
+                    calibration.warnings.len(),
+                    warning_detail
                 );
                 CalibrationStatus::from_completion(
                     device_uid_for_event,
