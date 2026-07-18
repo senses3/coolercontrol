@@ -51,6 +51,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { alertIsSilenced } from '@/models/Alert.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
+import { channelRoute } from '@/shell/channelRoute.ts'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
@@ -115,25 +116,8 @@ interface HealthRow {
     to: RouteLocationRaw
 }
 
-const failsafeRoute = (ref: FailsafeRef): RouteLocationRaw => {
-    for (const device of deviceStore.allDevices()) {
-        if (device.uid !== ref.device_uid) continue
-        if (device.type === DeviceType.CUSTOM_SENSORS) {
-            return { name: 'device-custom-sensor', params: { customSensorID: ref.name } }
-        }
-        if (device.info?.channels.get(ref.name)?.speed_options != null) {
-            return {
-                name: 'cooling-channel',
-                params: { deviceUID: ref.device_uid, channelName: ref.name },
-            }
-        }
-        break
-    }
-    return {
-        name: 'monitoring-sensor',
-        params: { deviceUID: ref.device_uid, channelName: ref.name },
-    }
-}
+const failsafeRoute = (ref: FailsafeRef): RouteLocationRaw =>
+    channelRoute(deviceStore.allDevices(), ref.device_uid, ref.name)
 
 const sourceRoute = (ref: SourceRef): RouteLocationRaw => {
     switch (ref.entity_type) {

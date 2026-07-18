@@ -57,6 +57,7 @@ import {
 } from '@/shell/panelOrder.ts'
 import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sensors.ts'
 import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
+import { channelRoute } from '@/shell/channelRoute.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import TagChips from '@/shell/TagChips.vue'
@@ -331,10 +332,8 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
     openTagRow.value = open ? rowKey : null
 }
 
-const sensorRoute = (sensor: MonitoringSensor) => ({
-    name: 'monitoring-sensor',
-    params: { deviceUID: sensor.deviceUID, channelName: sensor.channelName },
-})
+const sensorRoute = (sensor: MonitoringSensor) =>
+    channelRoute(deviceStore.allDevices(), sensor.deviceUID, sensor.channelName)
 </script>
 
 <template>

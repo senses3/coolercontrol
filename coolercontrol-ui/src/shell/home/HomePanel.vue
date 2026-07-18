@@ -30,7 +30,8 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { DeviceType, type Device, type UID } from '@/models/Device.ts'
+import type { RouteLocationRaw } from 'vue-router'
+import { type Device, type UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -39,6 +40,7 @@ import { coolingChannels, pinId } from '@/shell/cooling/channels.ts'
 import { reorderSubset } from '@/shell/panelOrder.ts'
 import { monitoringSensors } from '@/shell/monitoring/sensors.ts'
 import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
+import { channelRoute } from '@/shell/channelRoute.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
@@ -57,7 +59,7 @@ interface PinnedRow {
     value?: string
     icon?: string
     spins?: boolean
-    to: object
+    to: RouteLocationRaw
 }
 
 const label = (deviceUID: UID, channelName: string): string =>
@@ -134,20 +136,15 @@ const buildPinnedRows = (): PinnedRow[] => {
                 ...base,
                 icon: mdiFan,
                 spins: channelSpins('fan', values, settingsStore.eyeCandy),
-                to: { name: 'cooling-channel', params: { deviceUID, channelName } },
+                to: channelRoute(deviceStore.allDevices(), deviceUID, channelName),
             })
         } else if (sensorIds.has(id)) {
-            // Custom sensors are user-configured, so link to their editor under
-            // Devices rather than a read-only monitoring page.
-            const isCustomSensor = devicesByUid.get(deviceUID)?.type === DeviceType.CUSTOM_SENSORS
             rows.push({
                 ...base,
                 icon: channelKindIcon(
                     channelKind(devicesByUid.get(deviceUID), channelName, values),
                 ),
-                to: isCustomSensor
-                    ? { name: 'device-custom-sensor', params: { customSensorID: channelName } }
-                    : { name: 'monitoring-sensor', params: { deviceUID, channelName } },
+                to: channelRoute(deviceStore.allDevices(), deviceUID, channelName),
             })
         }
     }
