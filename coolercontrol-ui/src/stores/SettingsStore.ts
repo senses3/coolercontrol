@@ -19,7 +19,7 @@
 import { defineStore } from 'pinia'
 import { Function, FunctionsDTO, Profile, ProfilesDTO } from '@/models/Profile'
 import type { Ref } from 'vue'
-import { reactive, inject, ref, toRaw, watch } from 'vue'
+import { computed, reactive, inject, ref, toRaw, watch } from 'vue'
 import {
     type AllDeviceSettings,
     CustomThemeSettings,
@@ -56,7 +56,7 @@ import { CreateModeDTO, Mode, ModeOrderDTO, UpdateModeDTO } from '@/models/Mode.
 import { Dashboard } from '@/models/Dashboard.ts'
 import { Emitter, EventType } from 'mitt'
 import _ from 'lodash'
-import { Alert, AlertLog, AlertState } from '@/models/Alert.ts'
+import { Alert, AlertLog, AlertState, alertIsSilenced } from '@/models/Alert.ts'
 import {
     DeviceHealthDTO,
     FailsafeDelta,
@@ -105,6 +105,23 @@ export const useSettingsStore = defineStore('settings', () => {
     const alerts: Ref<Array<Alert>> = ref([])
     const alertLogs: Ref<Array<AlertLog>> = ref([])
     const alertsActive: Ref<Array<UID>> = ref([])
+
+    // The Qt tray badge mirrors the UI's alert state. Silencing/disabling happen in
+    // the UI, and the daemon emits nothing on the wire for a steadily-Active alert
+    // that becomes silenced or disabled, so push the derived state to Qt over IPC
+    // instead of polling. `enabled` + not-silenced gate out muted alerts.
+    const anyActiveUnsilencedAlert = computed((): boolean =>
+        alerts.value.some(
+            (alert) =>
+                alert.enabled && alertsActive.value.includes(alert.uid) && !alertIsSilenced(alert),
+        ),
+    )
+    const pushTrayAlertState = (): void => {
+        if (!deviceStore.isQtApp()) return
+        // @ts-ignore - window.ipc is the QWebChannel bridge, present only in the Qt app.
+        window.ipc?.setAlertsActive?.(anyActiveUnsilencedAlert.value)
+    }
+    watch(anyActiveUnsilencedAlert, () => pushTrayAlertState())
 
     const healthFailsafe: Ref<Array<FailsafeRef>> = ref([])
     const healthMissing: Ref<Array<SourceRef>> = ref([])
@@ -1568,6 +1585,7 @@ export const useSettingsStore = defineStore('settings', () => {
         alerts,
         alertLogs,
         alertsActive,
+        pushTrayAlertState,
         loadAlertsAndLogs,
         createAlert,
         updateAlert,
