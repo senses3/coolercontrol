@@ -41,6 +41,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
 import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
+import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import type { CalibrationBatchEntry, CalibrationStage } from '@/models/Calibration.ts'
 
@@ -52,6 +53,7 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const { blockingAlertName, watchingAlertCount } = useAlertCalibrationGuard()
+const { warningText } = useCalibrationStatusText()
 
 // The daemon owns the batch, so on open we resume an in-progress run
 // rather than always starting at the picker.
@@ -216,6 +218,16 @@ const runningText = (entry: CalibrationBatchEntry): string => {
     return `${stageLabel(entry.stage)} ${entry.percent}%`
 }
 
+// A completed fan's persisted calibration may carry warnings (e.g. no RPM
+// detected). Read them from the per-channel status the store refreshes on
+// batch completion, formatted like the channel popover shows them.
+const entryWarnings = (entry: CalibrationBatchEntry): string => {
+    if (entry.phase !== 'done') return ''
+    const status = calibrationStore.statusFor(entry.device_uid, entry.channel_name)
+    if (status?.phase !== 'completed') return ''
+    return (status.calibration.warnings ?? []).map(warningText).join('; ')
+}
+
 const phaseIcon = (phase: CalibrationBatchEntry['phase']): string => {
     switch (phase) {
         case 'done':
@@ -368,8 +380,16 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                             <span class="shrink-0 inline-flex overflow-hidden">
                                 <svg-icon
                                     type="mdi"
-                                    :class="phaseClass(entry.phase)"
-                                    :path="phaseIcon(entry.phase)"
+                                    :class="
+                                        entryWarnings(entry)
+                                            ? 'text-warning'
+                                            : phaseClass(entry.phase)
+                                    "
+                                    :path="
+                                        entryWarnings(entry)
+                                            ? mdiAlertCircleOutline
+                                            : phaseIcon(entry.phase)
+                                    "
                                     :size="deviceStore.getREMSize(1.2)"
                                 />
                             </span>
@@ -386,9 +406,13 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                                 class="text-text-color-secondary"
                                 >{{ t('components.wizards.calibration.queued') }}</span
                             >
-                            <span v-else-if="entry.phase === 'done'" class="text-accent">{{
-                                t('components.wizards.calibration.done')
-                            }}</span>
+                            <span
+                                v-else-if="entry.phase === 'done'"
+                                :class="entryWarnings(entry) ? 'text-warning' : 'text-accent'"
+                                >{{
+                                    entryWarnings(entry) || t('components.wizards.calibration.done')
+                                }}</span
+                            >
                             <span
                                 v-else-if="entry.phase === 'cancelled'"
                                 class="text-text-color-secondary"
