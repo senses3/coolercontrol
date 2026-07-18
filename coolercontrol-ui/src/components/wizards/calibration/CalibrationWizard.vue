@@ -116,6 +116,13 @@ fillFans()
 // rejects it, so the picker keeps it out of the selection.
 const rowBlockedBy = (row: FanRow): string | undefined =>
     blockingAlertName(row.deviceUID, row.channelName)
+// An already-calibrated fan may carry warnings (e.g. no RPM detected); surface
+// them on the picker so the user sees them before re-running, like the popover.
+const rowWarnings = (row: FanRow): string => {
+    const status = calibrationStore.statusFor(row.deviceUID, row.channelName)
+    if (status?.phase !== 'completed') return ''
+    return (status.calibration.warnings ?? []).map(warningText).join('; ')
+}
 const selectedRows = computed(() =>
     fanRows.value.filter((row) => row.selected && rowBlockedBy(row) == null),
 )
@@ -303,6 +310,19 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                                         name: rowBlockedBy(row),
                                     })
                                 }}
+                            </span>
+                            <span
+                                v-else-if="row.alreadyCalibrated && rowWarnings(row)"
+                                v-tooltip.top="rowWarnings(row)"
+                                class="flex min-w-0 items-center gap-x-1 text-xs text-warning"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiAlertCircleOutline"
+                                    :size="14"
+                                    class="shrink-0"
+                                />
+                                <span class="truncate">{{ rowWarnings(row) }}</span>
                             </span>
                             <span v-else-if="row.alreadyCalibrated" class="text-xs text-accent">
                                 {{ t('components.wizards.calibration.calibratedBadge') }}
