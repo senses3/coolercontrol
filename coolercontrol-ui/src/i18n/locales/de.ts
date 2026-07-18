@@ -190,6 +190,7 @@ export default {
                 landingHint:
                     'Wählen Sie einen Lüfter oder eine Pumpe, um dessen Kühlung anzuzeigen und anzupassen.',
                 noChannels: 'Keine steuerbaren Lüfter- oder Pumpenkanäle erkannt.',
+                fullChart: 'Vollständiges Diagramm',
                 guidedSetup: 'Geführte Einrichtung',
                 setupMenu: {
                     autoCreateThisFan: 'Für diesen Lüfter automatisch erstellen',
@@ -661,6 +662,7 @@ export default {
             dashboardDeleted: 'Dashboard gelöscht',
             setAsHome: 'Als Startseite festlegen',
             duplicateDashboard: 'Dashboard duplizieren',
+            openCooling: 'Kühlungssteuerung öffnen',
         },
         appInfo: {
             title: 'Info & Werkzeuge',

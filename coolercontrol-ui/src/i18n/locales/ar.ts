@@ -186,6 +186,7 @@ export default {
             coolingPage: {
                 landingHint: 'حدد مروحة أو مضخة لعرض تبريدها وضبطه.',
                 noChannels: 'لم يتم اكتشاف قنوات مراوح أو مضخات قابلة للتحكم.',
+                fullChart: 'الرسم البياني الكامل',
                 guidedSetup: 'إعداد موجّه',
                 setupMenu: {
                     autoCreateThisFan: 'إنشاء تلقائي لهذه المروحة',
@@ -647,6 +648,7 @@ export default {
             dashboardDeleted: 'تم حذف لوحة المعلومات',
             setAsHome: 'تعيين كصفحة رئيسية',
             duplicateDashboard: 'تكرار لوحة المعلومات',
+            openCooling: 'فتح عناصر تحكم التبريد',
         },
         appInfo: {
             title: 'معلومات وأدوات',

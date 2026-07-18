@@ -189,6 +189,7 @@ export default {
                 landingHint:
                     'Selecione um ventilador ou bomba para ver e ajustar seu resfriamento.',
                 noChannels: 'Nenhum canal de ventilador ou bomba controlável foi detectado.',
+                fullChart: 'Gráfico completo',
                 guidedSetup: 'Configuração Guiada',
                 setupMenu: {
                     autoCreateThisFan: 'Criar automaticamente para este ventilador',
@@ -659,6 +660,7 @@ export default {
             dashboardDeleted: 'Painel Excluído',
             setAsHome: 'Definir como Inicial',
             duplicateDashboard: 'Duplicar Painel',
+            openCooling: 'Abrir controles de resfriamento',
         },
         appInfo: {
             title: 'Info e Ferramentas',

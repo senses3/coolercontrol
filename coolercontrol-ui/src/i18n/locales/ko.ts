@@ -186,6 +186,7 @@ export default {
             coolingPage: {
                 landingHint: '팬 또는 펌프를 선택하여 냉각을 확인하고 조정하세요.',
                 noChannels: '제어 가능한 팬 또는 펌프 채널이 감지되지 않았습니다.',
+                fullChart: '전체 차트',
                 guidedSetup: '가이드 설정',
                 setupMenu: {
                     autoCreateThisFan: '이 팬 자동 생성',
@@ -646,6 +647,7 @@ export default {
             dashboardDeleted: '대시보드 삭제됨',
             setAsHome: '홈으로 설정',
             duplicateDashboard: '대시보드 복제',
+            openCooling: '냉각 제어 열기',
         },
         appInfo: {
             title: '정보 및 도구',

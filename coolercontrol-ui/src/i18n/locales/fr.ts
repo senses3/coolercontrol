@@ -192,6 +192,7 @@ export default {
                 landingHint:
                     'Sélectionnez un ventilateur ou une pompe pour afficher et ajuster son refroidissement.',
                 noChannels: "Aucun canal de ventilateur ou de pompe contrôlable n'a été détecté.",
+                fullChart: 'Graphique complet',
                 guidedSetup: 'Configuration guidée',
                 setupMenu: {
                     autoCreateThisFan: 'Créer automatiquement pour ce ventilateur',
@@ -671,6 +672,7 @@ export default {
             dashboardDeleted: 'Tableau de Bord Supprimé',
             setAsHome: 'Définir comme Accueil',
             duplicateDashboard: 'Dupliquer le Tableau de Bord',
+            openCooling: 'Ouvrir les contrôles de refroidissement',
         },
         appInfo: {
             title: 'Info & Outils',

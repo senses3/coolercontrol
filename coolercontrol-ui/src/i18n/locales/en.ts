@@ -186,6 +186,7 @@ export default {
             coolingPage: {
                 landingHint: 'Select a fan or pump to view and adjust its cooling.',
                 noChannels: 'No controllable fan or pump channels were detected.',
+                fullChart: 'Full chart',
                 guidedSetup: 'Guided Setup',
                 setupMenu: {
                     autoCreateThisFan: 'Auto-Create for This Fan',
@@ -651,6 +652,7 @@ export default {
             dashboardDeleted: 'Dashboard Deleted',
             setAsHome: 'Set as Home',
             duplicateDashboard: 'Duplicate Dashboard',
+            openCooling: 'Open cooling controls',
         },
         appInfo: {
             title: 'Info & Tools',

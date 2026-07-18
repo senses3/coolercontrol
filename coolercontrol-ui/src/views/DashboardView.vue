@@ -38,6 +38,7 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlertOutline,
     mdiContentCopy,
+    mdiFan,
     mdiHome,
     mdiHomeOutline,
     mdiInformationSlabCircleOutline,
@@ -78,6 +79,17 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
 const sensorMode: boolean = props.deviceUID != null && props.channelName != null
+
+// Entity-first companion link: fan/pump channels also have a Cooling page.
+const hasCoolingPage = computed((): boolean => {
+    if (!sensorMode) return false
+    for (const device of deviceStore.allDevices()) {
+        if (device.uid === props.deviceUID) {
+            return device.info?.channels.get(props.channelName!)?.speed_options != null
+        }
+    }
+    return false
+})
 
 const channelLabel = ref(
     sensorMode
@@ -515,6 +527,20 @@ onUnmounted(() => {
             <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-full" />
         </span>
         <div class="flex flex-wrap items-center gap-x-1 justify-end">
+            <UiButton
+                v-if="hasCoolingPage"
+                variant="outline"
+                v-tooltip.top="t('views.dashboard.openCooling')"
+                @click="
+                    router.push({
+                        name: 'cooling-channel',
+                        params: { deviceUID: props.deviceUID!, channelName: props.channelName! },
+                    })
+                "
+            >
+                <svg-icon type="mdi" :path="mdiFan" :size="deviceStore.getREMSize(1.1)" />
+                <span class="ml-1">{{ t('layout.shell.cooling') }}</span>
+            </UiButton>
             <div
                 v-if="dashboard.chartType == ChartType.TIME_CHART"
                 class="p-2 flex leading-none items-center"

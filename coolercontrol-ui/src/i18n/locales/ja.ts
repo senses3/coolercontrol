@@ -186,6 +186,7 @@ export default {
             coolingPage: {
                 landingHint: 'ファンまたはポンプを選択して冷却を表示・調整します。',
                 noChannels: '制御可能なファンまたはポンプのチャンネルが検出されませんでした。',
+                fullChart: 'フルチャート',
                 guidedSetup: 'ガイド付きセットアップ',
                 setupMenu: {
                     autoCreateThisFan: 'このファンの自動作成',
@@ -652,6 +653,7 @@ export default {
             dashboardDeleted: 'ダッシュボードが削除されました',
             setAsHome: 'ホームとして設定',
             duplicateDashboard: 'ダッシュボードを複製',
+            openCooling: '冷却コントロールを開く',
         },
         appInfo: {
             title: '情報とツール',

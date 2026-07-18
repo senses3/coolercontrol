@@ -186,6 +186,7 @@ export default {
             coolingPage: {
                 landingHint: '選擇風扇或水泵以檢視並調整其冷卻。',
                 noChannels: '未偵測到可控制的風扇或水泵通道。',
+                fullChart: '完整圖表',
                 guidedSetup: '引導式設定',
                 setupMenu: {
                     autoCreateThisFan: '為此風扇自動建立',
@@ -631,6 +632,7 @@ export default {
             dashboardDeleted: '儀表板已刪除',
             setAsHome: '設為首頁',
             duplicateDashboard: '複製儀表板',
+            openCooling: '開啟冷卻控制',
         },
         appInfo: {
             title: '資訊與工具',

@@ -189,6 +189,7 @@ export default {
                 landingHint:
                     'Выберите вентилятор или помпу, чтобы просмотреть и настроить охлаждение.',
                 noChannels: 'Управляемые каналы вентиляторов или помп не обнаружены.',
+                fullChart: 'Полный график',
                 guidedSetup: 'Пошаговая настройка',
                 setupMenu: {
                     autoCreateThisFan: 'Автосоздание для этого вентилятора',
@@ -657,6 +658,7 @@ export default {
             dashboardDeleted: 'Панель удалена',
             setAsHome: 'Установить как домашнюю',
             duplicateDashboard: 'Дублировать панель',
+            openCooling: 'Открыть управление охлаждением',
         },
         appInfo: {
             title: 'Информация и инструменты',

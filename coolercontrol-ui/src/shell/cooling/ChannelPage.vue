@@ -19,7 +19,13 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAutoFix, mdiChevronDown, mdiShareVariantOutline, mdiSourceFork } from '@mdi/js'
+import {
+    mdiAutoFix,
+    mdiChartLine,
+    mdiChevronDown,
+    mdiShareVariantOutline,
+    mdiSourceFork,
+} from '@mdi/js'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
 import { v4 as uuidV4 } from 'uuid'
@@ -523,6 +529,15 @@ if (channelDashboard.value.dataTypes.length > 0) {
         </p>
 
         <div class="shrink-0" style="--time-chart-height: 24rem">
+            <div class="mb-1 flex justify-end">
+                <RouterLink
+                    :to="{ name: 'monitoring-sensor', params: { deviceUID, channelName } }"
+                    class="flex items-center gap-1 rounded text-sm text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                    <svg-icon type="mdi" :path="mdiChartLine" :size="16" />
+                    {{ t('layout.shell.coolingPage.fullChart') }}
+                </RouterLink>
+            </div>
             <TimeChart :dashboard="channelDashboard" />
         </div>
     </div>

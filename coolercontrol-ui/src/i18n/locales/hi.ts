@@ -187,6 +187,7 @@ export default {
             coolingPage: {
                 landingHint: 'कूलिंग देखने और समायोजित करने के लिए एक पंखा या पंप चुनें।',
                 noChannels: 'कोई नियंत्रण योग्य पंखा या पंप चैनल नहीं मिला।',
+                fullChart: 'पूरा चार्ट',
                 guidedSetup: 'निर्देशित सेटअप',
                 setupMenu: {
                     autoCreateThisFan: 'इस पंखे के लिए स्वतः बनाएँ',
@@ -649,6 +650,7 @@ export default {
             dashboardDeleted: 'डैशबोर्ड हटा दिया गया',
             setAsHome: 'होम के रूप में सेट करें',
             duplicateDashboard: 'डैशबोर्ड डुप्लिकेट करें',
+            openCooling: 'कूलिंग नियंत्रण खोलें',
         },
         appInfo: {
             title: 'जानकारी और उपकरण',
