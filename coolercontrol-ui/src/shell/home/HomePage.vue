@@ -21,6 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiBellOutline,
+    mdiBellRingOutline,
     mdiBellSleepOutline,
     mdiBookmarkCheck,
     mdiChartMultiple,
@@ -399,11 +400,13 @@ const shortcutClasses =
                         :to="{ name: 'monitoring-alert', params: { alertUID: alert.uid } }"
                         :class="shortcutClasses"
                     >
-                        <!-- Shape encodes silenced, color keeps the live state:
-                             a red sleep bell means firing-but-muted. -->
+                        <!-- Shape encodes silenced, color keeps the live state: a
+                             ringing bell for firing, a red sleep bell for firing-but-muted. -->
                         <svg-icon
                             type="mdi"
-                            :path="alertIsSilenced(alert) ? mdiBellSleepOutline : mdiBellOutline"
+                            :path="
+                                alertIsSilenced(alert) ? mdiBellSleepOutline : mdiBellRingOutline
+                            "
                             :size="18"
                             class="text-error"
                         />

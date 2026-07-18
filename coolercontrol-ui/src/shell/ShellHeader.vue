@@ -22,6 +22,7 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiArrowLeft,
     mdiBellOutline,
+    mdiBellRingOutline,
     mdiBookmarkCheck,
     mdiBookmarkMultipleOutline,
     mdiBookmarkOutline,
@@ -141,7 +142,11 @@ const isMobile = computed(() => width.value < 768)
                         : 'text-text-color-secondary hover:text-text-color'
                 "
             >
-                <svg-icon type="mdi" :path="mdiBellOutline" :size="deviceStore.getREMSize(1.25)" />
+                <svg-icon
+                    type="mdi"
+                    :path="hasActiveAlert ? mdiBellRingOutline : mdiBellOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
             </RouterLink>
         </UiTooltip>
         <div class="flex-1" />
