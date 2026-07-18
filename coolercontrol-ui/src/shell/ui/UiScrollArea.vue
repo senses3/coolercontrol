@@ -18,10 +18,15 @@
 
 <script setup lang="ts">
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
 
-withDefaults(defineProps<{ horizontal?: boolean }>(), { horizontal: false })
+// `surface` picks the colour the edge fades blend into, so the cue is seamless on
+// whichever background hosts the scroll area (panels sit on bg-one, dialogs bg-two).
+const props = withDefaults(defineProps<{ horizontal?: boolean; surface?: 'one' | 'two' }>(), {
+    horizontal: false,
+    surface: 'one',
+})
 
 const scrollbarClasses =
     'flex select-none touch-none py-2 bg-transparent transition-colors duration-[120ms] ' +
@@ -60,12 +65,16 @@ onMounted(measure)
 // overlaps the panel's lower edge.
 const fadeBase =
     'pointer-events-none absolute inset-x-0 z-[1] transition-opacity duration-150 ease-out'
-const fadeStops = (direction: 'top' | 'bottom'): string =>
-    `background-image: linear-gradient(to ${direction}, rgb(var(--colors-bg-one)) 0%, ` +
-    'rgb(var(--colors-bg-one)) 28%, rgb(var(--colors-bg-one) / 0.6) 68%, ' +
-    'rgb(var(--colors-bg-one) / 0) 100%)'
-const topFadeStyle = fadeStops('bottom')
-const bottomFadeStyle = fadeStops('top')
+const fadeStops = (direction: 'top' | 'bottom'): string => {
+    const surface = props.surface === 'two' ? '--colors-bg-two' : '--colors-bg-one'
+    return (
+        `background-image: linear-gradient(to ${direction}, rgb(var(${surface})) 0%, ` +
+        `rgb(var(${surface})) 28%, rgb(var(${surface}) / 0.6) 68%, ` +
+        `rgb(var(${surface}) / 0) 100%)`
+    )
+}
+const topFadeStyle = computed(() => fadeStops('bottom'))
+const bottomFadeStyle = computed(() => fadeStops('top'))
 </script>
 
 <template>
