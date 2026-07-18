@@ -24,6 +24,7 @@ import {
     mdiChartMultiple,
     mdiDragVertical,
     mdiFan,
+    mdiFanAlert,
     mdiFunction,
     mdiPinOff,
     mdiPinOutline,
@@ -56,10 +57,12 @@ import {
 } from '@/shell/panelOrder.ts'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import { channelSpins } from '@/shell/channelIcon.ts'
+import { useFailAlert } from '@/composables/useFailAlert.ts'
 import TagChips from '@/shell/TagChips.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 
 const { t } = useI18n()
+const { createFailAlert: pushFailAlert } = useFailAlert()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
@@ -105,6 +108,17 @@ const channelColor = (deviceUID: UID, channelName: string): string =>
 
 const liveFor = (deviceUID: UID, channelName: string): ChannelValues | undefined =>
     currentDeviceStatus.value.get(deviceUID)?.get(channelName)
+
+// Fail-alert convenience, same as the Monitoring panel's fan rows.
+const hasRpm = (channel: CoolingChannel): boolean =>
+    liveFor(channel.deviceUID, channel.channelName)?.rpm != null
+
+const createFailAlert = (channel: CoolingChannel): void =>
+    pushFailAlert(
+        channel.deviceUID,
+        channel.channelName,
+        channelLabel(channel.deviceUID, channel.channelName),
+    )
 
 const isUnhealthy = (deviceUID: UID, channelName: string): boolean =>
     settingsStore.healthFailsafe.some(
@@ -333,6 +347,15 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                             "
                         />
                         <button
+                            v-if="hasRpm(channel)"
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            v-tooltip.top="t('layout.shell.monitoringPanel.failAlert')"
+                            @click.prevent="createFailAlert(channel)"
+                        >
+                            <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
+                        </button>
+                        <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                             v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
@@ -457,6 +480,15 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                                     onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
                             "
                         />
+                        <button
+                            v-if="hasRpm(channel)"
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            v-tooltip.top="t('layout.shell.monitoringPanel.failAlert')"
+                            @click.prevent="createFailAlert(channel)"
+                        >
+                            <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
+                        </button>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"

@@ -20,9 +20,12 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
+    mdiBellPlusOutline,
     mdiDragVertical,
     mdiFan,
+    mdiFanAlert,
     mdiHomeOutline,
+    mdiPinOff,
     mdiTextBoxOutline,
     mdiViewDashboardOutline,
 } from '@mdi/js'
@@ -30,9 +33,12 @@ import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import type { RouteLocationRaw } from 'vue-router'
-import { type Device, type UID } from '@/models/Device.ts'
+import { type Color, type Device, type UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
+import { ChannelMetric } from '@/models/ChannelSource.ts'
+import { useFailAlert } from '@/composables/useFailAlert.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -41,16 +47,21 @@ import { reorderSubset } from '@/shell/panelOrder.ts'
 import { monitoringSensors } from '@/shell/monitoring/sensors.ts'
 import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
 import { channelRoute } from '@/shell/channelRoute.ts'
+import CCColorPicker from '@/components/CCColorPicker.vue'
+import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
+const router = useRouter()
+const { createFailAlert } = useFailAlert()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
 
 // The Home panel shows everything pinned anywhere: fans open their cooling
 // page, custom sensors their editor under Devices, other sensors their
-// monitoring page, dashboards their dashboard.
+// monitoring page, dashboards their dashboard. Channel rows carry the same
+// hover actions as their Cooling/Monitoring panel rows; dashboards only unpin.
 interface PinnedRow {
     key: string
     label: string
@@ -60,6 +71,9 @@ interface PinnedRow {
     icon?: string
     spins?: boolean
     to: RouteLocationRaw
+    deviceUID?: UID
+    channelName?: string
+    alertKind?: 'temp' | 'fan'
 }
 
 const label = (deviceUID: UID, channelName: string): string =>
@@ -130,21 +144,23 @@ const buildPinnedRows = (): PinnedRow[] => {
             sublabel: deviceLabel(deviceUID),
             color: color(deviceUID, channelName),
             value: liveValue(deviceUID, channelName),
+            deviceUID,
+            channelName,
+            to: channelRoute(deviceStore.allDevices(), deviceUID, channelName),
         }
         if (fanIds.has(id)) {
             rows.push({
                 ...base,
                 icon: mdiFan,
                 spins: channelSpins('fan', values, settingsStore.eyeCandy),
-                to: channelRoute(deviceStore.allDevices(), deviceUID, channelName),
+                alertKind: values?.rpm != null ? 'fan' : undefined,
             })
         } else if (sensorIds.has(id)) {
+            const kind = channelKind(devicesByUid.get(deviceUID), channelName, values)
             rows.push({
                 ...base,
-                icon: channelKindIcon(
-                    channelKind(devicesByUid.get(deviceUID), channelName, values),
-                ),
-                to: channelRoute(deviceStore.allDevices(), deviceUID, channelName),
+                icon: channelKindIcon(kind),
+                alertKind: kind === 'temp' ? 'temp' : undefined,
             })
         }
     }
@@ -159,6 +175,35 @@ const persistPinnedOrder = (): void => {
         settingsStore.pinnedIds,
         pinnedRows.value.map((row) => row.key),
     )
+}
+
+// Keeps a row's hover actions visible while its tag popover is open.
+const openTagRow = ref<string | null>(null)
+const onTagOpen = (rowKey: string, open: boolean): void => {
+    openTagRow.value = open ? rowKey : null
+}
+
+const unpin = (row: PinnedRow): void => {
+    settingsStore.pinnedIds = settingsStore.pinnedIds.filter((pinned) => pinned !== row.key)
+}
+
+const setRowColor = (row: PinnedRow, newColor: Color): void => {
+    const setting = settingsStore.allUIDeviceSettings
+        .get(row.deviceUID!)
+        ?.sensorsAndChannels.get(row.channelName!)
+    if (setting != null) setting.userColor = newColor
+}
+
+const createAlert = (row: PinnedRow): void => {
+    if (row.alertKind == null) return
+    if (row.alertKind === 'fan') {
+        createFailAlert(row.deviceUID!, row.channelName!, row.label)
+        return
+    }
+    router.push({
+        name: 'monitoring-alert-new',
+        query: { device: row.deviceUID!, channel: row.channelName!, metric: ChannelMetric.Temp },
+    })
 }
 </script>
 
@@ -201,50 +246,97 @@ const persistPinnedOrder = (): void => {
                 class="flex flex-col gap-0.5"
                 @end="persistPinnedOrder"
             >
-                <RouterLink
+                <div
                     v-for="row in pinnedRows"
                     :key="row.key"
-                    :to="row.to"
-                    class="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                    exact-active-class="!text-accent"
+                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
-                    <svg-icon
-                        v-if="row.icon"
-                        type="mdi"
-                        :path="row.icon"
-                        :size="14"
-                        class="shrink-0"
-                        :class="{ 'animate-spin-slow': row.spins }"
-                        :style="{ color: row.color || undefined }"
-                    />
-                    <svg-icon
-                        v-else
-                        type="mdi"
-                        :path="mdiViewDashboardOutline"
-                        :size="14"
-                        class="shrink-0 text-text-color-secondary"
-                    />
-                    <span class="truncate">{{ row.label }}</span>
-                    <!-- Huge shrink so the sublabel (device name) fully collapses
-                         before the label (truncate, shrink-1) gives up any space. -->
-                    <span
-                        v-if="row.sublabel"
-                        class="shrink-[9999] truncate text-xs text-text-color-secondary"
+                    <RouterLink
+                        :to="row.to"
+                        class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
+                        exact-active-class="!text-accent"
                     >
-                        {{ row.sublabel }}
-                    </span>
-                    <span
-                        v-if="row.value"
-                        class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden"
+                        <svg-icon
+                            v-if="row.icon"
+                            type="mdi"
+                            :path="row.icon"
+                            :size="14"
+                            class="shrink-0"
+                            :class="{ 'animate-spin-slow': row.spins }"
+                            :style="{ color: row.color || undefined }"
+                        />
+                        <svg-icon
+                            v-else
+                            type="mdi"
+                            :path="mdiViewDashboardOutline"
+                            :size="14"
+                            class="shrink-0 text-text-color-secondary"
+                        />
+                        <span class="truncate">{{ row.label }}</span>
+                        <!-- Huge shrink so the sublabel (device name) fully collapses
+                             before the label (truncate, shrink-1) gives up any space. -->
+                        <span
+                            v-if="row.sublabel"
+                            class="shrink-[9999] truncate text-xs text-text-color-secondary"
+                        >
+                            {{ row.sublabel }}
+                        </span>
+                        <span
+                            v-if="row.value"
+                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
+                            :class="{ '!hidden': openTagRow === row.key }"
+                        >
+                            {{ row.value }}
+                        </span>
+                    </RouterLink>
+                    <div
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        :class="{ '!flex': openTagRow === row.key }"
                     >
-                        {{ row.value }}
-                    </span>
-                    <span
-                        class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
-                    >
-                        <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
-                    </span>
-                </RouterLink>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
+                        <template v-if="row.deviceUID != null && row.channelName != null">
+                            <CCColorPicker
+                                :model-value="row.color ?? ''"
+                                :size="1.25"
+                                @update:model-value="(c: Color) => setRowColor(row, c)"
+                            />
+                            <TagPopover
+                                :device-u-i-d="row.deviceUID"
+                                :channel-name="row.channelName"
+                                @open="(open: boolean) => onTagOpen(row.key, open)"
+                            />
+                            <button
+                                v-if="row.alertKind != null"
+                                type="button"
+                                class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                                v-tooltip.top="
+                                    row.alertKind === 'fan'
+                                        ? t('layout.shell.monitoringPanel.failAlert')
+                                        : t('layout.shell.monitoringPanel.createAlert')
+                                "
+                                @click.prevent="createAlert(row)"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="
+                                        row.alertKind === 'fan' ? mdiFanAlert : mdiBellPlusOutline
+                                    "
+                                    :size="16"
+                                />
+                            </button>
+                        </template>
+                        <button
+                            type="button"
+                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                            v-tooltip.top="t('layout.shell.coolingPanel.unpin')"
+                            @click.prevent="unpin(row)"
+                        >
+                            <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
+                        </button>
+                    </div>
+                </div>
             </VueDraggable>
         </template>
     </div>
