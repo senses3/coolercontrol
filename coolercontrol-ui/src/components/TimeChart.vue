@@ -509,13 +509,11 @@ const uOptions: uPlot.Options = {
                 settingsStore.frequencyPrecision === 1
                     ? t('components.axisOptions.rpmMhz')
                     : t('components.axisOptions.krpmGhz'),
-            labelGap: settingsStore.frequencyPrecision === 1 ? deviceStore.getREMSize(1.0) : 0,
+            labelGap: deviceStore.getREMSize(1.0),
             labelSize:
                 settingsStore.frequencyPrecision === 1
                     ? deviceStore.getREMSize(2.9)
-                    : hasWattsAxis
-                      ? deviceStore.getREMSize(2.25)
-                      : deviceStore.getREMSize(1.4),
+                    : deviceStore.getREMSize(2.25),
             // labelFont, unlike font, seems to take rem values properly, and by is 1rem by default:
             labelFont: `sans-serif`,
             stroke: colors.themeColors.text_color,
