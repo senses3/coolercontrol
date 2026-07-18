@@ -1027,6 +1027,14 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         const response = await deviceStore.daemonClient.updateAlert(alert_to_update)
         if (response == null) {
+            // The daemon resets a disabled alert to Inactive but does so silently (no
+            // SSE event), so mirror that locally to keep the active set, top-bar badge,
+            // and panel counter consistent. Re-enabling is announced via SSE.
+            if (!alert_to_update.enabled) {
+                alert_to_update.state = AlertState.Inactive
+                const activeIndex = alertsActive.value.indexOf(alertUID)
+                if (activeIndex > -1) alertsActive.value.splice(activeIndex, 1)
+            }
             toast.add({
                 severity: 'success',
                 summary: t('common.success'),
@@ -1585,6 +1593,7 @@ export const useSettingsStore = defineStore('settings', () => {
         alerts,
         alertLogs,
         alertsActive,
+        anyActiveUnsilencedAlert,
         pushTrayAlertState,
         loadAlertsAndLogs,
         createAlert,

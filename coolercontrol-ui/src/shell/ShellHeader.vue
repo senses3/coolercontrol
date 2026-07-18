@@ -35,7 +35,6 @@ import { computed, inject } from 'vue'
 import { useWindowSize } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { alertIsSilenced } from '@/models/Alert.ts'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -70,13 +69,9 @@ const statusTarget = computed(() =>
         : { name: 'home-logs', query: { level: 'warn' } },
 )
 
-// Top-bar alert indicator: secondary until an unsilenced alert is firing, then
-// error. Silenced alerts still reach Active, so a fully-silenced set stays quiet.
-const hasActiveAlert = computed(() =>
-    settingsStore.alerts.some(
-        (alert) => settingsStore.alertsActive.includes(alert.uid) && !alertIsSilenced(alert),
-    ),
-)
+// Top-bar alert indicator: secondary until an enabled, unsilenced alert is firing,
+// then error. Shares the tray's source of truth so the two never disagree.
+const hasActiveAlert = computed(() => settingsStore.anyActiveUnsilencedAlert)
 
 const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
