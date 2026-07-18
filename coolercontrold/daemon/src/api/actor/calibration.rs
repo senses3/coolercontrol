@@ -152,6 +152,10 @@ impl CalibrationStatus {
                 ),
             ),
             DiagnosisFailure::Cancelled => ("user_cancelled", "diagnosis cancelled".to_string()),
+            DiagnosisFailure::BlockedByAlert { alert_name } => (
+                "blocked_by_alert",
+                format!("alert '{alert_name}' is active on this channel"),
+            ),
             DiagnosisFailure::WriteFailed(err) => ("write_failed", err.clone()),
             DiagnosisFailure::RestoreFailed(err) => ("restore_failed", err.clone()),
             DiagnosisFailure::PersistFailed(err) => ("persist_failed", err.clone()),
@@ -270,6 +274,11 @@ impl CalibrationActor {
         if self.engine.is_calibration_in_progress(&key) {
             return Err(anyhow::anyhow!(
                 "calibration already in progress for {device_uid}:{channel_name}"
+            ));
+        }
+        if let Some(alert_name) = self.engine.active_alert_blocking(&key) {
+            return Err(anyhow::anyhow!(
+                "cannot calibrate {device_uid}:{channel_name}: alert '{alert_name}' is active"
             ));
         }
         let engine = Rc::clone(&self.engine);

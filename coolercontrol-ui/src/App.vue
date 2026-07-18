@@ -319,6 +319,8 @@ onMounted(async () => {
             // @ts-ignore
             const ipc = window.ipc
             await ipc.loadFinished()
+            // Push the current alert state now the IPC bridge is confirmed ready.
+            settingsStore.pushTrayAlertState()
         }
     }
     // Fire-and-forget: SW manages its own SSE connection independently.

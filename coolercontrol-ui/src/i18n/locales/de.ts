@@ -743,8 +743,9 @@ export default {
             proceed: 'Fortfahren',
         },
         alerts: {
-            range: 'Bereich: {min} bis {max}{unit}',
-            since: 'seit {time}',
+            triggersOutside: 'löst unter {min} oder über {max}{unit} aus',
+            triggersAbove: 'löst über {max}{unit} aus',
+            stateSince: '{state} seit {time}',
             createAlert: 'Warnung erstellen',
             editAlert: 'Warnung bearbeiten',
             deleteAlert: 'Warnung löschen',
@@ -754,15 +755,40 @@ export default {
             alertLogs: 'Warnungsprotokolle',
             alertTriggered: 'Warnung ausgelöst',
             alertRecovered: 'Warnung wiederhergestellt',
+            alertError: 'Warnungsfehler',
             deleteAlertConfirm: 'Sind Sie sicher, dass Sie löschen möchten: "{name}"?',
             saveAlert: 'Warnung speichern',
-            channelSource: 'Kanalquelle für Warnung',
-            channelSourceTooltip: 'Die Kanalquelle, die für die Warnung verwendet werden soll',
+            channelSources: 'Kanalquellen für Warnung',
+            channelSourcesTooltip:
+                'Die von dieser Warnung überwachten Kanalquellen.\nEin Sensortyp pro Warnung: die erste Auswahl filtert die übrigen.',
             triggerConditions: 'Auslösebedingungen',
             maxValueTooltip: 'Werte über diesem lösen die Warnung aus.',
             minValueTooltip: 'Werte unter diesem lösen die Warnung aus.',
             warmupDurationTooltip:
                 'Gibt an, wie lange eine Bedingung aktiv sein muss, bevor die Warnung als aktiv gilt.\nDie Überprüfung erfolgt nur in regelmäßigen Poll-Intervallen\nund kann daher von dieser Länge abweichen.',
+            cooldownDurationTooltip:
+                'Gibt an, wie lange der Wert wieder im Bereich bleiben muss, bevor die Warnung wiederhergestellt wird.\nVerhindert schnelles Hin- und Herspringen zwischen ausgelöst und wiederhergestellt.',
+            cooldownLessThan: 'Bedingung wiederhergestellt länger als',
+            repeatInterval: 'Benachrichtigung wiederholen alle',
+            repeatIntervalTooltip:
+                'Die Desktop-Benachrichtigung in diesem Intervall erneut senden, solange die Warnung aktiv bleibt.\n0 deaktiviert wiederholte Benachrichtigungen.',
+            enabled: 'Aktiviert',
+            enabledTooltip: 'Eine deaktivierte Warnung wird überhaupt nicht ausgewertet.',
+            sectionGeneral: 'Allgemein',
+            sectionNotifications: 'Benachrichtigungen',
+            sectionActions: 'Aktionen',
+            silence: 'Stummschalten',
+            silenceTooltip:
+                'Stummschalten: Benachrichtigungen und Herunterfahren für eine Weile unterdrücken.\nDie Warnung wird weiterhin ausgewertet und zeigt ihren Zustand an.',
+            silence15m: 'Für 15 Minuten stummschalten',
+            silence1h: 'Für 1 Stunde stummschalten',
+            silence8h: 'Für 8 Stunden stummschalten',
+            silence24h: 'Für 24 Stunden stummschalten',
+            unsilence: 'Stummschaltung jetzt aufheben',
+            enableAlert: 'Warnung aktivieren',
+            disableAlert: 'Warnung deaktivieren',
+            silencedUntil: 'Stummgeschaltet bis {time}',
+            disabledLabel: 'Deaktiviert',
             greaterThan: 'größer als',
             lessThan: 'kleiner als',
             newAlert: 'Neue Warnung',
@@ -1266,6 +1292,9 @@ export default {
                 noFans: 'Keine steuerbaren Lüfter erkannt.',
                 selectAll: 'Alle auswählen',
                 calibratedBadge: 'kalibriert',
+                blockedByAlert: "blockiert: Warnung '{name}' ist aktiv",
+                alertsPausedNote:
+                    '{count} Warnung(en) überwachen die ausgewählten Lüfter und werden während des Durchlaufs der einzelnen Lüfter pausiert.',
                 idleNote:
                     'Bei der Kalibrierung wird jeder Lüfter über seinen gesamten Bereich hochgefahren. Am besten im Leerlauf ausführen: Es ist laut und dauert einige Minuten pro Lüfter.',
                 concurrencyLabel: 'Lüfter gleichzeitig',
@@ -1402,6 +1431,10 @@ export default {
                 description:
                     'Lassen Sie den Lüfter den gesamten Bereich durchlaufen, um seine tatsächliche Tastgrad-zu-Drehzahl-Kurve zu ermitteln, und steuern Sie den Kanal anschließend als drehzahlnormierten Echt-Tastgrad.\nBeseitigt tote Zonen bei niedrigem Tastgrad und Sättigung bei hohem Tastgrad.\nDer Anlauf-Boost wird ebenfalls automatisch behandelt, sobald der Lüfter kalibriert ist: Ein kurzer Startschub bringt den Lüfter aus dem Stillstand auf Drehzahl, bevor er sich auf den Zieltastgrad einpendelt.\nDer Durchlauf dauert in der Regel mehrere Minuten und kann bei träge reagierenden Lüftern deutlich länger laufen. Der Kanal wird zu Beginn auf 0 % gesetzt.',
                 statusNotCalibrated: 'Nicht kalibriert',
+                blockedByAlert:
+                    "Kalibrierung blockiert: Warnung '{name}' ist auf diesem Lüfter aktiv.",
+                alertsPausedNote:
+                    'Warnungen, die diesen Lüfter überwachen, werden während des Durchlaufs pausiert.',
                 statusInProgress: 'Kalibrierung läuft: {stage} ({percent} %)',
                 statusCompleted: 'Kalibriert (gleichmäßig, Abbildung aktiv)',
                 statusCompletedStepped: 'Kalibriert (Stufenkurve, Abbildung deaktiviert)',

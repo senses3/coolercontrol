@@ -26,8 +26,10 @@ import { useDialog } from '@/shell/dialog'
 import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import { mdiChartLine, mdiInformationSlabCircleOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
 import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
+import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import type { UID } from '@/models/Device.ts'
 
@@ -42,10 +44,19 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
+const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const toast = useToast()
 const dialog = useDialog()
 const { completedStatusText } = useCalibrationStatusText()
+const { blockingAlertName, watchingAlertCount } = useAlertCalibrationGuard()
+
+// An Active alert on this fan blocks calibration (the daemon rejects it);
+// alerts merely watching it are paused during the sweep.
+const blockingAlert = computed(() => blockingAlertName(props.deviceUID, props.channelName))
+const watchedByAlerts = computed(
+    () => watchingAlertCount([{ deviceUID: props.deviceUID, channelName: props.channelName }]) > 0,
+)
 
 const calibrationCurveDialog = defineAsyncComponent(
     () => import('@/components/CalibrationCurveDialog.vue'),
@@ -166,6 +177,8 @@ async function onClearCalibration(): Promise<void> {
 // open, so the lifecycle hook fires at the right moment.
 onMounted(() => {
     calibrationStore.ensurePolling(props.deviceUID, props.channelName).catch(() => {})
+    // Refresh alert states so the active-alert blocking hint is current.
+    settingsStore.loadAlertsAndLogs().catch(() => {})
 })
 </script>
 
@@ -190,6 +203,19 @@ onMounted(() => {
         <div :class="['text-sm pb-2', calibrationHasWarnings ? 'text-warning' : '']">
             {{ calibrationStatusText }}
         </div>
+        <div v-if="blockingAlert != null" class="text-sm text-warning pb-2">
+            {{
+                t('components.channelExtensionSettings.calibration.blockedByAlert', {
+                    name: blockingAlert,
+                })
+            }}
+        </div>
+        <div
+            v-else-if="watchedByAlerts && calibrationPhase !== 'in_progress'"
+            class="text-xs text-text-color-secondary pb-2"
+        >
+            {{ t('components.channelExtensionSettings.calibration.alertsPausedNote') }}
+        </div>
         <UiProgressBar
             v-if="calibrationPhase === 'in_progress'"
             :value="calibrationStatus?.phase === 'in_progress' ? calibrationStatus.percent : 0"
@@ -205,8 +231,9 @@ onMounted(() => {
             <button
                 v-if="calibrationPhase === 'not_started'"
                 type="button"
+                :disabled="blockingAlert != null"
                 @click="onStartCalibration"
-                class="px-3 py-1 rounded border border-border-one hover:bg-surface-hover text-sm"
+                class="px-3 py-1 rounded border border-border-one hover:bg-surface-hover text-sm disabled:opacity-50 disabled:pointer-events-none"
             >
                 {{ t('components.channelExtensionSettings.calibration.buttonCalibrate') }}
             </button>
@@ -230,8 +257,9 @@ onMounted(() => {
             <button
                 v-if="calibrationPhase === 'completed' || calibrationPhase === 'failed'"
                 type="button"
+                :disabled="blockingAlert != null"
                 @click="onStartCalibration"
-                class="px-3 py-1 rounded border border-border-one hover:bg-surface-hover text-sm"
+                class="px-3 py-1 rounded border border-border-one hover:bg-surface-hover text-sm disabled:opacity-50 disabled:pointer-events-none"
             >
                 {{ t('components.channelExtensionSettings.calibration.buttonRecalibrate') }}
             </button>

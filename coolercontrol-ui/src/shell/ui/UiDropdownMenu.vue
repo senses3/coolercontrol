@@ -39,7 +39,7 @@ withDefaults(defineProps<{ align?: 'start' | 'center' | 'end'; sideOffset?: numb
             <DropdownMenuContent
                 :align="align"
                 :side-offset="sideOffset"
-                class="z-[1300] min-w-44 rounded-lg border border-border-one bg-bg-two p-1 shadow-overlay"
+                class="z-[1300] min-w-44 rounded-lg border border-border-one bg-bg-two p-1 shadow-overlay-lg"
             >
                 <slot />
             </DropdownMenuContent>

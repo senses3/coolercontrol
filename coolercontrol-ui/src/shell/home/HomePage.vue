@@ -21,6 +21,8 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiBellOutline,
+    mdiBellRingOutline,
+    mdiBellSleepOutline,
     mdiBookmarkCheck,
     mdiChartMultiple,
     mdiCircle,
@@ -47,6 +49,7 @@ import {
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { alertIsSilenced } from '@/models/Alert.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
@@ -397,7 +400,16 @@ const shortcutClasses =
                         :to="{ name: 'monitoring-alert', params: { alertUID: alert.uid } }"
                         :class="shortcutClasses"
                     >
-                        <svg-icon type="mdi" :path="mdiBellOutline" :size="18" class="text-error" />
+                        <!-- Shape encodes silenced, color keeps the live state: a
+                             ringing bell for firing, a red sleep bell for firing-but-muted. -->
+                        <svg-icon
+                            type="mdi"
+                            :path="
+                                alertIsSilenced(alert) ? mdiBellSleepOutline : mdiBellRingOutline
+                            "
+                            :size="18"
+                            class="text-error"
+                        />
                         <span class="text-text-color">{{ alert.name }}</span>
                         <span class="text-sm text-error">{{ t('models.alertState.active') }}</span>
                     </RouterLink>

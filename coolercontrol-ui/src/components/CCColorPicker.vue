@@ -23,10 +23,10 @@ import { mdiPalette } from '@mdi/js'
 import { Color } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { ChromePicker, CompactPicker } from 'vue-color'
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
-import { computed, nextTick, ref, Ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, Ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
@@ -42,6 +42,10 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
     (e: 'open', value: boolean): void
+    // Emitted instead of a save when the chosen color equals default-color:
+    // the parent clears its stored user color so the non-user-defined color
+    // takes over again (and keeps tracking future palette changes).
+    (e: 'reset'): void
 }>()
 
 enum ColorFormat {
@@ -75,29 +79,49 @@ const popoverOpen = ref(false)
 // used to help determine closing behavior, whether closed by OK or clicking away/cancel.
 let newColorApplied: boolean = false
 
-const closeAndReset = (): void => {
-    if (!props.defaultColor) return
+// Preview only: shows the default in the picker and stays open for review;
+// nothing applies until Save.
+const resetToDefault = (): void => {
+    if (props.defaultColor == null) return
     currentColor.value = colorStore.rgbToHex(props.defaultColor)
-    newColorApplied = true
-    colorModel.value = props.defaultColor
-    popoverOpen.value = false
 }
 const closeAndSave = (): void => {
     if (!colorStore.isValidHex(currentColor.value)) return
     newColorApplied = true
-    colorModel.value =
-        colorFormat.value === ColorFormat.HEX
-            ? currentColor.value
-            : colorStore.hexToRgbString(currentColor.value)
-    // note: the color model is updated with a reactive delay, so logging is error-prone
+    if (
+        props.defaultColor != null &&
+        currentColor.value.toLowerCase() === colorStore.rgbToHex(props.defaultColor).toLowerCase()
+    ) {
+        // Saving the exact default clears the user override instead of
+        // pinning the default as a new user color.
+        emit('reset')
+    } else {
+        colorModel.value =
+            colorFormat.value === ColorFormat.HEX
+                ? currentColor.value
+                : colorStore.hexToRgbString(currentColor.value)
+        // note: the color model is updated with a reactive delay, so logging is error-prone
+    }
+    popoverOpen.value = false
+}
+// Close on Escape regardless of where focus sits: clicking the picker
+// canvases drops focus to body, which reka's own escape handling misses.
+const onDocumentKeydown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return
+    event.stopPropagation()
     popoverOpen.value = false
 }
 watch(popoverOpen, (open) => {
     if (open) {
+        document.addEventListener('keydown', onDocumentKeydown, { capture: true })
         emit('open', true)
     } else {
+        document.removeEventListener('keydown', onDocumentKeydown, { capture: true })
         popoverClose()
     }
+})
+onUnmounted(() => {
+    document.removeEventListener('keydown', onDocumentKeydown, { capture: true })
 })
 
 const popoverClose = (): void => {
@@ -144,49 +168,56 @@ const handleRedIssue = (newColor: Color): void => {
                 />
             </div>
         </PopoverTrigger>
-        <PopoverContent side="bottom" align="start" class="z-50" @click.stop>
-            <div
-                class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color shadow-overlay"
-                @click.stop
-            >
-                <div>
-                    <ChromePicker
-                        v-model="currentColor"
-                        disable-alpha
-                        disable-fields
-                        class="!w-[32rem]"
-                        @click.stop
-                    />
-                    <CompactPicker
-                        v-model="currentColor"
-                        class="!w-[32rem]"
-                        :palette="settingsStore.predefinedColorOptions"
-                        @update:modelValue="handleRedIssue"
-                        @click.stop
-                    />
-                </div>
-                <div class="flex flex-row justify-between mt-4 w-full">
-                    <UiInput
-                        id="property-color"
-                        v-model="currentColor"
-                        class="w-32"
-                        :class="{ '!border-error': !colorStore.isValidHex(currentColor) }"
-                        @keydown.enter.prevent="closeAndSave"
-                    />
-                    <div class="text-right justify-end">
-                        <UiButton variant="outline" class="mr-4" @click.stop="closeAndReset">
-                            {{ t('common.reset') }}
-                        </UiButton>
-                        <UiButton
-                            :disabled="!colorStore.isValidHex(currentColor)"
-                            @click.stop="closeAndSave"
-                        >
-                            {{ t('common.save') }}
-                        </UiButton>
+        <PopoverPortal>
+            <PopoverContent side="bottom" align="start" class="z-[1300]" @click.stop>
+                <div
+                    class="mt-2 w-full bg-bg-two border border-border-one p-4 rounded-lg text-text-color shadow-overlay-lg"
+                    @click.stop
+                >
+                    <div>
+                        <ChromePicker
+                            v-model="currentColor"
+                            disable-alpha
+                            disable-fields
+                            class="!w-[32rem]"
+                            @click.stop
+                        />
+                        <CompactPicker
+                            v-model="currentColor"
+                            class="!w-[32rem]"
+                            :palette="settingsStore.predefinedColorOptions"
+                            @update:modelValue="handleRedIssue"
+                            @click.stop
+                        />
+                    </div>
+                    <div class="flex flex-row justify-between mt-4 w-full">
+                        <UiInput
+                            id="property-color"
+                            v-model="currentColor"
+                            class="w-32"
+                            :class="{ '!border-error': !colorStore.isValidHex(currentColor) }"
+                            @keydown.enter.prevent="closeAndSave"
+                        />
+                        <div class="text-right justify-end">
+                            <UiButton
+                                v-if="defaultColor != null"
+                                variant="outline"
+                                class="mr-4"
+                                @click.stop="resetToDefault"
+                            >
+                                {{ t('common.reset') }}
+                            </UiButton>
+                            <UiButton
+                                :disabled="!colorStore.isValidHex(currentColor)"
+                                @click.stop="closeAndSave"
+                            >
+                                {{ t('common.save') }}
+                            </UiButton>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </PopoverContent>
+            </PopoverContent>
+        </PopoverPortal>
     </PopoverRoot>
 </template>
 

@@ -232,6 +232,10 @@ module.exports = {
             boxShadow: {
                 // Elevation for floating overlays; shadow-md is invisible on dark surfaces.
                 overlay: '0 4px 8px -1px rgb(0 0 0 / 0.5), 0 10px 24px -6px rgb(0 0 0 / 0.4)',
+                // Larger floating panels (menus, popovers, pickers) need a bigger
+                // shadow than tooltips to read as equally elevated.
+                'overlay-lg':
+                    '0 8px 20px -2px rgb(0 0 0 / 0.55), 0 24px 56px -10px rgb(0 0 0 / 0.45)',
             },
             // This seems to confict with our setup. Don't use:
             //colors: {},

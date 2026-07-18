@@ -27,9 +27,9 @@ use crate::api::actor::{CalibrationBatchEntry, CalibrationBatchStatus, Calibrati
 use crate::api::CCError;
 use crate::calibration::{
     self, others_over_limit_note, BatchBeginError, BatchEntry, BatchEntryPhase, Calibration,
-    CalibrationBatchState, CalibrationEntry, CalibrationStore, ChannelKey, DiagnosisFailure,
-    DiagnosisHost, DiagnosisProgress, DiagnosisRegistry, DiagnosisSettings, FanStateMap,
-    HottestTemp, RepoWriter, SettingsSnapshot, SnapshotKind, CALIBRATION_TEMP_HINT,
+    CalibrationAlertGate, CalibrationBatchState, CalibrationEntry, CalibrationStore, ChannelKey,
+    DiagnosisFailure, DiagnosisHost, DiagnosisProgress, DiagnosisRegistry, DiagnosisSettings,
+    FanStateMap, HottestTemp, RepoWriter, SettingsSnapshot, SnapshotKind, CALIBRATION_TEMP_HINT,
 };
 use crate::config::Config;
 use crate::device::{
@@ -97,6 +97,7 @@ pub struct Engine {
     /// notification system is created. None in tests; the broadcast is
     /// then a no-op.
     notification_handle: RefCell<Option<NotificationHandle>>,
+    alert_gate: RefCell<Option<Rc<dyn CalibrationAlertGate>>>,
     overrides: Rc<OverridesController>,
 }
 
@@ -169,6 +170,7 @@ impl Engine {
             calibration_batch: Rc::new(CalibrationBatchState::new()),
             calibration_statuses: RefCell::new(HashMap::new()),
             notification_handle: RefCell::new(None),
+            alert_gate: RefCell::new(None),
             overrides,
         }
     }
@@ -1452,6 +1454,23 @@ impl Engine {
         self.notification_handle.borrow_mut().replace(handle);
     }
 
+    /// Wire the calibration preflight alert gate. Called by `main.rs` after
+    /// the alert controller is constructed (the engine is built earlier).
+    pub fn set_alert_gate(&self, gate: Rc<dyn CalibrationAlertGate>) {
+        self.alert_gate.borrow_mut().replace(gate);
+    }
+
+    /// The name of an alert already Active on the channel, if any. A sweep
+    /// must not run on a fan whose alert fired before the sweep began: the
+    /// alert was not caused by calibration, so the fan itself is suspect.
+    /// No-op (None) if no gate is wired (tests, early startup).
+    pub fn active_alert_blocking(&self, key: &ChannelKey) -> Option<String> {
+        self.alert_gate
+            .borrow()
+            .as_ref()
+            .and_then(|gate| gate.active_alert_for_channel(&key.0, &key.1))
+    }
+
     /// No-op if no handle is wired (tests, early startup).
     fn notify_calibration(&self, title: &str, body: &str, icon: NotificationIcon, urgency: u8) {
         let Some(handle) = self.notification_handle.borrow().clone() else {
@@ -1632,6 +1651,9 @@ impl Engine {
                 "calibration already in progress for {device_uid}:{channel_name}"
             )));
         }
+        if let Some(alert_name) = self.active_alert_blocking(&key) {
+            return Err(DiagnosisFailure::BlockedByAlert { alert_name });
+        }
         let cancellation = self.diagnosis_registry.register(key.clone());
         let settings = DiagnosisSettings::default();
         let device_uid_for_event = key.0.clone();
@@ -1674,12 +1696,26 @@ impl Engine {
         }
         let status = match &outcome {
             Ok(calibration) => {
+                let warning_detail = if calibration.warnings.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ": {}",
+                        calibration
+                            .warnings
+                            .iter()
+                            .map(describe_warning)
+                            .collect::<Vec<_>>()
+                            .join("; ")
+                    )
+                };
                 info!(
-                    "Calibration completed for {} (curve_kind={:?}, rpm_max={}, warnings={})",
+                    "Calibration completed for {} (curve_kind={:?}, rpm_max={}, warnings={}{})",
                     self.log_device_channel(&key.0, &key.1),
                     calibration.curve_kind,
                     calibration.rpm_max,
-                    calibration.warnings.len()
+                    calibration.warnings.len(),
+                    warning_detail
                 );
                 CalibrationStatus::from_completion(
                     device_uid_for_event,
@@ -1785,6 +1821,11 @@ impl Engine {
         self.diagnosis_registry.is_in_flight(key)
     }
 
+    /// Shared handle for calibration-aware callers (alert suppression).
+    pub fn diagnosis_registry(&self) -> Rc<DiagnosisRegistry> {
+        Rc::clone(&self.diagnosis_registry)
+    }
+
     /// Validate and install a calibration batch without running it; the
     /// actor spawns `drive_calibration_batch` next. Maps the state
     /// machine's typed rejection onto a daemon error for the boundary.
@@ -1793,6 +1834,23 @@ impl Engine {
         channels: Vec<ChannelKey>,
         concurrency: usize,
     ) -> Result<()> {
+        let blocked: Vec<String> = channels
+            .iter()
+            .filter_map(|key| {
+                self.active_alert_blocking(key).map(|alert_name| {
+                    format!(
+                        "{} (alert '{alert_name}')",
+                        self.log_device_channel(&key.0, &key.1)
+                    )
+                })
+            })
+            .collect();
+        if blocked.is_empty().not() {
+            return Err(anyhow!(
+                "cannot calibrate, alerts are active on: {}",
+                blocked.join(", ")
+            ));
+        }
         self.calibration_batch
             .try_begin(channels, concurrency)
             .map(|_token| ())
@@ -1974,6 +2032,9 @@ fn describe_failure(failure: &DiagnosisFailure) -> String {
             CALIBRATION_TEMP_HINT,
         ),
         DiagnosisFailure::Cancelled => "cancelled".to_string(),
+        DiagnosisFailure::BlockedByAlert { alert_name } => {
+            format!("alert '{alert_name}' is active on this channel")
+        }
         DiagnosisFailure::WriteFailed(msg) => format!("write failed: {msg}"),
         DiagnosisFailure::RestoreFailed(msg) => format!("restore failed: {msg}"),
         DiagnosisFailure::PersistFailed(msg) => format!("could not save calibration: {msg}"),

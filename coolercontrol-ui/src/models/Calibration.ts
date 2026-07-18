@@ -198,8 +198,8 @@ export interface CalibrationStatusFailed {
      * Machine-readable code matching one of the
      * `coolercontrold::calibration::DiagnosisFailure` variants:
      * `preflight_temp_too_high`, `fan_unresponsive`, `temp_aborted`,
-     * `user_cancelled`, `write_failed`, `restore_failed`,
-     * `persist_failed`.
+     * `user_cancelled`, `blocked_by_alert`, `write_failed`,
+     * `restore_failed`, `persist_failed`.
      */
     reason: string
     /** Human-readable explanation for display. */

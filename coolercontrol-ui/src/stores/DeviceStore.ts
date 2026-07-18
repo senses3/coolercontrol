@@ -1071,12 +1071,6 @@ export const useDeviceStore = defineStore('device', () => {
                         if (!settingsStore.alertsActive.includes(alertMessage.uid)) {
                             settingsStore.alertsActive.push(alertMessage.uid)
                         }
-                        toast.add({
-                            severity: 'error',
-                            summary: t('views.alerts.alertTriggered'),
-                            detail: `${alertMessage.name} - ${alertMessage.message}`,
-                            life: 5000,
-                        })
                     } else {
                         const activeIndex = settingsStore.alertsActive.findIndex(
                             (uid) => uid === alertMessage.uid,
@@ -1084,12 +1078,41 @@ export const useDeviceStore = defineStore('device', () => {
                         if (activeIndex > -1) {
                             settingsStore.alertsActive.splice(activeIndex, 1)
                         }
-                        toast.add({
-                            severity: 'info',
-                            summary: t('views.alerts.alertRecovered'),
-                            detail: `${alertMessage.name} - ${alertMessage.message}`,
-                            life: 3000,
-                        })
+                    }
+                    // A silenced state change still updates state; only the toast
+                    // is muted. The toast tone follows the event, not just the
+                    // aggregate state: a partial recovery of a multi-source
+                    // alert arrives as resolved while the state stays Active.
+                    if (!alertMessage.silenced) {
+                        if (alertMessage.resolved) {
+                            toast.add({
+                                severity: 'info',
+                                summary: t('views.alerts.alertRecovered'),
+                                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                                life: 3000,
+                            })
+                        } else if (alertMessage.state === AlertState.Error) {
+                            toast.add({
+                                severity: 'warn',
+                                summary: t('views.alerts.alertError'),
+                                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                                life: 5000,
+                            })
+                        } else if (alertMessage.state === AlertState.Active) {
+                            toast.add({
+                                severity: 'error',
+                                summary: t('views.alerts.alertTriggered'),
+                                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                                life: 5000,
+                            })
+                        } else {
+                            toast.add({
+                                severity: 'info',
+                                summary: t('views.alerts.alertRecovered'),
+                                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                                life: 3000,
+                            })
+                        }
                     }
                 },
                 async onclose() {

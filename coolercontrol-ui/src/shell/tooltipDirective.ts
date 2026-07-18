@@ -34,7 +34,7 @@ interface TooltipOptions {
 
 interface TooltipHost extends Element {
     $ccTooltip?: TooltipOptions
-    $ccTooltipShow?: () => void
+    $ccTooltipShow?: (event: Event) => void
     $ccTooltipShowDelayed?: () => void
     $ccTooltipHide?: () => void
 }
@@ -161,7 +161,21 @@ export const tooltipDirective: Directive<
 > = {
     mounted(host, binding) {
         host.$ccTooltip = parseOptions(binding)
-        host.$ccTooltipShow = () => show(host)
+        // Focus shows the tooltip only for keyboard-driven focus. Mouse
+        // clicks, and the focus a dropdown restores to its trigger on close,
+        // leave the pointer elsewhere and must stay quiet. focusin bubbles,
+        // so also accept a focus-visible CHILD: many hosts are non-focusable
+        // wrappers around the actual control.
+        host.$ccTooltipShow = (event: Event) => {
+            if (host.matches(':focus-visible')) {
+                show(host)
+                return
+            }
+            const target = event.target as Element | null
+            if (target != null && target !== host && target.matches(':focus-visible')) {
+                show(host)
+            }
+        }
         host.$ccTooltipShowDelayed = () => scheduleShow(host)
         host.$ccTooltipHide = () => {
             cancelShow(host)
@@ -171,6 +185,10 @@ export const tooltipDirective: Directive<
         host.addEventListener('mouseleave', host.$ccTooltipHide)
         host.addEventListener('focusin', host.$ccTooltipShow)
         host.addEventListener('focusout', host.$ccTooltipHide)
+        // Activation dismisses the tooltip: it has served its purpose, and it
+        // stays hidden until the pointer leaves and re-enters (no mouseenter
+        // fires while the pointer stays put).
+        host.addEventListener('pointerdown', host.$ccTooltipHide)
     },
     updated(host, binding) {
         const options = parseOptions(binding)
@@ -196,6 +214,7 @@ export const tooltipDirective: Directive<
         if (host.$ccTooltipHide != null) {
             host.removeEventListener('mouseleave', host.$ccTooltipHide)
             host.removeEventListener('focusout', host.$ccTooltipHide)
+            host.removeEventListener('pointerdown', host.$ccTooltipHide)
         }
     },
 }

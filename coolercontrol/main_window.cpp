@@ -530,7 +530,7 @@ QIcon MainWindow::createIconWithNotificationBadge(const QIcon& baseIcon, const b
 }
 
 void MainWindow::applyTrayIconNotificationBadge(const bool forceBadge) const {
-  if (forceBadge || m_daemonHasErrors || m_daemonHasWarnings || m_alertCount > 0) {
+  if (forceBadge || m_daemonHasErrors || m_daemonHasWarnings || m_uiAlertsActive) {
     m_sysTrayIcon->setIcon(QIcon::fromTheme(
         APP_ID_SYMBOLIC_ALERT.data(),
         QIcon::fromTheme(APP_ID_ALERT.data(),
@@ -597,36 +597,12 @@ void MainWindow::acknowledgeDaemonErrors() const {
   applyTrayIconNotificationBadge();
 }
 
-// requestAllAlerts - and set the tray icon notification badge if any are active
-void MainWindow::requestAllAlerts() const {
-  QNetworkRequest alertsRequest;
-  alertsRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
-  alertsRequest.setUrl(getEndpointUrl(ENDPOINT_ALERTS.data()));
-  const auto alertsReply = m_manager->get(alertsRequest);
-  connect(alertsReply, &QNetworkReply::sslErrors, alertsReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(alertsReply, &QNetworkReply::readyRead, [alertsReply, this]() {
-    const auto status = alertsReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    const QString replyText = alertsReply->readAll();
-    qDebug() << "Alerts Endpoint Response Status: " << status << "; Body: " << replyText;
-    const QJsonObject rootObj = QJsonDocument::fromJson(replyText.toUtf8()).object();
-    const auto alerts = rootObj.value("alerts").toArray();
-    foreach (const auto alert, alerts) {
-      if (alert.toObject().value("state") == "Active") {
-        m_alertCount++;
-      }
-    }
-    applyTrayIconNotificationBadge();
-    alertsReply->deleteLater();
-  });
-  connect(alertsReply, &QNetworkReply::errorOccurred,
-          [alertsReply](const QNetworkReply::NetworkError code) {
-            const auto status =
-                alertsReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-            qWarning() << "Error occurred connecting to Daemon Alerts endpoint. Status: " << status
-                       << " QtErrorCode: " << code;
-            alertsReply->deleteLater();
-          });
+// Reflects the UI's alert state on the tray badge. The UI is the single source of
+// truth and pushes this over IPC whenever the set of enabled, active, unsilenced
+// alerts changes; silencing/disabling happen in the UI and never reach the wire.
+void MainWindow::setAlertsActive(const bool active) const {
+  m_uiAlertsActive = active;
+  applyTrayIconNotificationBadge();
 }
 
 void MainWindow::requestAllModes() const {
@@ -722,7 +698,6 @@ void MainWindow::requestActiveMode() const {
 void MainWindow::startWatchingSSE() const {
   watchConnectionAndLogs();
   watchModeActivation();
-  watchAlerts();
   watchNotifications();
 }
 
@@ -799,7 +774,6 @@ void MainWindow::tryDaemonConnection() {
     m_retryTimer->stop();
     if (m_startup) {
       requestDaemonErrors();
-      requestAllAlerts();
       requestAllModes();
       requestActiveMode();
       emit watchForSSE();
@@ -809,7 +783,6 @@ void MainWindow::tryDaemonConnection() {
       qInfo() << "Connection to the Daemon Reestablished";
       notifyDaemonConnectionRestored();
       // reset states on reconnection
-      m_alertCount = 0;
       m_daemonHasErrors = false;
       m_daemonHasWarnings = false;
       m_loginWindowShown = false;
@@ -818,8 +791,7 @@ void MainWindow::tryDaemonConnection() {
         // This is particularly helpful when closed to tray and the daemon reconnects
         m_view->load(getDaemonUrl());
       }
-      // systray badge update will be handled by re-checking for Alerts and Errors:
-      requestAllAlerts();
+      // systray badge update: daemon errors re-checked here; alerts come from the UI.
       requestDaemonErrors();
       emit watchForSSE();
     }
@@ -914,40 +886,5 @@ void MainWindow::watchNotifications() const {
     const auto status = notifyReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     qDebug() << "Notifications SSE closed with status: " << status;
     notifyReply->deleteLater();
-  });
-}
-
-void MainWindow::watchAlerts() const {
-  QNetworkRequest alertsRequest;
-  alertsRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                             QNetworkRequest::AlwaysNetwork);
-  alertsRequest.setUrl(getEndpointUrl(ENDPOINT_SSE_ALERTS.data(), false));
-  const auto alertsReply = m_manager->get(alertsRequest);
-  connect(alertsReply, &QNetworkReply::sslErrors, alertsReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(this, &MainWindow::dropConnections, alertsReply, &QNetworkReply::abort,
-          Qt::DirectConnection);
-  connect(alertsReply, &QNetworkReply::readyRead, [alertsReply, this]() {
-    const QString alert =
-        QString(alertsReply->readAll()).simplified().replace("event: alert data: ", "");
-    const QJsonObject rootObj = QJsonDocument::fromJson(alert.toUtf8()).object();
-    if (rootObj.isEmpty()) {
-      // This is also called for keepAlive ticks - but semi-empty message
-      return;
-    }
-    const auto alertState = rootObj.value("state").toString();
-    const auto isActive = alertState == tr("Active");
-    if (!isActive && m_alertCount > 0) {
-      m_alertCount--;
-    } else if (isActive) {
-      m_alertCount++;
-    }
-    applyTrayIconNotificationBadge();
-  });
-  connect(alertsReply, &QNetworkReply::finished, [alertsReply]() {
-    const auto status = alertsReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    qDebug() << "Alerts SSE closed with status: " << status;
-    // on error or dropped connection will be re-connected once connection is re-established.
-    alertsReply->deleteLater();
   });
 }

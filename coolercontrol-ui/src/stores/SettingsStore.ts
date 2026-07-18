@@ -19,7 +19,7 @@
 import { defineStore } from 'pinia'
 import { Function, FunctionsDTO, Profile, ProfilesDTO } from '@/models/Profile'
 import type { Ref } from 'vue'
-import { reactive, inject, ref, toRaw, watch } from 'vue'
+import { computed, reactive, inject, ref, toRaw, watch } from 'vue'
 import {
     type AllDeviceSettings,
     CustomThemeSettings,
@@ -56,7 +56,7 @@ import { CreateModeDTO, Mode, ModeOrderDTO, UpdateModeDTO } from '@/models/Mode.
 import { Dashboard } from '@/models/Dashboard.ts'
 import { Emitter, EventType } from 'mitt'
 import _ from 'lodash'
-import { Alert, AlertLog, AlertState } from '@/models/Alert.ts'
+import { Alert, AlertLog, AlertState, alertIsSilenced } from '@/models/Alert.ts'
 import {
     DeviceHealthDTO,
     FailsafeDelta,
@@ -105,6 +105,23 @@ export const useSettingsStore = defineStore('settings', () => {
     const alerts: Ref<Array<Alert>> = ref([])
     const alertLogs: Ref<Array<AlertLog>> = ref([])
     const alertsActive: Ref<Array<UID>> = ref([])
+
+    // The Qt tray badge mirrors the UI's alert state. Silencing/disabling happen in
+    // the UI, and the daemon emits nothing on the wire for a steadily-Active alert
+    // that becomes silenced or disabled, so push the derived state to Qt over IPC
+    // instead of polling. `enabled` + not-silenced gate out muted alerts.
+    const anyActiveUnsilencedAlert = computed((): boolean =>
+        alerts.value.some(
+            (alert) =>
+                alert.enabled && alertsActive.value.includes(alert.uid) && !alertIsSilenced(alert),
+        ),
+    )
+    const pushTrayAlertState = (): void => {
+        if (!deviceStore.isQtApp()) return
+        // @ts-ignore - window.ipc is the QWebChannel bridge, present only in the Qt app.
+        window.ipc?.setAlertsActive?.(anyActiveUnsilencedAlert.value)
+    }
+    watch(anyActiveUnsilencedAlert, () => pushTrayAlertState())
 
     const healthFailsafe: Ref<Array<FailsafeRef>> = ref([])
     const healthMissing: Ref<Array<SourceRef>> = ref([])
@@ -1010,6 +1027,14 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         const response = await deviceStore.daemonClient.updateAlert(alert_to_update)
         if (response == null) {
+            // The daemon resets a disabled alert to Inactive but does so silently (no
+            // SSE event), so mirror that locally to keep the active set, top-bar badge,
+            // and panel counter consistent. Re-enabling is announced via SSE.
+            if (!alert_to_update.enabled) {
+                alert_to_update.state = AlertState.Inactive
+                const activeIndex = alertsActive.value.indexOf(alertUID)
+                if (activeIndex > -1) alertsActive.value.splice(activeIndex, 1)
+            }
             toast.add({
                 severity: 'success',
                 summary: t('common.success'),
@@ -1026,6 +1051,39 @@ export const useSettingsStore = defineStore('settings', () => {
             })
             return false
         }
+    }
+
+    // Alert quiet controls. These own the silence/enable contract (timestamp
+    // math, unsilence = undefined) and roll the optimistic mutation back if
+    // the daemon rejects the update.
+    async function silenceAlert(alertUID: UID, minutes: number): Promise<boolean> {
+        const alert = alerts.value.find((entry) => entry.uid === alertUID)
+        if (alert == null) return false
+        const previous = alert.silenced_until
+        alert.silenced_until = new Date(Date.now() + minutes * 60_000).toISOString()
+        const successful = await updateAlert(alertUID)
+        if (!successful) alert.silenced_until = previous
+        return successful
+    }
+
+    async function unsilenceAlert(alertUID: UID): Promise<boolean> {
+        const alert = alerts.value.find((entry) => entry.uid === alertUID)
+        if (alert == null) return false
+        const previous = alert.silenced_until
+        alert.silenced_until = undefined
+        const successful = await updateAlert(alertUID)
+        if (!successful) alert.silenced_until = previous
+        return successful
+    }
+
+    async function setAlertEnabled(alertUID: UID, enabled: boolean): Promise<boolean> {
+        const alert = alerts.value.find((entry) => entry.uid === alertUID)
+        if (alert == null) return false
+        const previous = alert.enabled
+        alert.enabled = enabled
+        const successful = await updateAlert(alertUID)
+        if (!successful) alert.enabled = previous
+        return successful
     }
 
     async function deleteAlert(alertUID: UID): Promise<boolean> {
@@ -1535,9 +1593,14 @@ export const useSettingsStore = defineStore('settings', () => {
         alerts,
         alertLogs,
         alertsActive,
+        anyActiveUnsilencedAlert,
+        pushTrayAlertState,
         loadAlertsAndLogs,
         createAlert,
         updateAlert,
+        silenceAlert,
+        unsilenceAlert,
+        setAlertEnabled,
         deleteAlert,
         healthFailsafe,
         healthMissing,

@@ -21,9 +21,11 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiAlert,
+    mdiBellOffOutline,
     mdiBellOutline,
     mdiBellPlusOutline,
     mdiBellRingOutline,
+    mdiBellSleepOutline,
     mdiDragVertical,
     mdiFanAlert,
     mdiHome,
@@ -33,14 +35,16 @@ import {
     mdiViewDashboardOutline,
 } from '@mdi/js'
 import { VueDraggable } from 'vue-draggable-plus'
+import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Color, Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
-import { AlertState } from '@/models/Alert.ts'
+import { Alert, alertIsSilenced, AlertState } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
+import { useFailAlert } from '@/composables/useFailAlert.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -61,6 +65,7 @@ import UiSeparator from '@/shell/ui/UiSeparator.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const { createFailAlert } = useFailAlert()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
@@ -181,20 +186,22 @@ const alertKind = (sensor: MonitoringSensor): AlertKind | null => {
 const createAlert = (sensor: MonitoringSensor): void => {
     const kind = alertKind(sensor)
     if (kind == null) return
-    const query: Record<string, string> = {
-        device: sensor.deviceUID,
-        channel: sensor.channelName,
-    }
     if (kind === 'fan') {
-        query.metric = ChannelMetric.RPM
-        // Alert when the fan drops to 0 rpm; the upper bound is effectively open.
-        query.min = '1'
-        query.max = '100000'
-        query.name = `${sensorLabel(sensor.deviceUID, sensor.channelName)} ${t('layout.shell.monitoringPanel.failAlertSuffix')}`
-    } else {
-        query.metric = ChannelMetric.Temp
+        createFailAlert(
+            sensor.deviceUID,
+            sensor.channelName,
+            sensorLabel(sensor.deviceUID, sensor.channelName),
+        )
+        return
     }
-    router.push({ name: 'monitoring-alert-new', query })
+    router.push({
+        name: 'monitoring-alert-new',
+        query: {
+            device: sensor.deviceUID,
+            channel: sensor.channelName,
+            metric: ChannelMetric.Temp,
+        },
+    })
 }
 
 const isDashboardPinned = (dashboard: Dashboard): boolean =>
@@ -243,6 +250,16 @@ const setSensorColor = (sensor: MonitoringSensor, newColor: Color): void => {
         .get(sensor.deviceUID)
         ?.sensorsAndChannels.get(sensor.channelName)
     if (setting != null) setting.userColor = newColor
+}
+const sensorDefaultColor = (deviceUID: UID, channelName: string): Color | undefined =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)
+        ?.defaultColor
+// Reset clears the user override so the non-user-defined color applies again.
+const resetSensorColor = (sensor: MonitoringSensor): void => {
+    const setting = settingsStore.allUIDeviceSettings
+        .get(sensor.deviceUID)
+        ?.sensorsAndChannels.get(sensor.channelName)
+    if (setting != null) setting.userColor = undefined
 }
 
 // Explicit drag order wins; otherwise home dashboard first, then store order.
@@ -297,7 +314,17 @@ const persistAlertOrder = (): void => {
 const activeAlertCount = computed(
     () => settingsStore.alerts.filter((alert) => alert.state === AlertState.Active).length,
 )
-
+// Menu glyph: shape encodes silenced/disabled, color keeps the live state
+// (silenced alerts still evaluate; a red sleep bell means firing-but-muted).
+const alertMenuIcon = (alert: Alert): string => {
+    if (!alert.enabled) return mdiBellOffOutline
+    if (alertIsSilenced(alert)) return mdiBellSleepOutline
+    return alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline
+}
+const alertMenuIconClass = (alert: Alert): string => {
+    if (!alert.enabled) return 'text-text-color-secondary'
+    return alert.state === AlertState.Active ? 'text-error' : 'text-success'
+}
 // Keeps a row's hover actions visible while its tag popover is open.
 const openTagRow = ref<string | null>(null)
 const onTagOpen = (rowKey: string, open: boolean): void => {
@@ -343,7 +370,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="truncate">{{ dashboard.name }}</span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                     >
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -410,7 +437,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
                         }"
@@ -418,6 +445,15 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
+                        <CCColorPicker
+                            :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                            :default-color="
+                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                            "
+                            :size="1.25"
+                            @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                            @reset="resetSensorColor(sensor)"
+                        />
                         <TagPopover
                             :device-u-i-d="sensor.deviceUID"
                             :channel-name="sensor.channelName"
@@ -503,7 +539,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                     />
                 </RouterLink>
                 <div
-                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                    class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                 >
                     <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                         <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
@@ -576,14 +612,46 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
             >
                 <svg-icon
                     type="mdi"
-                    :path="alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline"
+                    :path="alertMenuIcon(alert)"
                     :size="14"
                     class="shrink-0"
-                    :class="alert.state === AlertState.Active ? 'text-error' : 'text-success'"
+                    :class="alertMenuIconClass(alert)"
                 />
                 <span class="truncate">{{ alert.name }}</span>
                 <span
-                    class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
+                    class="ml-auto hidden items-center gap-0.5 group-hover:inline-flex group-has-[[data-state=open]]:inline-flex"
+                    @click.prevent.stop
+                >
+                    <AlertSilenceMenu v-if="alert.enabled" :alert="alert">
+                        <template #trigger>
+                            <button
+                                type="button"
+                                class="rounded p-0.5 text-text-color-secondary hover:text-text-color"
+                                v-tooltip.top="t('views.alerts.silenceTooltip')"
+                            >
+                                <svg-icon type="mdi" :path="mdiBellSleepOutline" :size="14" />
+                            </button>
+                        </template>
+                    </AlertSilenceMenu>
+                    <button
+                        type="button"
+                        class="rounded p-0.5 text-text-color-secondary hover:text-text-color"
+                        v-tooltip.top="
+                            alert.enabled
+                                ? t('views.alerts.disableAlert')
+                                : t('views.alerts.enableAlert')
+                        "
+                        @click="settingsStore.setAlertEnabled(alert.uid, !alert.enabled)"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="alert.enabled ? mdiBellOffOutline : mdiBellOutline"
+                            :size="14"
+                        />
+                    </button>
+                </span>
+                <span
+                    class="drag-handle hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
                     <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
                 </span>
@@ -652,7 +720,7 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
                         }"
@@ -662,8 +730,12 @@ const sensorRoute = (sensor: MonitoringSensor) => ({
                         </span>
                         <CCColorPicker
                             :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                            :default-color="
+                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                            "
                             :size="1.25"
                             @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                            @reset="resetSensorColor(sensor)"
                         />
                         <TagPopover
                             :device-u-i-d="sensor.deviceUID"

@@ -21,7 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { mdiAlertOutline, mdiCogs, mdiInformationSlabCircleOutline } from '@mdi/js'
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChannelCalibrationPanel from '@/components/ChannelCalibrationPanel.vue'
 import { computed, nextTick, ref, Ref } from 'vue'
@@ -175,90 +175,93 @@ defineExpose({
     >
         <popover-root @update:open="(open) => (isPopupOpen = open)">
             <popover-trigger
-                class="h-[2.375rem] rounded-lg border-2 border-border-one bg-control !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
+                class="h-[2.375rem] gap-1.5 rounded-lg border-2 border-border-one bg-control !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
             >
                 <svg-icon
-                    class="outline-0 mt-[-2px]"
+                    class="outline-0"
                     type="mdi"
                     :path="mdiCogs"
                     :size="deviceStore.getREMSize(1.35)"
                 />
+                <span>{{ t('layout.topbar.settings') }}</span>
             </popover-trigger>
-            <popover-content side="bottom" class="z-10">
-                <div
-                    class="w-full bg-bg-two border border-border-one p-2 rounded-lg text-text-color pb-4 shadow-overlay"
-                >
-                    <div class="font-semibold pb-2.5 pt-1 text-center">
-                        {{ t('components.channelExtensionSettings.title') }}
-                    </div>
-                    <table v-if="currentChannelExtension != null">
-                        <tbody>
-                            <tr>
-                                <td class="w-24 text-end pl-4">
-                                    <div class="flex flex-row leading-none items-center">
-                                        <div
-                                            v-tooltip.top="
-                                                t(
-                                                    'components.channelExtensionSettings.firmwareControlledProfileDesc',
-                                                )
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                class="mr-2"
-                                                :path="mdiInformationSlabCircleOutline"
-                                                :size="deviceStore.getREMSize(1.25)"
-                                            />
-                                        </div>
-                                        {{
-                                            t(
-                                                'components.channelExtensionSettings.firmwareControlledProfile',
-                                            )
-                                        }}
-                                        <div
-                                            class="ml-2 w-2"
-                                            v-tooltip.top="
-                                                t(
-                                                    'components.channelExtensionSettings.firmwareControlDisabled',
-                                                )
-                                            "
-                                        >
-                                            <svg-icon
-                                                v-if="!hwFanCurveIsApplicable"
-                                                type="mdi"
-                                                :path="mdiAlertOutline"
-                                                :size="deviceStore.getREMSize(1.25)"
-                                                style="color: rgb(var(--colors-red))"
-                                            />
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiSwitch
-                                        v-model="hwFanCurve"
-                                        :disabled="!hwFanCurveIsApplicable"
-                                        @update:model-value="emit('change')"
-                                    />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <popover-portal>
+                <popover-content side="bottom" class="z-[1300]">
                     <div
-                        v-if="calibrationEligible"
-                        :class="[
-                            'px-2',
-                            currentChannelExtension != null
-                                ? 'mt-3 pt-3 border-t border-border-one'
-                                : 'pt-1',
-                        ]"
+                        class="w-full bg-bg-two border border-border-one p-2 rounded-lg text-text-color pb-4 shadow-overlay-lg"
                     >
-                        <channel-calibration-panel
-                            :device-u-i-d="deviceUID"
-                            :channel-name="channelName"
-                        />
+                        <div class="font-semibold pb-2.5 pt-1 text-center">
+                            {{ t('components.channelExtensionSettings.title') }}
+                        </div>
+                        <table v-if="currentChannelExtension != null">
+                            <tbody>
+                                <tr>
+                                    <td class="w-24 text-end pl-4">
+                                        <div class="flex flex-row leading-none items-center">
+                                            <div
+                                                v-tooltip.top="
+                                                    t(
+                                                        'components.channelExtensionSettings.firmwareControlledProfileDesc',
+                                                    )
+                                                "
+                                            >
+                                                <svg-icon
+                                                    type="mdi"
+                                                    class="mr-2"
+                                                    :path="mdiInformationSlabCircleOutline"
+                                                    :size="deviceStore.getREMSize(1.25)"
+                                                />
+                                            </div>
+                                            {{
+                                                t(
+                                                    'components.channelExtensionSettings.firmwareControlledProfile',
+                                                )
+                                            }}
+                                            <div
+                                                class="ml-2 w-2"
+                                                v-tooltip.top="
+                                                    t(
+                                                        'components.channelExtensionSettings.firmwareControlDisabled',
+                                                    )
+                                                "
+                                            >
+                                                <svg-icon
+                                                    v-if="!hwFanCurveIsApplicable"
+                                                    type="mdi"
+                                                    :path="mdiAlertOutline"
+                                                    :size="deviceStore.getREMSize(1.25)"
+                                                    style="color: rgb(var(--colors-red))"
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiSwitch
+                                            v-model="hwFanCurve"
+                                            :disabled="!hwFanCurveIsApplicable"
+                                            @update:model-value="emit('change')"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div
+                            v-if="calibrationEligible"
+                            :class="[
+                                'px-2',
+                                currentChannelExtension != null
+                                    ? 'mt-3 pt-3 border-t border-border-one'
+                                    : 'pt-1',
+                            ]"
+                        >
+                            <channel-calibration-panel
+                                :device-u-i-d="deviceUID"
+                                :channel-name="channelName"
+                            />
+                        </div>
                     </div>
-                </div>
-            </popover-content>
+                </popover-content>
+            </popover-portal>
         </popover-root>
     </div>
 </template>

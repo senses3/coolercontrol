@@ -19,12 +19,33 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiBellPlusOutline, mdiMinusThick, mdiMonitor, mdiPower, mdiVolumeHigh } from '@mdi/js'
+import {
+    mdiBellPlusOutline,
+    mdiBellSleepOutline,
+    mdiMinusThick,
+    mdiMonitor,
+    mdiPower,
+    mdiVolumeHigh,
+} from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { Alert, AlertState, getAlertStateDisplayName, getAlertStateIcon } from '@/models/Alert.ts'
-import { ChannelMetric, getChannelMetricDisplayName } from '@/models/ChannelSource.ts'
+import {
+    Alert,
+    alertIsSilenced,
+    alertSources,
+    AlertState,
+    getAlertStateDisplayName,
+    getAlertStateIcon,
+} from '@/models/Alert.ts'
+import {
+    ChannelMetric,
+    ChannelSource,
+    getChannelMetricDisplayName,
+} from '@/models/ChannelSource.ts'
 import UiTag from '@/shell/ui/UiTag.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
+import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -56,22 +77,32 @@ const onRowSelect = (alertUID: string) => {
     router.push({ name: 'monitoring-alert', params: { alertUID } })
 }
 
-// Card grid: alerts needing attention first, then the panel's menu order.
+// Card grid: alerts needing attention first, disabled last, then the
+// panel's menu order.
 const sortedAlerts = computed(() => {
-    const rank = (alert: Alert): number =>
-        alert.state === AlertState.Active ? 0 : alert.state === AlertState.Error ? 1 : 2
+    const rank = (alert: Alert): number => {
+        if (!alert.enabled) return 3
+        return alert.state === AlertState.Active ? 0 : alert.state === AlertState.Error ? 1 : 2
+    }
     return [...alertsList.value].sort((a, b) => rank(a) - rank(b))
 })
 const tagSeverity = (state?: AlertState): 'danger' | 'warn' | 'success' =>
     state === AlertState.Active ? 'danger' : state === AlertState.Error ? 'warn' : 'success'
-const sourceChannel = (alert: Alert) =>
+const sourceChannel = (source: ChannelSource) =>
     settingsStore.allUIDeviceSettings
-        .get(alert.channel_source.device_uid)
-        ?.sensorsAndChannels.get(alert.channel_source.channel_name)
-const sourceLabel = (alert: Alert): string =>
-    sourceChannel(alert)?.name ?? alert.channel_source.channel_name
-const sourceColor = (alert: Alert): string =>
-    sourceChannel(alert)?.color ?? 'rgb(var(--colors-text-color-secondary))'
+        .get(source.device_uid)
+        ?.sensorsAndChannels.get(source.channel_name)
+const sourceLabel = (source: ChannelSource): string =>
+    sourceChannel(source)?.name ?? source.channel_name
+const sourceColor = (source: ChannelSource): string =>
+    sourceChannel(source)?.color ?? 'rgb(var(--colors-text-color-secondary))'
+// Per-source state text color, parallel to channel_sources by index.
+const sourceStateClass = (alert: Alert, index: number): string => {
+    const state = alert.source_states[index]?.state
+    if (state === AlertState.Active) return 'text-error'
+    if (state === AlertState.Error) return 'text-warning'
+    return ''
+}
 const valueSuffix = (metric: ChannelMetric): string => {
     switch (metric) {
         case ChannelMetric.Duty:
@@ -85,12 +116,10 @@ const valueSuffix = (metric: ChannelMetric): string => {
             return ` ${t('common.tempUnit')}`
     }
 }
-const liveValue = (alert: Alert): string => {
-    const values = deviceStore.currentDeviceStatus
-        .get(alert.channel_source.device_uid)
-        ?.get(alert.channel_source.channel_name)
+const liveValue = (source: ChannelSource): string => {
+    const values = deviceStore.currentDeviceStatus.get(source.device_uid)?.get(source.channel_name)
     if (values == null) return ''
-    switch (alert.channel_source.channel_metric) {
+    switch (source.channel_metric) {
         case ChannelMetric.Duty:
         case ChannelMetric.Load:
             return values.duty ?? ''
@@ -102,6 +131,22 @@ const liveValue = (alert: Alert): string => {
             return values.temp ?? ''
     }
 }
+// Phrase the thresholds as the firing condition (the inverse of the OK
+// range); min is validated >= 0, so a 0 floor cannot fire and is omitted.
+const triggerText = (alert: Alert): string => {
+    const unit = valueSuffix(alertSources(alert)[0].channel_metric)
+    if (alert.min > 0) {
+        return t('views.alerts.triggersOutside', { min: alert.min, max: alert.max, unit })
+    }
+    return t('views.alerts.triggersAbove', { max: alert.max, unit })
+}
+const silencedUntilText = (alert: Alert): string =>
+    new Date(alert.silenced_until!).toLocaleString([], {
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
 // Latest log entry per alert: the moment it entered its current state.
 const lastLogTimes = computed(() => {
     const latest = new Map<string, string>()
@@ -132,72 +177,104 @@ const lastLogTimes = computed(() => {
                         v-for="alert in sortedAlerts"
                         :key="alert.uid"
                         class="flex cursor-pointer flex-col gap-2 rounded-lg border bg-bg-two p-4 hover:bg-surface-hover"
-                        :class="
-                            alert.state === AlertState.Active || alert.state === AlertState.Error
+                        :class="[
+                            alert.enabled &&
+                            (alert.state === AlertState.Active || alert.state === AlertState.Error)
                                 ? 'border-error'
-                                : 'border-border-one'
-                        "
+                                : 'border-border-one',
+                            { 'opacity-60': !alert.enabled },
+                        ]"
                         @click="onRowSelect(alert.uid)"
                     >
                         <div class="flex items-center gap-2">
+                            <!-- Shape encodes silenced, color keeps the live state:
+                                 a red sleep bell means firing-but-muted. -->
                             <svg-icon
                                 type="mdi"
                                 class="shrink-0"
-                                :class="{ 'text-error': alert.state === AlertState.Active }"
-                                :path="getAlertStateIcon(alert.state!)"
+                                :class="{
+                                    'text-error':
+                                        alert.enabled && alert.state === AlertState.Active,
+                                }"
+                                :path="
+                                    alert.enabled && alertIsSilenced(alert)
+                                        ? mdiBellSleepOutline
+                                        : getAlertStateIcon(alert.state!)
+                                "
                                 :size="getREMSize(1.5)"
                             />
                             <span class="truncate text-base font-semibold text-text-color">
                                 {{ alert.name }}
                             </span>
-                            <UiTag
-                                class="ml-auto shrink-0"
-                                :value="getAlertStateDisplayName(alert.state!)"
-                                :severity="tagSeverity(alert.state)"
-                            />
-                        </div>
-                        <div class="flex items-center gap-2 text-base text-text-color">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMinusThick"
-                                :size="14"
-                                class="shrink-0"
-                                :style="{ color: sourceColor(alert) }"
-                            />
-                            <span class="truncate">{{ sourceLabel(alert) }}</span>
-                            <span class="shrink-0 text-text-color-secondary">
-                                {{
-                                    getChannelMetricDisplayName(alert.channel_source.channel_metric)
-                                }}
+                            <span class="ml-auto flex shrink-0 items-center gap-1.5">
+                                <UiTag
+                                    v-if="alert.enabled && alertIsSilenced(alert)"
+                                    :value="
+                                        t('views.alerts.silencedUntil', {
+                                            time: silencedUntilText(alert),
+                                        })
+                                    "
+                                    severity="warn"
+                                />
+                                <UiTag
+                                    v-if="!alert.enabled"
+                                    :value="t('views.alerts.disabledLabel')"
+                                />
+                                <UiTag
+                                    v-else
+                                    :value="getAlertStateDisplayName(alert.state!)"
+                                    :severity="tagSeverity(alert.state)"
+                                />
                             </span>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <div
+                                v-for="(source, index) in alertSources(alert)"
+                                :key="`${source.channel_name}/${source.channel_metric}`"
+                                class="flex items-center gap-2 text-base text-text-color"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiMinusThick"
+                                    :size="14"
+                                    class="shrink-0"
+                                    :style="{ color: sourceColor(source) }"
+                                />
+                                <span class="truncate" :class="sourceStateClass(alert, index)">
+                                    {{ sourceLabel(source) }}
+                                </span>
+                                <span
+                                    v-if="liveValue(source) !== ''"
+                                    class="ml-auto shrink-0 text-text-color-secondary"
+                                >
+                                    {{ liveValue(source) }}{{ valueSuffix(source.channel_metric) }}
+                                </span>
+                            </div>
                         </div>
                         <div class="text-sm text-text-color-secondary">
                             {{
-                                t('views.alerts.range', {
-                                    min: alert.min,
-                                    max: alert.max,
-                                    unit: valueSuffix(alert.channel_source.channel_metric),
-                                })
-                            }}
-                            <template v-if="liveValue(alert) !== ''">
-                                <br />
-                                {{ t('components.sensorTable.current') }}: {{ liveValue(alert)
-                                }}{{ valueSuffix(alert.channel_source.channel_metric) }}
-                            </template>
+                                getChannelMetricDisplayName(alertSources(alert)[0].channel_metric)
+                            }}: {{ triggerText(alert) }}
                         </div>
                         <div
                             class="mt-auto flex items-center gap-2 text-sm text-text-color-secondary"
                         >
-                            <span v-if="lastLogTimes.get(alert.uid) != null" class="truncate">
+                            <!-- The latest state transition: when the alert entered its
+                                 current state. Meaningless while disabled (not evaluated). -->
+                            <span
+                                v-if="alert.enabled && lastLogTimes.get(alert.uid) != null"
+                                class="truncate"
+                            >
                                 {{
-                                    t('views.alerts.since', {
+                                    t('views.alerts.stateSince', {
+                                        state: getAlertStateDisplayName(alert.state!),
                                         time: new Date(
                                             lastLogTimes.get(alert.uid)!,
                                         ).toLocaleString(),
                                     })
                                 }}
                             </span>
-                            <span class="ml-auto flex shrink-0 items-center gap-1.5">
+                            <span class="ml-auto flex shrink-0 items-center gap-1.5" @click.stop>
                                 <svg-icon
                                     v-if="alert.desktop_notify"
                                     type="mdi"
@@ -220,6 +297,33 @@ const lastLogTimes = computed(() => {
                                     :size="14"
                                     v-tooltip.top="t('views.alerts.shutdownOnActivation')"
                                 />
+                                <AlertSilenceMenu v-if="alert.enabled" :alert="alert">
+                                    <template #trigger>
+                                        <UiButton
+                                            variant="ghost"
+                                            size="icon"
+                                            class="h-6 w-6"
+                                            v-tooltip.top="t('views.alerts.silenceTooltip')"
+                                        >
+                                            <svg-icon
+                                                type="mdi"
+                                                :path="mdiBellSleepOutline"
+                                                :size="16"
+                                            />
+                                        </UiButton>
+                                    </template>
+                                </AlertSilenceMenu>
+                                <!-- Wrapper span: UiSwitch roots at a component, so the
+                                     tooltip directive needs a plain element to attach to. -->
+                                <span v-tooltip.top="t('views.alerts.enabledTooltip')">
+                                    <UiSwitch
+                                        :model-value="alert.enabled"
+                                        @update:model-value="
+                                            (value: boolean) =>
+                                                settingsStore.setAlertEnabled(alert.uid, value)
+                                        "
+                                    />
+                                </span>
                             </span>
                         </div>
                     </div>

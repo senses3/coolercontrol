@@ -19,10 +19,11 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAlert, mdiAutoFix } from '@mdi/js'
+import { mdiAlert, mdiAutoFix, mdiFanAlert } from '@mdi/js'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useFailAlert } from '@/composables/useFailAlert.ts'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -43,6 +44,8 @@ const uiSetting = computed(() =>
         ?.sensorsAndChannels.get(props.channel.channelName),
 )
 const channelLabel = computed(() => uiSetting.value?.name ?? props.channel.channelName)
+
+const { createFailAlert } = useFailAlert()
 const deviceLabel = computed(
     () => settingsStore.allUIDeviceSettings.get(props.channel.deviceUID)?.name ?? '',
 )
@@ -120,22 +123,38 @@ const isUnhealthy = computed(() =>
                 </div>
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>
-            <ChannelSetupMenu
-                v-if="channel.controllable"
-                :device-u-i-d="channel.deviceUID"
-                :channel-name="channel.channelName"
+            <div
+                v-if="liveRpm != null || channel.controllable"
+                class="ml-auto flex shrink-0 items-center gap-0.5"
             >
-                <template #trigger>
-                    <button
-                        type="button"
-                        class="ml-auto hidden shrink-0 rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block"
-                        v-tooltip.top="t('layout.shell.coolingPage.guidedSetup')"
-                        @click.stop.prevent
-                    >
-                        <svg-icon type="mdi" :path="mdiAutoFix" :size="18" />
-                    </button>
-                </template>
-            </ChannelSetupMenu>
+                <button
+                    v-if="liveRpm != null"
+                    type="button"
+                    class="hidden rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block"
+                    v-tooltip.top="t('layout.shell.monitoringPanel.failAlert')"
+                    @click.stop.prevent="
+                        createFailAlert(channel.deviceUID, channel.channelName, channelLabel)
+                    "
+                >
+                    <svg-icon type="mdi" :path="mdiFanAlert" :size="18" />
+                </button>
+                <ChannelSetupMenu
+                    v-if="channel.controllable"
+                    :device-u-i-d="channel.deviceUID"
+                    :channel-name="channel.channelName"
+                >
+                    <template #trigger>
+                        <button
+                            type="button"
+                            class="hidden rounded-lg p-1.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent group-hover:block data-[state=open]:block"
+                            v-tooltip.top="t('layout.shell.coolingPage.guidedSetup')"
+                            @click.stop.prevent
+                        >
+                            <svg-icon type="mdi" :path="mdiAutoFix" :size="18" />
+                        </button>
+                    </template>
+                </ChannelSetupMenu>
+            </div>
         </div>
         <div class="flex items-end justify-between gap-2">
             <div>

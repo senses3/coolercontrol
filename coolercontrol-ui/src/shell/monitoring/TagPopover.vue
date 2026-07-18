@@ -170,7 +170,7 @@ const inputClasses =
                 side="bottom"
                 align="start"
                 :side-offset="2"
-                class="z-50 w-72 rounded-lg border border-border-one bg-bg-two p-3 text-base text-text-color shadow-overlay outline-none"
+                class="z-[1300] w-72 rounded-lg border border-border-one bg-bg-two p-3 text-base text-text-color shadow-overlay-lg outline-none"
             >
                 <div class="pb-2 text-sm font-medium">
                     {{ t('components.menuTagAssign.title') }}
@@ -266,6 +266,7 @@ const inputClasses =
                         color-format="hex"
                         :default-color="DEFAULT_TAG_COLOR"
                         :size="1.5"
+                        @reset="newTagColor = DEFAULT_TAG_COLOR"
                     />
                     <input
                         v-model="newTagName"

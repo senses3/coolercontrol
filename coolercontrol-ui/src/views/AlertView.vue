@@ -21,6 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiAlertOutline,
+    mdiBellSleepOutline,
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiTrashCanOutline,
@@ -36,7 +37,9 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import UiGroupedListbox from '@/shell/ui/UiGroupedListbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSlider from '@/shell/ui/UiSlider.vue'
-import { Alert } from '@/models/Alert.ts'
+import { Alert, alertIsSilenced, alertSources } from '@/models/Alert.ts'
+import UiTag from '@/shell/ui/UiTag.vue'
+import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
@@ -83,8 +86,9 @@ const pollRate: Ref<number> = ref(settingsStore.ccSettings.poll_rate)
 const collectAlert = async (): Promise<Alert> => {
     if (shouldCreateAlert) {
         const newAlertName = `${t('views.alerts.newAlert')} ${settingsStore.alerts.length + 1}`
+        // Placeholder source; replaced from the selection on save.
         const channelSource = new ChannelSource('', '', ChannelMetric.Temp)
-        return new Alert(newAlertName, channelSource, defaultMin, 100, pollRate.value)
+        return new Alert(newAlertName, [channelSource], defaultMin, 100, pollRate.value)
     } else {
         const foundAlert = settingsStore.alerts.find((alert) => alert.uid === props.alertUID!)
         if (foundAlert == undefined) {
@@ -94,11 +98,14 @@ const collectAlert = async (): Promise<Alert> => {
     }
 }
 const alert: Alert = await collectAlert()
-const chosenChannelSource: Ref<AvailableChannel | undefined> = ref()
+const chosenChannelKeys: Ref<Array<string>> = ref([])
 const chosenMin: Ref<number> = ref(alert.min)
 const chosenMax: Ref<number> = ref(alert.max)
 const chosenName: Ref<string> = ref(alert.name)
 const chosenWarmupDuration: Ref<number> = ref(alert.warmup_duration)
+const chosenCooldownDuration: Ref<number> = ref(alert.cooldown_duration)
+const chosenRepeatMinutes: Ref<number> = ref(Math.round(alert.repeat_interval / 60))
+const chosenEnabled: Ref<boolean> = ref(alert.enabled)
 const chosenDesktopNotification: Ref<boolean> = ref(alert.desktop_notify)
 const chosenDesktopNotificationRecovery: Ref<boolean> = ref(alert.desktop_notify_recovery)
 const chosenDesktopNotificationAudio: Ref<boolean> = ref(alert.desktop_notify_audio)
@@ -163,33 +170,42 @@ const fillChannelSources = async (): Promise<void> => {
     }
 }
 await fillChannelSources()
-const startingChannelSource = () => {
-    // Edit: use the alert's own source. Create: honor an optional
+// Metric-qualified: a fan channel appears once per metric (Duty and RPM).
+const channelKey = (channel: AvailableChannel): string =>
+    `${channel.deviceUID}/${channel.channelName}/${channel.metric}`
+const findChannel = (
+    deviceUID: string,
+    channelName: string,
+    metric: ChannelMetric,
+): AvailableChannel | undefined =>
+    channelSources.value
+        .flatMap((device) => device.channels)
+        .find(
+            (channel) =>
+                channel.deviceUID === deviceUID &&
+                channel.channelName === channelName &&
+                channel.metric === metric,
+        )
+const startingChannelKeys = (): Array<string> => {
+    // Edit: use the alert's own sources. Create: honor an optional
     // ?device/&channel/&metric query (from the Monitoring "create alert" row
     // convenience) to preselect the source.
-    const deviceUID = shouldCreateAlert
-        ? (route.query.device as string | undefined)
-        : alert.channel_source.device_uid
-    const channelName = shouldCreateAlert
-        ? (route.query.channel as string | undefined)
-        : alert.channel_source.channel_name
-    const channelMetric = shouldCreateAlert
-        ? (route.query.metric as ChannelMetric | undefined)
-        : alert.channel_source.channel_metric
-    if (deviceUID == null || channelName == null) return undefined
-    for (const device of channelSources.value) {
-        if (device.deviceUID !== deviceUID) {
-            continue
-        }
-        for (const channel of device.channels) {
-            if (channel.channelName === channelName && channel.metric === channelMetric) {
-                return channel
-            }
-        }
+    if (!shouldCreateAlert) {
+        return alertSources(alert)
+            .map((source) =>
+                findChannel(source.device_uid, source.channel_name, source.channel_metric),
+            )
+            .filter((channel): channel is AvailableChannel => channel != null)
+            .map(channelKey)
     }
-    return undefined
+    const deviceUID = route.query.device as string | undefined
+    const channelName = route.query.channel as string | undefined
+    const channelMetric = route.query.metric as ChannelMetric | undefined
+    if (deviceUID == null || channelName == null || channelMetric == null) return []
+    const match = findChannel(deviceUID, channelName, channelMetric)
+    return match != null ? [channelKey(match)] : []
 }
-chosenChannelSource.value = startingChannelSource()
+chosenChannelKeys.value = startingChannelKeys()
 // Create-from-sensor convenience: honor optional min/max/name query overrides
 // (the fan "fail alert" prefills min=1 with an open max to catch 0 rpm).
 if (shouldCreateAlert) {
@@ -203,13 +219,17 @@ const saveAlert = async (): Promise<void> => {
     alert.min = chosenMin.value
     alert.name = chosenName.value
     alert.warmup_duration = chosenWarmupDuration.value
+    alert.cooldown_duration = chosenCooldownDuration.value
+    alert.repeat_interval = chosenRepeatMinutes.value * 60
+    alert.enabled = chosenEnabled.value
     alert.desktop_notify = chosenDesktopNotification.value
     alert.desktop_notify_recovery = chosenDesktopNotificationRecovery.value
     alert.desktop_notify_audio = chosenDesktopNotificationAudio.value
     alert.shutdown_on_activation = chosenShutdownOnActivation.value
-    alert.channel_source.device_uid = chosenChannelSource.value?.deviceUID!
-    alert.channel_source.channel_name = chosenChannelSource.value?.channelName!
-    alert.channel_source.channel_metric = chosenChannelSource.value?.metric!
+    alert.channel_sources = selectedChannels.value.map(
+        (channel) => new ChannelSource(channel.deviceUID, channel.channelName, channel.metric),
+    )
+    alert.channel_source = alert.channel_sources[0]
     if (shouldCreateAlert) {
         const successful = await settingsStore.createAlert(alert)
         if (successful) {
@@ -226,15 +246,17 @@ const saveAlert = async (): Promise<void> => {
 const duplicateAlert = async (): Promise<void> => {
     const copy = new Alert(
         `${alert.name} ${t('common.copy')}`,
-        new ChannelSource(
-            alert.channel_source.device_uid,
-            alert.channel_source.channel_name,
-            alert.channel_source.channel_metric,
+        alertSources(alert).map(
+            (source) =>
+                new ChannelSource(source.device_uid, source.channel_name, source.channel_metric),
         ),
         alert.min,
         alert.max,
         alert.warmup_duration,
     )
+    copy.cooldown_duration = alert.cooldown_duration
+    copy.repeat_interval = alert.repeat_interval
+    copy.enabled = alert.enabled
     copy.desktop_notify = alert.desktop_notify
     copy.desktop_notify_recovery = alert.desktop_notify_recovery
     copy.desktop_notify_audio = alert.desktop_notify_audio
@@ -279,6 +301,14 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     }
     return false
 }
+
+const silencedUntilText = (): string =>
+    new Date(alert.silenced_until!).toLocaleString([], {
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
 
 const updateValues = (): void => {
     for (const channelDevice of channelSources.value) {
@@ -334,7 +364,9 @@ const valueMax = (metric: ChannelMetric | undefined): number => {
         case ChannelMetric.Duty:
         case ChannelMetric.Load:
             return 100
+        // Small server fans (40/60mm Delta, San Ace) reach ~20k RPM.
         case ChannelMetric.RPM:
+            return 30_000
         case ChannelMetric.Freq:
             return 10_000
         case ChannelMetric.Temp:
@@ -343,8 +375,17 @@ const valueMax = (metric: ChannelMetric | undefined): number => {
     }
 }
 
-const channelKey = (channel: AvailableChannel): string =>
-    `${channel.deviceUID}/${channel.channelName}`
+const selectedChannels = computed<Array<AvailableChannel>>(() =>
+    chosenChannelKeys.value
+        .map((key) =>
+            channelSources.value
+                .flatMap((source) => source.channels)
+                .find((candidate) => channelKey(candidate) === key),
+        )
+        .filter((channel): channel is AvailableChannel => channel != null),
+)
+// All sources share one metric; the first pick establishes it.
+const selectedMetric = computed<ChannelMetric | undefined>(() => selectedChannels.value[0]?.metric)
 const sourceGroups = computed(() =>
     channelSources.value.map((source) => ({
         label: source.deviceName,
@@ -353,22 +394,17 @@ const sourceGroups = computed(() =>
             value: channelKey(channel),
             color: channel.lineColor,
             rightText: `${channel.value}${valueSuffix(channel.metric)}`,
+            disabled: selectedMetric.value != null && channel.metric !== selectedMetric.value,
         })),
     })),
 )
-const chosenChannelKey = computed(() =>
-    chosenChannelSource.value != null ? channelKey(chosenChannelSource.value) : undefined,
-)
-const changeChannelSource = (value: string | string[] | undefined): void => {
-    if (value == null || Array.isArray(value)) {
-        return // do not update on unselect
+const onSourcesChange = (value: string | string[] | undefined): void => {
+    if (!Array.isArray(value)) return
+    const hadNone = chosenChannelKeys.value.length === 0
+    chosenChannelKeys.value = value
+    if (hadNone && selectedMetric.value != null) {
+        chosenMax.value = valueMax(selectedMetric.value)
     }
-    const channel = channelSources.value
-        .flatMap((source) => source.channels)
-        .find((candidate) => channelKey(candidate) === value)
-    if (channel == null) return
-    chosenChannelSource.value = channel
-    chosenMax.value = valueMax(chosenChannelSource.value?.metric)
 }
 
 const valueSuffix = (metric: ChannelMetric | undefined): string => {
@@ -409,10 +445,9 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
 
 const minScrolled = (event: WheelEvent): void => {
     if (chosenMin.value == null) return
-    const step = stepSize(chosenChannelSource.value?.metric)
+    const step = stepSize(selectedMetric.value)
     if (event.deltaY < 0) {
-        const max =
-            chosenMax.value - (chosenChannelSource.value?.metric !== ChannelMetric.RPM ? 1 : 100)
+        const max = chosenMax.value - (selectedMetric.value !== ChannelMetric.RPM ? 1 : 100)
         if (chosenMin.value < max) chosenMin.value += step
     } else {
         if (chosenMin.value >= step) chosenMin.value -= step
@@ -420,13 +455,12 @@ const minScrolled = (event: WheelEvent): void => {
 }
 const maxScrolled = (event: WheelEvent): void => {
     if (chosenMax.value == null) return
-    const step = stepSize(chosenChannelSource.value?.metric)
+    const step = stepSize(selectedMetric.value)
     if (event.deltaY < 0) {
-        const max = valueMax(chosenChannelSource.value?.metric)
+        const max = valueMax(selectedMetric.value)
         if (chosenMax.value < max) chosenMax.value += step
     } else {
-        const min =
-            chosenMin.value + (chosenChannelSource.value?.metric !== ChannelMetric.RPM ? 1 : 100)
+        const min = chosenMin.value + (selectedMetric.value !== ChannelMetric.RPM ? 1 : 100)
         if (chosenMax.value >= min) chosenMax.value -= step
     }
 }
@@ -446,11 +480,14 @@ onMounted(async () => {
     })
     watch(
         [
-            chosenChannelSource,
+            chosenChannelKeys,
             chosenMax,
             chosenMin,
             chosenName,
             chosenWarmupDuration,
+            chosenCooldownDuration,
+            chosenRepeatMinutes,
+            chosenEnabled,
             chosenDesktopNotification,
             chosenDesktopNotificationRecovery,
             chosenDesktopNotificationAudio,
@@ -501,7 +538,7 @@ onMounted(async () => {
                     class="w-32"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
                     v-tooltip.top="t('views.alerts.saveAlert')"
-                    :disabled="chosenChannelSource == null || chosenName.length === 0"
+                    :disabled="chosenChannelKeys.length === 0 || chosenName.length === 0"
                     @click="saveAlert"
                 >
                     <svg-icon
@@ -517,26 +554,70 @@ onMounted(async () => {
     <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
             <div class="flex flex-col-reverse items-start lg:flex-row mt-0 w-full">
-                <div class="flex w-96 flex-col self-stretch mr-4">
+                <!-- Stacked (below lg) the listbox needs its own height: the
+                     flex-1/basis-0 fill only works next to the settings column. -->
+                <div
+                    class="flex w-full flex-col self-stretch mt-4 lg:mt-0 lg:mr-4 lg:w-96 lg:shrink-0"
+                >
                     <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.alerts.channelSource') }}
+                        {{ t('views.alerts.channelSources') }}
                     </small>
                     <UiGroupedListbox
-                        :model-value="chosenChannelKey"
-                        class="mt-1 min-h-0 flex-1 basis-0"
+                        :model-value="chosenChannelKeys"
+                        multiple
+                        class="mt-1 h-96 min-h-0 lg:h-auto lg:flex-1 lg:basis-0"
                         :groups="sourceGroups"
                         filter
                         :filter-placeholder="t('common.search')"
-                        :invalid="chosenChannelSource == null"
-                        v-tooltip.top="t('views.alerts.channelSourceTooltip')"
-                        @update:model-value="changeChannelSource"
+                        :invalid="chosenChannelKeys.length === 0"
+                        v-tooltip.top="t('views.alerts.channelSourcesTooltip')"
+                        @update:model-value="onSourcesChange"
                     />
                 </div>
-                <div class="flex w-96 flex-col">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.alerts.triggerConditions') }}
-                    </small>
-                    <UiSettingsCard class="mb-0 mt-1">
+                <!-- Responsive card grid: full-width cards when narrow, two
+                     columns when wide, like the overview pages. -->
+                <div
+                    class="grid w-full max-w-4xl flex-1 grid-cols-1 items-start gap-4 xl:grid-cols-2"
+                >
+                    <UiSettingsCard :title="t('views.alerts.sectionGeneral')">
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.enabledTooltip')"
+                            :label="t('views.alerts.enabled')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiSwitch v-model="chosenEnabled" />
+                            </div>
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-if="!shouldCreateAlert"
+                            v-tooltip.top="t('views.alerts.silenceTooltip')"
+                            :label="t('views.alerts.silence')"
+                        >
+                            <div class="flex items-center justify-end gap-2">
+                                <UiTag
+                                    v-if="alertIsSilenced(alert)"
+                                    :value="
+                                        t('views.alerts.silencedUntil', {
+                                            time: silencedUntilText(),
+                                        })
+                                    "
+                                    severity="warn"
+                                />
+                                <AlertSilenceMenu :alert="alert">
+                                    <template #trigger>
+                                        <UiButton variant="ghost" size="icon">
+                                            <svg-icon
+                                                type="mdi"
+                                                :path="mdiBellSleepOutline"
+                                                :size="deviceStore.getREMSize(1.25)"
+                                            />
+                                        </UiButton>
+                                    </template>
+                                </AlertSilenceMenu>
+                            </div>
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard :title="t('views.alerts.triggerConditions')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.maxValueTooltip')"
                             :label="t('views.alerts.greaterThan')"
@@ -545,28 +626,22 @@ onMounted(async () => {
                                 <UiNumberInput
                                     v-model="chosenMax"
                                     :min="
-                                        chosenMin +
-                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                            ? 1
-                                            : 100)
+                                        chosenMin + (selectedMetric !== ChannelMetric.RPM ? 1 : 100)
                                     "
-                                    :max="valueMax(chosenChannelSource?.metric)"
-                                    :step="stepSize(chosenChannelSource?.metric)"
-                                    :suffix="valueSuffix(chosenChannelSource?.metric)"
-                                    :disabled="chosenChannelSource == null"
+                                    :max="valueMax(selectedMetric)"
+                                    :step="stepSize(selectedMetric)"
+                                    :suffix="valueSuffix(selectedMetric)"
+                                    :disabled="selectedMetric == null"
                                 />
                                 <UiSlider
                                     v-model="chosenMax"
                                     class="!w-48"
-                                    :step="stepSize(chosenChannelSource?.metric)"
+                                    :step="stepSize(selectedMetric)"
                                     :min="
-                                        chosenMin +
-                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                            ? 1
-                                            : 100)
+                                        chosenMin + (selectedMetric !== ChannelMetric.RPM ? 1 : 100)
                                     "
-                                    :max="valueMax(chosenChannelSource?.metric)"
-                                    :disabled="chosenChannelSource == null"
+                                    :max="valueMax(selectedMetric)"
+                                    :disabled="selectedMetric == null"
                                 />
                             </div>
                         </UiSettingRow>
@@ -579,27 +654,21 @@ onMounted(async () => {
                                     v-model="chosenMin"
                                     :min="0"
                                     :max="
-                                        chosenMax -
-                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                            ? 1
-                                            : 100)
+                                        chosenMax - (selectedMetric !== ChannelMetric.RPM ? 1 : 100)
                                     "
-                                    :step="stepSize(chosenChannelSource?.metric)"
-                                    :suffix="valueSuffix(chosenChannelSource?.metric)"
-                                    :disabled="chosenChannelSource == null"
+                                    :step="stepSize(selectedMetric)"
+                                    :suffix="valueSuffix(selectedMetric)"
+                                    :disabled="selectedMetric == null"
                                 />
                                 <UiSlider
                                     v-model="chosenMin"
                                     class="!w-48"
-                                    :step="stepSize(chosenChannelSource?.metric)"
+                                    :step="stepSize(selectedMetric)"
                                     :min="0"
                                     :max="
-                                        chosenMax -
-                                        (chosenChannelSource?.metric !== ChannelMetric.RPM
-                                            ? 1
-                                            : 100)
+                                        chosenMax - (selectedMetric !== ChannelMetric.RPM ? 1 : 100)
                                     "
-                                    :disabled="chosenChannelSource == null"
+                                    :disabled="selectedMetric == null"
                                 />
                             </div>
                         </UiSettingRow>
@@ -614,7 +683,7 @@ onMounted(async () => {
                                     :max="60"
                                     :step="0.5"
                                     :suffix="' s'"
-                                    :disabled="chosenChannelSource == null"
+                                    :disabled="selectedMetric == null"
                                 />
                                 <UiSlider
                                     v-model="chosenWarmupDuration"
@@ -622,10 +691,35 @@ onMounted(async () => {
                                     :step="0.5"
                                     :min="0"
                                     :max="60"
-                                    :disabled="chosenChannelSource == null"
+                                    :disabled="selectedMetric == null"
                                 />
                             </div>
                         </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.cooldownDurationTooltip')"
+                            :label="t('views.alerts.cooldownLessThan')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiNumberInput
+                                    v-model="chosenCooldownDuration"
+                                    :min="0"
+                                    :max="60"
+                                    :step="0.5"
+                                    :suffix="' s'"
+                                    :disabled="selectedMetric == null"
+                                />
+                                <UiSlider
+                                    v-model="chosenCooldownDuration"
+                                    class="!w-48"
+                                    :step="0.5"
+                                    :min="0"
+                                    :max="60"
+                                    :disabled="selectedMetric == null"
+                                />
+                            </div>
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard :title="t('views.alerts.sectionNotifications')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.desktopNotifyTooltip')"
                             :label="t('views.alerts.desktopNotify')"
@@ -656,6 +750,23 @@ onMounted(async () => {
                                 />
                             </div>
                         </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.alerts.repeatIntervalTooltip')"
+                            :label="t('views.alerts.repeatInterval')"
+                        >
+                            <div class="flex flex-col items-end gap-2">
+                                <UiNumberInput
+                                    v-model="chosenRepeatMinutes"
+                                    :min="0"
+                                    :max="120"
+                                    :step="1"
+                                    :suffix="' min'"
+                                    :disabled="!chosenDesktopNotification"
+                                />
+                            </div>
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard :title="t('views.alerts.sectionActions')">
                         <UiSettingRow
                             v-tooltip.top="t('views.alerts.shutdownOnActivationTooltip')"
                             :label="t('views.alerts.shutdownOnActivation')"

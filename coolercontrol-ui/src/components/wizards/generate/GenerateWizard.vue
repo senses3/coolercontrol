@@ -27,6 +27,7 @@ import {
     mdiMinus,
 } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
@@ -431,241 +432,251 @@ const createAndApply = async (): Promise<void> => {
 </script>
 
 <template>
-    <div class="flex flex-col justify-between min-w-96 w-[40vw] min-h-max h-[50vh]">
-        <!-- Step 1: assign fans -->
-        <div v-if="step === 1" class="flex flex-col gap-y-3 overflow-y-auto">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.assignIntro') }}
-            </small>
-            <button
-                type="button"
-                class="ml-1 self-start text-sm text-text-color-secondary hover:underline"
-                @click="calibrateFansFirst"
-            >
-                {{ t('components.wizards.generate.calibrateFirst') }}
-            </button>
-            <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
-                {{ t('components.wizards.generate.noFans') }}
-            </div>
-            <div
-                v-for="(row, index) in fanRows"
-                :key="row.deviceUID + row.channelName"
-                class="flex items-center justify-between gap-x-3"
-            >
-                <div class="flex items-center min-w-0">
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiMinus"
-                        :size="16"
-                        class="mr-2 ml-1"
-                        :style="{ color: row.color }"
-                    />
-                    <span class="truncate">{{ row.label }}</span>
-                </div>
-                <UiSelect
-                    :model-value="fanRows[index].kind ?? undefined"
-                    :options="kindOptions"
-                    clearable
-                    :placeholder="t('components.wizards.generate.skip')"
-                    class="w-56"
-                    @update:model-value="setFanKind(index, $event)"
-                />
-            </div>
-        </div>
-
-        <!-- Step 2: key temps -->
-        <div v-else-if="step === 2" class="flex flex-col gap-y-3">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.tempsIntro') }}
-            </small>
-            <div
-                v-for="picker in [
-                    { label: t('components.wizards.generate.cpuTemp'), model: 'cpu' },
-                    { label: t('components.wizards.generate.gpuTemp'), model: 'gpu' },
-                    { label: t('components.wizards.generate.liquidTemp'), model: 'liquid' },
-                    { label: t('components.wizards.generate.ambientTemp'), model: 'ambient' },
-                ]"
-                :key="picker.model"
-                class="flex items-center justify-between gap-x-3"
-            >
-                <span class="ml-1">{{ picker.label }}</span>
-                <UiGroupedSelect
-                    v-if="picker.model === 'cpu'"
-                    v-model="cpuTempKey"
-                    :groups="tempOptionGroups"
-                    clearable
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                    class="w-64"
-                />
-                <UiGroupedSelect
-                    v-else-if="picker.model === 'gpu'"
-                    v-model="gpuTempKey"
-                    :groups="tempOptionGroups"
-                    clearable
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                    class="w-64"
-                />
-                <UiGroupedSelect
-                    v-else-if="picker.model === 'liquid'"
-                    v-model="liquidTempKey"
-                    :groups="tempOptionGroups"
-                    clearable
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                    class="w-64"
-                />
-                <UiGroupedSelect
-                    v-else
-                    v-model="ambientTempKey"
-                    :groups="tempOptionGroups"
-                    clearable
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                    class="w-64"
-                />
-            </div>
-        </div>
-
-        <!-- Step 3: preset -->
-        <div v-else-if="step === 3" class="flex flex-col gap-y-4">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.presetIntro') }}
-            </small>
-            <UiToggleGroup
-                v-model="globalPresetModel"
-                :options="presetToggleOptions"
-                class="self-start"
-            />
-            <button
-                class="ml-1 text-sm text-text-color-secondary hover:text-text-color self-start"
-                @click="overridesOpen = !overridesOpen"
-            >
-                {{ t('components.wizards.generate.perKindOverrides') }}
-            </button>
-            <div v-if="overridesOpen" class="flex flex-col gap-y-2">
-                <div
-                    v-for="(row, index) in overrideRows"
-                    :key="row.key"
-                    class="flex items-center justify-between gap-x-3"
-                >
-                    <span class="ml-1">{{ row.label }}</span>
-                    <UiToggleGroup
-                        :model-value="overrideRows[index].preset"
-                        :options="presetToggleOptions"
-                        @update:model-value="setOverridePreset(index, $event)"
-                    />
-                </div>
-            </div>
-            <small class="ml-1 font-light text-xs text-text-color-secondary">
-                {{ t('components.wizards.generate.cfmCaveat') }}
-            </small>
-        </div>
-
-        <!-- Step 4: preview -->
-        <div v-else class="flex flex-col gap-y-3 overflow-y-auto">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.previewIntro') }}
-            </small>
-
-            <!-- Fan assignments -->
-            <div class="flex flex-col gap-y-1">
-                <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
-                    {{ t('components.wizards.generate.previewAssignments') }}
-                </div>
-                <div
-                    v-for="assignment in proposal?.assignments ?? []"
-                    :key="assignment.device_uid + assignment.channel_name"
-                    class="flex items-start justify-between gap-x-3 ml-1"
-                >
-                    <span class="truncate">{{
-                        fanLabel(assignment.device_uid, assignment.channel_name)
-                    }}</span>
-                    <div class="text-right">
-                        <span class="font-bold">{{
-                            profileNameByUid(assignment.profile_uid)
-                        }}</span>
-                        <span
-                            v-if="
-                                currentProfileName(assignment.device_uid, assignment.channel_name)
-                            "
-                            class="block text-xs text-yellow-500"
-                        >
-                            {{
-                                t('components.wizards.generate.replaces', {
-                                    name: currentProfileName(
-                                        assignment.device_uid,
-                                        assignment.channel_name,
-                                    ),
-                                })
-                            }}
-                        </span>
+    <div class="flex flex-col min-w-96 w-[40vw] h-[70vh]">
+        <div class="min-h-0 flex-1">
+            <UiScrollArea surface="two">
+                <!-- Step 1: assign fans -->
+                <div v-if="step === 1" class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.assignIntro') }}
+                    </small>
+                    <button
+                        type="button"
+                        class="ml-1 self-start text-sm text-text-color-secondary hover:underline"
+                        @click="calibrateFansFirst"
+                    >
+                        {{ t('components.wizards.generate.calibrateFirst') }}
+                    </button>
+                    <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
+                        {{ t('components.wizards.generate.noFans') }}
+                    </div>
+                    <div
+                        v-for="(row, index) in fanRows"
+                        :key="row.deviceUID + row.channelName"
+                        class="flex items-center justify-between gap-x-3"
+                    >
+                        <div class="flex items-center min-w-0">
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiMinus"
+                                :size="16"
+                                class="mr-2 ml-1"
+                                :style="{ color: row.color }"
+                            />
+                            <span class="truncate">{{ row.label }}</span>
+                        </div>
+                        <UiSelect
+                            :model-value="fanRows[index].kind ?? undefined"
+                            :options="kindOptions"
+                            clearable
+                            :placeholder="t('components.wizards.generate.skip')"
+                            class="w-56"
+                            @update:model-value="setFanKind(index, $event)"
+                        />
                     </div>
                 </div>
-            </div>
 
-            <!-- Will be created -->
-            <div class="flex flex-col gap-y-1">
-                <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
-                    {{ t('components.wizards.generate.willCreateHeader') }}
+                <!-- Step 2: key temps -->
+                <div v-else-if="step === 2" class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.tempsIntro') }}
+                    </small>
+                    <div
+                        v-for="picker in [
+                            { label: t('components.wizards.generate.cpuTemp'), model: 'cpu' },
+                            { label: t('components.wizards.generate.gpuTemp'), model: 'gpu' },
+                            { label: t('components.wizards.generate.liquidTemp'), model: 'liquid' },
+                            {
+                                label: t('components.wizards.generate.ambientTemp'),
+                                model: 'ambient',
+                            },
+                        ]"
+                        :key="picker.model"
+                        class="flex items-center justify-between gap-x-3"
+                    >
+                        <span class="ml-1">{{ picker.label }}</span>
+                        <UiGroupedSelect
+                            v-if="picker.model === 'cpu'"
+                            v-model="cpuTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                        <UiGroupedSelect
+                            v-else-if="picker.model === 'gpu'"
+                            v-model="gpuTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                        <UiGroupedSelect
+                            v-else-if="picker.model === 'liquid'"
+                            v-model="liquidTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                        <UiGroupedSelect
+                            v-else
+                            v-model="ambientTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                    </div>
                 </div>
-                <div class="flex items-start gap-x-2 ml-1 mb-1">
-                    <svg-icon
-                        type="mdi"
-                        class="shrink-0 mt-0.5"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.2)"
+
+                <!-- Step 3: preset -->
+                <div v-else-if="step === 3" class="flex flex-col gap-y-4">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.presetIntro') }}
+                    </small>
+                    <UiToggleGroup
+                        v-model="globalPresetModel"
+                        :options="presetToggleOptions"
+                        class="self-start"
                     />
-                    <span class="text-sm">
-                        {{ t('components.wizards.generate.startingPointNote') }}
-                    </span>
+                    <button
+                        class="ml-1 text-sm text-text-color-secondary hover:text-text-color self-start"
+                        @click="overridesOpen = !overridesOpen"
+                    >
+                        {{ t('components.wizards.generate.perKindOverrides') }}
+                    </button>
+                    <div v-if="overridesOpen" class="flex flex-col gap-y-2">
+                        <div
+                            v-for="(row, index) in overrideRows"
+                            :key="row.key"
+                            class="flex items-center justify-between gap-x-3"
+                        >
+                            <span class="ml-1">{{ row.label }}</span>
+                            <UiToggleGroup
+                                :model-value="overrideRows[index].preset"
+                                :options="presetToggleOptions"
+                                @update:model-value="setOverridePreset(index, $event)"
+                            />
+                        </div>
+                    </div>
+                    <small class="ml-1 font-light text-xs text-text-color-secondary">
+                        {{ t('components.wizards.generate.cfmCaveat') }}
+                    </small>
                 </div>
-                <div
-                    v-for="profile in proposal?.profiles ?? []"
-                    :key="profile.uid"
-                    class="flex items-center justify-between gap-x-3 ml-1 text-sm"
-                >
-                    <span class="truncate">{{ profile.name }}</span>
-                    <span class="shrink-0 text-text-color-secondary">{{
-                        `${getProfileTypeDisplayName(profile.p_type)} ${t('layout.add.profile')}`
-                    }}</span>
+
+                <!-- Step 4: preview -->
+                <div v-else class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.previewIntro') }}
+                    </small>
+
+                    <!-- Fan assignments -->
+                    <div class="flex flex-col gap-y-1">
+                        <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
+                            {{ t('components.wizards.generate.previewAssignments') }}
+                        </div>
+                        <div
+                            v-for="assignment in proposal?.assignments ?? []"
+                            :key="assignment.device_uid + assignment.channel_name"
+                            class="flex items-start justify-between gap-x-3 ml-1"
+                        >
+                            <span class="truncate">{{
+                                fanLabel(assignment.device_uid, assignment.channel_name)
+                            }}</span>
+                            <div class="text-right">
+                                <span class="font-bold">{{
+                                    profileNameByUid(assignment.profile_uid)
+                                }}</span>
+                                <span
+                                    v-if="
+                                        currentProfileName(
+                                            assignment.device_uid,
+                                            assignment.channel_name,
+                                        )
+                                    "
+                                    class="block text-xs text-yellow-500"
+                                >
+                                    {{
+                                        t('components.wizards.generate.replaces', {
+                                            name: currentProfileName(
+                                                assignment.device_uid,
+                                                assignment.channel_name,
+                                            ),
+                                        })
+                                    }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Will be created -->
+                    <div class="flex flex-col gap-y-1">
+                        <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
+                            {{ t('components.wizards.generate.willCreateHeader') }}
+                        </div>
+                        <div class="flex items-start gap-x-2 ml-1 mb-1">
+                            <svg-icon
+                                type="mdi"
+                                class="shrink-0 mt-0.5"
+                                :path="mdiInformationSlabCircleOutline"
+                                :size="deviceStore.getREMSize(1.2)"
+                            />
+                            <span class="text-sm">
+                                {{ t('components.wizards.generate.startingPointNote') }}
+                            </span>
+                        </div>
+                        <div
+                            v-for="profile in proposal?.profiles ?? []"
+                            :key="profile.uid"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ profile.name }}</span>
+                            <span class="shrink-0 text-text-color-secondary">{{
+                                `${getProfileTypeDisplayName(profile.p_type)} ${t('layout.add.profile')}`
+                            }}</span>
+                        </div>
+                        <div
+                            v-for="fn in proposal?.functions ?? []"
+                            :key="fn.uid"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ fn.name }}</span>
+                            <span class="shrink-0 text-text-color-secondary">{{
+                                t('layout.add.function')
+                            }}</span>
+                        </div>
+                        <div
+                            v-for="sensor in proposal?.custom_sensors ?? []"
+                            :key="sensor.id"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ sensor.id }}</span>
+                            <span class="shrink-0 text-text-color-secondary">{{
+                                t('layout.add.customSensor')
+                            }}</span>
+                        </div>
+                        <small
+                            v-if="anyCaseFanAssigned()"
+                            class="ml-1 mt-1 font-light text-xs text-text-color-secondary"
+                        >
+                            {{ t('components.wizards.generate.cfmCaveat') }}
+                        </small>
+                    </div>
                 </div>
-                <div
-                    v-for="fn in proposal?.functions ?? []"
-                    :key="fn.uid"
-                    class="flex items-center justify-between gap-x-3 ml-1 text-sm"
-                >
-                    <span class="truncate">{{ fn.name }}</span>
-                    <span class="shrink-0 text-text-color-secondary">{{
-                        t('layout.add.function')
-                    }}</span>
-                </div>
-                <div
-                    v-for="sensor in proposal?.custom_sensors ?? []"
-                    :key="sensor.id"
-                    class="flex items-center justify-between gap-x-3 ml-1 text-sm"
-                >
-                    <span class="truncate">{{ sensor.id }}</span>
-                    <span class="shrink-0 text-text-color-secondary">{{
-                        t('layout.add.customSensor')
-                    }}</span>
-                </div>
-                <small
-                    v-if="anyCaseFanAssigned()"
-                    class="ml-1 mt-1 font-light text-xs text-text-color-secondary"
-                >
-                    {{ t('components.wizards.generate.cfmCaveat') }}
-                </small>
-            </div>
+            </UiScrollArea>
         </div>
 
         <!-- Footer -->
-        <div class="flex flex-row justify-between mt-4">
+        <div class="flex flex-row justify-between mt-4 shrink-0">
             <UiButton v-if="step === 1" variant="ghost" class="w-24 bg-bg-one" @click="closeDialog">
                 {{ t('common.cancel') }}
             </UiButton>

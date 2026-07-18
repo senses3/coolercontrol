@@ -20,7 +20,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiCheck, mdiMagnify, mdiMemory, mdiMinusThick } from '@mdi/js'
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 
 export interface UiGroupedOption {
     label: string
@@ -82,6 +82,25 @@ const toggle = (value: string): void => {
         model.value = value
     }
 }
+
+const scrollContainer = ref<HTMLDivElement>()
+
+// Center the first selected option on mount: these lists can be long and the
+// current selection may sit far below the fold. Manual scrollTop math keeps
+// ancestor scroll containers untouched (scrollIntoView would move them too).
+onMounted(async () => {
+    await nextTick()
+    const container = scrollContainer.value
+    if (container == null) return
+    const selected = container.querySelector<HTMLElement>('[data-selected]')
+    if (selected == null) return
+    const containerRect = container.getBoundingClientRect()
+    const selectedRect = selected.getBoundingClientRect()
+    container.scrollTop +=
+        selectedRect.top -
+        containerRect.top -
+        (container.clientHeight / 2 - selected.clientHeight / 2)
+})
 </script>
 
 <template>
@@ -103,7 +122,7 @@ const toggle = (value: string): void => {
                 class="w-full bg-transparent text-base text-text-color outline-none"
             />
         </div>
-        <div class="min-h-0 flex-1 overflow-y-auto p-1">
+        <div ref="scrollContainer" class="min-h-0 flex-1 overflow-y-auto p-1">
             <template v-for="group in visibleGroups" :key="group.label">
                 <div
                     v-if="group.label !== ''"
@@ -118,6 +137,7 @@ const toggle = (value: string): void => {
                     v-for="option in group.options"
                     :key="option.value"
                     type="button"
+                    :data-selected="isSelected(option.value) ? 'true' : undefined"
                     :disabled="option.disabled"
                     class="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50"
                     :class="[

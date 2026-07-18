@@ -741,8 +741,9 @@ export default {
             proceed: 'Continuar',
         },
         alerts: {
-            range: 'Intervalo: {min} a {max}{unit}',
-            since: 'desde {time}',
+            triggersOutside: 'aciona abaixo de {min} ou acima de {max}{unit}',
+            triggersAbove: 'aciona acima de {max}{unit}',
+            stateSince: '{state} desde {time}',
             createAlert: 'Criar Alerta',
             editAlert: 'Editar Alerta',
             deleteAlert: 'Excluir Alerta',
@@ -752,15 +753,40 @@ export default {
             alertLogs: 'Logs de Alertas',
             alertTriggered: 'Alerta Acionado',
             alertRecovered: 'Alerta Recuperado',
+            alertError: 'Erro de alerta',
             deleteAlertConfirm: 'Tem certeza que deseja excluir: "{name}"?',
             saveAlert: 'Salvar Alerta',
-            channelSource: 'Fonte do Canal para o Alerta',
-            channelSourceTooltip: 'A fonte de canal a ser usada para o Alerta',
+            channelSources: 'Fontes de Canal para o Alerta',
+            channelSourcesTooltip:
+                'As fontes de canal monitoradas por este Alerta.\nUm tipo de sensor por Alerta: a primeira escolha filtra as demais.',
             triggerConditions: 'Condições de Acionamento',
             maxValueTooltip: 'Valores acima disso acionarão o alerta.',
             minValueTooltip: 'Valores abaixo disso acionarão o alerta.',
             warmupDurationTooltip:
                 'Durante quanto tempo uma condição deve permanecer ativa antes de o alerta ser considerado ativo.\nÉ verificado apenas em intervalos regulares de poll-rate\ne, por isso, pode não ter exatamente essa duração.',
+            cooldownDurationTooltip:
+                'Durante quanto tempo o valor deve permanecer dentro do intervalo antes de o alerta ser recuperado.\nEvita alternância rápida entre acionado e resolvido.',
+            cooldownLessThan: 'condição recuperada durante mais tempo do que',
+            repeatInterval: 'Repetir notificação a cada',
+            repeatIntervalTooltip:
+                'Reenviar a notificação de área de trabalho neste intervalo enquanto o alerta permanecer ativo.\n0 desativa as notificações repetidas.',
+            enabled: 'Habilitado',
+            enabledTooltip: 'Um alerta desabilitado não é avaliado de forma alguma.',
+            sectionGeneral: 'Geral',
+            sectionNotifications: 'Notificações',
+            sectionActions: 'Ações',
+            silence: 'Silenciar',
+            silenceTooltip:
+                'Silenciar: suprime notificações e desligamento por um tempo.\nO alerta continua sendo avaliado e mostra seu estado.',
+            silence15m: 'Silenciar por 15 minutos',
+            silence1h: 'Silenciar por 1 hora',
+            silence8h: 'Silenciar por 8 horas',
+            silence24h: 'Silenciar por 24 horas',
+            unsilence: 'Remover silêncio agora',
+            enableAlert: 'Habilitar Alerta',
+            disableAlert: 'Desabilitar Alerta',
+            silencedUntil: 'Silenciado até {time}',
+            disabledLabel: 'Desabilitado',
             greaterThan: 'maior que',
             lessThan: 'menor que',
             newAlert: 'Novo Alerta',
@@ -1258,6 +1284,9 @@ export default {
                 noFans: 'Nenhum ventilador controlável detectado.',
                 selectAll: 'Selecionar tudo',
                 calibratedBadge: 'calibrado',
+                blockedByAlert: "bloqueado: o alerta '{name}' está ativo",
+                alertsPausedNote:
+                    '{count} alerta(s) monitoram os ventiladores selecionados e são pausados durante a varredura de cada ventilador.',
                 idleNote:
                     'A calibração percorre toda a faixa de cada ventilador. É melhor executar em repouso: faz barulho e leva alguns minutos por ventilador.',
                 concurrencyLabel: 'Ventiladores por vez',
@@ -1393,6 +1422,10 @@ export default {
                 description:
                     'Faça uma varredura no ventilador para descobrir sua curva real de ciclo de trabalho versus RPM e, em seguida, controle o canal como ciclo de trabalho real normalizado por RPM.\nElimina zonas mortas em ciclo baixo e saturação em ciclo alto.\nO impulso de partida também é tratado automaticamente quando o ventilador está calibrado: um breve reforço inicial o tira do repouso antes de estabilizá-lo no ciclo alvo.\nA varredura normalmente leva vários minutos e pode ser bem mais longa em ventiladores de resposta lenta. O canal é ajustado para 0 % no início.',
                 statusNotCalibrated: 'Não calibrado',
+                blockedByAlert:
+                    "A calibração está bloqueada: o alerta '{name}' está ativo neste ventilador.",
+                alertsPausedNote:
+                    'Os alertas que monitoram este ventilador são pausados durante a varredura.',
                 statusInProgress: 'Calibrando: {stage} ({percent} %)',
                 statusCompleted: 'Calibrado (curva suave, mapeamento ativo)',
                 statusCompletedStepped: 'Calibrado (curva em degraus, mapeamento desativado)',

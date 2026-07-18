@@ -71,6 +71,16 @@ impl DiagnosisRegistry {
         self.in_flight.borrow().contains_key(key)
     }
 
+    /// Allocation-free variant for per-tick callers (alert suppression):
+    /// avoids building an owned `ChannelKey` on the hot path. The map holds
+    /// at most a handful of concurrent sweeps, so iteration beats hashing.
+    pub fn is_in_flight_parts(&self, device_uid: &str, channel_name: &str) -> bool {
+        self.in_flight
+            .borrow()
+            .keys()
+            .any(|(dev, chan)| dev == device_uid && chan == channel_name)
+    }
+
     #[allow(dead_code)] // test-only; useful production API.
     pub fn len(&self) -> usize {
         self.in_flight.borrow().len()
@@ -165,6 +175,20 @@ mod tests {
         assert!(registry.cancel(&key("dev-a", "fan1")));
         assert!(second.is_cancelled());
         assert!(!first.is_cancelled());
+    }
+
+    #[test]
+    fn is_in_flight_parts_matches_without_key_allocation() {
+        // Goal: verify the borrowed-parts lookup used by the per-tick alert
+        // suppression agrees with the owned-key variant.
+        let registry = DiagnosisRegistry::new();
+        assert!(!registry.is_in_flight_parts("dev-a", "fan1"));
+        let _token = registry.register(key("dev-a", "fan1"));
+        assert!(registry.is_in_flight_parts("dev-a", "fan1"));
+        assert!(!registry.is_in_flight_parts("dev-a", "fan2"));
+        assert!(!registry.is_in_flight_parts("dev-b", "fan1"));
+        registry.clear(&key("dev-a", "fan1"));
+        assert!(!registry.is_in_flight_parts("dev-a", "fan1"));
     }
 
     #[test]

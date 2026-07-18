@@ -21,6 +21,8 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiArrowLeft,
+    mdiBellOutline,
+    mdiBellRingOutline,
     mdiBookmarkCheck,
     mdiBookmarkMultipleOutline,
     mdiBookmarkOutline,
@@ -60,6 +62,16 @@ const statusColor = computed(() => {
             return 'bg-error'
     }
 })
+// A degraded status jumps straight to the logs, pre-filtered to warnings.
+const statusTarget = computed(() =>
+    daemonState.status === DaemonStatus.OK
+        ? { name: 'section-home' }
+        : { name: 'home-logs', query: { level: 'warn' } },
+)
+
+// Top-bar alert indicator: secondary until an enabled, unsilenced alert is firing,
+// then error. Shares the tray's source of truth so the two never disagree.
+const hasActiveAlert = computed(() => settingsStore.anyActiveUnsilencedAlert)
 
 const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
@@ -106,13 +118,30 @@ const isMobile = computed(() => width.value < 768)
         </UiTooltip>
         <UiTooltip :text="daemonState.status">
             <RouterLink
-                :to="{ name: 'section-home' }"
+                :to="statusTarget"
                 class="flex items-center gap-2.5 rounded-lg px-1 py-0.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <span class="h-2.5 w-2.5 rounded-full" :class="statusColor" />
                 <span class="text-base text-text-color-secondary">
                     {{ daemonState.systemName }}
                 </span>
+            </RouterLink>
+        </UiTooltip>
+        <UiTooltip :text="t('layout.topbar.alerts')">
+            <RouterLink
+                :to="{ name: 'monitoring-alerts' }"
+                class="flex items-center justify-center rounded-lg p-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                :class="
+                    hasActiveAlert
+                        ? 'text-error'
+                        : 'text-text-color-secondary hover:text-text-color'
+                "
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="hasActiveAlert ? mdiBellRingOutline : mdiBellOutline"
+                    :size="deviceStore.getREMSize(1.25)"
+                />
             </RouterLink>
         </UiTooltip>
         <div class="flex-1" />

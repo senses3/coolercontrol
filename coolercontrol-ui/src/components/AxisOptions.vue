@@ -23,7 +23,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { mdiAxisArrow, mdiAxisXArrow, mdiAxisYArrow } from '@mdi/js'
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'reka-ui'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { ref, Ref, watch } from 'vue'
@@ -67,164 +67,166 @@ const isPopupOpen = ref(false)
                     :size="deviceStore.getREMSize(1.25)"
                 />
             </popover-trigger>
-            <popover-content side="bottom" class="z-10">
-                <div
-                    class="w-full bg-bg-two border border-border-one p-1 rounded-lg text-text-color shadow-overlay"
-                >
-                    <table>
-                        <thead>
-                            <tr>
-                                <th colspan="6" class="pb-2">
-                                    {{ t('components.axisOptions.title') }}
-                                </th>
-                            </tr>
-                            <tr>
-                                <th
-                                    colspan="2"
-                                    class="w-48 p-2 border-b border-r border-border-one"
-                                >
-                                    <span class="flex flex-row justify-center">
-                                        <svg-icon
-                                            class="outline-0 mr-2"
-                                            type="mdi"
-                                            :path="mdiAxisXArrow"
-                                            :size="deviceStore.getREMSize(1.25)"
+            <popover-portal>
+                <popover-content side="bottom" class="z-[1300]">
+                    <div
+                        class="w-full bg-bg-two border border-border-one p-1 rounded-lg text-text-color shadow-overlay-lg"
+                    >
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="6" class="pb-2">
+                                        {{ t('components.axisOptions.title') }}
+                                    </th>
+                                </tr>
+                                <tr>
+                                    <th
+                                        colspan="2"
+                                        class="w-48 p-2 border-b border-r border-border-one"
+                                    >
+                                        <span class="flex flex-row justify-center">
+                                            <svg-icon
+                                                class="outline-0 mr-2"
+                                                type="mdi"
+                                                :path="mdiAxisXArrow"
+                                                :size="deviceStore.getREMSize(1.25)"
+                                            />
+                                            {{ t('components.axisOptions.dutyTemperature') }}
+                                        </span>
+                                    </th>
+                                    <th colspan="2" class="w-48 p-2 border-b border-border-one">
+                                        <span class="flex flex-row justify-center">
+                                            {{
+                                                freqIsMhz
+                                                    ? t('components.axisOptions.rpmMhz')
+                                                    : t('components.axisOptions.krpmGhz')
+                                            }}
+                                            <svg-icon
+                                                class="outline-0 ml-2"
+                                                type="mdi"
+                                                :path="mdiAxisYArrow"
+                                                :size="deviceStore.getREMSize(1.25)"
+                                            />
+                                        </span>
+                                    </th>
+                                    <th
+                                        colspan="2"
+                                        class="w-48 p-2 border-l border-b border-border-one"
+                                    >
+                                        <span class="flex flex-row justify-center">
+                                            {{ t('components.axisOptions.watts') }}
+                                            <svg-icon
+                                                class="outline-0 ml-2"
+                                                type="mdi"
+                                                :path="mdiAxisYArrow"
+                                                :size="deviceStore.getREMSize(1.25)"
+                                            />
+                                        </span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="w-24 text-end px-2 border-r border-border-one">
+                                        {{ t('components.axisOptions.autoScale') }}
+                                    </td>
+                                    <td class="w-24 px-2 border-r border-border-one text-center">
+                                        <UiSwitch v-model="dashboard.autoScaleDegree" />
+                                    </td>
+                                    <td class="w-24 text-end px-2 border-r border-border-one">
+                                        {{ t('components.axisOptions.autoScale') }}
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiSwitch v-model="dashboard.autoScaleFrequency" />
+                                    </td>
+                                    <td class="w-24 text-end px-2 border-x border-border-one">
+                                        {{ t('components.axisOptions.autoScale') }}
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiSwitch v-model="dashboard.autoScaleWatts" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="w-24 text-end px-2 border-r border-border-one">
+                                        {{ t('components.axisOptions.max') }}
+                                    </td>
+                                    <td class="w-24 px-2 border-r border-border-one">
+                                        <UiNumberInput
+                                            v-model="dashboard.degreeMax"
+                                            :min="dashboard.degreeMin + 10"
+                                            :max="200"
+                                            :step="10"
+                                            :disabled="dashboard.autoScaleDegree"
                                         />
-                                        {{ t('components.axisOptions.dutyTemperature') }}
-                                    </span>
-                                </th>
-                                <th colspan="2" class="w-48 p-2 border-b border-border-one">
-                                    <span class="flex flex-row justify-center">
-                                        {{
-                                            freqIsMhz
-                                                ? t('components.axisOptions.rpmMhz')
-                                                : t('components.axisOptions.krpmGhz')
-                                        }}
-                                        <svg-icon
-                                            class="outline-0 ml-2"
-                                            type="mdi"
-                                            :path="mdiAxisYArrow"
-                                            :size="deviceStore.getREMSize(1.25)"
+                                    </td>
+                                    <td class="w-24 text-end px-2 border-r border-border-one">
+                                        {{ t('components.axisOptions.max') }}
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiNumberInput
+                                            v-model="freqScaledMax"
+                                            :min="freqScaledMin + freqStepSize"
+                                            :max="freqMaxLimit"
+                                            :step="freqStepSize"
+                                            :disabled="dashboard.autoScaleFrequency"
                                         />
-                                    </span>
-                                </th>
-                                <th
-                                    colspan="2"
-                                    class="w-48 p-2 border-l border-b border-border-one"
-                                >
-                                    <span class="flex flex-row justify-center">
-                                        {{ t('components.axisOptions.watts') }}
-                                        <svg-icon
-                                            class="outline-0 ml-2"
-                                            type="mdi"
-                                            :path="mdiAxisYArrow"
-                                            :size="deviceStore.getREMSize(1.25)"
+                                    </td>
+                                    <td class="w-24 text-end px-2 border-x border-border-one">
+                                        {{ t('components.axisOptions.max') }}
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiNumberInput
+                                            v-model="dashboard.wattsMax"
+                                            :min="dashboard.wattsMin + 1"
+                                            :max="800"
+                                            :step="dashboard.wattsMax >= 10 ? 10 : 1"
+                                            :disabled="dashboard.autoScaleWatts"
                                         />
-                                    </span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td class="w-24 text-end px-2 border-r border-border-one">
-                                    {{ t('components.axisOptions.autoScale') }}
-                                </td>
-                                <td class="w-24 px-2 border-r border-border-one text-center">
-                                    <UiSwitch v-model="dashboard.autoScaleDegree" />
-                                </td>
-                                <td class="w-24 text-end px-2 border-r border-border-one">
-                                    {{ t('components.axisOptions.autoScale') }}
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiSwitch v-model="dashboard.autoScaleFrequency" />
-                                </td>
-                                <td class="w-24 text-end px-2 border-x border-border-one">
-                                    {{ t('components.axisOptions.autoScale') }}
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiSwitch v-model="dashboard.autoScaleWatts" />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="w-24 text-end px-2 border-r border-border-one">
-                                    {{ t('components.axisOptions.max') }}
-                                </td>
-                                <td class="w-24 px-2 border-r border-border-one">
-                                    <UiNumberInput
-                                        v-model="dashboard.degreeMax"
-                                        :min="dashboard.degreeMin + 10"
-                                        :max="200"
-                                        :step="10"
-                                        :disabled="dashboard.autoScaleDegree"
-                                    />
-                                </td>
-                                <td class="w-24 text-end px-2 border-r border-border-one">
-                                    {{ t('components.axisOptions.max') }}
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiNumberInput
-                                        v-model="freqScaledMax"
-                                        :min="freqScaledMin + freqStepSize"
-                                        :max="freqMaxLimit"
-                                        :step="freqStepSize"
-                                        :disabled="dashboard.autoScaleFrequency"
-                                    />
-                                </td>
-                                <td class="w-24 text-end px-2 border-x border-border-one">
-                                    {{ t('components.axisOptions.max') }}
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiNumberInput
-                                        v-model="dashboard.wattsMax"
-                                        :min="dashboard.wattsMin + 1"
-                                        :max="800"
-                                        :step="dashboard.wattsMax >= 10 ? 10 : 1"
-                                        :disabled="dashboard.autoScaleWatts"
-                                    />
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="w-24 text-end px-2 border-r border-border-one">
-                                    {{ t('components.axisOptions.min') }}
-                                </td>
-                                <td class="w-24 px-2 border-r border-border-one">
-                                    <UiNumberInput
-                                        v-model="dashboard.degreeMin"
-                                        :min="0"
-                                        :max="dashboard.degreeMax - 10"
-                                        :step="10"
-                                        :disabled="dashboard.autoScaleDegree"
-                                    />
-                                </td>
-                                <td class="w-24 text-end px-2 border-r border-border-one">
-                                    {{ t('components.axisOptions.min') }}
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiNumberInput
-                                        v-model="freqScaledMin"
-                                        :min="0"
-                                        :max="freqScaledMax - freqStepSize"
-                                        :step="freqStepSize"
-                                        :disabled="dashboard.autoScaleFrequency"
-                                    />
-                                </td>
-                                <td class="w-24 text-end px-2 border-x border-border-one">
-                                    {{ t('components.axisOptions.min') }}
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <UiNumberInput
-                                        v-model="dashboard.wattsMin"
-                                        :min="0"
-                                        :max="dashboard.wattsMax - 1"
-                                        :step="dashboard.wattsMax >= 10 ? 10 : 1"
-                                        :disabled="dashboard.autoScaleWatts"
-                                    />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </popover-content>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="w-24 text-end px-2 border-r border-border-one">
+                                        {{ t('components.axisOptions.min') }}
+                                    </td>
+                                    <td class="w-24 px-2 border-r border-border-one">
+                                        <UiNumberInput
+                                            v-model="dashboard.degreeMin"
+                                            :min="0"
+                                            :max="dashboard.degreeMax - 10"
+                                            :step="10"
+                                            :disabled="dashboard.autoScaleDegree"
+                                        />
+                                    </td>
+                                    <td class="w-24 text-end px-2 border-r border-border-one">
+                                        {{ t('components.axisOptions.min') }}
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiNumberInput
+                                            v-model="freqScaledMin"
+                                            :min="0"
+                                            :max="freqScaledMax - freqStepSize"
+                                            :step="freqStepSize"
+                                            :disabled="dashboard.autoScaleFrequency"
+                                        />
+                                    </td>
+                                    <td class="w-24 text-end px-2 border-x border-border-one">
+                                        {{ t('components.axisOptions.min') }}
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiNumberInput
+                                            v-model="dashboard.wattsMin"
+                                            :min="0"
+                                            :max="dashboard.wattsMax - 1"
+                                            :step="dashboard.wattsMax >= 10 ? 10 : 1"
+                                            :disabled="dashboard.autoScaleWatts"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </popover-content>
+            </popover-portal>
         </popover-root>
     </div>
 </template>

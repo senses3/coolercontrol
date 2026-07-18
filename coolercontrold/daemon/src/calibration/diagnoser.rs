@@ -115,6 +115,12 @@ pub enum DiagnosisFailure {
         others_over_limit: usize,
     },
     Cancelled,
+    /// Preflight: an enabled alert is already Active on this channel. The
+    /// alert was not triggered by the sweep, so the fan itself is suspect;
+    /// calibration refuses to run on it.
+    BlockedByAlert {
+        alert_name: String,
+    },
     /// Hardware write failed; preserves the repo error verbatim.
     WriteFailed(String),
     /// Restore failed after the sweep. The calibration is kept if

@@ -148,6 +148,16 @@ const setChannelColor = (channel: CoolingChannel, newColor: Color): void => {
         ?.sensorsAndChannels.get(channel.channelName)
     if (setting != null) setting.userColor = newColor
 }
+const channelDefaultColor = (deviceUID: UID, channelName: string): Color | undefined =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)
+        ?.defaultColor
+// Reset clears the user override so the non-user-defined color applies again.
+const resetChannelColor = (channel: CoolingChannel): void => {
+    const setting = settingsStore.allUIDeviceSettings
+        .get(channel.deviceUID)
+        ?.sensorsAndChannels.get(channel.channelName)
+    if (setting != null) setting.userColor = undefined
+}
 
 // Keeps a fan row's hover actions visible while its tag popover is open.
 const openTagRow = ref<string | null>(null)
@@ -297,7 +307,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
@@ -307,8 +317,12 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                         <CCColorPicker
                             :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                            :default-color="
+                                channelDefaultColor(channel.deviceUID, channel.channelName)
+                            "
                             :size="1.25"
                             @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                            @reset="resetChannelColor(channel)"
                         />
                         <TagPopover
                             :device-u-i-d="channel.deviceUID"
@@ -418,7 +432,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                     </RouterLink>
                     <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
+                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
@@ -428,8 +442,12 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         </span>
                         <CCColorPicker
                             :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                            :default-color="
+                                channelDefaultColor(channel.deviceUID, channel.channelName)
+                            "
                             :size="1.25"
                             @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                            @reset="resetChannelColor(channel)"
                         />
                         <TagPopover
                             :device-u-i-d="channel.deviceUID"
