@@ -82,14 +82,16 @@ const bottomFadeStyle = computed(() => fadeStops('top'))
         <ScrollAreaViewport ref="viewportRef" class="h-full w-full">
             <slot />
         </ScrollAreaViewport>
+        <!-- 1px overhang: fractional viewport heights leave the edge pixel only
+             partially covered, letting a hairline of content pass through. -->
         <div
-            class="top-0 h-14"
+            class="-top-px h-14"
             :class="[fadeBase, showTopFade ? 'opacity-100' : 'opacity-0']"
             :style="topFadeStyle"
             aria-hidden="true"
         />
         <div
-            class="bottom-0 h-28"
+            class="-bottom-px h-28"
             :class="[fadeBase, showBottomFade ? 'opacity-100' : 'opacity-0']"
             :style="bottomFadeStyle"
             aria-hidden="true"
