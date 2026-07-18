@@ -529,10 +529,10 @@ if (channelDashboard.value.dataTypes.length > 0) {
         </p>
 
         <div class="shrink-0" style="--time-chart-height: 24rem">
-            <div class="mb-1 flex justify-end">
+            <div class="mb-1 flex justify-center">
                 <RouterLink
                     :to="{ name: 'monitoring-sensor', params: { deviceUID, channelName } }"
-                    class="flex items-center gap-1 rounded text-sm text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                 >
                     <svg-icon type="mdi" :path="mdiChartLine" :size="16" />
                     {{ t('layout.shell.coolingPage.fullChart') }}
