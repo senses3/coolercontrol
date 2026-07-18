@@ -21,6 +21,7 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
     mdiArrowLeft,
+    mdiBellOutline,
     mdiBookmarkCheck,
     mdiBookmarkMultipleOutline,
     mdiBookmarkOutline,
@@ -66,6 +67,9 @@ const statusTarget = computed(() =>
         ? { name: 'section-home' }
         : { name: 'home-logs', query: { level: 'warn' } },
 )
+
+// Top-bar alert indicator: secondary until any alert is firing, then error.
+const hasActiveAlert = computed(() => settingsStore.alertsActive.length > 0)
 
 const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
@@ -119,6 +123,19 @@ const isMobile = computed(() => width.value < 768)
                 <span class="text-base text-text-color-secondary">
                     {{ daemonState.systemName }}
                 </span>
+            </RouterLink>
+        </UiTooltip>
+        <UiTooltip :text="t('layout.topbar.alerts')">
+            <RouterLink
+                :to="{ name: 'monitoring-alerts' }"
+                class="flex items-center justify-center rounded-lg p-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                :class="
+                    hasActiveAlert
+                        ? 'text-error'
+                        : 'text-text-color-secondary hover:text-text-color'
+                "
+            >
+                <svg-icon type="mdi" :path="mdiBellOutline" :size="deviceStore.getREMSize(1.25)" />
             </RouterLink>
         </UiTooltip>
         <div class="flex-1" />
