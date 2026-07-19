@@ -29,9 +29,11 @@ use crate::device::{
     DriverType, Mhz, Status, TempInfo, TempStatus, Watts, UID,
 };
 use crate::repositories::cpu_percent::CpuPercentCollector;
+use crate::repositories::hwmon::chip_name::{self, ChipName};
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo};
 use crate::repositories::hwmon::{devices, power_cap, temps};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
+use crate::sensors_conf::SensorsConf;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -71,6 +73,8 @@ struct CpuFreqs {
 /// A CPU Repository for CPU status
 pub struct CpuRepo {
     config: Rc<Config>,
+    /// The user's lm-sensors labels for the CPU chips, which the hwmon repo leaves to us.
+    sensors_conf: Rc<SensorsConf>,
     devices: HashMap<UID, (DeviceLock, Rc<HwmonDriverInfo>)>,
     cpu_infos: HashMap<PhysicalID, Cell<ProcessorCount>>,
     cpu_model_names: HashMap<PhysicalID, String>,
@@ -81,9 +85,10 @@ pub struct CpuRepo {
 }
 
 impl CpuRepo {
-    pub fn new(config: Rc<Config>) -> Result<Self> {
+    pub fn new(config: Rc<Config>, sensors_conf: Rc<SensorsConf>) -> Result<Self> {
         Ok(Self {
             config,
+            sensors_conf,
             devices: HashMap::new(),
             cpu_infos: HashMap::new(),
             cpu_model_names: HashMap::new(),
@@ -92,6 +97,22 @@ impl CpuRepo {
             energy_counters: HashMap::new(),
             poll_rate: 0.,
         })
+    }
+
+    /// The temp label to show for a CPU sensor.
+    ///
+    /// A label from the user's lm-sensors configuration is used exactly as written, without the
+    /// title-casing or the `CPU Temp` prefix we add to driver labels: the user already said what
+    /// they want this sensor called, and it is shown under the CPU device either way.
+    fn resolve_temp_label(&self, chip: Option<&ChipName>, channel: &HwmonChannelInfo) -> String {
+        if let Some(label) = chip.and_then(|chip| self.sensors_conf.label(chip, &channel.name)) {
+            return label.to_owned();
+        }
+        let label_base = channel
+            .label
+            .as_ref()
+            .map_or_else(|| channel.name.to_title_case(), |l| l.to_title_case());
+        format!("{CPU_TEMP_NAME} {label_base}")
     }
 
     async fn set_cpu_infos(&mut self, cpuinfo_path: &Path) -> Result<()> {
@@ -796,19 +817,16 @@ impl Repository for CpuRepo {
                 .borrow_mut()
                 .insert(type_index, (channels.clone(), temps.clone()));
             let cpu_name = self.cpu_model_names.get(&physical_id).unwrap().clone();
+            let chip = chip_name::derive(&driver.path).await;
             let temp_infos = driver
                 .channels
                 .iter()
                 .filter(|channel| channel.hwmon_type == HwmonChannelType::Temp)
                 .map(|channel| {
-                    let label_base = channel
-                        .label
-                        .as_ref()
-                        .map_or_else(|| channel.name.to_title_case(), |l| l.to_title_case());
                     (
                         channel.name.clone(),
                         TempInfo {
-                            label: format!("{CPU_TEMP_NAME} {label_base}"),
+                            label: self.resolve_temp_label(chip.as_ref(), channel),
                             number: channel.number,
                         },
                     )
@@ -1054,6 +1072,7 @@ mod tests {
     use crate::cc_fs;
     use crate::config::Config;
     use crate::repositories::cpu_repo::{CpuFreqs, CpuRepo};
+    use crate::sensors_conf::SensorsConf;
     use serial_test::serial;
     use std::rc::Rc;
 
@@ -1084,7 +1103,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1150,7 +1169,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1228,7 +1247,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1293,7 +1312,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1347,7 +1366,7 @@ mod tests {
             let test_cpuinfo = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
             cc_fs::write(&test_cpuinfo, vec![]).await.unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1386,7 +1405,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1416,7 +1435,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count_0 = cpu_repo.cpu_infos.get(&0).unwrap().get();
             let initial_count_1 = cpu_repo.cpu_infos.get(&1).unwrap().get();
@@ -1452,7 +1471,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1482,7 +1501,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1512,7 +1531,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let cpu_repo = CpuRepo::new(test_config).unwrap();
+            let cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
             // Note: set_cpu_infos NOT called
 
             // when:
@@ -1536,7 +1555,7 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1558,5 +1577,73 @@ mod tests {
                 "processor count should remain unchanged when file is empty"
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod label_tests {
+    use crate::config::Config;
+    use crate::repositories::cpu_repo::CpuRepo;
+    use crate::repositories::hwmon::chip_name::{Bus, ChipName};
+    use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
+    use crate::sensors_conf::SensorsConf;
+    use std::rc::Rc;
+
+    fn k10temp() -> ChipName {
+        ChipName {
+            prefix: "k10temp".to_owned(),
+            bus: Bus::Pci { addr: 0x00c3 },
+        }
+    }
+
+    fn repo_with(conf: SensorsConf) -> CpuRepo {
+        let config = Rc::new(Config::init_default_config().unwrap());
+        CpuRepo::new(config, Rc::new(conf)).unwrap()
+    }
+
+    fn temp_channel(label: Option<&str>) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Temp,
+            number: 1,
+            name: "temp1".to_owned(),
+            label: label.map(ToOwned::to_owned),
+            ..Default::default()
+        }
+    }
+
+    /// Goal: a configured label must replace the whole displayed name, prefix included. We add
+    /// "CPU Temp" to driver labels to say what they are, which is not our business to do to a
+    /// name the user chose.
+    #[test]
+    fn a_configured_label_replaces_the_prefixed_name() {
+        let repo = repo_with(SensorsConf::from_config_text(
+            "chip \"k10temp-*\"\n label temp1 \"Package\"\n",
+        ));
+
+        assert_eq!(
+            repo.resolve_temp_label(Some(&k10temp()), &temp_channel(Some("Tctl"))),
+            "Package"
+        );
+    }
+
+    /// Goal: without a statement, CPU temps keep the prefixed and title-cased name they have had
+    /// all along. Method: an empty configuration, an unidentified chip, and a temp with no
+    /// driver label at all.
+    #[test]
+    fn without_a_statement_the_prefixed_name_stands() {
+        let repo = repo_with(SensorsConf::default());
+
+        assert_eq!(
+            repo.resolve_temp_label(Some(&k10temp()), &temp_channel(Some("Tctl"))),
+            "CPU Temp Tctl"
+        );
+        assert_eq!(
+            repo.resolve_temp_label(None, &temp_channel(Some("Tctl"))),
+            "CPU Temp Tctl"
+        );
+        assert_eq!(
+            repo.resolve_temp_label(Some(&k10temp()), &temp_channel(None)),
+            "CPU Temp Temp1"
+        );
     }
 }

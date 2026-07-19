@@ -69,6 +69,7 @@ mod overrides;
 mod paths;
 mod repositories;
 mod rt;
+mod sensors_conf;
 mod setting;
 mod sidecar;
 mod sleep_listener;
@@ -324,12 +325,14 @@ fn main() -> Result<()> {
         rt::log_active_backend();
 
         let overrides_controller = Rc::new(overrides::OverridesController::init().await);
+        let sensors_conf = Rc::new(load_sensors_conf(&config).await);
         let (repos, custom_sensors_repo, plugin_controller, api_up_token, lc_repo) =
             initialize_device_repos(
                 &config,
                 &cmd_args,
                 run_token.clone(),
                 Rc::clone(&overrides_controller),
+                sensors_conf,
             )
             .await?;
         let all_devices = create_devices_map(&repos).await;
@@ -746,6 +749,7 @@ async fn initialize_device_repos(
     cmd_args: &Args,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
+    sensors_conf: Rc<sensors_conf::SensorsConf>,
 ) -> Result<(
     Repos,
     Rc<CustomSensorsRepo>,
@@ -775,7 +779,7 @@ async fn initialize_device_repos(
     // init these concurrently:
     moro_local::async_scope!(|init_scope| {
         init_scope.spawn(async {
-            match init_cpu_repo(config.clone()).await {
+            match init_cpu_repo(config.clone(), Rc::clone(&sensors_conf)).await {
                 Ok(repo) => repos.cpu = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing CPU Repo: {err}"),
             }
@@ -787,7 +791,14 @@ async fn initialize_device_repos(
             }
         });
         init_scope.spawn(async {
-            match init_hwmon_repo(config.clone(), lc_locations, Rc::clone(&overrides)).await {
+            match init_hwmon_repo(
+                config.clone(),
+                lc_locations,
+                Rc::clone(&overrides),
+                Rc::clone(&sensors_conf),
+            )
+            .await
+            {
                 Ok(repo) => repos.hwmon = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing HWMON Repo: {err}"),
             }
@@ -849,8 +860,24 @@ async fn init_liquidctl_repo(
     Ok((lc_repo, lc_locations))
 }
 
-async fn init_cpu_repo(config: Rc<Config>) -> Result<CpuRepo> {
-    let mut cpu_repo = CpuRepo::new(config)?;
+/// Reads the lm-sensors configuration, unless the user has turned that support off, in which case
+/// the files are never touched.
+async fn load_sensors_conf(config: &Rc<Config>) -> sensors_conf::SensorsConf {
+    let enabled = config
+        .get_settings()
+        .map_or(true, |settings| settings.sensors_conf_enabled);
+    if enabled.not() {
+        info!("lm-sensors configuration support is disabled");
+        return sensors_conf::SensorsConf::default();
+    }
+    sensors_conf::SensorsConf::load().await
+}
+
+async fn init_cpu_repo(
+    config: Rc<Config>,
+    sensors_conf: Rc<sensors_conf::SensorsConf>,
+) -> Result<CpuRepo> {
+    let mut cpu_repo = CpuRepo::new(config, sensors_conf)?;
     cpu_repo.initialize_devices().await?;
     Ok(cpu_repo)
 }
@@ -865,8 +892,9 @@ async fn init_hwmon_repo(
     config: Rc<Config>,
     lc_locations: Vec<String>,
     overrides: Rc<overrides::OverridesController>,
+    sensors_conf: Rc<sensors_conf::SensorsConf>,
 ) -> Result<HwmonRepo> {
-    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides);
+    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides, sensors_conf);
     hwmon_repo.initialize_devices().await?;
     Ok(hwmon_repo)
 }

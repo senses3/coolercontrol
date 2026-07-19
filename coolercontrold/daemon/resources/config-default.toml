@@ -149,6 +149,12 @@ drivetemp_suspend = false
 # modules at startup. This helps ensure all hwmon chips are available. (x86_64 only)
 # sensors_auto_detect = true
 
+# Whether to apply the "label" and "ignore" statements from the lm-sensors configuration files
+# (/etc/sensors3.conf, /etc/sensors.conf and /etc/sensors.d/). Labels set there replace the ones
+# the kernel driver reports, and ignored sensors are hidden. Names set in CoolerControl itself
+# always win. The files are read once at startup and are never written to.
+# sensors_conf_enabled = true
+
 # Whether to listen for kernel device add/remove events (e.g. USB hotplug) at startup.
 # When enabled, the daemon watches for hardware changes and notifies connected clients.
 # Disable this in containers or environments without netlink socket access.

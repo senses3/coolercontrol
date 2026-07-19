@@ -300,6 +300,8 @@ pub struct CoolerControlSettings {
     pub sensors_auto_detect: bool,
     /// Whether to listen for kernel device add/remove events at startup
     pub device_listener_enabled: bool,
+    /// Whether to apply the `label` and `ignore` statements from the lm-sensors configuration
+    pub sensors_conf_enabled: bool,
 }
 
 /// Device Specific settings that generally apply to how the application deals with the device.

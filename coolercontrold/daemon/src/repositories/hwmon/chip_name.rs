@@ -51,6 +51,45 @@ pub struct ChipName {
     pub bus: Bus,
 }
 
+/// The bus types libsensors knows, as named in a `chip` statement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BusType {
+    Isa,
+    Pci,
+    I2c,
+    Spi,
+    Virtual,
+    Acpi,
+    Hid,
+    Mdio,
+    Scsi,
+    Sdio,
+}
+
+impl BusType {
+    /// Parses the bus element of a chip pattern, as `sensors_parse_chip_name` does.
+    pub fn from_config_token(token: &str) -> Option<Self> {
+        match token {
+            "isa" => Some(Self::Isa),
+            "pci" => Some(Self::Pci),
+            "i2c" => Some(Self::I2c),
+            "spi" => Some(Self::Spi),
+            "virtual" => Some(Self::Virtual),
+            "acpi" => Some(Self::Acpi),
+            "hid" => Some(Self::Hid),
+            "mdio" => Some(Self::Mdio),
+            "scsi" => Some(Self::Scsi),
+            "sdio" => Some(Self::Sdio),
+            _ => None,
+        }
+    }
+
+    /// Whether this bus type carries a bus number element in a chip pattern.
+    pub fn has_bus_nr(self) -> bool {
+        matches!(self, Self::I2c | Self::Spi | Self::Hid | Self::Scsi)
+    }
+}
+
 /// Bus type and address, carrying only the fields that bus type prints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Bus {
@@ -64,6 +103,50 @@ pub enum Bus {
     Mdio { addr: u32 },
     Scsi { nr: i16, addr: u32 },
     Sdio { nr: i16, addr: u32 },
+}
+
+impl Bus {
+    pub fn bus_type(self) -> BusType {
+        match self {
+            Self::Isa { .. } => BusType::Isa,
+            Self::Pci { .. } => BusType::Pci,
+            Self::I2c { .. } => BusType::I2c,
+            Self::Spi { .. } => BusType::Spi,
+            Self::Virtual => BusType::Virtual,
+            Self::Acpi => BusType::Acpi,
+            Self::Hid { .. } => BusType::Hid,
+            Self::Mdio { .. } => BusType::Mdio,
+            Self::Scsi { .. } => BusType::Scsi,
+            Self::Sdio { .. } => BusType::Sdio,
+        }
+    }
+
+    /// Zero for the bus types that carry no bus number, matching what libsensors stores.
+    pub fn nr(self) -> i16 {
+        match self {
+            Self::I2c { nr, .. }
+            | Self::Spi { nr, .. }
+            | Self::Hid { nr, .. }
+            | Self::Scsi { nr, .. }
+            | Self::Sdio { nr, .. } => nr,
+            _ => 0,
+        }
+    }
+
+    /// Zero for virtual and acpi devices, which libsensors assumes are unique.
+    pub fn addr(self) -> u32 {
+        match self {
+            Self::Isa { addr }
+            | Self::Pci { addr }
+            | Self::I2c { addr, .. }
+            | Self::Spi { addr, .. }
+            | Self::Hid { addr, .. }
+            | Self::Mdio { addr }
+            | Self::Scsi { addr, .. }
+            | Self::Sdio { addr, .. } => addr,
+            Self::Virtual | Self::Acpi => 0,
+        }
+    }
 }
 
 impl fmt::Display for ChipName {
