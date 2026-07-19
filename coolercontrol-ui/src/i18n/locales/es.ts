@@ -347,6 +347,7 @@ export default {
             hideDuplicateDevices: 'Ocultar dispositivos duplicados',
             drivePowerState: 'Estado de energía del disco',
             sensorsAutoDetect: 'Detección automática de sensores',
+            sensorsConfig: 'Configuración de lm-sensors',
             deviceListener: 'Listener de cambios de dispositivos',
             customTheme: {
                 title: 'Tema Personalizado',
@@ -401,6 +402,8 @@ export default {
                     'Los SSD y los HDD en particular pueden detenerse y entrar en un estado de bajo consumo.\nEsta opción, cuando está habilitada y la unidad lo soporta, informará las temperaturas de la unidad\ncomo 0°C cuando esté detenida para que los perfiles del ventilador puedan ajustarse en consecuencia.',
                 sensorsAutoDetect:
                     'Detectar automáticamente sensores de hardware Super-I/O y cargar\nmódulos del kernel al iniciar. (solo x86_64)',
+                sensorsConfig:
+                    'Usar los nombres de sensores y los sensores ocultos de los archivos\nde configuración de lm-sensors (/etc/sensors3.conf y /etc/sensors.d).\nLos nombres definidos en CoolerControl siempre tienen prioridad.',
                 deviceListener:
                     'Escuchar eventos de adición/eliminación de dispositivos (ej. conexión USB)\ny notificar cuando se detecten cambios de hardware.',
                 daemonAddress:

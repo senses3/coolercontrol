@@ -347,6 +347,7 @@ export default {
             hideDuplicateDevices: 'Doppelte Geräte ausblenden',
             drivePowerState: 'Festplattenstromzustand',
             sensorsAutoDetect: 'Sensoren automatisch erkennen',
+            sensorsConfig: 'lm-sensors-Konfiguration',
             deviceListener: 'Geräteänderungs-Listener',
             customTheme: {
                 title: 'Benutzerdefiniertes Theme',
@@ -402,6 +403,8 @@ export default {
                     'SSDs und HDDs können insbesondere heruntergefahren werden und in einen Energiesparmodus eintreten.\nDiese Option, wenn sie aktiviert ist und das Laufwerk dies unterstützt, wird die Laufwerktemperaturen\nals 0 °C melden, wenn es heruntergefahren ist, damit die Lüfterprofile entsprechend angepasst werden können.',
                 sensorsAutoDetect:
                     'Super-I/O-Hardwaresensoren automatisch erkennen und\nKernelmodule beim Start laden. (nur x86_64)',
+                sensorsConfig:
+                    'Sensornamen und ausgeblendete Sensoren aus den lm-sensors-\nKonfigurationsdateien (/etc/sensors3.conf und /etc/sensors.d) verwenden.\nIn CoolerControl gesetzte Namen haben immer Vorrang.',
                 deviceListener:
                     'Auf Geräte-Hinzufügen/-Entfernen-Ereignisse lauschen (z. B. USB-Hotplug)\nund benachrichtigen, wenn Hardwareänderungen erkannt werden.',
                 daemonAddress:

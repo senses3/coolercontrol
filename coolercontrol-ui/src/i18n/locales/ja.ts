@@ -342,6 +342,7 @@ export default {
             hideDuplicateDevices: '重複するデバイスを非表示',
             drivePowerState: 'ディスクドライブの電源状態',
             sensorsAutoDetect: 'センサー自動検出',
+            sensorsConfig: 'lm-sensors 設定',
             deviceListener: 'デバイス変更リスナー',
             customTheme: {
                 title: 'カスタムテーマ',
@@ -396,6 +397,8 @@ export default {
                     'SSDおよびHDDは特にスピンダウンして低電力状態に入ることがあります。\nこのオプションは有効にされ、ドライブがそれをサポートしている場合、ドライブの温度を\nスピンダウン時に0°Cとして報告し、ファンプロファイルをそれに応じて調整できるようにします。',
                 sensorsAutoDetect:
                     '起動時にSuper-I/Oハードウェアセンサーを自動検出し、\nカーネルモジュールを読み込みます。（x86_64のみ）',
+                sensorsConfig:
+                    'lm-sensors の設定ファイル (/etc/sensors3.conf と /etc/sensors.d) の\nセンサー名と非表示センサーを使用します。\nCoolerControl で設定した名前が常に優先されます。',
                 deviceListener:
                     'デバイスの追加/取り外しイベント（例：USBホットプラグ）を監視し、\nハードウェアの変更が検出された場合に通知します。',
                 daemonAddress:

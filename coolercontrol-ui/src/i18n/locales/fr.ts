@@ -353,6 +353,7 @@ export default {
             hideDuplicateDevices: 'Masquer les appareils en double',
             drivePowerState: "État d'alimentation du disque ",
             sensorsAutoDetect: 'Détection auto des capteurs',
+            sensorsConfig: 'Configuration lm-sensors',
             deviceListener: "Surveillance des changements d'appareils",
             customTheme: {
                 title: 'Thème Personnalisé',
@@ -408,6 +409,8 @@ export default {
                     "Les SSD et les HDD en particulier peuvent s'arrêter et entrer dans un état de faible consommation d'énergie.\nCette option, lorsqu'elle est activée et que le disque la prend en charge, rapportera les températures du disque\ncomme 0°C lorsqu'il est arrêté afin que les profils de ventilateur puissent être ajustés en conséquence.",
                 sensorsAutoDetect:
                     'Détecter automatiquement les capteurs matériels Super-I/O et charger\nles modules noyau au démarrage. (x86_64 uniquement)',
+                sensorsConfig:
+                    'Utiliser les noms de capteurs et les capteurs masqués des fichiers\nde configuration lm-sensors (/etc/sensors3.conf et /etc/sensors.d).\nLes noms définis dans CoolerControl sont toujours prioritaires.',
                 deviceListener:
                     "Surveiller les événements d'ajout/suppression d'appareils (ex. branchement USB)\net notifier lorsque des changements matériels sont détectés.",
                 daemonAddress:

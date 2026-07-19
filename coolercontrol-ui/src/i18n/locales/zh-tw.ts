@@ -337,6 +337,7 @@ export default {
             hideDuplicateDevices: '隱藏重複裝置',
             drivePowerState: '磁碟機電源狀態',
             sensorsAutoDetect: '感測器自動偵測',
+            sensorsConfig: 'lm-sensors 設定',
             deviceListener: '裝置變更監聽器',
             customTheme: {
                 title: '自訂主題',
@@ -386,6 +387,8 @@ export default {
                     'SSD和HDD尤其可以停止旋轉並進入低功耗狀態。 \n當啟用此選項且驅動器支援時，驅動器溫度將報告為0°C\n在停止旋轉時，以便風扇配置檔可以相應調整。',
                 sensorsAutoDetect:
                     '在啟動時自動偵測Super-I/O硬體感測器並載入\n核心模組。（僅限x86_64）',
+                sensorsConfig:
+                    '使用 lm-sensors 設定檔 (/etc/sensors3.conf 與 /etc/sensors.d)\n中的感測器名稱與隱藏的感測器。\nCoolerControl 中設定的名稱一律優先。',
                 deviceListener:
                     '監聽裝置新增/移除事件（例如USB熱插拔）\n並在偵測到硬體變更時發送通知。',
                 daemonAddress:

@@ -341,6 +341,7 @@ export default {
             hideDuplicateDevices: 'Hide Duplicate Devices',
             drivePowerState: 'Drive Power State',
             sensorsAutoDetect: 'Sensors Auto-Detect',
+            sensorsConfig: 'lm-sensors Configuration',
             deviceListener: 'Device Change Listener',
             customTheme: {
                 title: 'Custom Theme',
@@ -395,6 +396,8 @@ export default {
                     'SSDs and HDDs in particular can spin down and enter a low power state.\nThis option, when enabled and the drive supports it, will report drive temperatures\nas 0°C when spun down so that fan Profiles can be adjusted accordingly.',
                 sensorsAutoDetect:
                     'Automatically detect Super-I/O hardware sensors and load\nkernel modules at startup. (x86_64 only)',
+                sensorsConfig:
+                    'Use the sensor names and hidden sensors from the lm-sensors\nconfiguration files (/etc/sensors3.conf and /etc/sensors.d).\nNames set in CoolerControl always take precedence.',
                 deviceListener:
                     'Listen for device add/remove events (e.g. USB hotplug)\nand notify when hardware changes are detected.',
                 daemonAddress:

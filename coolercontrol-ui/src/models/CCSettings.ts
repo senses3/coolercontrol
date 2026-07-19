@@ -35,6 +35,7 @@ export class CoolerControlSettingsDTO {
     drivetemp_suspend: boolean = false
     sensors_auto_detect: boolean = true
     device_listener_enabled: boolean = true
+    sensors_conf_enabled: boolean = true
 }
 
 /**

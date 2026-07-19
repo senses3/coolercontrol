@@ -337,6 +337,7 @@ export default {
             hideDuplicateDevices: '隐藏重复设备',
             drivePowerState: '磁盘驱动器电源状态',
             sensorsAutoDetect: '传感器自动检测',
+            sensorsConfig: 'lm-sensors 配置',
             deviceListener: '设备变更监听器',
             customTheme: {
                 title: '自定义主题',
@@ -386,6 +387,8 @@ export default {
                     'SSD和HDD尤其可以停止旋转并进入低功耗状态。\n当启用此选项且驱动器支持时，驱动器温度将报告为0°C\n在停止旋转时，以便风扇配置文件可以相应调整。',
                 sensorsAutoDetect:
                     '在启动时自动检测Super-I/O硬件传感器并加载\n内核模块。（仅限x86_64）',
+                sensorsConfig:
+                    '使用 lm-sensors 配置文件 (/etc/sensors3.conf 和 /etc/sensors.d)\n中的传感器名称和隐藏的传感器。\nCoolerControl 中设置的名称始终优先。',
                 deviceListener:
                     '监听设备添加/移除事件（例如USB热插拔）\n并在检测到硬件变更时发送通知。',
                 daemonAddress:
