@@ -146,7 +146,7 @@ pub async fn get_device_name(base_path: &Path) -> String {
         info!(
             "Hwmon driver at location: {} has no name set, using default: {}",
             base_path.display(),
-            &hwmon_name
+            hwmon_name
         );
         hwmon_name
     }

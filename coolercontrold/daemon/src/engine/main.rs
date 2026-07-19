@@ -1069,7 +1069,7 @@ impl Engine {
     /// waking from sleep, as the status history is no longer sequential.
     pub fn reinitialize_all_status_histories(&self) -> Result<()> {
         let poll_rate = self.config.get_settings()?.poll_rate;
-        for (_uid, device) in self.all_devices.iter() {
+        for device in self.all_devices.values() {
             let most_recent_status = device.borrow().status_current().unwrap();
             let adjusted_recent_status = Status {
                 // The next snapshot will most likely be after another loop interval:
@@ -1134,7 +1134,7 @@ impl Engine {
         let affected_overlay_profiles = self
             .get_profiles_affected_by(profile_uid, ProfileType::Overlay)
             .await;
-        for (device_uid, _device) in self.all_devices.iter() {
+        for device_uid in self.all_devices.keys() {
             if let Ok(config_settings) = self.config.get_device_settings(device_uid) {
                 for setting in config_settings {
                     let SettingKind::Profile {
@@ -1214,7 +1214,7 @@ impl Engine {
             }
             self.config.update_profile(mix_profile.clone())?;
         }
-        for (device_uid, _device) in self.all_devices.iter() {
+        for device_uid in self.all_devices.keys() {
             if let Ok(config_settings) = self.config.get_device_settings(device_uid) {
                 for setting in config_settings {
                     let SettingKind::Profile {
@@ -1275,7 +1275,7 @@ impl Engine {
                         .any(|p_uid| affected_profiles.iter().any(|p| &p.uid == p_uid))
             })
             .collect::<Vec<_>>();
-        for (device_uid, _device) in self.all_devices.iter() {
+        for device_uid in self.all_devices.keys() {
             if let Ok(config_settings) = self.config.get_device_settings(device_uid) {
                 for setting in config_settings {
                     let SettingKind::Profile {

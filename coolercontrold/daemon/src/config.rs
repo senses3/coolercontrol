@@ -209,13 +209,13 @@ impl Config {
         }
         cc_fs::write_string(&self.path, document_content)
             .await
-            .with_context(|| format!("Saving configuration file: {}", &self.path.display()))
+            .with_context(|| format!("Saving configuration file: {}", self.path.display()))
     }
 
     pub async fn save_ui_config_file(&self, ui_settings: String) -> Result<()> {
         cc_fs::write_string(&self.path_ui, ui_settings)
             .await
-            .with_context(|| format!("Saving UI configuration file: {}", &self.path_ui.display()))
+            .with_context(|| format!("Saving UI configuration file: {}", self.path_ui.display()))
     }
 
     pub async fn load_ui_config_file(&self) -> Result<String> {
