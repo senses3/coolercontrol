@@ -34,7 +34,7 @@ use crate::repositories::hwmon::chip_name::{self, ChipName};
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo};
 use crate::repositories::hwmon::{devices, power_cap, temps};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
-use crate::setting::{LcdSettings, LightingSettings, TempSource};
+use crate::setting::{CCDeviceSettings, LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use heck::ToTitleCase;
@@ -113,6 +113,46 @@ impl CpuRepo {
             .as_ref()
             .map_or_else(|| channel.name.to_title_case(), |l| l.to_title_case());
         format!("{CPU_TEMP_NAME} {label_base}")
+    }
+
+    /// Drops every channel the user hides: those disabled in `CoolerControl`, and those the
+    /// lm-sensors configuration ignores.
+    async fn retain_visible_channels(
+        &self,
+        channels: Vec<HwmonChannelInfo>,
+        cc_device_setting: Option<&CCDeviceSettings>,
+        path: &Path,
+    ) -> Vec<HwmonChannelInfo> {
+        let disabled_channels =
+            cc_device_setting.map_or_else(Vec::new, CCDeviceSettings::get_disabled_channels);
+        let mut channels = channels
+            .into_iter()
+            .filter(|channel| disabled_channels.contains(&channel.name).not())
+            .collect::<Vec<HwmonChannelInfo>>();
+        let chip = chip_name::derive(path).await;
+        self.drop_ignored_channels(chip.as_ref(), &mut channels);
+        channels
+    }
+
+    /// Drops the CPU channels the user's lm-sensors configuration ignores. Relabelling and hiding
+    /// `coretemp` sensors are both common things to do in that file, so the CPU repository
+    /// honours it exactly as the hwmon one does.
+    fn drop_ignored_channels(&self, chip: Option<&ChipName>, channels: &mut Vec<HwmonChannelInfo>) {
+        channels.retain(|channel| {
+            let Some(source) = self
+                .overrides
+                .sensors_conf_ignore_source(chip, &channel.name)
+            else {
+                return true;
+            };
+            let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+            info!(
+                "Hiding CPU channel {} of {chip_name}: ignored by {}",
+                channel.name,
+                source.display()
+            );
+            false
+        });
     }
 
     async fn set_cpu_infos(&mut self, cpuinfo_path: &Path) -> Result<()> {
@@ -700,8 +740,6 @@ impl CpuRepo {
                     info!("Skipping disabled device: {cpu_name} with UID: {device_uid}");
                     continue;
                 }
-                let disabled_channels = cc_device_setting
-                    .map_or_else(Vec::new, |setting| setting.get_disabled_channels());
                 match self.init_cpu_load(physical_id).await {
                     Ok(load) => channels.push(load),
                     Err(err) => {
@@ -729,10 +767,9 @@ impl CpuRepo {
                         debug!("Error finding power cap paths: {err}");
                     }
                 }
-                let channels = channels
-                    .into_iter()
-                    .filter(|channel| disabled_channels.contains(&channel.name).not())
-                    .collect::<Vec<HwmonChannelInfo>>();
+                let channels = self
+                    .retain_visible_channels(channels, cc_device_setting.as_ref(), path)
+                    .await;
                 let pci_device_names = devices::get_device_pci_names(path).await;
                 let model = devices::get_device_model_name(path).await.or_else(|| {
                     pci_device_names.and_then(|names| names.subdevice_name.or(names.device_name))
@@ -1592,7 +1629,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod label_tests {
+mod sensors_conf_tests {
     use crate::config::Config;
     use crate::overrides::OverridesController;
     use crate::repositories::cpu_repo::CpuRepo;
@@ -1612,6 +1649,15 @@ mod label_tests {
         let config = Rc::new(Config::init_default_config().unwrap());
         let overrides = OverridesController::empty().with_sensors_conf(Rc::new(conf));
         CpuRepo::new(config, Rc::new(overrides)).unwrap()
+    }
+
+    fn temp_channel_named(name: &str) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Temp,
+            number: 1,
+            name: name.to_owned(),
+            ..Default::default()
+        }
     }
 
     fn temp_channel(label: Option<&str>) -> HwmonChannelInfo {
@@ -1658,5 +1704,25 @@ mod label_tests {
             repo.resolve_temp_label(Some(&k10temp()), &temp_channel(None)),
             "CPU Temp Temp1"
         );
+    }
+
+    /// Goal: hiding a CPU sensor from the lm-sensors configuration must work the same as hiding
+    /// any other, since `ignore` on `coretemp` is a common thing to write. Method: two ignored
+    /// temps and one that nothing names.
+    #[test]
+    fn ignored_cpu_channels_are_dropped() {
+        let repo = repo_with(SensorsConf::from_config_text(
+            "chip \"k10temp-*\"\n ignore temp1\n ignore temp2\n",
+        ));
+        let mut channels = vec![
+            temp_channel_named("temp1"),
+            temp_channel_named("temp2"),
+            temp_channel_named("temp3"),
+        ];
+
+        repo.drop_ignored_channels(Some(&k10temp()), &mut channels);
+
+        let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["temp3"]);
     }
 }

@@ -32,6 +32,7 @@ use log::{info, warn};
 use std::fmt::Write as _;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 /// Where lm-sensors looks for its configuration.
 const DEFAULT_ETC_DIR: &str = "/etc";
@@ -55,8 +56,10 @@ pub struct SensorsConf {
 }
 
 /// One `chip` statement and the statements that follow it, up to the next `chip`.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct ChipBlock {
+    /// The file the block came from, named when we report acting on it.
+    source: Rc<Path>,
     /// The chip patterns the block applies to. A block matches if any of them does. Empty when
     /// the `chip` statement itself was malformed, which makes the block inert.
     patterns: Vec<ChipPattern>,
@@ -117,13 +120,19 @@ impl SensorsConf {
         })
     }
 
-    /// Whether any matching block hides this feature. Order does not matter here: there is no
-    /// statement that un-ignores a feature.
-    // Wired up by the ignore layer, which lands separately from the label layer.
-    #[allow(dead_code)]
-    pub fn is_ignored(&self, chip: &ChipName, feature: &str) -> bool {
-        self.matching_blocks(chip)
-            .any(|block| block.ignores.iter().any(|name| name == feature))
+    /// The configuration file that hides this feature, if any of them does.
+    ///
+    /// Order does not matter here, unlike for labels: no statement un-ignores a feature, so the
+    /// first match found is as good as any. The file is reported so that a user with a directory
+    /// full of them can find the statement.
+    pub fn ignore_source(&self, chip: &ChipName, feature: &str) -> Option<&Path> {
+        self.matching_blocks(chip).find_map(|block| {
+            block
+                .ignores
+                .iter()
+                .any(|name| name == feature)
+                .then(|| block.source.as_ref())
+        })
     }
 
     /// Blocks that apply to this chip, last parsed first.
@@ -249,13 +258,21 @@ async fn read_config_file(path: &Path) -> Option<String> {
 /// Turns one configuration file into its chip blocks. Statements we cannot make sense of are
 /// reported and dropped, as the grammar's own error production does.
 fn parse(contents: &str, path: &Path) -> Vec<ChipBlock> {
+    let source: Rc<Path> = Rc::from(path);
     let mut blocks: Vec<ChipBlock> = Vec::new();
     let mut lexer = Lexer::new(contents);
     let mut statement = Vec::new();
     loop {
         let line = lexer.line;
         let end_of_input = lexer.read_statement(&mut statement);
-        apply_statement(&statement, &mut blocks, &Location { path, line });
+        apply_statement(
+            &statement,
+            &mut blocks,
+            &Location {
+                source: &source,
+                line,
+            },
+        );
         if end_of_input {
             return blocks;
         }
@@ -264,7 +281,7 @@ fn parse(contents: &str, path: &Path) -> Vec<ChipBlock> {
 
 /// Where a statement came from, for the log lines about it.
 struct Location<'a> {
-    path: &'a Path,
+    source: &'a Rc<Path>,
     line: u32,
 }
 
@@ -272,7 +289,7 @@ impl Location<'_> {
     fn warn(&self, message: &str) {
         warn!(
             "Ignoring lm-sensors configuration statement at {}:{}: {message}",
-            self.path.display(),
+            self.source.display(),
             self.line
         );
     }
@@ -315,8 +332,10 @@ fn parse_chip_statement(arguments: &[Token], location: &Location) -> ChipBlock {
         location.warn("chip statement names no chips");
     }
     ChipBlock {
+        source: Rc::clone(location.source),
         patterns,
-        ..ChipBlock::default()
+        labels: Vec::new(),
+        ignores: Vec::new(),
     }
 }
 
@@ -645,9 +664,9 @@ mod tests {
         // It cannot do so from inside a string, though: that is an unterminated string.
         assert_eq!(conf.label(&nct6687(), "temp3"), None);
         assert_eq!(conf.label(&nct6687(), "temp9"), None);
-        assert!(conf.is_ignored(&nct6687(), "temp5"));
-        assert!(conf.is_ignored(&nct6687(), "fan7"));
-        assert!(conf.is_ignored(&nct6687(), "temp1").not());
+        assert!(conf.ignore_source(&nct6687(), "temp5").is_some());
+        assert!(conf.ignore_source(&nct6687(), "fan7").is_some());
+        assert!(conf.ignore_source(&nct6687(), "temp1").is_some().not());
         // The second pattern of the same statement matches too.
         let it8686 = chip("it8686", Bus::Isa { addr: 0x0a40 });
         assert_eq!(conf.label(&it8686, "temp1"), Some("Water In"));
@@ -825,8 +844,8 @@ mod tests {
         assert_eq!(conf.label(&nct6687(), "temp7"), None);
         // Recovery: the statements after the broken ones still apply.
         assert_eq!(conf.label(&nct6687(), "temp8"), Some("Good Again"));
-        assert!(conf.is_ignored(&nct6687(), "temp9"));
-        assert!(conf.is_ignored(&nct6687(), "temp4").not());
+        assert!(conf.ignore_source(&nct6687(), "temp9").is_some());
+        assert!(conf.ignore_source(&nct6687(), "temp4").is_some().not());
     }
 
     /// Goal: a `chip` statement with an unusable name must not capture the labels that follow it,
@@ -860,10 +879,10 @@ mod tests {
             "#,
         );
 
-        assert!(conf.is_ignored(&nct6687(), "fan1").not());
-        assert!(conf.is_ignored(&nct6687(), "fan1_input").not());
-        assert!(conf.is_ignored(&nct6687(), "temp2").not());
-        assert!(conf.is_ignored(&nct6687(), "fan3"));
+        assert!(conf.ignore_source(&nct6687(), "fan1").is_some().not());
+        assert!(conf.ignore_source(&nct6687(), "fan1_input").is_some().not());
+        assert!(conf.ignore_source(&nct6687(), "temp2").is_some().not());
+        assert!(conf.ignore_source(&nct6687(), "fan3").is_some());
     }
 
     /// Goal: a feature name that merely contains an underscore must still work, or chips with a
@@ -879,8 +898,8 @@ mod tests {
             "#,
         );
 
-        assert!(conf.is_ignored(&nct6687(), "cpu0_vid"));
-        assert!(conf.is_ignored(&nct6687(), "beep_enable"));
+        assert!(conf.ignore_source(&nct6687(), "cpu0_vid").is_some());
+        assert!(conf.ignore_source(&nct6687(), "beep_enable").is_some());
     }
 
     /// Goal: the file search order decides which of two conflicting labels a user sees, so it
@@ -900,7 +919,8 @@ mod tests {
             );
             fixture.write(
                 "sensors.d/50-first",
-                "chip \"nct6687-*\"\n label temp1 \"Fifty\"\n label temp2 \"Only Fifty\"\n",
+                "chip \"nct6687-*\"\n label temp1 \"Fifty\"\n label temp2 \"Only Fifty\"\n \
+                 ignore fan4\n",
             );
             fixture.write(
                 "sensors.d/99-last.conf",
@@ -918,6 +938,13 @@ mod tests {
             // Extensionless files in the directory count, and hidden ones do not.
             assert_eq!(conf.label(&nct6687(), "temp2"), Some("Only Fifty"));
             assert_eq!(conf.files_read, 3);
+            // An ignore names the file it came from, which is the point of reporting one.
+            assert_eq!(
+                conf.ignore_source(&nct6687(), "fan4")
+                    .and_then(|path| path.file_name())
+                    .and_then(|name| name.to_str()),
+                Some("50-first")
+            );
         });
     }
 
@@ -950,7 +977,7 @@ mod tests {
             assert!(conf.chip_blocks.is_empty());
             assert_eq!(conf.files_read, 0);
             assert_eq!(conf.label(&nct6687(), "temp1"), None);
-            assert!(conf.is_ignored(&nct6687(), "temp1").not());
+            assert!(conf.ignore_source(&nct6687(), "temp1").is_some().not());
 
             fs::create_dir_all(fixture.root.path().join("sensors.d/a-directory")).unwrap();
             let conf = fixture.load().await;

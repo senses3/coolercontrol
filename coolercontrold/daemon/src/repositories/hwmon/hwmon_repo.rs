@@ -92,7 +92,7 @@ use crate::repositories::utils::apply_device_command_delay;
 use crate::rt;
 #[cfg(test)]
 use crate::rt::sleep;
-use crate::setting::{LcdSettings, LightingSettings, TempSource};
+use crate::setting::{CCDeviceSettings, LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use bitflags::bitflags;
@@ -1239,6 +1239,33 @@ fn order_entries_by_starvation(
     entries.sort_by_key(|(name, _)| last_processed.get(name.as_str()).copied().unwrap_or(0));
 }
 
+/// Drops the channels the user's lm-sensors configuration ignores, and reports how many went.
+///
+/// An `ignore` statement is final: it is the user's own file saying to hide the sensor, so we
+/// respect it rather than offering a way around it. Each dropped channel is logged with the chip
+/// and the file that hid it, which is the file to edit to get it back.
+fn drop_ignored_channels(
+    overrides: &OverridesController,
+    chip: Option<&ChipName>,
+    channels: &mut Vec<HwmonChannelInfo>,
+) -> usize {
+    let count_before = channels.len();
+    channels.retain(|channel| {
+        let Some(source) = overrides.sensors_conf_ignore_source(chip, &channel.name) else {
+            return true;
+        };
+        // `chip` is Some here: without it there is no configuration to match against.
+        let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+        info!(
+            "Hiding channel {} of {chip_name}: ignored by {}",
+            channel.name,
+            source.display()
+        );
+        false
+    });
+    count_before - channels.len()
+}
+
 /// The temp label to show: a label the user wrote in their lm-sensors configuration is used
 /// verbatim, the same as one of our own overrides. Only detected labels are title-cased, since
 /// they come from the driver and are not written for display.
@@ -1512,6 +1539,8 @@ impl Repository for HwmonRepo {
         }
         debug!("Detected HWMon device paths: {base_paths:?}");
         let mut hwmon_drivers: Vec<HwmonDriverInfo> = Vec::new();
+        // The libsensors chip identity per device, used for the labels and the summary log.
+        let mut chip_names = HashMap::with_capacity(base_paths.len());
         let settings = self.config.get_settings()?;
         // Guards against two devices resolving to the same UID (e.g. serial-less duplicates that
         // both hash blank). base_paths is path-sorted, so the assignment is stable across boots.
@@ -1551,8 +1580,12 @@ impl Repository for HwmonRepo {
                 info!("Skipping disabled device: {device_name} with UID: {device_uid}");
                 continue;
             }
-            let disabled_channels =
-                cc_device_setting.map_or_else(Vec::new, |setting| setting.get_disabled_channels());
+            let disabled_channels = cc_device_setting
+                .as_ref()
+                .map_or_else(Vec::new, CCDeviceSettings::get_disabled_channels);
+            // The chip identity the lm-sensors configuration names, needed here to apply its
+            // `ignore` statements, and reused below for the labels and the summary log.
+            let chip = chip_name::derive(&path).await;
             let mut channels = vec![];
             if DEVICE_NAMES_APPLE.contains(&device_name.as_str()) {
                 AppleMacSMC::init_fans(&path, &mut channels, &disabled_channels).await;
@@ -1584,12 +1617,24 @@ impl Repository for HwmonRepo {
                 ),
                 Err(err) => error!("Error initializing Hwmon Power: {err}"),
             }
+            let ignored_count =
+                drop_ignored_channels(&self.overrides, chip.as_ref(), &mut channels);
             if channels.is_empty() {
-                debug!(
-                    "No fans, temps, or power detected under {}, skipping.",
-                    path.display()
-                );
+                if ignored_count > 0 {
+                    info!(
+                        "Skipping {device_name}: the lm-sensors configuration ignores every one \
+                         of its {ignored_count} channel(s)"
+                    );
+                } else {
+                    debug!(
+                        "No fans, temps, or power detected under {}, skipping.",
+                        path.display()
+                    );
+                }
                 continue;
+            }
+            if let Some(chip) = chip {
+                chip_names.insert(path.clone(), chip);
             }
             let drivetemp = if device_name == DRIVETEMP && settings.drivetemp_suspend {
                 let block_dev_path = drivetemp::get_verified_block_device_path(&path)
@@ -1627,14 +1672,6 @@ impl Repository for HwmonRepo {
         // re-sorted by name to help keep some semblance of order after reboots & device changes.
         hwmon_drivers.sort_by(|d1, d2| d1.name.cmp(&d2.name));
 
-        // The libsensors chip identity, which both the label layer and the summary log below
-        // need. Derived from sysfs, so the in-memory renaming above does not affect it.
-        let mut chip_names = HashMap::with_capacity(hwmon_drivers.len());
-        for driver in &hwmon_drivers {
-            if let Some(chip_name) = chip_name::derive(&driver.path).await {
-                chip_names.insert(driver.path.clone(), chip_name);
-            }
-        }
         self.map_into_our_device_model(hwmon_drivers, &chip_names, INIT_EXTRACT_TIMEOUT)
             .await?;
         self.load_device_delays();
@@ -5446,7 +5483,7 @@ mod init_timeout_tests {
 }
 
 #[cfg(test)]
-mod label_tests {
+mod sensors_conf_tests {
     use super::*;
     use crate::repositories::hwmon::chip_name::Bus;
     use crate::sensors_conf::SensorsConf;
@@ -5583,5 +5620,64 @@ mod label_tests {
             resolve_channel_label(&overrides, Some(&nct6687()), &fan),
             Some("Chassis".to_owned())
         );
+    }
+
+    fn fan_channel(name: &str) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 1,
+            name: name.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    /// Goal: an `ignore` statement must remove exactly the channel it names, and say how many it
+    /// removed so the caller can tell an emptied device from one that never had channels.
+    #[test]
+    fn an_ignored_channel_is_dropped() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n ignore fan2\n ignore temp5\n",
+        ));
+        let mut channels = vec![
+            fan_channel("fan1"),
+            fan_channel("fan2"),
+            temp_channel("temp5", None),
+        ];
+
+        let dropped = drop_ignored_channels(&overrides, Some(&nct6687()), &mut channels);
+
+        assert_eq!(dropped, 2);
+        let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["fan1"]);
+    }
+
+    /// Goal: nothing is dropped when there is nothing to match against, which is the case for
+    /// every machine without an lm-sensors configuration and for chips we could not identify.
+    #[test]
+    fn nothing_is_dropped_without_a_match() {
+        let mut channels = vec![fan_channel("fan2")];
+        let empty = overrides_with(SensorsConf::default());
+        assert_eq!(
+            drop_ignored_channels(&empty, Some(&nct6687()), &mut channels),
+            0
+        );
+
+        let ignoring = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n ignore fan2\n",
+        ));
+        // An unidentified chip matches no statement, so the channel survives.
+        assert_eq!(drop_ignored_channels(&ignoring, None, &mut channels), 0);
+        assert_eq!(channels.len(), 1);
+
+        // So does one whose chip the statement does not name.
+        let other_chip = ChipName {
+            prefix: "it8686".to_owned(),
+            bus: Bus::Isa { addr: 0x0a40 },
+        };
+        assert_eq!(
+            drop_ignored_channels(&ignoring, Some(&other_chip), &mut channels),
+            0
+        );
+        assert_eq!(channels.len(), 1);
     }
 }

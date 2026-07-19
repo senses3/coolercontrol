@@ -174,6 +174,18 @@ impl OverridesController {
         self.sensors_conf.label(chip?, channel_name)
     }
 
+    /// The lm-sensors configuration file that hides a channel, if one does.
+    ///
+    /// Hiding is not a name, but it comes from the same file and follows the same rule that our
+    /// own settings win, so it is answered here too.
+    pub fn sensors_conf_ignore_source(
+        &self,
+        chip: Option<&ChipName>,
+        channel_name: &str,
+    ) -> Option<&Path> {
+        self.sensors_conf.ignore_source(chip?, channel_name)
+    }
+
     /// The user-set device name override, if any.
     pub fn device_name_override(&self, device_uid: &DeviceUID) -> Option<DeviceName> {
         self.document
