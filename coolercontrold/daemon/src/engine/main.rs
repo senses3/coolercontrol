@@ -1656,8 +1656,6 @@ impl Engine {
         }
         let cancellation = self.diagnosis_registry.register(key.clone());
         let settings = DiagnosisSettings::default();
-        let device_uid_for_event = key.0.clone();
-        let channel_name_for_event = key.1.clone();
         info!(
             "Calibration started for {}",
             self.log_device_channel(&key.0, &key.1)
@@ -1694,7 +1692,20 @@ impl Engine {
                 outcome = Err(DiagnosisFailure::PersistFailed(err.to_string()));
             }
         }
-        let status = match &outcome {
+        let status = self.log_calibration_outcome(&key, &outcome);
+        self.broadcast_calibration_outcome(&key, &outcome);
+        self.store_calibration_status(key, status);
+        outcome
+    }
+
+    /// Logs a terminal diagnosis outcome and renders it as the status event.
+    fn log_calibration_outcome(
+        &self,
+        key: &ChannelKey,
+        outcome: &std::result::Result<Calibration, DiagnosisFailure>,
+    ) -> CalibrationStatus {
+        let (device_uid, channel_name) = (key.0.clone(), key.1.clone());
+        match outcome {
             Ok(calibration) => {
                 let warning_detail = if calibration.warnings.is_empty() {
                     String::new()
@@ -1717,11 +1728,7 @@ impl Engine {
                     calibration.warnings.len(),
                     warning_detail
                 );
-                CalibrationStatus::from_completion(
-                    device_uid_for_event,
-                    channel_name_for_event,
-                    calibration.clone(),
-                )
+                CalibrationStatus::from_completion(device_uid, channel_name, calibration.clone())
             }
             Err(DiagnosisFailure::Cancelled) => {
                 info!(
@@ -1729,8 +1736,8 @@ impl Engine {
                     self.log_device_channel(&key.0, &key.1)
                 );
                 CalibrationStatus::from_failure(
-                    device_uid_for_event,
-                    channel_name_for_event,
+                    device_uid,
+                    channel_name,
                     &DiagnosisFailure::Cancelled,
                 )
             }
@@ -1740,16 +1747,9 @@ impl Engine {
                     self.log_device_channel(&key.0, &key.1),
                     describe_failure(failure)
                 );
-                CalibrationStatus::from_failure(
-                    device_uid_for_event,
-                    channel_name_for_event,
-                    failure,
-                )
+                CalibrationStatus::from_failure(device_uid, channel_name, failure)
             }
-        };
-        self.broadcast_calibration_outcome(&key, &outcome);
-        self.store_calibration_status(key, status);
-        outcome
+        }
     }
 
     /// Send a desktop notification describing the terminal outcome of a
