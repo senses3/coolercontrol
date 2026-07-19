@@ -83,7 +83,9 @@ use crate::repositories::failsafe::{self, FailsafeStatusData, MISSING_STATUS_THR
 use crate::repositories::hwmon::apple_mac_smc::AppleMacSMC;
 use crate::repositories::hwmon::devices::{DEVICE_NAMES_APPLE, HWMON_DEVICE_NAME_BLACKLIST};
 use crate::repositories::hwmon::drivetemp::DrivetempState;
-use crate::repositories::hwmon::{auto_curve, devices, drivetemp, fans, power, temps, thinkpad};
+use crate::repositories::hwmon::{
+    auto_curve, chip_name, devices, drivetemp, fans, power, temps, thinkpad,
+};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
 use crate::repositories::utils::apply_device_command_delay;
 use crate::rt;
@@ -1599,11 +1601,17 @@ impl Repository for HwmonRepo {
         self.spawn_writer_tasks();
 
         let mut init_devices = HashMap::new();
+        // The libsensors chip name, so that `sensors` output can be matched up with our devices.
+        // Our UIDs are stable across boots, the hwmon numbering in the paths is not.
+        let mut chip_names = HashMap::with_capacity(self.devices.len());
         for (uid, (device, hwmon_info)) in &self.devices {
             init_devices.insert(uid.clone(), (device.borrow().clone(), hwmon_info.clone()));
+            if let Some(chip_name) = chip_name::derive(&hwmon_info.path).await {
+                chip_names.insert(uid.clone(), chip_name.to_string());
+            }
         }
         if log::max_level() == log::LevelFilter::Debug {
-            info!("Initialized Hwmon Devices: {init_devices:?}");
+            info!("Initialized Hwmon Devices: {init_devices:?}, Chip Names: {chip_names:?}");
         } else {
             let device_map: HashMap<_, _> = init_devices
                 .iter()
@@ -1611,6 +1619,10 @@ impl Repository for HwmonRepo {
                     (
                         d.1 .0.name.clone(),
                         HashMap::from([
+                            (
+                                "chip",
+                                vec![chip_names.get(d.0).cloned().unwrap_or_default()],
+                            ),
                             (
                                 "driver name",
                                 vec![d.1 .0.info.driver_info.name.clone().unwrap_or_default()],
