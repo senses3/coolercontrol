@@ -46,7 +46,6 @@ import {
     StartupPage,
     ThemeMode,
 } from '@/models/UISettings.ts'
-import { CoolerControlDeviceSettingsDTO } from '@/models/CCSettings.ts'
 import { Color } from '@/models/Device.ts'
 import { Emitter, EventType } from 'mitt'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
@@ -252,10 +251,6 @@ const setNewColorTextSecondary = (newHexColor: Color): void => {
     colorStore.reLoadThemeColors()
 }
 
-const blacklistedDevices: Ref<Array<CoolerControlDeviceSettingsDTO>> = ref([])
-for (const deviceSettings of settingsStore.ccBlacklistedDevices.values()) {
-    blacklistedDevices.value.push(deviceSettings)
-}
 const applyGenericDaemonChange = _.debounce(
     () =>
         confirm.require({
