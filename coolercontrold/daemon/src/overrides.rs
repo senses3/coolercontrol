@@ -18,8 +18,20 @@
 
 //! User-defined display-name overrides, stored in `overrides.toml`.
 //!
-//! Resolution is layered (override > detected label > raw name). The file is
-//! hand-editable; edits are read only at startup. Entries are pruned only on
+//! Resolution is layered, highest first:
+//!
+//! 1. these overrides, which the user set in `CoolerControl`
+//! 2. the user's lm-sensors configuration, see [`crate::sensors_conf`]
+//! 3. the label the driver reports
+//! 4. the raw channel name
+//!
+//! This controller owns the top two layers. They are applied at different points and cannot be
+//! collapsed into one call: an override can change while the daemon runs, so it is applied per
+//! request at the DTO boundary, while the lm-sensors layer is fixed at startup and is folded into
+//! the label a repository detects. Baking an override in at detection time would leave a stale
+//! name behind when the user later clears it.
+//!
+//! The overrides file is hand-editable; edits are read only at startup. Entries are pruned only on
 //! deliberate entity deletion, never on hardware absence.
 
 use std::borrow::Cow;
@@ -27,6 +39,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use anyhow::{anyhow, Context, Result};
 use log::{info, warn};
@@ -38,6 +51,8 @@ use crate::api::{is_forbidden_name_char, validate_name_string};
 use crate::cc_fs;
 use crate::device::{ChannelName, DeviceName, DeviceUID};
 use crate::paths;
+use crate::repositories::hwmon::chip_name::ChipName;
+use crate::sensors_conf::SensorsConf;
 
 const BANNER: &str = "\
 # CoolerControl display-name overrides.
@@ -49,9 +64,12 @@ const BANNER: &str = "\
 /// fewer channels, so this only caps accidental or abusive growth of the file.
 const MAX_CHANNEL_OVERRIDES_PER_DEVICE: usize = 512;
 
-/// Owns the overrides document and resolves display names against it.
+/// Owns the overrides document and the lm-sensors layer below it, and resolves display names
+/// against both.
 pub struct OverridesController {
     path: PathBuf,
+    /// The layer under our own overrides. Read-only and fixed at startup.
+    sensors_conf: Rc<SensorsConf>,
     document: RefCell<OverridesDocument>,
     /// Serializes read-modify-write cycles. Multiple actors write (settings
     /// renames, the custom sensor delete cascade) and a cycle spans await
@@ -87,6 +105,7 @@ impl OverridesController {
                 }
                 return Self {
                     path,
+                    sensors_conf: Rc::new(SensorsConf::default()),
                     document: RefCell::new(document),
                     write_lock: tokio::sync::Mutex::new(()),
                 };
@@ -115,9 +134,18 @@ impl OverridesController {
         }
         Self {
             path,
+            sensors_conf: Rc::new(SensorsConf::default()),
             document: RefCell::new(document),
             write_lock: tokio::sync::Mutex::new(()),
         }
+    }
+
+    /// Attaches the lm-sensors layer. Separate from the constructors because those load the
+    /// overrides document, which has nothing to say about lm-sensors.
+    #[must_use]
+    pub fn with_sensors_conf(mut self, sensors_conf: Rc<SensorsConf>) -> Self {
+        self.sensors_conf = sensors_conf;
+        self
     }
 
     /// An empty store not backed by a file, for tests of components that
@@ -126,6 +154,7 @@ impl OverridesController {
     pub fn empty() -> Self {
         Self {
             path: PathBuf::new(),
+            sensors_conf: Rc::new(SensorsConf::default()),
             document: RefCell::new(OverridesDocument::default()),
             write_lock: tokio::sync::Mutex::new(()),
         }
@@ -134,6 +163,15 @@ impl OverridesController {
     /// A copy of the raw, sparse overrides document.
     pub fn document(&self) -> OverridesDocument {
         self.document.borrow().clone()
+    }
+
+    /// The label the user's lm-sensors configuration gives a channel, which is the layer directly
+    /// under our own overrides.
+    ///
+    /// Takes the chip rather than a device UID because lm-sensors names chips, not our devices.
+    /// A device we could not identify a chip for has nothing to match against.
+    pub fn sensors_conf_label(&self, chip: Option<&ChipName>, channel_name: &str) -> Option<&str> {
+        self.sensors_conf.label(chip?, channel_name)
     }
 
     /// The user-set device name override, if any.

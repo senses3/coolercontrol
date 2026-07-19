@@ -324,15 +324,18 @@ fn main() -> Result<()> {
         run_sensors_detection(&config);
         rt::log_active_backend();
 
-        let overrides_controller = Rc::new(overrides::OverridesController::init().await);
         let sensors_conf = Rc::new(load_sensors_conf(&config).await);
+        let overrides_controller = Rc::new(
+            overrides::OverridesController::init()
+                .await
+                .with_sensors_conf(sensors_conf),
+        );
         let (repos, custom_sensors_repo, plugin_controller, api_up_token, lc_repo) =
             initialize_device_repos(
                 &config,
                 &cmd_args,
                 run_token.clone(),
                 Rc::clone(&overrides_controller),
-                sensors_conf,
             )
             .await?;
         let all_devices = create_devices_map(&repos).await;
@@ -749,7 +752,6 @@ async fn initialize_device_repos(
     cmd_args: &Args,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
-    sensors_conf: Rc<sensors_conf::SensorsConf>,
 ) -> Result<(
     Repos,
     Rc<CustomSensorsRepo>,
@@ -779,7 +781,7 @@ async fn initialize_device_repos(
     // init these concurrently:
     moro_local::async_scope!(|init_scope| {
         init_scope.spawn(async {
-            match init_cpu_repo(config.clone(), Rc::clone(&sensors_conf)).await {
+            match init_cpu_repo(config.clone(), Rc::clone(&overrides)).await {
                 Ok(repo) => repos.cpu = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing CPU Repo: {err}"),
             }
@@ -791,14 +793,7 @@ async fn initialize_device_repos(
             }
         });
         init_scope.spawn(async {
-            match init_hwmon_repo(
-                config.clone(),
-                lc_locations,
-                Rc::clone(&overrides),
-                Rc::clone(&sensors_conf),
-            )
-            .await
-            {
+            match init_hwmon_repo(config.clone(), lc_locations, Rc::clone(&overrides)).await {
                 Ok(repo) => repos.hwmon = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing HWMON Repo: {err}"),
             }
@@ -875,9 +870,9 @@ async fn load_sensors_conf(config: &Rc<Config>) -> sensors_conf::SensorsConf {
 
 async fn init_cpu_repo(
     config: Rc<Config>,
-    sensors_conf: Rc<sensors_conf::SensorsConf>,
+    overrides: Rc<overrides::OverridesController>,
 ) -> Result<CpuRepo> {
-    let mut cpu_repo = CpuRepo::new(config, sensors_conf)?;
+    let mut cpu_repo = CpuRepo::new(config, overrides)?;
     cpu_repo.initialize_devices().await?;
     Ok(cpu_repo)
 }
@@ -892,9 +887,8 @@ async fn init_hwmon_repo(
     config: Rc<Config>,
     lc_locations: Vec<String>,
     overrides: Rc<overrides::OverridesController>,
-    sensors_conf: Rc<sensors_conf::SensorsConf>,
 ) -> Result<HwmonRepo> {
-    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides, sensors_conf);
+    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides);
     hwmon_repo.initialize_devices().await?;
     Ok(hwmon_repo)
 }

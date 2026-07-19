@@ -92,7 +92,6 @@ use crate::repositories::utils::apply_device_command_delay;
 use crate::rt;
 #[cfg(test)]
 use crate::rt::sleep;
-use crate::sensors_conf::SensorsConf;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -350,9 +349,8 @@ const _: () = assert!(DUTY_CACHE_VERIFY_INTERVAL.as_secs() > 0);
 
 pub struct HwmonRepo {
     config: Rc<Config>,
+    /// Owns both the user's own name overrides and the lm-sensors labels under them.
     overrides: Rc<OverridesController>,
-    /// The user's lm-sensors labels, which sit under our own overrides but over driver labels.
-    sensors_conf: Rc<SensorsConf>,
     devices: HashMap<DeviceUID, (DeviceLock, Rc<HwmonDriverInfo>)>,
     /// Per-tick channel + temp snapshot. Shared with the writer task
     /// for the write-skip path.
@@ -410,7 +408,6 @@ impl HwmonRepo {
         config: Rc<Config>,
         lc_locations: Vec<String>,
         overrides: Rc<OverridesController>,
-        sensors_conf: Rc<SensorsConf>,
     ) -> Self {
         let poll_rate = config.get_settings().map_or(1.0, |s| s.poll_rate);
         let device_read_permit_timeout = device_read_permit_timeout_for(poll_rate);
@@ -420,7 +417,6 @@ impl HwmonRepo {
         Self {
             config,
             overrides,
-            sensors_conf,
             devices: HashMap::new(),
             preloaded_statuses: Rc::new(RefCell::new(HashMap::new())),
             failsafe_statuses: RefCell::new(HashMap::new()),
@@ -486,7 +482,7 @@ impl HwmonRepo {
     ) -> Result<()> {
         debug_assert!(extract_timeout > Duration::ZERO);
         let poll_rate = self.config.get_settings()?.poll_rate;
-        let sensors_conf = Rc::clone(&self.sensors_conf);
+        let overrides = Rc::clone(&self.overrides);
         for (index, driver) in hwmon_drivers.into_iter().enumerate() {
             let chip = chip_names.get(&driver.path);
             let temps = driver
@@ -497,7 +493,7 @@ impl HwmonRepo {
                     (
                         channel.name.clone(),
                         TempInfo {
-                            label: resolve_temp_label(&sensors_conf, chip, channel),
+                            label: resolve_temp_label(&overrides, chip, channel),
                             number: channel.number,
                         },
                     )
@@ -537,7 +533,7 @@ impl HwmonRepo {
                             }
                         };
                         let channel_info = ChannelInfo {
-                            label: resolve_channel_label(&sensors_conf, chip, channel),
+                            label: resolve_channel_label(&overrides, chip, channel),
                             kind: ChannelKind::Speed(SpeedOptions {
                                 fixed_enabled: channel
                                     .caps
@@ -550,7 +546,7 @@ impl HwmonRepo {
                     }
                     HwmonChannelType::Power => {
                         let channel_info = ChannelInfo {
-                            label: resolve_channel_label(&sensors_conf, chip, channel),
+                            label: resolve_channel_label(&overrides, chip, channel),
                             kind: ChannelKind::InfoOnly,
                         };
                         channels.insert(channel.name.clone(), channel_info);
@@ -1247,11 +1243,11 @@ fn order_entries_by_starvation(
 /// verbatim, the same as one of our own overrides. Only detected labels are title-cased, since
 /// they come from the driver and are not written for display.
 fn resolve_temp_label(
-    sensors_conf: &SensorsConf,
+    overrides: &OverridesController,
     chip: Option<&ChipName>,
     channel: &HwmonChannelInfo,
 ) -> String {
-    if let Some(label) = configured_label(sensors_conf, chip, &channel.name) {
+    if let Some(label) = overrides.sensors_conf_label(chip, &channel.name) {
         return label.to_owned();
     }
     channel
@@ -1263,23 +1259,14 @@ fn resolve_temp_label(
 /// The same for channels that keep the driver's label as it is, where an absent label means the
 /// UI falls back to the channel name.
 fn resolve_channel_label(
-    sensors_conf: &SensorsConf,
+    overrides: &OverridesController,
     chip: Option<&ChipName>,
     channel: &HwmonChannelInfo,
 ) -> Option<String> {
-    configured_label(sensors_conf, chip, &channel.name)
+    overrides
+        .sensors_conf_label(chip, &channel.name)
         .map(ToOwned::to_owned)
         .or_else(|| channel.label.clone())
-}
-
-/// Our channel names are the libsensors feature names (`temp1`, `fan2`), so they look up directly.
-/// A chip we could not identify has no configuration to match against.
-fn configured_label<'a>(
-    sensors_conf: &'a SensorsConf,
-    chip: Option<&ChipName>,
-    channel_name: &str,
-) -> Option<&'a str> {
-    sensors_conf.label(chip?, channel_name)
 }
 
 fn swap_pending_into(mailbox: &WriterMailbox, buffer: &mut HashMap<ChannelName, PendingWrite>) {
@@ -2127,7 +2114,6 @@ mod preload_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         );
         // Per-device-map invariant: one entry per registered
         // type_index across device_permits, preload_in_flight, and
@@ -3064,7 +3050,6 @@ mod command_delay_handoff_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         );
         repo.device_permits
             .insert(TEST_TYPE_INDEX, Rc::new(Semaphore::new(1)));
@@ -3193,7 +3178,6 @@ mod coalescer_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         )
     }
 
@@ -4006,7 +3990,6 @@ mod slow_device_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         )
     }
 
@@ -4857,7 +4840,6 @@ mod prepare_for_sleep_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         )
     }
 
@@ -5056,7 +5038,6 @@ mod shutdown_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         )
     }
 
@@ -5293,7 +5274,6 @@ mod init_timeout_tests {
             config,
             vec![],
             Rc::new(crate::overrides::OverridesController::empty()),
-            Rc::new(SensorsConf::default()),
         )
     }
 
@@ -5469,6 +5449,12 @@ mod init_timeout_tests {
 mod label_tests {
     use super::*;
     use crate::repositories::hwmon::chip_name::Bus;
+    use crate::sensors_conf::SensorsConf;
+
+    /// A controller carrying the given lm-sensors configuration and no overrides of its own.
+    fn overrides_with(conf: SensorsConf) -> OverridesController {
+        OverridesController::empty().with_sensors_conf(Rc::new(conf))
+    }
 
     fn nct6687() -> ChipName {
         ChipName {
@@ -5492,12 +5478,13 @@ mod label_tests {
     /// title-caser that driver labels go through.
     #[test]
     fn a_configured_label_is_used_verbatim() {
-        let conf =
-            SensorsConf::from_config_text("chip \"nct6687-*\"\n label temp1 \"CPU Coolant\"\n");
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label temp1 \"CPU Coolant\"\n",
+        ));
         let channel = temp_channel("temp1", Some("SYSTIN"));
 
         assert_eq!(
-            resolve_temp_label(&conf, Some(&nct6687()), &channel),
+            resolve_temp_label(&overrides, Some(&nct6687()), &channel),
             "CPU Coolant"
         );
     }
@@ -5508,7 +5495,7 @@ mod label_tests {
     #[test]
     fn without_a_matching_statement_the_driver_label_stands() {
         let channel = temp_channel("temp1", Some("SYSTIN"));
-        let empty = SensorsConf::default();
+        let empty = overrides_with(SensorsConf::default());
         assert_eq!(
             resolve_temp_label(&empty, Some(&nct6687()), &channel),
             "Systin"
@@ -5516,15 +5503,17 @@ mod label_tests {
         // An unidentified chip cannot match anything.
         assert_eq!(resolve_temp_label(&empty, None, &channel), "Systin");
 
-        let other_chip =
-            SensorsConf::from_config_text("chip \"it8686-*\"\n label temp1 \"Elsewhere\"\n");
+        let other_chip = overrides_with(SensorsConf::from_config_text(
+            "chip \"it8686-*\"\n label temp1 \"Elsewhere\"\n",
+        ));
         assert_eq!(
             resolve_temp_label(&other_chip, Some(&nct6687()), &channel),
             "Systin"
         );
 
-        let other_feature =
-            SensorsConf::from_config_text("chip \"nct6687-*\"\n label temp2 \"Elsewhere\"\n");
+        let other_feature = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label temp2 \"Elsewhere\"\n",
+        ));
         assert_eq!(
             resolve_temp_label(&other_feature, Some(&nct6687()), &channel),
             "Systin"
@@ -5536,7 +5525,11 @@ mod label_tests {
     fn an_unlabelled_temp_still_falls_back_to_its_name() {
         let channel = temp_channel("temp1", None);
         assert_eq!(
-            resolve_temp_label(&SensorsConf::default(), Some(&nct6687()), &channel),
+            resolve_temp_label(
+                &overrides_with(SensorsConf::default()),
+                Some(&nct6687()),
+                &channel
+            ),
             "Temp1"
         );
     }
@@ -5545,7 +5538,9 @@ mod label_tests {
     /// absent so the UI keeps its own fallback. Method: a fan channel with and without a match.
     #[test]
     fn channel_labels_follow_the_same_rule() {
-        let conf = SensorsConf::from_config_text("chip \"nct6687-*\"\n label fan2 \"Pump\"\n");
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label fan2 \"Pump\"\n",
+        ));
         let fan = HwmonChannelInfo {
             hwmon_type: HwmonChannelType::Fan,
             number: 2,
@@ -5555,11 +5550,15 @@ mod label_tests {
         };
 
         assert_eq!(
-            resolve_channel_label(&conf, Some(&nct6687()), &fan),
+            resolve_channel_label(&overrides, Some(&nct6687()), &fan),
             Some("Pump".to_owned())
         );
         assert_eq!(
-            resolve_channel_label(&SensorsConf::default(), Some(&nct6687()), &fan),
+            resolve_channel_label(
+                &overrides_with(SensorsConf::default()),
+                Some(&nct6687()),
+                &fan
+            ),
             None
         );
     }
@@ -5569,7 +5568,9 @@ mod label_tests {
     /// would relabel a channel the user was not talking about.
     #[test]
     fn a_pwm_label_does_not_name_our_fan_channel() {
-        let conf = SensorsConf::from_config_text("chip \"nct6687-*\"\n label pwm2 \"Pwm Two\"\n");
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label pwm2 \"Pwm Two\"\n",
+        ));
         let fan = HwmonChannelInfo {
             hwmon_type: HwmonChannelType::Fan,
             number: 2,
@@ -5579,7 +5580,7 @@ mod label_tests {
         };
 
         assert_eq!(
-            resolve_channel_label(&conf, Some(&nct6687()), &fan),
+            resolve_channel_label(&overrides, Some(&nct6687()), &fan),
             Some("Chassis".to_owned())
         );
     }

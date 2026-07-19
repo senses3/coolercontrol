@@ -28,12 +28,12 @@ use crate::device::{
     ChannelInfo, ChannelKind, ChannelStatus, Device, DeviceInfo, DeviceType, DriverInfo,
     DriverType, Mhz, Status, TempInfo, TempStatus, Watts, UID,
 };
+use crate::overrides::OverridesController;
 use crate::repositories::cpu_percent::CpuPercentCollector;
 use crate::repositories::hwmon::chip_name::{self, ChipName};
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo};
 use crate::repositories::hwmon::{devices, power_cap, temps};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
-use crate::sensors_conf::SensorsConf;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -73,8 +73,8 @@ struct CpuFreqs {
 /// A CPU Repository for CPU status
 pub struct CpuRepo {
     config: Rc<Config>,
-    /// The user's lm-sensors labels for the CPU chips, which the hwmon repo leaves to us.
-    sensors_conf: Rc<SensorsConf>,
+    /// Owns the lm-sensors labels for the CPU chips, which the hwmon repo leaves to us.
+    overrides: Rc<OverridesController>,
     devices: HashMap<UID, (DeviceLock, Rc<HwmonDriverInfo>)>,
     cpu_infos: HashMap<PhysicalID, Cell<ProcessorCount>>,
     cpu_model_names: HashMap<PhysicalID, String>,
@@ -85,10 +85,10 @@ pub struct CpuRepo {
 }
 
 impl CpuRepo {
-    pub fn new(config: Rc<Config>, sensors_conf: Rc<SensorsConf>) -> Result<Self> {
+    pub fn new(config: Rc<Config>, overrides: Rc<OverridesController>) -> Result<Self> {
         Ok(Self {
             config,
-            sensors_conf,
+            overrides,
             devices: HashMap::new(),
             cpu_infos: HashMap::new(),
             cpu_model_names: HashMap::new(),
@@ -105,7 +105,7 @@ impl CpuRepo {
     /// title-casing or the `CPU Temp` prefix we add to driver labels: the user already said what
     /// they want this sensor called, and it is shown under the CPU device either way.
     fn resolve_temp_label(&self, chip: Option<&ChipName>, channel: &HwmonChannelInfo) -> String {
-        if let Some(label) = chip.and_then(|chip| self.sensors_conf.label(chip, &channel.name)) {
+        if let Some(label) = self.overrides.sensors_conf_label(chip, &channel.name) {
             return label.to_owned();
         }
         let label_base = channel
@@ -1071,8 +1071,8 @@ impl Repository for CpuRepo {
 mod tests {
     use crate::cc_fs;
     use crate::config::Config;
+    use crate::overrides::OverridesController;
     use crate::repositories::cpu_repo::{CpuFreqs, CpuRepo};
-    use crate::sensors_conf::SensorsConf;
     use serial_test::serial;
     use std::rc::Rc;
 
@@ -1103,7 +1103,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1169,7 +1170,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1247,7 +1249,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1312,7 +1315,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1366,7 +1370,8 @@ mod tests {
             let test_cpuinfo = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
             cc_fs::write(&test_cpuinfo, vec![]).await.unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1405,7 +1410,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1435,7 +1441,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count_0 = cpu_repo.cpu_infos.get(&0).unwrap().get();
             let initial_count_1 = cpu_repo.cpu_infos.get(&1).unwrap().get();
@@ -1471,7 +1478,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1501,7 +1509,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1531,7 +1540,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             // Note: set_cpu_infos NOT called
 
             // when:
@@ -1555,7 +1565,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config, Rc::new(SensorsConf::default())).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1583,6 +1594,7 @@ mod tests {
 #[cfg(test)]
 mod label_tests {
     use crate::config::Config;
+    use crate::overrides::OverridesController;
     use crate::repositories::cpu_repo::CpuRepo;
     use crate::repositories::hwmon::chip_name::{Bus, ChipName};
     use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
@@ -1598,7 +1610,8 @@ mod label_tests {
 
     fn repo_with(conf: SensorsConf) -> CpuRepo {
         let config = Rc::new(Config::init_default_config().unwrap());
-        CpuRepo::new(config, Rc::new(conf)).unwrap()
+        let overrides = OverridesController::empty().with_sensors_conf(Rc::new(conf));
+        CpuRepo::new(config, Rc::new(overrides)).unwrap()
     }
 
     fn temp_channel(label: Option<&str>) -> HwmonChannelInfo {
