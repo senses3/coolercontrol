@@ -18,7 +18,6 @@
 
 import type { UID } from '@/models/Device'
 import { plainToInstance, Transform, Type } from 'class-transformer'
-import { ChannelInfo } from '@/models/ChannelInfo.ts'
 
 /**
  * General settings specific to CoolerControl
@@ -52,10 +51,10 @@ export class CoolerControlDeviceSettingsDTO {
     // We need a special transformer for this collection mapping to work
     @Transform(
         ({ value }) => {
-            const result: Map<string, ChannelInfo> = new Map()
+            const result: Map<string, CCChannelSettings> = new Map()
             const valueMap = new Map(Object.entries(value))
             for (const [k, v] of valueMap) {
-                result.set(k, plainToInstance(ChannelInfo, v))
+                result.set(k, plainToInstance(CCChannelSettings, v))
             }
             return result
         },
