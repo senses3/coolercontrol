@@ -342,6 +342,7 @@ export default {
             hideDuplicateDevices: 'إخفاء الأجهزة المكررة',
             drivePowerState: 'حالة طاقة محرك الأقراص',
             sensorsAutoDetect: 'الكشف التلقائي عن المستشعرات',
+            sensorsConfig: 'إعدادات lm-sensors',
             deviceListener: 'مراقب تغييرات الأجهزة',
             customTheme: {
                 title: 'سمة مخصصة',
@@ -395,6 +396,8 @@ export default {
                     'يمكن أن تتوقف محركات الأقراص SSD وHDD بشكل خاص وتدخل في حالة طاقة منخفضة.\n هذه الخيار، عند تفعيله ودعم القرص له، سيبلغ عن درجات حرارة القرص\n كـ 0 درجة مئوية عند توقفه حتى يمكن ضبط ملفات تعريف المروحة وفقًا لذلك.',
                 sensorsAutoDetect:
                     'الكشف التلقائي عن مستشعرات الأجهزة Super-I/O وتحميل\nوحدات النواة عند بدء التشغيل. (x86_64 فقط)',
+                sensorsConfig:
+                    'استخدام أسماء المستشعرات والمستشعرات المخفية من ملفات\nإعداد lm-sensors (/etc/sensors3.conf و /etc/sensors.d).\nالأسماء المحددة في CoolerControl لها الأولوية دائمًا.',
                 deviceListener:
                     'مراقبة أحداث إضافة/إزالة الأجهزة (مثل توصيل USB)\nوالإشعار عند اكتشاف تغييرات في الأجهزة.',
                 daemonAddress:

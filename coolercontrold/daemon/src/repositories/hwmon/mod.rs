@@ -18,6 +18,7 @@
 
 pub mod apple_mac_smc;
 pub mod auto_curve;
+pub mod chip_name;
 pub mod devices;
 mod drivetemp;
 pub mod fans;

@@ -903,6 +903,29 @@ onUnmounted(() => {
                 <UiSettingRow
                     v-tooltip.top="{
                         escape: false,
+                        value: t('layout.settings.tooltips.sensorsConfig'),
+                    }"
+                >
+                    <template #label
+                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiRestart"
+                                :size="deviceStore.getREMSize(1.0)"
+                            />
+                        </div>
+                        <div>
+                            {{ t('layout.settings.sensorsConfig') }}
+                        </div></template
+                    >
+                    <UiSwitch
+                        v-model="settingsStore.ccSettings.sensors_conf_enabled"
+                        @update:model-value="applyGenericDaemonChange"
+                    />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-tooltip.top="{
+                        escape: false,
                         value: t('layout.settings.tooltips.deviceListener'),
                     }"
                 >

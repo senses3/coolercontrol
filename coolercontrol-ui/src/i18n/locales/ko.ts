@@ -342,6 +342,7 @@ export default {
             hideDuplicateDevices: '중복 장치 숨기기',
             drivePowerState: '드라이버 전원 상태',
             sensorsAutoDetect: '센서 자동 감지',
+            sensorsConfig: 'lm-sensors 구성',
             deviceListener: '장치 변경 리스너',
             customTheme: {
                 title: '커스텀 테마',
@@ -394,6 +395,8 @@ export default {
                     '특히 SSD와 HDD는 회전을 멈추고 저전력 상태로 전환할 수 있습니다.\n이 옵션을 활성화하고 드라이브가 이를 지원하는 경우, 드라이브가 회전을 멈췄을 때\n드라이브 온도를 0°C로 보고하므로 팬 프로파일을 그에 맞게 조정할 수 있습니다.',
                 sensorsAutoDetect:
                     '시작 시 Super-I/O 하드웨어 센서를 자동으로 감지하고\n커널 모듈을 로드합니다. (x86_64 전용)',
+                sensorsConfig:
+                    'lm-sensors 구성 파일(/etc/sensors3.conf 및 /etc/sensors.d)의\n센서 이름과 숨겨진 센서를 사용합니다.\nCoolerControl에서 설정한 이름이 항상 우선합니다.',
                 deviceListener:
                     '장치 추가/제거 이벤트(예: USB 핫플러그)를 감지하고\n하드웨어 변경이 감지되면 알림을 보냅니다.',
                 daemonAddress:

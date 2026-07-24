@@ -162,6 +162,8 @@ pub struct CoolerControlSettingsDto {
     sensors_auto_detect: Option<bool>,
     /// Whether to listen for device add/remove events at startup
     device_listener_enabled: Option<bool>,
+    /// Whether to apply labels and ignores from the lm-sensors configuration
+    sensors_conf_enabled: Option<bool>,
 }
 
 impl CoolerControlSettingsDto {
@@ -231,16 +233,15 @@ impl CoolerControlSettingsDto {
         } else {
             current_settings.protocol_header
         };
-        let sensors_auto_detect = if let Some(detect) = self.sensors_auto_detect {
-            detect
-        } else {
-            current_settings.sensors_auto_detect
-        };
-        let device_listener_enabled = if let Some(listener) = self.device_listener_enabled {
-            listener
-        } else {
-            current_settings.device_listener_enabled
-        };
+        let sensors_auto_detect = self
+            .sensors_auto_detect
+            .unwrap_or(current_settings.sensors_auto_detect);
+        let device_listener_enabled = self
+            .device_listener_enabled
+            .unwrap_or(current_settings.device_listener_enabled);
+        let sensors_conf_enabled = self
+            .sensors_conf_enabled
+            .unwrap_or(current_settings.sensors_conf_enabled);
         CoolerControlSettings {
             apply_on_boot,
             no_init,
@@ -262,6 +263,7 @@ impl CoolerControlSettingsDto {
             protocol_header,
             sensors_auto_detect,
             device_listener_enabled,
+            sensors_conf_enabled,
         }
     }
 }
@@ -284,6 +286,7 @@ impl From<CoolerControlSettings> for CoolerControlSettingsDto {
             protocol_header: settings.protocol_header,
             sensors_auto_detect: Some(settings.sensors_auto_detect),
             device_listener_enabled: Some(settings.device_listener_enabled),
+            sensors_conf_enabled: Some(settings.sensors_conf_enabled),
         }
     }
 }
@@ -342,6 +345,7 @@ mod tests {
                 protocol_header: None,
                 sensors_auto_detect: None,
                 device_listener_enabled: None,
+                sensors_conf_enabled: None,
             }
         }
     }
