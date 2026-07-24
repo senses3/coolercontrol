@@ -75,6 +75,7 @@
     "overrides": {
         "js-beautify": {
             "glob": "^13.0.0"
-        }
+        },
+        "brace-expansion@2": "^2.1.2"
     }
 }
