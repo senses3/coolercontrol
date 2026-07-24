@@ -105,7 +105,16 @@ impl CpuRepo {
     /// title-casing or the `CPU Temp` prefix we add to driver labels: the user already said what
     /// they want this sensor called, and it is shown under the CPU device either way.
     fn resolve_temp_label(&self, chip: Option<&ChipName>, channel: &HwmonChannelInfo) -> String {
-        if let Some(label) = self.overrides.sensors_conf_label(chip, &channel.name) {
+        if let Some((label, source)) = self
+            .overrides
+            .sensors_conf_label_source(chip, &channel.name)
+        {
+            let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+            info!(
+                "Labeling CPU channel {} of {chip_name} as \"{label}\": from {}",
+                channel.name,
+                source.display()
+            );
             return label.to_owned();
         }
         let label_base = channel

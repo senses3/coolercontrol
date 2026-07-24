@@ -166,12 +166,16 @@ impl OverridesController {
     }
 
     /// The label the user's lm-sensors configuration gives a channel, which is the layer directly
-    /// under our own overrides.
+    /// under our own overrides, paired with the file that set it so the choice can be reported.
     ///
     /// Takes the chip rather than a device UID because lm-sensors names chips, not our devices.
     /// A device we could not identify a chip for has nothing to match against.
-    pub fn sensors_conf_label(&self, chip: Option<&ChipName>, channel_name: &str) -> Option<&str> {
-        self.sensors_conf.label(chip?, channel_name)
+    pub fn sensors_conf_label_source(
+        &self,
+        chip: Option<&ChipName>,
+        channel_name: &str,
+    ) -> Option<(&str, &Path)> {
+        self.sensors_conf.label_source(chip?, channel_name)
     }
 
     /// The lm-sensors configuration file that hides a channel, if one does.

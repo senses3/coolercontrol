@@ -1274,7 +1274,8 @@ fn resolve_temp_label(
     chip: Option<&ChipName>,
     channel: &HwmonChannelInfo,
 ) -> String {
-    if let Some(label) = overrides.sensors_conf_label(chip, &channel.name) {
+    if let Some((label, source)) = overrides.sensors_conf_label_source(chip, &channel.name) {
+        log_applied_label(chip, &channel.name, label, source);
         return label.to_owned();
     }
     channel
@@ -1290,10 +1291,22 @@ fn resolve_channel_label(
     chip: Option<&ChipName>,
     channel: &HwmonChannelInfo,
 ) -> Option<String> {
-    overrides
-        .sensors_conf_label(chip, &channel.name)
-        .map(ToOwned::to_owned)
-        .or_else(|| channel.label.clone())
+    if let Some((label, source)) = overrides.sensors_conf_label_source(chip, &channel.name) {
+        log_applied_label(chip, &channel.name, label, source);
+        return Some(label.to_owned());
+    }
+    channel.label.clone()
+}
+
+/// Reports a label applied from the user's lm-sensors configuration, naming the file that set it
+/// so it is the file to edit to change or drop the label, mirroring the log for a hidden channel.
+fn log_applied_label(chip: Option<&ChipName>, channel_name: &str, label: &str, source: &Path) {
+    // `chip` is Some here: without it there is no configuration to match against.
+    let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+    info!(
+        "Labeling channel {channel_name} of {chip_name} as \"{label}\": from {}",
+        source.display()
+    );
 }
 
 fn swap_pending_into(mailbox: &WriterMailbox, buffer: &mut HashMap<ChannelName, PendingWrite>) {

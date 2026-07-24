@@ -105,19 +105,26 @@ impl SensorsConf {
         loaded
     }
 
-    /// The label configured for a feature, e.g. `temp1`, of a chip.
+    /// The label configured for a feature, e.g. `temp1`, of a chip, with the file that set it.
     ///
     /// Across blocks the last one parsed wins, within a block the first statement wins. That
     /// ordering is `sensors_get_label`'s, which walks the blocks backwards and their statements
-    /// forwards. It is positional: a later `chip "nct6687-*"` beats an earlier exact match.
-    pub fn label(&self, chip: &ChipName, feature: &str) -> Option<&str> {
+    /// forwards. It is positional: a later `chip "nct6687-*"` beats an earlier exact match. The
+    /// source file is returned so the choice can be reported and found again.
+    pub fn label_source(&self, chip: &ChipName, feature: &str) -> Option<(&str, &Path)> {
         self.matching_blocks(chip).find_map(|block| {
             block
                 .labels
                 .iter()
                 .find(|(name, _)| name == feature)
-                .map(|(_, label)| label.as_str())
+                .map(|(_, label)| (label.as_str(), block.source.as_ref()))
         })
+    }
+
+    /// Just the label, dropping the source, for the assertions that only check what was parsed.
+    #[cfg(test)]
+    pub fn label(&self, chip: &ChipName, feature: &str) -> Option<&str> {
+        self.label_source(chip, feature).map(|(label, _)| label)
     }
 
     /// The configuration file that hides this feature, if any of them does.
