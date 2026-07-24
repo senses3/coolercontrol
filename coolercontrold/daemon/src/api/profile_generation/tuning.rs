@@ -38,7 +38,7 @@ use std::sync::LazyLock;
 static TUNING_TOML: &str = include_str!("../../../resources/auto_profiles.toml");
 
 /// The parsed, validated tuning data, built once on first access.
-pub(super) static TUNING: LazyLock<TuningConfig> = LazyLock::new(|| {
+pub static TUNING: LazyLock<TuningConfig> = LazyLock::new(|| {
     // These `expect`s cannot fire in a shipped build: the tests below parse and validate the same
     // embedded string in CI, so any malformed edit fails tests before release.
     let config: TuningConfig =
@@ -52,7 +52,7 @@ pub(super) static TUNING: LazyLock<TuningConfig> = LazyLock::new(|| {
 /// The full tuning table: shared functions plus one setup group per fan kind.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct TuningConfig {
+pub struct TuningConfig {
     pub functions: HashMap<String, FunctionSpec>,
     pub cpu_cooler: PresetMap,
     pub gpu_fan: PresetMap,
@@ -68,7 +68,7 @@ pub(super) struct TuningConfig {
 /// `step_size_*` fields are optional: an unset one keeps the daemon default (2/100/0/0).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct FunctionSpec {
+pub struct FunctionSpec {
     pub name: String,
     #[serde(default)]
     pub deviance: Option<Temp>,
@@ -90,14 +90,14 @@ pub(super) struct FunctionSpec {
 /// completeness is enforced by the type rather than by a runtime check.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct PresetMap {
+pub struct PresetMap {
     pub silent: SetupEntry,
     pub balanced: SetupEntry,
     pub performance: SetupEntry,
 }
 
 impl PresetMap {
-    pub(super) fn get(&self, preset: Preset) -> &SetupEntry {
+    pub fn get(&self, preset: Preset) -> &SetupEntry {
         match preset {
             Preset::Silent => &self.silent,
             Preset::Balanced => &self.balanced,
@@ -109,7 +109,7 @@ impl PresetMap {
 /// One preset's setup: either a constant duty or a temperature-driven curve.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub(super) enum SetupEntry {
+pub enum SetupEntry {
     Fixed {
         duty: Duty,
     },
@@ -125,7 +125,7 @@ pub(super) enum SetupEntry {
 /// (skipped when the system has no custom-sensors device).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct SmoothingSpec {
+pub struct SmoothingSpec {
     pub ema_window_seconds: u16,
 }
 
@@ -133,7 +133,7 @@ pub(super) struct SmoothingSpec {
 /// `cpu_cooler` curve in the parent module, so it has no table here.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct RadiatorBands {
+pub struct RadiatorBands {
     pub delta: PresetMap,
     pub liquid: PresetMap,
 }
@@ -141,7 +141,7 @@ pub(super) struct RadiatorBands {
 /// Case-fan tuning: the shared Mix member curve plus the positive-pressure parameters.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct CaseTuning {
+pub struct CaseTuning {
     pub member: PresetMap,
     pub pressure: CasePressure,
 }
@@ -151,7 +151,7 @@ pub(super) struct CaseTuning {
 /// idle. The parent module derives the overlay offset encoding from these two numbers.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct CasePressure {
+pub struct CasePressure {
     pub exhaust_bias_percent: Duty,
     pub floor_percent: Duty,
 }
@@ -159,7 +159,7 @@ pub(super) struct CasePressure {
 impl TuningConfig {
     /// Validates every curve, smoothing window, function reference, and percent field. Returns the
     /// first problem found so a malformed edit surfaces a clear reason.
-    pub(super) fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), String> {
         let labeled: [(&str, &PresetMap); 7] = [
             ("cpu_cooler", &self.cpu_cooler),
             ("gpu_fan", &self.gpu_fan),
