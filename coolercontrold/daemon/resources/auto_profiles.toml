@@ -29,7 +29,10 @@
 # a Standard hysteresis function. Silent presets lean on EMA smoothing instead of hysteresis, so
 # they use the plain function.
 # ---------------------------------------------------------------------------
-# `name` is the display name of the generated function entity.
+# `name` is the display name of the generated function entity. Optional step-size fields tune the
+# per-tick duty change and may be added to any function: step_size_min, step_size_max,
+# step_size_min_decreasing, step_size_max_decreasing. Omitting them (as below) keeps today's daemon
+# defaults (2 / 100 / 0 / 0); set them if you find better values.
 [functions.identity]
 name = "Auto Fan (Silent)"
 

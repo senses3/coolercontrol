@@ -176,10 +176,6 @@ pub struct GenerateProfilesResponse {
     pub assignments: Vec<ChannelAssignment>,
 }
 
-/// EMA smoothing window for the Silent preset, in seconds. Long enough to absorb brief temp
-/// spikes so a quiet fan does not chase them.
-const SILENT_EMA_WINDOW_SECONDS: u16 = 8;
-
 /// Proposes profiles, functions, and custom sensors for the assigned fans, without persisting
 /// anything. The UI previews the result and the user confirms before it is saved.
 pub async fn generate(
@@ -320,12 +316,15 @@ fn add_gpu_fan(
     gpu_temp: &TempSource,
     preset: Preset,
 ) {
-    let source = resolve_smoothed_source(proposal, context, gpu_temp, preset);
-    let function_uid = proposal.intern_function(build_preset_function(preset));
-    let curve = gpu_fan_curve(preset);
-    assert_valid_curve(&curve);
-    let profile = build_graph_profile(&format!("GPU Fan ({preset})"), source, function_uid, curve);
-    let profile_uid = proposal.intern_profile(profile);
+    let entry = TUNING.gpu_fan.get(preset);
+    let profile_uid = build_from_entry(
+        proposal,
+        context,
+        entry,
+        gpu_temp,
+        &format!("GPU Fan ({preset})"),
+        None,
+    );
     proposal.assign(assignment, profile_uid);
 }
 
@@ -338,9 +337,9 @@ enum CaseRole {
 }
 
 /// Case fan: an Overlay on the shared case base (Mix(CPU, GPU) Max, or a CPU graph when there is
-/// no GPU temp). Intake follows the base; exhaust runs 15% below it for positive pressure. Both
-/// keep a 1% floor so the fan stays addressable at idle. Intake and exhaust share one base via
-/// de-duplication.
+/// no GPU temp). Intake follows the base; exhaust runs below it (the `[case.pressure]` bias) for
+/// positive pressure. Both keep the configured floor so the fan stays addressable at idle. Intake
+/// and exhaust share one base via de-duplication.
 fn add_case_fan(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -350,9 +349,16 @@ fn add_case_fan(
     role: CaseRole,
 ) -> Result<(), CCError> {
     let base_uid = build_case_base(proposal, context, key_temps, preset)?;
+    let pressure = &TUNING.case.pressure;
     let (name, offset_profile) = match role {
-        CaseRole::Intake => (format!("Case Intake ({preset})"), intake_offset_profile()),
-        CaseRole::Exhaust => (format!("Case Exhaust ({preset})"), exhaust_offset_profile()),
+        CaseRole::Intake => (
+            format!("Case Intake ({preset})"),
+            intake_offset_profile(pressure.floor_percent),
+        ),
+        CaseRole::Exhaust => (
+            format!("Case Exhaust ({preset})"),
+            exhaust_offset_profile(pressure.floor_percent, pressure.exhaust_bias_percent),
+        ),
     };
     let overlay = build_overlay_profile(&name, base_uid, offset_profile);
     let profile_uid = proposal.intern_profile(overlay);
@@ -395,40 +401,42 @@ fn build_case_member(
     preset: Preset,
     label: &str,
 ) -> ProfileUID {
-    let source = resolve_smoothed_source(proposal, context, temp, preset);
-    let function_uid = proposal.intern_function(build_preset_function(preset));
-    let curve = case_curve(preset);
-    assert_valid_curve(&curve);
-    let profile = build_graph_profile(
+    let entry = TUNING.case.member.get(preset);
+    build_from_entry(
+        proposal,
+        context,
+        entry,
+        temp,
         &format!("Case {label} ({preset})"),
-        source,
-        function_uid,
-        curve,
-    );
-    proposal.intern_profile(profile)
+        None,
+    )
 }
 
-/// Case fan curves per preset (CPU or GPU temp in Celsius, duty percent). Strawman values
-/// pending tuning at the phase checkpoint.
-fn case_curve(preset: Preset) -> Vec<(Temp, Duty)> {
-    match preset {
-        Preset::Silent => vec![(50.0, 20), (65.0, 40), (78.0, 70)],
-        Preset::Balanced => vec![(45.0, 30), (65.0, 70), (78.0, 100)],
-        Preset::Performance => vec![(40.0, 40), (60.0, 80), (72.0, 100)],
+/// Intake overlay offset: output = max(base, floor%). Keeps the fan addressable at idle without
+/// reducing the airflow the thermal curve asks for. The offset encoding is derived from the tuning
+/// data's `floor_percent`.
+fn intake_offset_profile(floor: Duty) -> Vec<(Duty, Offset)> {
+    if floor == 0 {
+        return vec![(0, 0), (100, 0)];
     }
+    let floor_offset = Offset::try_from(floor).expect("floor_percent is validated <= 100, fits i8");
+    vec![(0, floor_offset), (floor, 0), (100, 0)]
 }
 
-/// Intake overlay offset: output = max(base, 1%). Keeps the fan addressable at idle without
-/// reducing the airflow the thermal curve asks for.
-fn intake_offset_profile() -> Vec<(Duty, Offset)> {
-    vec![(0, 1), (1, 0), (100, 0)]
-}
-
-/// Exhaust overlay offset: output = max(base - 15%, 1%). Running 15% below the shared thermal
-/// demand biases the case toward positive pressure (more intake than exhaust). The breakpoint at
-/// duty 16 is where base minus 15 meets the 1% floor.
-fn exhaust_offset_profile() -> Vec<(Duty, Offset)> {
-    vec![(0, 1), (16, -15), (100, -15)]
+/// Exhaust overlay offset: output = max(base - bias%, floor%). Running `bias` below the shared
+/// thermal demand biases the case toward positive pressure (more intake than exhaust). The
+/// breakpoint at `floor + bias` is where base minus bias meets the floor. Both numbers come from
+/// the tuning data's `[case.pressure]`.
+fn exhaust_offset_profile(floor: Duty, bias: Duty) -> Vec<(Duty, Offset)> {
+    let floor_offset = Offset::try_from(floor).expect("floor_percent is validated <= 100, fits i8");
+    let bias_offset =
+        Offset::try_from(bias).expect("exhaust_bias_percent is validated <= 100, fits i8");
+    let breakpoint = floor.saturating_add(bias);
+    vec![
+        (0, floor_offset),
+        (breakpoint, -bias_offset),
+        (100, -bias_offset),
+    ]
 }
 
 /// A Mix profile combining member profiles with the given function. Its own function is the
@@ -477,8 +485,11 @@ fn add_aio_pump(
     assignment: &FanAssignment,
     preset: Preset,
 ) -> Result<(), CCError> {
-    let profile = match preset {
-        Preset::Silent => {
+    let entry = TUNING.aio_pump.get(preset);
+    let name = format!("AIO Pump ({preset})");
+    let profile_uid = match entry {
+        SetupEntry::Fixed { duty } => proposal.intern_profile(build_fixed_profile(&name, *duty)),
+        SetupEntry::Graph { .. } => {
             let base = key_temps
                 .cpu
                 .as_ref()
@@ -487,26 +498,12 @@ fn add_aio_pump(
                     msg: "An AIO pump was assigned but no CPU or liquid temp was selected"
                         .to_string(),
                 })?;
-            let source = resolve_smoothed_source(proposal, context, base, Preset::Silent);
-            let function_uid = proposal.intern_function(build_preset_function(Preset::Silent));
             let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
-            let curve = clamp_curve_floor(pump_silent_curve(), min_duty);
-            assert_valid_curve(&curve);
-            build_graph_profile(&format!("AIO Pump ({preset})"), source, function_uid, curve)
-        }
-        Preset::Balanced | Preset::Performance => {
-            build_fixed_profile(&format!("AIO Pump ({preset})"), 100)
+            build_from_entry(proposal, context, entry, base, &name, Some(min_duty))
         }
     };
-    let profile_uid = proposal.intern_profile(profile);
     proposal.assign(assignment, profile_uid);
     Ok(())
-}
-
-/// The Silent pump's 2-step curve (CPU temp in Celsius, duty percent): a quiet 50% floor that
-/// ramps to full flow under load. 50% keeps noise down while still moving coolant.
-fn pump_silent_curve() -> Vec<(Temp, Duty)> {
-    vec![(50.0, 50), (70.0, 100)]
 }
 
 /// The temperature band a radiator curve is shaped for, chosen by the available temp source.
@@ -528,17 +525,21 @@ fn add_aio_radiator(
     preset: Preset,
 ) -> Result<(), CCError> {
     let (source, band) = resolve_radiator_source(proposal, context, key_temps)?;
-    let function_uid = proposal.intern_function(build_preset_function(preset));
+    let entry = match band {
+        RadiatorBand::Delta => TUNING.aio_radiator.delta.get(preset),
+        RadiatorBand::Liquid => TUNING.aio_radiator.liquid.get(preset),
+        RadiatorBand::Cpu => TUNING.cpu_cooler.get(preset),
+    };
     let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
-    let curve = clamp_curve_floor(radiator_curve(preset, band), min_duty);
-    assert_valid_curve(&curve);
-    let profile = build_graph_profile(
-        &format!("AIO Radiator ({preset})"),
+    // Radiator follows a raw source (liquid and Delta are already slow-moving), so the cpu_cooler
+    // fallback's smoothing is intentionally bypassed via build_entry_with_source.
+    let profile_uid = build_entry_with_source(
+        proposal,
+        entry,
         source,
-        function_uid,
-        curve,
+        &format!("AIO Radiator ({preset})"),
+        Some(min_duty),
     );
-    let profile_uid = proposal.intern_profile(profile);
     proposal.assign(assignment, profile_uid);
     Ok(())
 }
@@ -573,24 +574,6 @@ fn resolve_radiator_source(
     Err(CCError::UserError {
         msg: "An AIO radiator was assigned but no liquid or CPU temp was selected".to_string(),
     })
-}
-
-/// Radiator curves per preset and band. Liquid curves ramp 28C to 38C; Delta curves ramp 5C to
-/// 10C; the CPU fallback reuses the wider CPU-cooler band. Strawman values pending tuning.
-fn radiator_curve(preset: Preset, band: RadiatorBand) -> Vec<(Temp, Duty)> {
-    match band {
-        RadiatorBand::Delta => match preset {
-            Preset::Silent => vec![(5.0, 30), (10.0, 80)],
-            Preset::Balanced => vec![(5.0, 40), (10.0, 100)],
-            Preset::Performance => vec![(5.0, 50), (10.0, 100)],
-        },
-        RadiatorBand::Liquid => match preset {
-            Preset::Silent => vec![(28.0, 30), (38.0, 80)],
-            Preset::Balanced => vec![(28.0, 40), (38.0, 100)],
-            Preset::Performance => vec![(28.0, 50), (38.0, 100)],
-        },
-        RadiatorBand::Cpu => cpu_cooler_curve(preset),
-    }
 }
 
 /// A Delta custom sensor giving liquid minus ambient (the loop's thermal load, independent of
@@ -671,21 +654,14 @@ fn build_laptop_graph(
     let cpu = key_temps.cpu.as_ref().ok_or_else(|| CCError::UserError {
         msg: "A laptop fan was assigned but no CPU temp was selected".to_string(),
     })?;
-    let source = if smooth {
-        laptop_ema_source(proposal, context, cpu, preset)
+    let entry = TUNING.laptop.get(preset);
+    let name = format!("Laptop Fan ({preset})");
+    let profile_uid = if smooth {
+        build_from_entry(proposal, context, entry, cpu, &name, Some(min_duty))
     } else {
-        cpu.clone()
+        build_entry_with_source(proposal, entry, cpu.clone(), &name, Some(min_duty))
     };
-    let function_uid = proposal.intern_function(build_laptop_function(preset));
-    let curve = clamp_curve_floor(laptop_curve(preset), min_duty);
-    assert_valid_curve(&curve);
-    let profile = build_graph_profile(
-        &format!("Laptop Fan ({preset})"),
-        source,
-        function_uid,
-        curve,
-    );
-    Ok(proposal.intern_profile(profile))
+    Ok(profile_uid)
 }
 
 /// A laptop fan as a Mix(CPU, GPU) Max, each member an EMA-smoothed Graph. Used when the user
@@ -721,90 +697,27 @@ fn build_laptop_member(
     preset: Preset,
     min_duty: Duty,
 ) -> ProfileUID {
-    let source = laptop_ema_source(proposal, context, temp, preset);
-    let function_uid = proposal.intern_function(build_laptop_function(preset));
-    let curve = clamp_curve_floor(laptop_curve(preset), min_duty);
-    assert_valid_curve(&curve);
-    let profile = build_graph_profile(
+    let entry = TUNING.laptop.get(preset);
+    build_from_entry(
+        proposal,
+        context,
+        entry,
+        temp,
         &format!("Laptop {} ({preset})", temp.temp_name),
-        source,
-        function_uid,
-        curve,
-    );
-    proposal.intern_profile(profile)
+        Some(min_duty),
+    )
 }
 
-/// Wraps a laptop temp in an EMA sensor sized for the preset (Silent gets the longest window for
-/// sustain). Falls back to the raw temp if there is no custom-sensors device.
-fn laptop_ema_source(
+/// Builds a profile from a tuning entry using an already-resolved source. A Fixed entry becomes a
+/// Fixed profile (the source is unused); a Graph entry applies its curve and named function to the
+/// source. `clamp_min_duty`, when set, raises the floor so a low curve or duty cannot stall a fan
+/// that needs more to spin; pass None for channels that may idle at 0% (a zero-RPM GPU fan). The
+/// entry's smoothing is NOT applied here: the caller resolves the source, so kinds that follow a
+/// raw signal (radiator, laptop `ThinkPad` sensor) can bypass smoothing.
+fn build_entry_with_source(
     proposal: &mut Proposal,
-    context: &DeviceContext,
-    base: &TempSource,
-    preset: Preset,
-) -> TempSource {
-    let Some(custom_sensors_device_uid) = context.custom_sensors_device_uid.clone() else {
-        return base.clone();
-    };
-    let sensor_id =
-        proposal.intern_custom_sensor(build_ema_sensor(base.clone(), laptop_ema_window(preset)));
-    TempSource {
-        temp_name: sensor_id,
-        device_uid: custom_sensors_device_uid,
-    }
-}
-
-/// Laptop EMA window per preset, in seconds. Silent is long to sustain through brief load before
-/// ramping; Performance is short to react quickly. Strawman values pending tuning.
-fn laptop_ema_window(preset: Preset) -> u16 {
-    match preset {
-        Preset::Silent => 30,
-        Preset::Balanced => 15,
-        Preset::Performance => 10,
-    }
-}
-
-/// Laptop hysteresis function per preset. All presets use downward-only hysteresis with a large
-/// deviance because laptops hold heat (a slow down-ramp avoids surging). Silent is the slowest.
-/// Strawman values pending tuning.
-fn build_laptop_function(preset: Preset) -> Function {
-    let (deviance, response_delay) = match preset {
-        Preset::Silent => (5.0, 5),
-        Preset::Balanced => (3.0, 3),
-        Preset::Performance => (2.0, 1),
-    };
-    Function {
-        uid: Uuid::new_v4().to_string(),
-        name: format!("Auto Laptop ({preset})"),
-        kind: FunctionKind::Standard {
-            deviance: Some(deviance),
-            only_downward: Some(true),
-            response_delay: Some(response_delay),
-        },
-        ..Function::default()
-    }
-}
-
-/// Laptop fan curves per preset (CPU temp in Celsius, duty percent). High knees keep the fan
-/// quiet until temps are genuinely high, matching how laptops run hot. Strawman values pending
-/// tuning.
-fn laptop_curve(preset: Preset) -> Vec<(Temp, Duty)> {
-    match preset {
-        Preset::Silent => vec![(60.0, 20), (80.0, 40), (95.0, 100)],
-        Preset::Balanced => vec![(55.0, 30), (75.0, 60), (90.0, 100)],
-        Preset::Performance => vec![(50.0, 40), (70.0, 80), (85.0, 100)],
-    }
-}
-
-/// Builds a profile from a tuning entry and returns its (de-duplicated) UID. A Fixed entry becomes
-/// a Fixed profile; a Graph entry resolves its (optionally EMA-smoothed) source and named function
-/// and applies the curve. `clamp_min_duty`, when set, raises the floor so a low curve or duty
-/// cannot stall a fan that needs more to spin; pass None for channels that may idle at 0% (a
-/// zero-RPM GPU fan).
-fn build_from_entry(
-    proposal: &mut Proposal,
-    context: &DeviceContext,
     entry: &SetupEntry,
-    base_temp: &TempSource,
+    source: TempSource,
     name: &str,
     clamp_min_duty: Option<Duty>,
 ) -> ProfileUID {
@@ -814,11 +727,8 @@ fn build_from_entry(
             proposal.intern_profile(build_fixed_profile(name, duty))
         }
         SetupEntry::Graph {
-            curve,
-            smoothing,
-            function,
+            curve, function, ..
         } => {
-            let source = resolve_entry_source(proposal, context, base_temp, smoothing.as_ref());
             let function_uid = proposal.intern_function(build_function(function));
             let curve = match clamp_min_duty {
                 Some(min_duty) => clamp_curve_floor(curve.clone(), min_duty),
@@ -828,6 +738,26 @@ fn build_from_entry(
             proposal.intern_profile(build_graph_profile(name, source, function_uid, curve))
         }
     }
+}
+
+/// Builds a profile from a tuning entry, resolving its (optionally EMA-smoothed) source from the
+/// given base temp per the entry's `smoothing`. Used by the kinds whose smoothing is driven by the
+/// tuning data (CPU cooler, GPU fan, case members, laptop EMA, Silent pump).
+fn build_from_entry(
+    proposal: &mut Proposal,
+    context: &DeviceContext,
+    entry: &SetupEntry,
+    base_temp: &TempSource,
+    name: &str,
+    clamp_min_duty: Option<Duty>,
+) -> ProfileUID {
+    let source = match entry {
+        SetupEntry::Graph { smoothing, .. } => {
+            resolve_entry_source(proposal, context, base_temp, smoothing.as_ref())
+        }
+        SetupEntry::Fixed { .. } => base_temp.clone(),
+    };
+    build_entry_with_source(proposal, entry, source, name, clamp_min_duty)
 }
 
 /// Resolves the temp source for a graph entry: the raw temp, or (when the entry sets smoothing and
@@ -872,34 +802,22 @@ fn build_function(name: &str) -> Function {
     } else {
         FunctionKind::Identity
     };
+    // Step sizes are optional in the tuning data: an unset field keeps the daemon default.
+    let defaults = Function::default();
     Function {
         uid: Uuid::new_v4().to_string(),
         name: spec.name.clone(),
+        step_size_min: spec.step_size_min.unwrap_or(defaults.step_size_min),
+        step_size_max: spec.step_size_max.unwrap_or(defaults.step_size_max),
+        step_size_min_decreasing: spec
+            .step_size_min_decreasing
+            .unwrap_or(defaults.step_size_min_decreasing),
+        step_size_max_decreasing: spec
+            .step_size_max_decreasing
+            .unwrap_or(defaults.step_size_max_decreasing),
+        threshold_hopping: defaults.threshold_hopping,
+        bypass_min_at_extremes: defaults.bypass_min_at_extremes,
         kind,
-        ..Function::default()
-    }
-}
-
-/// The temp source a profile should follow. For Silent, the base temp is wrapped in an EMA
-/// custom sensor (created and de-duplicated here) so the fan follows a smoothed signal rather
-/// than chasing spikes. With no custom-sensors device available, the raw temp is used.
-fn resolve_smoothed_source(
-    proposal: &mut Proposal,
-    context: &DeviceContext,
-    base: &TempSource,
-    preset: Preset,
-) -> TempSource {
-    if preset != Preset::Silent {
-        return base.clone();
-    }
-    let Some(custom_sensors_device_uid) = context.custom_sensors_device_uid.clone() else {
-        return base.clone();
-    };
-    let sensor_id =
-        proposal.intern_custom_sensor(build_ema_sensor(base.clone(), SILENT_EMA_WINDOW_SECONDS));
-    TempSource {
-        temp_name: sensor_id,
-        device_uid: custom_sensors_device_uid,
     }
 }
 
@@ -918,61 +836,6 @@ fn build_ema_sensor(source: TempSource, window_seconds: u16) -> CustomSensor {
         },
         children: Vec::new(),
         parents: Vec::new(),
-    }
-}
-
-/// The hysteresis function for a preset. Silent relies on EMA smoothing of its source, so it
-/// keeps a plain function; Balanced and Performance ramp up promptly but ease down via
-/// downward-only hysteresis, Performance being the snappier of the two. Strawman values pending
-/// tuning.
-fn build_preset_function(preset: Preset) -> Function {
-    let name = format!("Auto Fan ({preset})");
-    match preset {
-        Preset::Silent => Function {
-            uid: Uuid::new_v4().to_string(),
-            name,
-            ..Function::default()
-        },
-        Preset::Balanced => Function {
-            uid: Uuid::new_v4().to_string(),
-            name,
-            kind: FunctionKind::Standard {
-                deviance: Some(2.0),
-                only_downward: Some(true),
-                response_delay: Some(2),
-            },
-            ..Function::default()
-        },
-        Preset::Performance => Function {
-            uid: Uuid::new_v4().to_string(),
-            name,
-            kind: FunctionKind::Standard {
-                deviance: Some(1.0),
-                only_downward: Some(true),
-                response_delay: Some(1),
-            },
-            ..Function::default()
-        },
-    }
-}
-
-/// CPU cooler curves per preset (CPU temp in Celsius, duty percent). Strawman values pending
-/// tuning at the phase checkpoint.
-fn cpu_cooler_curve(preset: Preset) -> Vec<(Temp, Duty)> {
-    match preset {
-        Preset::Silent => vec![(45.0, 25), (60.0, 40), (75.0, 70), (85.0, 100)],
-        Preset::Balanced => vec![(35.0, 30), (55.0, 55), (75.0, 90), (85.0, 100)],
-        Preset::Performance => vec![(30.0, 40), (50.0, 70), (65.0, 100)],
-    }
-}
-
-/// GPU fan curves per preset (GPU temp in Celsius, duty percent). The low-temp 0% entries
-/// preserve the card's zero-RPM idle. Strawman values pending tuning.
-fn gpu_fan_curve(preset: Preset) -> Vec<(Temp, Duty)> {
-    match preset {
-        Preset::Silent => vec![(45.0, 0), (55.0, 30), (70.0, 60), (83.0, 90)],
-        Preset::Balanced => vec![(45.0, 0), (60.0, 40), (75.0, 80), (85.0, 100)],
-        Preset::Performance => vec![(40.0, 30), (55.0, 65), (70.0, 100)],
     }
 }
 
@@ -1627,6 +1490,14 @@ mod tests {
         profiles.iter().filter(|p| &p.p_type() == p_type).count()
     }
 
+    /// The curve of a graph tuning entry, for asserting generated output against the data.
+    fn entry_curve(entry: &SetupEntry) -> &[(Temp, Duty)] {
+        match entry {
+            SetupEntry::Graph { curve, .. } => curve,
+            SetupEntry::Fixed { .. } => panic!("expected a graph entry"),
+        }
+    }
+
     /// Goal: with a GPU temp, case fans produce two member graphs, one Max Mix base, and two
     /// Overlays, and each fan is assigned. Method: generate and assert the per-type profile
     /// counts and the assignment count.
@@ -1833,7 +1704,7 @@ mod tests {
         assert_eq!(pump.p_type(), ProfileType::Graph);
         assert_eq!(
             pump.speed_profile().expect("has curve").as_slice(),
-            &[(50.0, 50), (70.0, 100)]
+            entry_curve(TUNING.aio_pump.get(Preset::Silent))
         );
         assert_eq!(
             response.custom_sensors.len(),
@@ -1900,7 +1771,7 @@ mod tests {
         assert_eq!(radiator.temp_source(), Some(&liquid_temp()));
         assert_eq!(
             radiator.speed_profile().expect("has curve").as_slice(),
-            &[(28.0, 40), (38.0, 100)]
+            entry_curve(TUNING.aio_radiator.liquid.get(Preset::Balanced))
         );
         assert!(response.custom_sensors.is_empty());
     }
@@ -1935,7 +1806,7 @@ mod tests {
         assert_eq!(source.temp_name, sensor.id);
         assert_eq!(
             radiator.speed_profile().expect("has curve").as_slice(),
-            &[(5.0, 40), (10.0, 100)]
+            entry_curve(TUNING.aio_radiator.delta.get(Preset::Balanced))
         );
     }
 
@@ -1950,10 +1821,11 @@ mod tests {
         .expect("generates");
         let radiator = &response.profiles[0];
         assert_eq!(radiator.temp_source(), Some(&cpu_temp()));
-        assert_eq!(
-            radiator.speed_profile().unwrap(),
-            &cpu_cooler_curve(Preset::Balanced)
-        );
+        // The CPU fallback reuses the cpu_cooler curve from the tuning data.
+        let SetupEntry::Graph { curve, .. } = TUNING.cpu_cooler.get(Preset::Balanced) else {
+            panic!("cpu_cooler entry should be a graph");
+        };
+        assert_eq!(radiator.speed_profile().unwrap(), curve);
     }
 
     /// Goal: a radiator with no liquid or CPU temp is a user error. Method: omit both and assert
@@ -2049,8 +1921,15 @@ mod tests {
         else {
             panic!("expected an EMA sensor");
         };
+        let SetupEntry::Graph {
+            smoothing: Some(desktop_silent),
+            ..
+        } = TUNING.cpu_cooler.get(Preset::Silent)
+        else {
+            panic!("cpu_cooler Silent should smooth");
+        };
         assert!(
-            time_window_seconds > SILENT_EMA_WINDOW_SECONDS,
+            time_window_seconds > desktop_silent.ema_window_seconds,
             "laptop Silent sustains with a longer window"
         );
     }
@@ -2111,5 +1990,74 @@ mod tests {
             &test_context()
         )
         .is_err());
+    }
+
+    /// Goal: a full config covering all seven kinds generates a coherent proposal, and a function
+    /// shared across kinds is de-duplicated rather than copied. Method: build one request with every
+    /// kind at the global Balanced preset, then assert every fan is assigned to an existing profile,
+    /// every profile is named, and the shared Balanced fan function appears exactly once.
+    #[test]
+    fn full_config_generates_and_dedups_shared_function() {
+        let all_kinds = [
+            ("dev-mb-1", "fan1", FanKind::CpuCooler),
+            ("dev-mb-1", "fan2", FanKind::GpuFan),
+            ("dev-mb-1", "fan3", FanKind::CaseIntake),
+            ("dev-mb-1", "fan4", FanKind::CaseExhaust),
+            ("dev-aio-1", "pump", FanKind::AioPump),
+            ("dev-aio-1", "rad", FanKind::AioRadiator),
+            ("dev-laptop-1", "fan1", FanKind::LaptopFan),
+        ];
+        let assignments = all_kinds
+            .iter()
+            .map(|(device_uid, channel_name, kind)| FanAssignment {
+                device_uid: (*device_uid).to_string(),
+                channel_name: (*channel_name).to_string(),
+                kind: *kind,
+                position: None,
+                laptop_temp_strategy: None,
+            })
+            .collect();
+        let request = GenerateProfilesRequest {
+            assignments,
+            key_temps: KeyTemps {
+                cpu: Some(cpu_temp()),
+                gpu: Some(gpu_temp()),
+                liquid: Some(liquid_temp()),
+                ambient: Some(ambient_temp()),
+            },
+            global_preset: Preset::Balanced,
+            preset_overrides: Vec::new(),
+        };
+        let response = generate_proposal(&request, &test_context()).expect("generates");
+
+        assert_eq!(
+            response.assignments.len(),
+            all_kinds.len(),
+            "every fan is assigned"
+        );
+        let profile_uids: HashMap<ProfileUID, ()> = response
+            .profiles
+            .iter()
+            .map(|p| (p.uid.clone(), ()))
+            .collect();
+        for assignment in &response.assignments {
+            assert!(
+                profile_uids.contains_key(&assignment.profile_uid),
+                "assignment references an existing profile"
+            );
+        }
+        assert!(
+            response.profiles.iter().all(|p| p.name.is_empty().not()),
+            "every profile is named"
+        );
+        let shared_fan_functions = response
+            .functions
+            .iter()
+            .filter(|f| f.name == "Auto Fan (Balanced)")
+            .count();
+        assert_eq!(
+            shared_fan_functions, 1,
+            "the Balanced fan function is shared across kinds, not duplicated"
+        );
     }
 }

@@ -64,7 +64,8 @@ pub(super) struct TuningConfig {
 
 /// A named hysteresis function referenced by graph entries. A spec with none of
 /// `deviance`/`only_downward`/`response_delay` is a plain (Identity) function; any of them present
-/// makes it a Standard function. `name` is the display name of the generated function entity.
+/// makes it a Standard function. `name` is the display name of the generated function entity. The
+/// `step_size_*` fields are optional: an unset one keeps the daemon default (2/100/0/0).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct FunctionSpec {
@@ -75,6 +76,14 @@ pub(super) struct FunctionSpec {
     pub only_downward: Option<bool>,
     #[serde(default)]
     pub response_delay: Option<u8>,
+    #[serde(default)]
+    pub step_size_min: Option<Duty>,
+    #[serde(default)]
+    pub step_size_max: Option<Duty>,
+    #[serde(default)]
+    pub step_size_min_decreasing: Option<Duty>,
+    #[serde(default)]
+    pub step_size_max_decreasing: Option<Duty>,
 }
 
 /// The three presets every fan kind must define. Missing one is a deserialization error, so
@@ -165,6 +174,9 @@ impl TuningConfig {
             self.validate_entry(kind, "balanced", &preset_map.balanced)?;
             self.validate_entry(kind, "performance", &preset_map.performance)?;
         }
+        for (name, spec) in &self.functions {
+            validate_function(name, spec)?;
+        }
         validate_percent(
             "case.pressure.exhaust_bias_percent",
             self.case.pressure.exhaust_bias_percent,
@@ -233,6 +245,21 @@ fn validate_curve(kind: &str, preset: &str, curve: &[(Temp, Duty)]) -> Result<()
 fn validate_percent(label: &str, value: Duty) -> Result<(), String> {
     if value > 100 {
         return Err(format!("{label} must be within 0..=100, got {value}"));
+    }
+    Ok(())
+}
+
+/// A function's optional step-size fields must each be within 0..=100.
+fn validate_function(name: &str, spec: &FunctionSpec) -> Result<(), String> {
+    for (field, value) in [
+        ("step_size_min", spec.step_size_min),
+        ("step_size_max", spec.step_size_max),
+        ("step_size_min_decreasing", spec.step_size_min_decreasing),
+        ("step_size_max_decreasing", spec.step_size_max_decreasing),
+    ] {
+        if let Some(value) = value {
+            validate_percent(&format!("functions.{name}.{field}"), value)?;
+        }
     }
     Ok(())
 }
