@@ -42,6 +42,10 @@ use std::ops::Not;
 use strum::{Display, EnumString};
 use uuid::Uuid;
 
+mod tuning;
+
+use tuning::{SetupEntry, SmoothingSpec, TUNING};
+
 /// The cooling role a fan plays. Assigned explicitly by the user: fan roles cannot be
 /// reliably auto-detected (an AIO pump can be wired to an ordinary motherboard fan header),
 /// so a wrong guess is worse than none.
@@ -294,18 +298,16 @@ fn add_cpu_cooler(
     cpu_temp: &TempSource,
     preset: Preset,
 ) {
-    let source = resolve_smoothed_source(proposal, context, cpu_temp, preset);
-    let function_uid = proposal.intern_function(build_preset_function(preset));
+    let entry = TUNING.cpu_cooler.get(preset);
     let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
-    let curve = clamp_curve_floor(cpu_cooler_curve(preset), min_duty);
-    assert_valid_curve(&curve);
-    let profile = build_graph_profile(
+    let profile_uid = build_from_entry(
+        proposal,
+        context,
+        entry,
+        cpu_temp,
         &format!("CPU Cooler ({preset})"),
-        source,
-        function_uid,
-        curve,
+        Some(min_duty),
     );
-    let profile_uid = proposal.intern_profile(profile);
     proposal.assign(assignment, profile_uid);
 }
 
@@ -790,6 +792,91 @@ fn laptop_curve(preset: Preset) -> Vec<(Temp, Duty)> {
         Preset::Silent => vec![(60.0, 20), (80.0, 40), (95.0, 100)],
         Preset::Balanced => vec![(55.0, 30), (75.0, 60), (90.0, 100)],
         Preset::Performance => vec![(50.0, 40), (70.0, 80), (85.0, 100)],
+    }
+}
+
+/// Builds a profile from a tuning entry and returns its (de-duplicated) UID. A Fixed entry becomes
+/// a Fixed profile; a Graph entry resolves its (optionally EMA-smoothed) source and named function
+/// and applies the curve. `clamp_min_duty`, when set, raises the floor so a low curve or duty
+/// cannot stall a fan that needs more to spin; pass None for channels that may idle at 0% (a
+/// zero-RPM GPU fan).
+fn build_from_entry(
+    proposal: &mut Proposal,
+    context: &DeviceContext,
+    entry: &SetupEntry,
+    base_temp: &TempSource,
+    name: &str,
+    clamp_min_duty: Option<Duty>,
+) -> ProfileUID {
+    match entry {
+        SetupEntry::Fixed { duty } => {
+            let duty = clamp_min_duty.map_or(*duty, |min_duty| (*duty).max(min_duty));
+            proposal.intern_profile(build_fixed_profile(name, duty))
+        }
+        SetupEntry::Graph {
+            curve,
+            smoothing,
+            function,
+        } => {
+            let source = resolve_entry_source(proposal, context, base_temp, smoothing.as_ref());
+            let function_uid = proposal.intern_function(build_function(function));
+            let curve = match clamp_min_duty {
+                Some(min_duty) => clamp_curve_floor(curve.clone(), min_duty),
+                None => curve.clone(),
+            };
+            assert_valid_curve(&curve);
+            proposal.intern_profile(build_graph_profile(name, source, function_uid, curve))
+        }
+    }
+}
+
+/// Resolves the temp source for a graph entry: the raw temp, or (when the entry sets smoothing and
+/// a custom-sensors device exists) an EMA custom sensor wrapping it. The EMA sensor is created and
+/// de-duplicated here.
+fn resolve_entry_source(
+    proposal: &mut Proposal,
+    context: &DeviceContext,
+    base: &TempSource,
+    smoothing: Option<&SmoothingSpec>,
+) -> TempSource {
+    let Some(smoothing) = smoothing else {
+        return base.clone();
+    };
+    let Some(custom_sensors_device_uid) = context.custom_sensors_device_uid.clone() else {
+        return base.clone();
+    };
+    let sensor_id =
+        proposal.intern_custom_sensor(build_ema_sensor(base.clone(), smoothing.ema_window_seconds));
+    TempSource {
+        temp_name: sensor_id,
+        device_uid: custom_sensors_device_uid,
+    }
+}
+
+/// Builds a Function from a named spec in the tuning data. A spec with no Standard fields is a
+/// plain (Identity) function; otherwise a Standard hysteresis function. The name is validated at
+/// load, so the lookup cannot miss in a shipped build.
+fn build_function(name: &str) -> Function {
+    let spec = TUNING
+        .functions
+        .get(name)
+        .expect("tuning function name is validated at load");
+    let has_standard_fields =
+        spec.deviance.is_some() || spec.only_downward.is_some() || spec.response_delay.is_some();
+    let kind = if has_standard_fields {
+        FunctionKind::Standard {
+            deviance: spec.deviance,
+            only_downward: spec.only_downward,
+            response_delay: spec.response_delay,
+        }
+    } else {
+        FunctionKind::Identity
+    };
+    Function {
+        uid: Uuid::new_v4().to_string(),
+        name: spec.name.clone(),
+        kind,
+        ..Function::default()
     }
 }
 
