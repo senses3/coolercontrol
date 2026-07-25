@@ -73,8 +73,7 @@ make dev
     an object instead of a function, so forcing it under an older `minimatch` clears the audit but
     breaks at runtime with `expand is not a function`.
 - `npm-run-all2` replaces the unmaintained `npm-run-all`, which held `minimatch` 3 and with it the
-  same vulnerable `brace-expansion`. Same `run-s` and `run-p` binaries, no script changes. Held at
-  8.x because 9.x requires Node 22.22.2+, above our Node 22 floor.
+  same vulnerable `brace-expansion`. Same `run-s` and `run-p` binaries, no script changes.
 
 ## Formatting
 
