@@ -13,7 +13,8 @@ CARGO := $(shell command -v cargo || command -v cargo-1.88 || command -v cargo-1
 CARGO_VER := $(if $(CARGO),$(shell $(CARGO) --version | awk '{print $$2}'))
 # Empty (compio) when cargo >= 1.88, i.e. when [1.88, cargo version] is already in ascending
 # order. Any 1.88+ release (1.88.1, 1.96.0, ...) selects compio; 1.85.x/1.87.x select tokio.
-FEATURES := $(shell printf '1.88\n%s\n' "$(CARGO_VER)" | sort -V -C || echo --no-default-features)
+# `-c` not `-C`: BusyBox sort (Alpine) has no `-C`, and would fail into the tokio fallback.
+FEATURES := $(shell printf '1.88\n%s\n' "$(CARGO_VER)" | sort -V -c 2>/dev/null || echo --no-default-features)
 
 .PHONY: build test clippy ci-test dev-run vendor clean clean-app install uninstall
 
