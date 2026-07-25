@@ -17,7 +17,8 @@ and processes are handled by the daemon.
 ## Requirements
 
 - make
-- nodejs >= 22.0.0
+- nodejs >= 22.22.2 (the minimum our dependency tree declares; CI and releases build with Node 24
+  LTS, which is what we test against)
 - npm
 
 ## Installation
