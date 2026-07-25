@@ -61,6 +61,14 @@ make dev
     distros with QtWebEngine)
   - https://wiki.qt.io/QtWebEngine/ChromiumVersions
 - "Overrides" section is to handle some current vulnerabilities in the dev dependencies.
+  - `js-beautify: ^2.0.3` because `@vue/test-utils` still declares `^1.14.9`, whose `editorconfig`
+    and `minimatch` chain holds the vulnerable `brace-expansion` (GHSA-mh99-v99m-4gvg). Only
+    `brace-expansion` 5.0.8+ carries the fix and only `minimatch` 10 can consume it: 5.0.8 exports
+    an object instead of a function, so forcing it under an older `minimatch` clears the audit but
+    breaks at runtime with `expand is not a function`.
+- `npm-run-all2` replaces the unmaintained `npm-run-all`, which held `minimatch` 3 and with it the
+  same vulnerable `brace-expansion`. Same `run-s` and `run-p` binaries, no script changes. Held at
+  8.x because 9.x requires Node 22.22.2+, above our Node 22 floor.
 
 ## Formatting
 
