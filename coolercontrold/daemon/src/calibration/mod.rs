@@ -46,6 +46,10 @@ pub use diagnoser::{
 pub use dispatch::{dispatch, DutyWriter, RepoWriter};
 pub use registry::DiagnosisRegistry;
 pub use state::FanStateMap;
+// Parameter and return types of `FanStateMap`'s public entry/replace
+// pair; only the engine tests name them today.
+#[cfg_attr(not(test), allow(unused_imports))]
+pub use state::{ChannelEntry, FanState};
 pub use store::{validate, CalibrationEntry, CalibrationStore};
 
 use crate::device::{ChannelName, DeviceUID};

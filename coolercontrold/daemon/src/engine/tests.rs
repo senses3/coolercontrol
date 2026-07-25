@@ -47,6 +47,7 @@ mod engine_tests {
     struct MockRepository {
         device_type: DeviceType,
         set_speeds: Rc<RefCell<Vec<u8>>>,
+        applied_profiles: Rc<RefCell<Vec<Vec<(Temp, Duty)>>>>,
         should_fail: Rc<Cell<bool>>,
     }
 
@@ -104,8 +105,14 @@ mod engine_tests {
             _device_uid: &UID,
             _channel_name: &str,
             _temp_source: &TempSource,
-            _speed_profile: &[(f64, u8)],
+            speed_profile: &[(f64, u8)],
         ) -> Result<()> {
+            if self.should_fail.get() {
+                return Err(anyhow!("Simulated failure to apply speed profile"));
+            }
+            self.applied_profiles
+                .borrow_mut()
+                .push(speed_profile.to_vec());
             Ok(())
         }
 
@@ -139,22 +146,31 @@ mod engine_tests {
         async fn reinitialize_devices(&self) {}
     }
 
-    fn setup_single_device() -> (
-        DeviceLock,
-        Engine,
-        Rc<Config>,
-        Rc<RefCell<Vec<u8>>>,
-        Rc<Cell<bool>>,
-    ) {
+    /// One hwmon mock device with an Engine over it, plus every handle
+    /// the tests assert on. The setup wrappers below pick what they need.
+    struct MockHarness {
+        device: DeviceLock,
+        engine: Engine,
+        config: Rc<Config>,
+        set_speeds: Rc<RefCell<Vec<u8>>>,
+        applied_profiles: Rc<RefCell<Vec<Vec<(Temp, Duty)>>>>,
+        should_fail: Rc<Cell<bool>>,
+        calibration_store: Rc<crate::calibration::CalibrationStore>,
+        fan_state_map: Rc<crate::calibration::FanStateMap>,
+    }
+
+    fn setup_harness() -> MockHarness {
         let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
         let mut repos = Repositories::default();
         let set_speeds = Rc::new(RefCell::new(Vec::new()));
+        let applied_profiles = Rc::new(RefCell::new(Vec::new()));
         let should_fail = Rc::new(Cell::new(false));
 
         // Create mock repository
         let mock_repo = Rc::new(MockRepository {
             device_type: DeviceType::Hwmon,
             set_speeds: Rc::clone(&set_speeds),
+            applied_profiles: Rc::clone(&applied_profiles),
             should_fail: Rc::clone(&should_fail),
         });
         repos.hwmon = Some(mock_repo);
@@ -185,12 +201,32 @@ mod engine_tests {
             all_devices,
             &all_repos,
             Rc::clone(&config),
-            calibration_store,
-            fan_state_map,
+            Rc::clone(&calibration_store),
+            Rc::clone(&fan_state_map),
             Rc::new(crate::overrides::OverridesController::empty()),
         );
 
-        (device, engine, config, set_speeds, should_fail)
+        MockHarness {
+            device,
+            engine,
+            config,
+            set_speeds,
+            applied_profiles,
+            should_fail,
+            calibration_store,
+            fan_state_map,
+        }
+    }
+
+    fn setup_single_device() -> (
+        DeviceLock,
+        Engine,
+        Rc<Config>,
+        Rc<RefCell<Vec<u8>>>,
+        Rc<Cell<bool>>,
+    ) {
+        let h = setup_harness();
+        (h.device, h.engine, h.config, h.set_speeds, h.should_fail)
     }
 
     fn create_controllable_fan(device: &DeviceLock, fan_name: &str) -> ChannelName {
@@ -1433,47 +1469,8 @@ mod engine_tests {
     }
 
     fn setup_calibrated_device() -> (DeviceLock, Engine, Rc<crate::calibration::CalibrationStore>) {
-        let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
-        let mut repos = Repositories::default();
-        let set_speeds = Rc::new(RefCell::new(Vec::new()));
-        let should_fail = Rc::new(Cell::new(false));
-
-        let mock_repo = Rc::new(MockRepository {
-            device_type: DeviceType::Hwmon,
-            set_speeds,
-            should_fail,
-        });
-        repos.hwmon = Some(mock_repo);
-
-        let device = Rc::new(RefCell::new(Device::new(
-            "Test Device".to_string(),
-            DeviceType::Hwmon,
-            0,
-            None,
-            DeviceInfo::default(),
-            None,
-            1.0,
-        )));
-        let device_uid = device.borrow().uid.clone();
-        devices.insert(device_uid, Rc::clone(&device));
-
-        let all_devices = Rc::new(devices);
-        let all_repos = Rc::new(repos);
-        let config = Rc::new(Config::init_default_config().unwrap());
-        config.create_device_list(&all_devices);
-
-        let calibration_store = Rc::new(crate::calibration::CalibrationStore::empty());
-        let fan_state_map = Rc::new(crate::calibration::FanStateMap::new());
-        let engine = Engine::new(
-            all_devices,
-            &all_repos,
-            Rc::clone(&config),
-            Rc::clone(&calibration_store),
-            fan_state_map,
-            Rc::new(crate::overrides::OverridesController::empty()),
-        );
-
-        (device, engine, calibration_store)
+        let h = setup_harness();
+        (h.device, h.engine, h.calibration_store)
     }
 
     /// Build an Engine over one hwmon mock device, returning the config
@@ -1481,41 +1478,9 @@ mod engine_tests {
     /// `setup_calibrated_device` but exposes the `config` and
     /// `set_speeds` handles a snapshot/restore test needs to assert on.
     fn setup_engine_with_speed_recorder() -> (Engine, Rc<Config>, DeviceUID, Rc<RefCell<Vec<u8>>>) {
-        let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
-        let mut repos = Repositories::default();
-        let set_speeds = Rc::new(RefCell::new(Vec::new()));
-        let mock_repo = Rc::new(MockRepository {
-            device_type: DeviceType::Hwmon,
-            set_speeds: Rc::clone(&set_speeds),
-            should_fail: Rc::new(Cell::new(false)),
-        });
-        repos.hwmon = Some(mock_repo);
-
-        let device = Rc::new(RefCell::new(Device::new(
-            "Test Device".to_string(),
-            DeviceType::Hwmon,
-            0,
-            None,
-            DeviceInfo::default(),
-            None,
-            1.0,
-        )));
-        let device_uid = device.borrow().uid.clone();
-        devices.insert(device_uid.clone(), Rc::clone(&device));
-
-        let all_devices = Rc::new(devices);
-        let all_repos = Rc::new(repos);
-        let config = Rc::new(Config::init_default_config().unwrap());
-        config.create_device_list(&all_devices);
-        let engine = Engine::new(
-            all_devices,
-            &all_repos,
-            Rc::clone(&config),
-            Rc::new(crate::calibration::CalibrationStore::empty()),
-            Rc::new(crate::calibration::FanStateMap::new()),
-            Rc::new(crate::overrides::OverridesController::empty()),
-        );
-        (engine, config, device_uid, set_speeds)
+        let h = setup_harness();
+        let device_uid = h.device.borrow().uid.clone();
+        (h.engine, h.config, device_uid, h.set_speeds)
     }
 
     fn sample_smooth_calibration() -> crate::calibration::Calibration {
@@ -2387,6 +2352,167 @@ mod engine_tests {
                     "fan2 must keep its duty (not in clear scope)"
                 );
             }
+        });
+    }
+
+    /// A fan whose channel supports a firmware-internal curve, the
+    /// prerequisite for the `set_graph_profile` hardware branch.
+    fn create_firmware_curve_fan(device: &DeviceLock, fan_name: &str) -> ChannelName {
+        let fan_channel_name = fan_name.to_string();
+        device.borrow_mut().info.channels.insert(
+            fan_channel_name.clone(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Speed(SpeedOptions {
+                    fixed_enabled: true,
+                    extension: Some(crate::device::ChannelExtensionNames::AutoHWCurve),
+                    ..Default::default()
+                }),
+            },
+        );
+        fan_channel_name
+    }
+
+    /// Turn on the user-facing firmware-controlled profile toggle.
+    fn enable_hw_curve(config: &Config, device_uid: &UID, channel_name: &str) {
+        use crate::setting::{CCChannelSettings, CCDeviceSettings, ChannelExtensions};
+        let mut cc_settings = CCDeviceSettings::default();
+        cc_settings.channel_settings.insert(
+            channel_name.to_string(),
+            CCChannelSettings {
+                extension: Some(ChannelExtensions::AutoHWCurve {
+                    auto_hw_curve_enabled: true,
+                }),
+                ..Default::default()
+            },
+        );
+        config.set_cc_settings_for_device(device_uid, &cc_settings);
+    }
+
+    /// Apply a Graph profile to a firmware-curve channel and return the
+    /// points the repo received.
+    async fn apply_firmware_curve_profile(
+        h: &MockHarness,
+        points: Vec<(Temp, Duty)>,
+    ) -> Vec<(Temp, Duty)> {
+        let fan = create_firmware_curve_fan(&h.device, "fan1");
+        let temp = create_temp(&h.device, "temp1");
+        let device_uid = h.device.borrow().uid.clone();
+        enable_hw_curve(&h.config, &device_uid, &fan);
+        let profile_uid = create_graph_profile_with_temp_source(
+            &h.config,
+            points,
+            TempSource {
+                device_uid: device_uid.clone(),
+                temp_name: temp,
+            },
+        );
+        h.engine
+            .set_profile(&device_uid, &fan, &profile_uid)
+            .await
+            .expect("firmware profile applies");
+        let applied = h.applied_profiles.borrow();
+        assert_eq!(applied.len(), 1, "exactly one curve write expected");
+        applied[0].clone()
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_maps_points_through_calibration() {
+        // Goal: a calibrated channel draws its curve in true-duty, which
+        // the firmware cannot interpret. The hardware branch must write
+        // device-duty instead, or the firmware runs the fan below its
+        // calibrated floor. Expected values follow from the fixture's
+        // linear curve (rpm = duty * 20, floor 100 rpm at duty 5):
+        // true 10 -> 14, true 50 -> 52. The 0 and 100 endpoints are
+        // preserved exactly so an off-point stays off (AMD's zero-RPM
+        // detection depends on it) and full duty stays full.
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            h.calibration_store.insert_unsaved(
+                (device_uid, "fan1".to_string()),
+                sample_smooth_calibration(),
+            );
+
+            let applied = apply_firmware_curve_profile(
+                &h,
+                vec![(30.0, 0), (50.0, 10), (70.0, 50), (90.0, 100)],
+            )
+            .await;
+
+            assert_eq!(
+                applied,
+                vec![(30.0, 0), (50.0, 14), (70.0, 52), (90.0, 100)]
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_passes_through_when_uncalibrated() {
+        // Goal: without a calibration the curve must reach the repo
+        // byte-identical to what the user drew. This is the regression
+        // lock for every existing firmware-curve user.
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let points = vec![(30.0, 20), (50.0, 40), (70.0, 100)];
+
+            let applied = apply_firmware_curve_profile(&h, points.clone()).await;
+
+            assert_eq!(applied, points);
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_passes_through_for_stepped_calibration() {
+        // Goal: a stepped channel has no forward map (duties pass
+        // through in software mode too), so the firmware curve must not
+        // be rewritten.
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            let mut stepped = sample_smooth_calibration();
+            stepped.curve_kind = crate::calibration::CurveKind::Stepped;
+            h.calibration_store
+                .insert_unsaved((device_uid, "fan1".to_string()), stepped);
+            let points = vec![(30.0, 20), (50.0, 40), (70.0, 100)];
+
+            let applied = apply_firmware_curve_profile(&h, points.clone()).await;
+
+            assert_eq!(applied, points);
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_forgets_stale_dispatcher_state() {
+        // Goal: the dispatcher's kick/sustain state describes writes the
+        // daemon makes itself. Once the firmware owns the channel it is
+        // stale, and the status augmenter's cache tier would otherwise
+        // keep displaying the last commanded true-duty.
+        use crate::calibration::{ChannelEntry, FanState};
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            let key = (device_uid, "fan1".to_string());
+            h.fan_state_map.replace(
+                key.clone(),
+                ChannelEntry {
+                    state: FanState::On,
+                    under_diagnosis: false,
+                    commanded_true_duty: Some(42),
+                },
+            );
+            assert_eq!(h.fan_state_map.commanded_true_duty(&key), Some(42));
+
+            let _ = apply_firmware_curve_profile(&h, vec![(30.0, 20), (70.0, 100)]).await;
+
+            assert!(
+                h.fan_state_map.commanded_true_duty(&key).is_none(),
+                "entering firmware control must drop the dispatcher state"
+            );
         });
     }
 }
