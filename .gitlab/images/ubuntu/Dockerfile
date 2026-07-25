@@ -15,7 +15,7 @@ ENV CI=true
 #    RUST_VERSION=1.90.0
 ENV PATH=/root/.cargo/bin:$PATH
 
-ENV NODE_MAJOR=22
+ENV NODE_MAJOR=24
 
 RUN apt update && apt install -y --no-install-recommends \
     # build-deps:

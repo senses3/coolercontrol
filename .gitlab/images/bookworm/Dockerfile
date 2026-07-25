@@ -16,7 +16,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     PATH=/usr/local/cargo/bin:$PATH \
     RUST_VERSION=1.91.0
 # bookworm used node 18
-ENV NODE_MAJOR=22
+ENV NODE_MAJOR=24
 # bookworm has modern python dependencies - no issue.
 
 RUN apt update && apt install -y --no-install-recommends \

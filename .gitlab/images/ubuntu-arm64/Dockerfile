@@ -23,7 +23,7 @@ ENV CI=true
 #    RUST_VERSION=1.88.0
 ENV PATH=/root/.cargo/bin:$PATH
 
-ENV NODE_MAJOR=22
+ENV NODE_MAJOR=24
 
 # install most deps beforehand to keep this pipeline fast:
 RUN apt-get update && apt-get install -y --no-install-recommends \

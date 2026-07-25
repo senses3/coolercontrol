@@ -17,7 +17,7 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
     RUST_VERSION=1.96.0
-ENV NODE_MAJOR=22
+ENV NODE_MAJOR=24
 
 RUN apt update && apt install -y --no-install-recommends \
     # build essentials:
