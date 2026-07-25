@@ -17,7 +17,8 @@ and processes are handled by the daemon.
 ## Requirements
 
 - make
-- nodejs >= 22.0.0
+- nodejs >= 22.22.2 (the minimum our dependency tree declares; CI and releases build with Node 24
+  LTS, which is what we test against)
 - npm
 
 ## Installation
@@ -55,12 +56,25 @@ make dev
 ## Held-back Dependencies
 
 - `"@types/node": "22.19.19"` for compat with the current tsconfig node version
+- `"typescript": "^6.0.3"` because 7.x is the native (Go) port, which no longer ships the JavaScript
+  compiler API. Its `exports` map offers only `lib/version.cjs` and `unstable/*`, so `vue-tsc` dies
+  on startup resolving `typescript/lib/tsc` (`ERR_PACKAGE_PATH_NOT_EXPORTED`). Our own code is
+  already 7.x clean: the native `tsc` reports no errors on this project beyond the `.vue` imports it
+  cannot resolve. Revisit when vuejs/language-tools ships a `vue-tsc` that targets the native
+  compiler.
 - `"tailwindcss": "3.4.19",` the upgrade to 4.x looks to be significant work
   - https://tailwindcss.com/docs/upgrade-guide
   - Looks like 4.0 only works for Chrome 111+ (We need to support 90+ for older debian/ubuntu
     distros with QtWebEngine)
   - https://wiki.qt.io/QtWebEngine/ChromiumVersions
 - "Overrides" section is to handle some current vulnerabilities in the dev dependencies.
+  - `js-beautify: ^2.0.3` because `@vue/test-utils` still declares `^1.14.9`, whose `editorconfig`
+    and `minimatch` chain holds the vulnerable `brace-expansion` (GHSA-mh99-v99m-4gvg). Only
+    `brace-expansion` 5.0.8+ carries the fix and only `minimatch` 10 can consume it: 5.0.8 exports
+    an object instead of a function, so forcing it under an older `minimatch` clears the audit but
+    breaks at runtime with `expand is not a function`.
+- `npm-run-all2` replaces the unmaintained `npm-run-all`, which held `minimatch` 3 and with it the
+  same vulnerable `brace-expansion`. Same `run-s` and `run-p` binaries, no script changes.
 
 ## Formatting
 

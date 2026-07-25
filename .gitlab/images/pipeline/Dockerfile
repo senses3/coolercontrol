@@ -21,7 +21,7 @@ ENV PYTHONFAULTHANDLER=1 \
 #    RUST_VERSION=1.91.0
 ENV PATH=/root/.cargo/bin:$PATH
 
-ENV NODE_MAJOR=22
+ENV NODE_MAJOR=24
 
 
 # install most deps beforehand to keep this pipeline fast:

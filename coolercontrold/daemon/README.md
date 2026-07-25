@@ -50,7 +50,7 @@ currently, and is something we might take advantage of in the future.
 - cargo/rust >= 1.88.0 (default build); >= 1.85.0 with `--no-default-features`
 - libdrm-dev
 - To build the web assets:
-  - nodejs >= 22.0.0
+  - nodejs >= 22.22.2 (CI and releases build with Node 24 LTS)
   - npm
 
 ### Runtime
