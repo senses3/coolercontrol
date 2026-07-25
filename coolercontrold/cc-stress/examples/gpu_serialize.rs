@@ -1,10 +1,12 @@
-//! Demonstrates the multi-adapter head-of-line blocking in `run_gpu_stress`.
+//! Shows why `run_gpu_stress` gives each adapter its own OS thread.
 //!
-//! The shipped code drives every adapter from a `tokio::spawn` task on the
-//! daemon's current-thread runtime, and each task calls the *blocking*
+//! An earlier version drove every adapter from a `tokio::spawn` task on the
+//! daemon's current-thread runtime, with each task calling the *blocking*
 //! `device.poll(Maintain::Wait)`. A blocking call on a single-threaded
-//! runtime stalls every other task, so adapters take turns instead of
-//! running concurrently: each GPU idles while the runtime waits on another.
+//! runtime stalls every other task, so adapters took turns instead of
+//! running concurrently: each GPU idled while the runtime waited on another.
+//! Anyone tempted to move this back onto an async runtime should run this
+//! first.
 //!
 //! Adapter A is the real GPU with a short dispatch. Adapter B stands in for
 //! a second, slower adapter (typically the iGPU that nearly every modern
@@ -12,8 +14,9 @@
 //! so it costs wall-clock time inside the runtime without competing for the
 //! same silicon. That isolates the scheduling effect from GPU contention.
 //!
-//! Both loops mirror the shipped `stress_adapter`, including its
-//! `sleep(GPU_SUBMIT_SLEEP_MS).await` yield point.
+//! Both loops mirror that old `stress_adapter`, including its per-iteration
+//! yield point. The original used `sleep(0).await`, whose timer granularity
+//! cost a further ~1ms per submission on top of what is measured here.
 //!
 //! Usage: `gpu_serialize [seconds] [slow_adapter_wait_ms]`
 
@@ -173,7 +176,7 @@ fn main() {
     rt.block_on(async {
         while Instant::now() < deadline {
             gpu.step();
-            tokio::time::sleep(Duration::from_millis(0)).await;
+            tokio::task::yield_now().await;
         }
     });
     println!(
@@ -192,14 +195,14 @@ fn main() {
                 let a = tokio::task::spawn_local(async move {
                     while Instant::now() < deadline {
                         g.step();
-                        tokio::time::sleep(Duration::from_millis(0)).await;
+                        tokio::task::yield_now().await;
                     }
                 });
                 let b = tokio::task::spawn_local(async move {
                     while Instant::now() < deadline {
                         // Stands in for the second adapter's poll(Wait).
                         std::thread::sleep(Duration::from_millis(slow_ms));
-                        tokio::time::sleep(Duration::from_millis(0)).await;
+                        tokio::task::yield_now().await;
                     }
                 });
                 let _ = a.await;

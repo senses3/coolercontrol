@@ -305,7 +305,7 @@ fn main() -> Result<()> {
         // Publish the sidecar handle process-wide so reactor-bound work (process spawning, the
         // auth/token/liqctld/service-plugin transports) can reach it without threading a handle.
         sidecar::install_global(sidecar.handle());
-        handle_non_root_commands(&cmd_args).await?;
+        handle_non_root_commands(&cmd_args)?;
         let log_buf_handle = logger::setup_logging(&cmd_args, run_token.clone()).await?;
         verify_is_root()?;
         handle_detect_command(&cmd_args);
@@ -568,13 +568,15 @@ enum SubCommands {
     },
 }
 
-async fn handle_non_root_commands(args: &Args) -> Result<()> {
+/// The stress subcommands run synchronously on plain threads, so this needs
+/// no runtime of its own.
+fn handle_non_root_commands(args: &Args) -> Result<()> {
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {
         cc_stress::run_cpu_stress(*threads, *timeout)?;
         exit_successfully();
     }
     if let Some(SubCommands::StressGpu { timeout }) = &args.command {
-        cc_stress::run_gpu_stress(*timeout).await?;
+        cc_stress::run_gpu_stress(*timeout)?;
         exit_successfully();
     }
     if let Some(SubCommands::StressRam { bytes, timeout }) = &args.command {
