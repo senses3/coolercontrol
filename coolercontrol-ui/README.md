@@ -55,6 +55,12 @@ make dev
 ## Held-back Dependencies
 
 - `"@types/node": "22.19.19"` for compat with the current tsconfig node version
+- `"typescript": "^6.0.3"` because 7.x is the native (Go) port, which no longer ships the JavaScript
+  compiler API. Its `exports` map offers only `lib/version.cjs` and `unstable/*`, so `vue-tsc` dies
+  on startup resolving `typescript/lib/tsc` (`ERR_PACKAGE_PATH_NOT_EXPORTED`). Our own code is
+  already 7.x clean: the native `tsc` reports no errors on this project beyond the `.vue` imports it
+  cannot resolve. Revisit when vuejs/language-tools ships a `vue-tsc` that targets the native
+  compiler.
 - `"tailwindcss": "3.4.19",` the upgrade to 4.x looks to be significant work
   - https://tailwindcss.com/docs/upgrade-guide
   - Looks like 4.0 only works for Chrome 111+ (We need to support 90+ for older debian/ubuntu
