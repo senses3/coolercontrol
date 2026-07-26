@@ -27,7 +27,17 @@ import {
     mdiImport,
     mdiRestart,
 } from '@mdi/js'
-import { computed, inject, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
+import {
+    computed,
+    inject,
+    nextTick,
+    onMounted,
+    onUnmounted,
+    reactive,
+    type Ref,
+    ref,
+    watch,
+} from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useConfirm } from '@/shell/confirm'
@@ -41,11 +51,25 @@ import UiInput from '@/shell/ui/UiInput.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import { useToast } from '@/shell/toast'
 import {
+    BUILT_IN_THEME_MODES,
     CustomThemeSettings,
     defaultCustomTheme,
+    getThemeModeDisplayName,
     StartupPage,
     ThemeMode,
 } from '@/models/UISettings.ts'
+import {
+    INSTALLED_THEMES,
+    probeCompiledSwatch,
+    surfaceTintFor,
+    swatchFor,
+    THEME_TOKEN_KEYS,
+    THEME_TOKEN_VARS,
+    type ThemeSwatch,
+    type ThemeTokens,
+} from '@/shell/themes.ts'
+import type { UiSelectOption } from '@/shell/ui/UiSelect.vue'
+import ThemeSwatchStrip from '@/shell/ui/ThemeSwatchStrip.vue'
 import { Color } from '@/models/Device.ts'
 import { Emitter, EventType } from 'mitt'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
@@ -121,23 +145,58 @@ const toggleFullScreen = async (_enable: string | number | boolean): Promise<voi
     })
 }
 
+// Preview swatches. Compiled themes are read back from their own class so the
+// picker cannot drift from tailwind.config.js; installed themes carry theirs,
+// and Custom shows whatever the user has currently picked.
+const COMPILED_THEME_CLASSES: Record<string, string> = {
+    [ThemeMode.DARK]: 'dark-theme',
+    [ThemeMode.LIGHT]: 'light-theme',
+    [ThemeMode.HIGH_CONTRAST_DARK]: 'high-contrast-dark',
+    [ThemeMode.HIGH_CONTRAST_LIGHT]: 'high-contrast-light',
+}
+const builtInSwatch = (mode: string): ThemeSwatch => {
+    if (mode === ThemeMode.SYSTEM) {
+        const systemClass = window.matchMedia('(prefers-color-scheme: light)').matches
+            ? 'light-theme'
+            : 'dark-theme'
+        return probeCompiledSwatch(systemClass)
+    }
+    return probeCompiledSwatch(COMPILED_THEME_CLASSES[mode] ?? 'dark-theme')
+}
+const customSwatch = (): ThemeSwatch => [
+    `rgb(${settingsStore.customTheme.bgOne})`,
+    `rgb(${settingsStore.customTheme.bgTwo})`,
+    `rgb(${settingsStore.customTheme.accent})`,
+    `rgb(${settingsStore.customTheme.textColor})`,
+]
+const themeSwatches = computed((): Map<string, ThemeSwatch> => {
+    const swatches = new Map<string, ThemeSwatch>()
+    for (const mode of BUILT_IN_THEME_MODES) swatches.set(mode, builtInSwatch(mode))
+    for (const theme of INSTALLED_THEMES) swatches.set(theme.id, swatchFor(theme))
+    swatches.set(ThemeMode.CUSTOM, customSwatch())
+    return swatches
+})
+
 // Use computed to respond to language changes
-const themeModeOptions = computed(() => [
-    { value: ThemeMode.SYSTEM, label: t('layout.settings.themeMode.system') },
-    { value: ThemeMode.DARK, label: t('layout.settings.themeMode.dark') },
-    { value: ThemeMode.LIGHT, label: t('layout.settings.themeMode.light') },
+const themeModeOptions = computed((): UiSelectOption[] => [
+    ...BUILT_IN_THEME_MODES.map((mode) => ({
+        value: mode as string,
+        label: getThemeModeDisplayName(mode),
+        group: t('layout.settings.themeGroups.builtIn'),
+    })),
+    ...INSTALLED_THEMES.map((theme) => ({
+        value: theme.id,
+        label: theme.name,
+        group: t('layout.settings.themeGroups.installed'),
+    })),
     {
-        value: ThemeMode.HIGH_CONTRAST_DARK,
-        label: t('layout.settings.themeMode.highContrastDark'),
+        value: ThemeMode.CUSTOM as string,
+        label: getThemeModeDisplayName(ThemeMode.CUSTOM),
+        group: t('layout.settings.themeGroups.custom'),
     },
-    {
-        value: ThemeMode.HIGH_CONTRAST_LIGHT,
-        label: t('layout.settings.themeMode.highContrastLight'),
-    },
-    { value: ThemeMode.CUSTOM, label: t('layout.settings.themeMode.custom') },
 ])
-const changeThemeMode = async (value: ThemeMode) => {
-    if (value === null) {
+const changeThemeMode = async (value: string | undefined) => {
+    if (value == null) {
         return // do not update on unselect
     }
 
@@ -196,60 +255,44 @@ const startupPageOptions = computed(() => [
     { value: StartupPage.Controls, label: t('layout.shell.cooling') },
     { value: StartupPage.HomeDashboard, label: t('models.startupPage.homeDashboard') },
 ])
-const customThemeAccent: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.accent))
-const customThemeBgOne: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.bgOne))
-const customThemeBgTwo: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.bgTwo))
-const customThemeBorder: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.borderOne))
-const customThemeText: Ref<Color> = ref(colorStore.rgbToHex(settingsStore.customTheme.textColor))
-const customThemeTextSecondary: Ref<Color> = ref(
-    colorStore.rgbToHex(settingsStore.customTheme.textColorSecondary),
-)
+// The custom theme carries the same ten tokens an installed theme does. One hex
+// ref per token, mirrored into the store as `r g b` whenever a picker changes.
+const customThemeHex = reactive({ ...defaultCustomTheme }) as Record<keyof ThemeTokens, Color>
+for (const key of THEME_TOKEN_KEYS) {
+    customThemeHex[key] = colorStore.rgbToHex(settingsStore.customTheme[key])
+}
 
-const setNewColorAccent = (newHexColor: Color): void => {
-    customThemeAccent.value = newHexColor
-    settingsStore.customTheme.accent = colorStore.hexToRgbThemeString(newHexColor)
-    document.documentElement.style.setProperty('--colors-accent', settingsStore.customTheme.accent)
-    colorStore.reLoadThemeColors()
-}
-const setNewColorBgOne = (newHexColor: Color): void => {
-    customThemeBgOne.value = newHexColor
-    settingsStore.customTheme.bgOne = colorStore.hexToRgbThemeString(newHexColor)
-    document.documentElement.style.setProperty('--colors-bg-one', settingsStore.customTheme.bgOne)
-    colorStore.reLoadThemeColors()
-}
-const setNewColorBgTwo = (newHexColor: Color): void => {
-    customThemeBgTwo.value = newHexColor
-    settingsStore.customTheme.bgTwo = colorStore.hexToRgbThemeString(newHexColor)
-    document.documentElement.style.setProperty('--colors-bg-two', settingsStore.customTheme.bgTwo)
-    colorStore.reLoadThemeColors()
-}
-const setNewColorBorder = (newHexColor: Color): void => {
-    customThemeBorder.value = newHexColor
-    settingsStore.customTheme.borderOne = colorStore.hexToRgbThemeString(newHexColor)
+const setCustomColor = (key: keyof ThemeTokens, newHexColor: Color): void => {
+    customThemeHex[key] = newHexColor
+    settingsStore.customTheme[key] = colorStore.hexToRgbThemeString(newHexColor)
     document.documentElement.style.setProperty(
-        '--colors-border-one',
-        settingsStore.customTheme.borderOne,
+        THEME_TOKEN_VARS[key],
+        settingsStore.customTheme[key],
     )
+    if (key === 'bgOne') {
+        // A custom theme declares no variant, so the hover tint follows the
+        // background: a light one darkens instead of washing out.
+        document.documentElement.style.setProperty(
+            '--colors-surface-hover',
+            surfaceTintFor(settingsStore.customTheme.bgOne),
+        )
+    }
     colorStore.reLoadThemeColors()
 }
-const setNewColorText = (newHexColor: Color): void => {
-    customThemeText.value = newHexColor
-    settingsStore.customTheme.textColor = colorStore.hexToRgbThemeString(newHexColor)
-    document.documentElement.style.setProperty(
-        '--colors-text-color',
-        settingsStore.customTheme.textColor,
-    )
-    colorStore.reLoadThemeColors()
-}
-const setNewColorTextSecondary = (newHexColor: Color): void => {
-    customThemeTextSecondary.value = newHexColor
-    settingsStore.customTheme.textColorSecondary = colorStore.hexToRgbThemeString(newHexColor)
-    document.documentElement.style.setProperty(
-        '--colors-text-color-secondary',
-        settingsStore.customTheme.textColorSecondary,
-    )
-    colorStore.reLoadThemeColors()
-}
+
+// Label keys predate the token names, so they are mapped rather than derived.
+const CUSTOM_THEME_ROWS: Array<{ key: keyof ThemeTokens; labelKey: string }> = [
+    { key: 'accent', labelKey: 'accent' },
+    { key: 'bgOne', labelKey: 'bgOne' },
+    { key: 'bgTwo', labelKey: 'bgTwo' },
+    { key: 'borderOne', labelKey: 'border' },
+    { key: 'textColor', labelKey: 'text' },
+    { key: 'textColorSecondary', labelKey: 'textSecondary' },
+    { key: 'success', labelKey: 'success' },
+    { key: 'warning', labelKey: 'warning' },
+    { key: 'error', labelKey: 'error' },
+    { key: 'info', labelKey: 'info' },
+]
 
 const applyGenericDaemonChange = _.debounce(
     () =>
@@ -299,14 +342,9 @@ interface CustomColorTheme extends CustomThemeSettings {}
 class CustomColorTheme {
     static fromCustomThemeSettings(customThemeSettings: CustomThemeSettings): CustomColorTheme {
         const customColorTheme = new CustomColorTheme()
-        customColorTheme.accent = colorStore.rgbToHex(customThemeSettings.accent)
-        customColorTheme.bgOne = colorStore.rgbToHex(customThemeSettings.bgOne)
-        customColorTheme.bgTwo = colorStore.rgbToHex(customThemeSettings.bgTwo)
-        customColorTheme.borderOne = colorStore.rgbToHex(customThemeSettings.borderOne)
-        customColorTheme.textColor = colorStore.rgbToHex(customThemeSettings.textColor)
-        customColorTheme.textColorSecondary = colorStore.rgbToHex(
-            customThemeSettings.textColorSecondary,
-        )
+        for (const key of THEME_TOKEN_KEYS) {
+            customColorTheme[key] = colorStore.rgbToHex(customThemeSettings[key])
+        }
         return customColorTheme
     }
 
@@ -318,34 +356,30 @@ class CustomColorTheme {
     }
 
     static isCustomThemeSettings(jsonObj: any): jsonObj is CustomThemeSettings {
-        return (
-            typeof jsonObj.accent === 'string' &&
-            colorStore.isValidHex(jsonObj.accent) &&
-            typeof jsonObj.bgOne === 'string' &&
-            colorStore.isValidHex(jsonObj.bgOne) &&
-            typeof jsonObj.bgTwo === 'string' &&
-            colorStore.isValidHex(jsonObj.bgTwo) &&
-            typeof jsonObj.borderOne === 'string' &&
-            colorStore.isValidHex(jsonObj.borderOne) &&
-            typeof jsonObj.textColor === 'string' &&
-            colorStore.isValidHex(jsonObj.textColor) &&
-            typeof jsonObj.textColorSecondary === 'string' &&
-            colorStore.isValidHex(jsonObj.textColorSecondary)
-        )
+        const valid = (value: any): boolean =>
+            typeof value === 'string' && colorStore.isValidHex(value)
+        // Exports written before the status colors existed carry only the first
+        // six keys; they still import, and the rest fall back to the defaults.
+        if (LEGACY_THEME_KEYS.some((key) => !valid(jsonObj[key]))) return false
+        for (const key of THEME_TOKEN_KEYS) {
+            if (jsonObj[key] == null) jsonObj[key] = colorStore.rgbToHex(defaultCustomTheme[key])
+        }
+        return THEME_TOKEN_KEYS.every((key) => valid(jsonObj[key]))
     }
 
     applyCustomColorTheme(): void {
-        setNewColorAccent(this.accent)
-        setNewColorBgOne(this.bgOne)
-        setNewColorBgTwo(this.bgTwo)
-        setNewColorBorder(this.borderOne)
-        setNewColorText(this.textColor)
-        setNewColorTextSecondary(this.textColorSecondary)
+        for (const key of THEME_TOKEN_KEYS) {
+            setCustomColor(key, this[key])
+        }
     }
 }
-// Theme code: cct1:<36 hex chars>[<2 hex chars CRC-8>]
-// Output always includes the checksum; input accepts with or without.
-const THEME_CODE_PREFIX = 'cct1:'
+// Theme code: cct2:<60 hex chars>[<2 hex chars CRC-8>], one RGB triple per
+// token in THEME_TOKEN_KEYS order. Output always includes the checksum; input
+// accepts it with or without. cct1 codes hold only the first six tokens and are
+// still read, so codes shared before the status colors existed keep working.
+const THEME_CODE_PREFIX = 'cct2:'
+const LEGACY_THEME_CODE_PREFIX = 'cct1:'
+const LEGACY_THEME_KEYS = THEME_TOKEN_KEYS.slice(0, 6)
 
 const crc8 = (bytes: Uint8Array): number => {
     let crc = 0
@@ -363,50 +397,48 @@ const colorToHexBody = (c: Color): string => {
     return hex.startsWith('#') ? hex.slice(1) : hex
 }
 
-const encodeThemeCode = (theme: CustomThemeSettings): string => {
-    const hex = [
-        colorToHexBody(theme.accent),
-        colorToHexBody(theme.bgOne),
-        colorToHexBody(theme.bgTwo),
-        colorToHexBody(theme.borderOne),
-        colorToHexBody(theme.textColor),
-        colorToHexBody(theme.textColorSecondary),
-    ].join('')
-    const bytes = new Uint8Array(18)
-    for (let i = 0; i < 18; i++) {
+const hexBodyToBytes = (hex: string): Uint8Array => {
+    const bytes = new Uint8Array(hex.length / 2)
+    for (let i = 0; i < bytes.length; i++) {
         bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
     }
-    const cs = crc8(bytes).toString(16).padStart(2, '0')
+    return bytes
+}
+
+const encodeThemeCode = (theme: CustomThemeSettings): string => {
+    const hex = THEME_TOKEN_KEYS.map((key) => colorToHexBody(theme[key])).join('')
+    const cs = crc8(hexBodyToBytes(hex)).toString(16).padStart(2, '0')
     return THEME_CODE_PREFIX + hex + cs
+}
+
+/** Strips an optional CRC-8 suffix, rejecting a body that fails it. */
+const themeCodeBody = (body: string, hexLength: number): string | null => {
+    let hex: string
+    if (body.length === hexLength) {
+        hex = body
+    } else if (body.length === hexLength + 2) {
+        hex = body.slice(0, hexLength)
+        if (!new RegExp(`^[0-9a-f]{${hexLength}}$`).test(hex)) return null
+        if (crc8(hexBodyToBytes(hex)).toString(16).padStart(2, '0') !== body.slice(hexLength)) {
+            return null
+        }
+    } else {
+        return null
+    }
+    return new RegExp(`^[0-9a-f]{${hexLength}}$`).test(hex) ? hex : null
 }
 
 const decodeThemeCode = (input: string): CustomColorTheme | null => {
     const trimmed = input.trim().toLowerCase()
-    if (!trimmed.startsWith(THEME_CODE_PREFIX)) return null
-    const body = trimmed.slice(THEME_CODE_PREFIX.length)
-    let hex: string
-    if (body.length === 36) {
-        hex = body
-    } else if (body.length === 38) {
-        hex = body.slice(0, 36)
-        if (!/^[0-9a-f]{36}$/.test(hex)) return null
-        const expected = body.slice(36)
-        const bytes = new Uint8Array(18)
-        for (let i = 0; i < 18; i++) {
-            bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-        }
-        if (crc8(bytes).toString(16).padStart(2, '0') !== expected) return null
-    } else {
-        return null
-    }
-    if (!/^[0-9a-f]{36}$/.test(hex)) return null
-    const theme = new CustomColorTheme()
-    theme.accent = '#' + hex.slice(0, 6)
-    theme.bgOne = '#' + hex.slice(6, 12)
-    theme.bgTwo = '#' + hex.slice(12, 18)
-    theme.borderOne = '#' + hex.slice(18, 24)
-    theme.textColor = '#' + hex.slice(24, 30)
-    theme.textColorSecondary = '#' + hex.slice(30, 36)
+    const legacy = trimmed.startsWith(LEGACY_THEME_CODE_PREFIX)
+    if (!legacy && !trimmed.startsWith(THEME_CODE_PREFIX)) return null
+    const keys = legacy ? LEGACY_THEME_KEYS : THEME_TOKEN_KEYS
+    const hex = themeCodeBody(trimmed.slice(THEME_CODE_PREFIX.length), keys.length * 6)
+    if (hex == null) return null
+    const theme = CustomColorTheme.fromCustomThemeSettings(defaultCustomTheme)
+    keys.forEach((key, index) => {
+        theme[key] = '#' + hex.slice(index * 6, index * 6 + 6)
+    })
     return theme
 }
 
@@ -569,32 +601,25 @@ onUnmounted(() => {
             >
                 <UiSettingRow v-tooltip.top="t('layout.settings.appearance')">
                     <template #label>{{ t('layout.settings.themeStyle') }}</template>
-                    <div
-                        class="flex min-w-[12rem] flex-col gap-0.5 rounded-lg border-2 border-border-one bg-bg-one p-1 text-left"
+                    <UiSelect
+                        :model-value="settingsStore.themeMode"
+                        :options="themeModeOptions"
+                        class="w-full"
+                        @update:model-value="changeThemeMode"
                     >
-                        <button
-                            v-for="option in themeModeOptions"
-                            :key="option.value"
-                            type="button"
-                            class="flex items-center gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                            :class="{
-                                'bg-surface-hover': settingsStore.themeMode === option.value,
-                            }"
-                            @click="changeThemeMode(option.value)"
-                        >
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiCheck"
-                                :size="14"
-                                :class="
-                                    settingsStore.themeMode === option.value
-                                        ? 'text-accent'
-                                        : 'invisible'
-                                "
-                            />
-                            {{ option.label }}
-                        </button>
-                    </div>
+                        <template #value="{ option }">
+                            <span class="flex items-center gap-2 truncate">
+                                <ThemeSwatchStrip :colors="themeSwatches.get(option.value)" />
+                                {{ option.label }}
+                            </span>
+                        </template>
+                        <template #option="{ option }">
+                            <span class="flex items-center gap-2">
+                                <ThemeSwatchStrip :colors="themeSwatches.get(option.value)" />
+                                {{ option.label }}
+                            </span>
+                        </template>
+                    </UiSelect>
                 </UiSettingRow>
                 <UiSettingRow
                     v-tooltip.top="t('layout.settings.tooltips.lineThickness')"
@@ -651,68 +676,20 @@ onUnmounted(() => {
                 class="break-inside-avoid"
                 :title="t('layout.settings.customTheme.title')"
             >
-                <UiSettingRow :label="t('layout.settings.customTheme.accent')">
+                <UiSettingRow
+                    v-for="row in CUSTOM_THEME_ROWS"
+                    :key="row.key"
+                    :label="t(`layout.settings.customTheme.${row.labelKey}`)"
+                >
                     <div class="w-full h-full content-center flex justify-center">
-                        <c-c-color-picker
-                            v-model="customThemeAccent"
-                            color-format="hex"
-                            :default-color="colorStore.rgbToHex(defaultCustomTheme.accent)"
-                            @update:model-value="setNewColorAccent"
-                        />
-                    </div>
-                </UiSettingRow>
-                <UiSettingRow :label="t('layout.settings.customTheme.bgOne')">
-                    <div class="w-full h-full content-center flex justify-center">
-                        <c-c-color-picker
-                            v-model="customThemeBgOne"
-                            color-format="hex"
-                            :default-color="colorStore.rgbToHex(defaultCustomTheme.bgOne)"
-                            @update:model-value="setNewColorBgOne"
-                        />
-                    </div>
-                </UiSettingRow>
-                <UiSettingRow :label="t('layout.settings.customTheme.bgTwo')">
-                    <div class="w-full h-full content-center flex justify-center">
-                        <div class="rounded-lg bg-bg-one">
+                        <div :class="row.key === 'bgTwo' ? 'rounded-lg bg-bg-one' : ''">
                             <c-c-color-picker
-                                v-model="customThemeBgTwo"
+                                v-model="customThemeHex[row.key]"
                                 color-format="hex"
-                                :default-color="colorStore.rgbToHex(defaultCustomTheme.bgTwo)"
-                                @update:model-value="setNewColorBgTwo"
+                                :default-color="colorStore.rgbToHex(defaultCustomTheme[row.key])"
+                                @update:model-value="setCustomColor(row.key, $event)"
                             />
                         </div>
-                    </div>
-                </UiSettingRow>
-                <UiSettingRow :label="t('layout.settings.customTheme.border')">
-                    <div class="w-full h-full content-center flex justify-center">
-                        <c-c-color-picker
-                            v-model="customThemeBorder"
-                            color-format="hex"
-                            :default-color="colorStore.rgbToHex(defaultCustomTheme.borderOne)"
-                            @update:model-value="setNewColorBorder"
-                        />
-                    </div>
-                </UiSettingRow>
-                <UiSettingRow :label="t('layout.settings.customTheme.text')">
-                    <div class="w-full h-full content-center flex justify-center">
-                        <c-c-color-picker
-                            v-model="customThemeText"
-                            color-format="hex"
-                            :default-color="colorStore.rgbToHex(defaultCustomTheme.textColor)"
-                            @update:model-value="setNewColorText"
-                        />
-                    </div>
-                </UiSettingRow>
-                <UiSettingRow :label="t('layout.settings.customTheme.textSecondary')">
-                    <div class="w-full h-full content-center flex justify-center">
-                        <c-c-color-picker
-                            v-model="customThemeTextSecondary"
-                            color-format="hex"
-                            :default-color="
-                                colorStore.rgbToHex(defaultCustomTheme.textColorSecondary)
-                            "
-                            @update:model-value="setNewColorTextSecondary"
-                        />
                     </div>
                 </UiSettingRow>
                 <div v-tooltip.top="t('layout.settings.tooltips.copyThemeCode')" class="px-4 py-3">

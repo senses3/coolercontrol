@@ -323,6 +323,11 @@ export default {
             entitiesBelowSensors: 'Элементы под датчиками',
             dashboardLineSize: 'Размер линий на панели',
             themeStyle: 'Стиль темы',
+            themeGroups: {
+                builtIn: 'Встроенные',
+                installed: 'Установленные',
+                custom: 'Пользовательская',
+            },
             themeMode: {
                 system: 'Системная',
                 dark: 'Тёмная',
@@ -355,6 +360,10 @@ export default {
                 border: 'Цвет границы',
                 text: 'Цвет текста',
                 textSecondary: 'Цвет вторичного текста',
+                success: 'Успех',
+                warning: 'Предупреждение',
+                error: 'Ошибка',
+                info: 'Информация',
                 export: 'Экспорт темы',
                 import: 'Импорт темы',
                 copyCode: 'Копировать код',

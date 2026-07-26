@@ -21,6 +21,7 @@ import { Exclude, Type } from 'class-transformer'
 import type { UID } from '@/models/Device'
 import { Dashboard } from '@/models/Dashboard.ts'
 import i18n from '@/i18n'
+import { installedTheme, type ThemeTokens } from '@/shell/themes.ts'
 
 export class TagSettings {
     name: string
@@ -42,11 +43,22 @@ export enum ThemeMode {
 }
 
 /**
- * 获取ThemeMode的本地化显示名称
- * @param mode ThemeMode枚举值
- * @returns 本地化的显示名称
+ * The compiled themes, in picker order. Custom is listed separately because it
+ * sits last, after the installed themes.
  */
-export function getThemeModeDisplayName(mode: ThemeMode): string {
+export const BUILT_IN_THEME_MODES: ThemeMode[] = [
+    ThemeMode.SYSTEM,
+    ThemeMode.DARK,
+    ThemeMode.LIGHT,
+    ThemeMode.HIGH_CONTRAST_DARK,
+    ThemeMode.HIGH_CONTRAST_LIGHT,
+]
+
+/**
+ * The display name for a theme selection. Built-in modes are translated;
+ * installed themes are proper nouns and keep their own name.
+ */
+export function getThemeModeDisplayName(mode: string): string {
     const { t } = i18n.global
     switch (mode) {
         case ThemeMode.SYSTEM:
@@ -62,18 +74,16 @@ export function getThemeModeDisplayName(mode: ThemeMode): string {
         case ThemeMode.CUSTOM:
             return t('models.themeMode.custom')
         default:
-            return String(mode)
+            return installedTheme(mode)?.name ?? String(mode)
     }
 }
 
-export interface CustomThemeSettings {
-    accent: Color
-    bgOne: Color
-    bgTwo: Color
-    borderOne: Color
-    textColor: Color
-    textColorSecondary: Color
-}
+/**
+ * A custom theme carries the same ten tokens an installed theme does, so both
+ * are applied through the one variable map in `shell/themes.ts`.
+ */
+export type CustomThemeSettings = Record<keyof ThemeTokens, Color>
+
 export const defaultCustomTheme: CustomThemeSettings = {
     // default dark-theme
     accent: '86 138 242', //'#568af2'
@@ -82,6 +92,10 @@ export const defaultCustomTheme: CustomThemeSettings = {
     borderOne: '138 149 170 0.25', //'#8a95aa40'
     textColor: '220 225 236', //'#dce1ec'
     textColorSecondary: '138 149 170', //'#8a95aa'
+    success: '0 255 127', //'#00ff7f'
+    warning: '241 250 140', //'#f1fa8c'
+    error: '255 85 85', //'#ff5555'
+    info: '86 138 242', //'#568af2'
 }
 
 export enum ChannelViewType {
@@ -208,7 +222,7 @@ export class UISettingsDTO {
     @Type(() => Dashboard)
     dashboards: Array<Dashboard> = []
     homeDashboard?: UID
-    themeMode: ThemeMode = ThemeMode.SYSTEM
+    themeMode: string = ThemeMode.SYSTEM
     chartLineScale: number = 1.5
     time24: boolean = false
     menuOrder: Array<MenuOrderIds> = []
@@ -217,14 +231,7 @@ export class UISettingsDTO {
     collapsedMainMenu: boolean = false
     mainMenuWidthRem: number = 24
     frequencyPrecision: number = 1
-    customTheme: CustomThemeSettings = {
-        accent: defaultCustomTheme.accent,
-        bgOne: defaultCustomTheme.bgOne,
-        bgTwo: defaultCustomTheme.bgTwo,
-        borderOne: defaultCustomTheme.borderOne,
-        textColor: defaultCustomTheme.textColor,
-        textColorSecondary: defaultCustomTheme.textColorSecondary,
-    }
+    customTheme: CustomThemeSettings = { ...defaultCustomTheme }
     entityColors: Array<[string, string]> = []
     eyeCandy: boolean = false
     showOnboarding: boolean = true

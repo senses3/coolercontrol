@@ -320,6 +320,11 @@ export default {
             entitiesBelowSensors: 'सेंसर के नीचे एंटिटीज',
             dashboardLineSize: 'डैशबोर्ड रेखा आकार',
             themeStyle: 'थीम स्टाइल',
+            themeGroups: {
+                builtIn: 'अंतर्निहित',
+                installed: 'संस्थापित',
+                custom: 'कस्टम',
+            },
             themeMode: {
                 system: 'सिस्टम',
                 dark: 'डार्क',
@@ -352,6 +357,10 @@ export default {
                 border: 'बॉर्डर रंग',
                 text: 'पाठ रंग',
                 textSecondary: 'माध्यमिक पाठ रंग',
+                success: 'सफलता',
+                warning: 'चेतावनी',
+                error: 'त्रुटि',
+                info: 'जानकारी',
                 export: 'थीम निर्यात करें',
                 import: 'थीम आयात करें',
                 copyCode: 'कोड कॉपी करें',

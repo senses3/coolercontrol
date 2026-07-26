@@ -315,6 +315,11 @@ export default {
             entitiesBelowSensors: '实体显示在传感器下方',
             dashboardLineSize: '仪表盘线条大小',
             themeStyle: '主题样式',
+            themeGroups: {
+                builtIn: '内置',
+                installed: '已安装',
+                custom: '自定义',
+            },
             themeMode: {
                 system: '跟随系统',
                 dark: '深色',
@@ -347,6 +352,10 @@ export default {
                 border: '边框颜色',
                 text: '文本颜色',
                 textSecondary: '次要文本颜色',
+                success: '成功',
+                warning: '警告',
+                error: '错误',
+                info: '信息',
                 export: '导出主题',
                 import: '导入主题',
                 copyCode: '复制代码',

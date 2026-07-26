@@ -320,6 +320,11 @@ export default {
             entitiesBelowSensors: 'センサーの下にエンティティを表示',
             dashboardLineSize: 'ダッシュボードの線のサイズ',
             themeStyle: 'テーマスタイル',
+            themeGroups: {
+                builtIn: '組み込み',
+                installed: 'インストール済み',
+                custom: 'カスタム',
+            },
             themeMode: {
                 system: 'システム',
                 dark: 'ダーク',
@@ -352,6 +357,10 @@ export default {
                 border: 'ボーダーカラー',
                 text: 'テキストカラー',
                 textSecondary: 'セカンダリテキストカラー',
+                success: '成功',
+                warning: '警告',
+                error: 'エラー',
+                info: '情報',
                 export: 'テーマをエクスポート',
                 import: 'テーマをインポート',
                 copyCode: 'コードをコピー',

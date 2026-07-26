@@ -325,6 +325,11 @@ export default {
             entitiesBelowSensors: 'Entidades debajo de sensores',
             dashboardLineSize: 'Tamaño de línea del panel',
             themeStyle: 'Estilo del tema',
+            themeGroups: {
+                builtIn: 'Integrados',
+                installed: 'Instalados',
+                custom: 'Personalizado',
+            },
             themeMode: {
                 system: 'Sistema',
                 dark: 'Oscuro',
@@ -357,6 +362,10 @@ export default {
                 border: 'Color del Borde',
                 text: 'Color del Texto',
                 textSecondary: 'Color del Texto Secundario',
+                success: 'Éxito',
+                warning: 'Advertencia',
+                error: 'Error',
+                info: 'Información',
                 export: 'Exportar Tema',
                 import: 'Importar Tema',
                 copyCode: 'Copiar Código',
