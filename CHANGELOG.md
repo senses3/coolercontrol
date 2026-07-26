@@ -10,6 +10,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Release notes are automatically generated from this file and git tags.
 -->
 
+## [5.0.0] - 2026-08-31
+
+### Added
+
+- Rebuilt application shell: Home, Cooling, Monitoring, Devices, Plugins and Settings sections, with
+  a persistent icon rail, per-section side panels, and landing pages for each area
+- Mobile layout with bottom navigation, a header overflow menu for the Access, Power and Plugins
+  menus, a dashboard switcher, and responsive editors throughout
+- Consolidated channel page in the Cooling section: embedded profile editor, mini curve previews,
+  grouped manual duty control with a sized gauge, and per-channel setup menus
+- Expandable control-flow tree on channel pages, drawn with CSS instead of a chart library, with
+  links from each chain pill to its editor and persisted open state
+- Auto-Create Profiles wizard that generates cooling entities for CPU coolers, GPU fans, AIO pumps
+  and radiators, case fans and laptops, driven by editable tuning data compiled into the daemon
+  (`auto_profiles.toml`)
+- Calibration wizard with a batch API, per-fan warnings surfaced in the picker and completion log,
+  resume support, and abort on an active alert
+- Device health tracking: a daemon-side registry of failsafed channels and missing or stale temp
+  sources, surfaced as menu badges, a health panel, entity-page warnings, and a Home status dot
+- User-defined device and channel names are now daemon-owned in a hand-editable `overrides.toml`,
+  editable from any entity page, with detected-name hints and a one-time migration from
+  `config-ui.json`
+- lm-sensors `sensors.conf` support: applies its labels and honors `ignore` for hwmon channels
+  (#334)
+- Installed color themes: True Black, Dracula, Gruvbox, One, Catppuccin, Tokyo Night, Monokai, Nord
+  and Solarized, in light and dark variants, chosen from a preview dropdown with color swatches
+- Custom themes gained success, warning, error and info colors, carried by a new `cct2:` theme code
+- Multi-source alerts with per-source state, timed silencing with notify-on-expiry, and a per-alert
+  log table on each alert page
+- Alert indicator in the top bar, silenced and disabled glyphs in the menus, and tray badge state
+  pushed to the Qt app over IPC
+- Tags on channel rows as interactive chips, with a tag filter bar and a tag manager
+- Modes management with apply wizards, where-used listings, and a previous-mode indicator
+- "Used by" links and type icons across profiles, functions, channels and sensors
+- Backup CLI: archive, restore, list, rotated backup and config-check subcommands
+- Bulk device and sensor enable/disable editor
+- Target versus actual duty in the Mix profile editor
+- Temperature and power readings shown during stress tests
+- Per-channel failsafes for service plugin devices
+- Section hotkeys, a configurable startup page, and a menu collapse button in the header
+- `make pr-check` pre-PR gate and a gated-tests feature for the daemon test suite
+
+### Changed
+
+- The daemon now runs on the compio runtime with io_uring by default, with a small tokio sidecar for
+  dependencies that require it; `--no-default-features` still builds the tokio-only path
+- PrimeVue was replaced by an in-house component kit built on reka-ui, covering dialogs, toasts,
+  tooltips, dropdowns, selects, tables, inputs and confirms
+- Toasts are capped, hover-pausable and copyable; dialogs, dropdowns and popovers share consistent
+  offsets, shadows and stacking
+- Fan channels now resolve to one canonical page regardless of where they are opened from
+- Log output is bounded and de-duplicated: capped log buffers, an episode gate for repeated device
+  errors, and coalesced SSE bursts
+- Device UIDs are guarded against duplicates, so two identical devices no longer collapse into one
+- Names are resolved once in the daemon and used consistently in logs, alerts and failsafe messages
+- Settings moved from tabs to an anchored card grid
+- Info and Tools was dissolved into the Home section
+- Warning and success colors darken on light themes to stay legible, and status colors are now
+  checked for contrast in the test suite
+- Idle liqctld connections are reaped, and NVML is released when all GPUs are disabled or none are
+  detected
+- NVAPI thermal lookups and PCI bus lookups are cached, and live chart animation is throttled and
+  paused off-screen
+- Auto-created laptop profiles retuned: shorter EMA windows, no smoothing on Performance, and a 40C
+  fan-off point for Silent and Balanced
+- The Makefiles were split and documented behind `make help`
+- protoc is no longer a build dependency; protox generates the gRPC code
+- Many upstream dependencies updated across Cargo and npm
+
+### Fixed
+
+- liqctld could be orphaned during a liquidctl error storm, and now exits promptly on shutdown
+- Blank device UIDs on some systems (#594)
+- RDNA3/4 AMD GPUs went undetected when the kernel overdrive mask was off (#589)
+- Calibration now enters manual control mode before measuring (#583)
+- Older AMD GPUs without hwmon load sensors report load from DRM fdinfo (#562)
+- GPU stress tests now run off the async runtime and are judged by power draw, fixing newer cards
+- Clearing a device or channel name no longer restarts the UI, and falls back to the detected name
+- Settings are skipped for channels a device no longer offers, instead of erroring
+- Generated curve floors are clamped to the channel minimum so a low floor cannot stall a fan
+- Duplicate device UIDs no longer drop devices from AMD and liquidctl repositories
+- Name overrides survive a save error instead of losing the cascade
+- REST and gRPC server startup are decoupled, so one failing does not block the other
+- Chart axis titles no longer overlap the neighbouring axis, and the temp line is clamped to range
+- Korean locale detection, and translations synced across all supported locales
+- Disabled IP family is logged at info instead of warning
+- FIFO pairing could wedge the test suite, and sysfs read tests handle ENODATA
+- Numerous UI fixes: dropdowns above modal dialogs, focus-visible on the rail, pinned name priority,
+  profile graph padding, hover action focus, wizard chart zoom, and start page routing
+
+### Removed
+
+- The EMA Function type. Existing configurations are permanently converted to Identity on load; use
+  an EMA Custom Sensor for temperature smoothing
+- JSON theme file import and export. Theme codes are now the way to share a custom theme
+- The legacy shell and Control views, and the per-device Settings tab
+- PrimeVue, element-plus, vue-flow and radix-vue dependencies
+- The `notify` subcommand, and the unused `colors` field from the LCD settings enum
+
+### Security
+
+- Device and channel name overrides reject injection-capable characters
+- Backup archives are created owner-only, bounded on extraction, and restore only files listed in
+  the manifest; restored credentials are written owner-only
+- Dependencies updated to clear audit advisories
+
 ## [4.3.1] - 2026-05-23
 
 ### Added
