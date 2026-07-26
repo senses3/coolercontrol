@@ -167,21 +167,24 @@ const saveLighting = async (): Promise<void> => {
     await settingsStore.saveDaemonDeviceSettingLighting(props.deviceUID, props.channelName, setting)
     contextIsDirty.value = false
 }
+const defaultLabel = computed(() =>
+    settingsStore.defaultChannelLabel(props.deviceUID, props.channelName),
+)
 const saveNameFunction = async (newName: string): Promise<boolean> => {
-    // User names are persisted as daemon name overrides. An empty name
-    // removes the override and reloads the UI.
+    // User names are persisted as daemon name overrides. An empty name removes
+    // the override and falls back to the detected label, which has to be read
+    // before saving drops the override it is derived from.
+    const applied = newName.length > 0 ? newName : defaultLabel.value
     const success = await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
     if (!success) {
         return false
     }
-    if (newName.length > 0) {
-        channelLabel.value = newName
-        emitter.emit('device-sensor-name-update', {
-            deviceUID: props.deviceUID,
-            sensorId: props.channelName,
-            name: newName,
-        })
-    }
+    channelLabel.value = applied
+    emitter.emit('device-sensor-name-update', {
+        deviceUID: props.deviceUID,
+        sensorId: props.channelName,
+        name: applied,
+    })
     return true
 }
 
@@ -273,7 +276,11 @@ onMounted(() => {
 
 <template>
     <div class="flex items-center justify-between px-2 pt-2">
-        <entity-title-rename :current-name="channelLabel" :save-name-function="saveNameFunction" />
+        <entity-title-rename
+            :current-name="channelLabel"
+            :fallback-name="defaultLabel"
+            :save-name-function="saveNameFunction"
+        />
         <div class="flex flex-wrap gap-x-1 justify-end">
             <div class="p-2 flex flex-row">
                 <UiButton

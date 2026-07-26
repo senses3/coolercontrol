@@ -67,6 +67,7 @@ const deviceColor = computed(
 
 const saveNameFunction = async (newName: string): Promise<boolean> =>
     settingsStore.saveDeviceName(props.deviceUID, newName)
+const defaultName = computed(() => settingsStore.defaultDeviceName(props.deviceUID))
 
 const setDeviceColor = (newColor: Color): void => {
     if (uiSettings.value != null) uiSettings.value.userColor = newColor
@@ -228,6 +229,7 @@ const enableDevice = openManageSensors
             <div class="flex items-center gap-2">
                 <EntityTitleRename
                     :current-name="deviceLabel"
+                    :fallback-name="defaultName"
                     :save-name-function="saveNameFunction"
                 />
                 <CCColorPicker

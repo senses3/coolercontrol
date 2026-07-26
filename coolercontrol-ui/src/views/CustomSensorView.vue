@@ -439,9 +439,14 @@ const saveSensor = async (): Promise<void> => {
         }
     }
 }
+const defaultLabel = computed(() =>
+    settingsStore.defaultChannelLabel(customSensorsDeviceUID, customSensor.id),
+)
 const saveNameFunction = async (newName: string): Promise<boolean> => {
-    // User names are persisted as daemon name overrides. An empty name
-    // removes the override and reloads the UI.
+    // User names are persisted as daemon name overrides. An empty name removes
+    // the override and falls back to the detected label, which has to be read
+    // before saving drops the override it is derived from.
+    const applied = newName.length > 0 ? newName : defaultLabel.value
     const success = await settingsStore.saveChannelName(
         customSensorsDeviceUID,
         customSensor.id,
@@ -450,10 +455,8 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     if (!success) {
         return false
     }
-    if (newName.length > 0) {
-        sensorName.value = newName
-        currentName.value = newName
-    }
+    sensorName.value = newName.length > 0 ? newName : ''
+    currentName.value = applied
     return true
 }
 const deleteSensor = (): void => {
@@ -654,7 +657,11 @@ onMounted(async () => {
 
 <template>
     <div class="flex items-center justify-between px-2 pt-2">
-        <entity-title-rename :current-name="currentName" :save-name-function="saveNameFunction" />
+        <entity-title-rename
+            :current-name="currentName"
+            :fallback-name="defaultLabel"
+            :save-name-function="saveNameFunction"
+        />
         <div class="flex flex-wrap items-center gap-x-1 justify-end">
             <UiButton
                 v-if="!shouldCreateSensor"
