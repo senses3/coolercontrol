@@ -146,7 +146,9 @@ module.exports = {
                             red: '#ff0000',
                             error: '#ff0000',
                             yellow: '#ffff00',
-                            warning: '#ffff00',
+                            // Pure yellow is unreadable on white; this holds
+                            // AAA against the theme's background.
+                            warning: '#713f12',
                             blue: '#0000ff',
                             info: '#0000ff',
                         },
@@ -172,7 +174,10 @@ module.exports = {
                             red: '#ff5555',
                             error: '#ff5555',
                             yellow: '#f1fa8c',
-                            warning: '#f1fa8c',
+                            // The dark themes' pale yellow washes out on light
+                            // surfaces, so warning darkens to keep WCAG AA
+                            // against both bg-one and bg-two.
+                            warning: '#854d0e',
                             blue: '#568af2',
                             info: '#568af2',
                         },
