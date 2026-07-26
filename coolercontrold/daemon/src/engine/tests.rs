@@ -2515,4 +2515,41 @@ mod engine_tests {
             );
         });
     }
+
+    #[test]
+    #[serial]
+    fn duty_floor_comes_from_channel_info_and_repository() {
+        // Goal: the sweep's floor is the stricter of what the channel
+        // reports (a liquidctl pump header's min_duty, say) and what the
+        // repository clamps behind the daemon's back (an RDNA3 card's
+        // PMFW speed range). Channels that report no minimum and sit on
+        // a repository without a clamp keep a floor of 0, which is the
+        // pre-floor duty sequence.
+        use crate::calibration::DiagnosisHost;
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            create_controllable_fan(&h.device, "fan1");
+            h.device.borrow_mut().info.channels.insert(
+                "pump".to_string(),
+                ChannelInfo {
+                    label: None,
+                    kind: ChannelKind::Speed(SpeedOptions {
+                        min_duty: 20,
+                        fixed_enabled: true,
+                        ..Default::default()
+                    }),
+                },
+            );
+
+            assert_eq!(h.engine.duty_floor(&device_uid, "fan1"), 0);
+            assert_eq!(h.engine.duty_floor(&device_uid, "pump"), 20);
+            // Unknown channel and unknown device both degrade to no floor.
+            assert_eq!(h.engine.duty_floor(&device_uid, "nope"), 0);
+            assert_eq!(
+                h.engine.duty_floor(&"no-such-device".to_string(), "fan1"),
+                0
+            );
+        });
+    }
 }

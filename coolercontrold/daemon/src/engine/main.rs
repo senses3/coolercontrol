@@ -33,8 +33,8 @@ use crate::calibration::{
 };
 use crate::config::Config;
 use crate::device::{
-    ChannelExtensionNames, ChannelName, ChannelStatus, DeviceType, DeviceUID, Duty, Status,
-    TempStatus, RPM, UID,
+    ChannelExtensionNames, ChannelInfo, ChannelName, ChannelStatus, DeviceType, DeviceUID, Duty,
+    Status, TempStatus, RPM, UID,
 };
 use crate::engine::commanders::graph::GraphProfileCommander;
 use crate::engine::commanders::lcd::{LcdCommander, DEFAULT_LCD_SHUTDOWN_IMAGE};
@@ -2138,6 +2138,29 @@ impl DiagnosisHost for Engine {
             .ok_or_else(|| anyhow!("no repository for device type {device_type:?}"))?;
         repo.apply_setting_speed_fixed(device_uid, channel_name, duty)
             .await
+    }
+
+    fn duty_floor(&self, device_uid: &UID, channel_name: &str) -> Duty {
+        let Some(device_lock) = self.all_devices.get(device_uid) else {
+            return 0;
+        };
+        let (device_type, info_floor) = {
+            let device = device_lock.borrow();
+            // The raw `min_duty`, not the calibration-widened effective
+            // one: a Smooth calibration reports 0 there by design.
+            let info_floor = device
+                .info
+                .channels
+                .get(channel_name)
+                .and_then(ChannelInfo::speed_options)
+                .map_or(0, |options| options.min_duty);
+            (device.d_type, info_floor)
+        };
+        let repo_floor = self
+            .repos
+            .get(&device_type)
+            .map_or(0, |repo| repo.duty_floor(device_uid, channel_name));
+        info_floor.max(repo_floor).min(100)
     }
 
     async fn hottest_temp(&self, limit_celsius: f64) -> HottestTemp {

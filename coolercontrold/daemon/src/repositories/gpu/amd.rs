@@ -791,6 +791,21 @@ impl GpuAMD {
             .with_context(|| "Resetting Fan Curve file to automatic mode")
     }
 
+    /// PMFW `FAN_CURVE_SPEED` floor for an RDNA3/4 card, `None` for any
+    /// device that takes plain hwmon pwm writes. `set_amd_duty` clamps
+    /// every non-zero duty into this range, so duties in `1..floor` all
+    /// land on the floor.
+    pub fn pmfw_duty_floor(&self, device_uid: &UID) -> Option<Duty> {
+        let fan_curve_info = self
+            .amd_driver_infos
+            .get(device_uid)?
+            .fan_curve_info
+            .as_ref()?;
+        fan_curve_info
+            .changeable
+            .then(|| *fan_curve_info.speed_range.start())
+    }
+
     pub async fn set_amd_duty(
         &self,
         device_uid: &UID,
