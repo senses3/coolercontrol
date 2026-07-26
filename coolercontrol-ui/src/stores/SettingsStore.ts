@@ -33,6 +33,14 @@ import {
     ThemeMode,
     UISettingsDTO,
 } from '@/models/UISettings'
+import {
+    installedTheme,
+    surfaceTintFor,
+    THEME_CSS_VAR_NAMES,
+    THEME_TOKEN_KEYS,
+    THEME_TOKEN_VARS,
+    themeCssVars,
+} from '@/shell/themes.ts'
 import type { Color, UID } from '@/models/Device'
 import { Device } from '@/models/Device'
 import setDefaultSensorAndChannelColors from '@/stores/DeviceColorCreator'
@@ -150,7 +158,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const startInSystemTray: Ref<boolean> = ref(false)
     const closeToSystemTray: Ref<boolean> = ref(false)
     const desktopStartupDelay: Ref<number> = ref(0)
-    const themeMode: Ref<ThemeMode> = ref(ThemeMode.SYSTEM)
+    const themeMode: Ref<string> = ref(ThemeMode.SYSTEM)
     const uiScale: Ref<number> = ref(100)
     const time24: Ref<boolean> = ref(false)
     const menuOrder: Ref<Array<MenuOrderIds>> = ref([])
@@ -159,14 +167,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const collapsedMainMenu: Ref<boolean> = ref(false)
     const mainMenuWidthRem: Ref<number> = ref(24)
     const frequencyPrecision: Ref<number> = ref(1)
-    const customTheme: CustomThemeSettings = reactive({
-        accent: defaultCustomTheme.accent,
-        bgOne: defaultCustomTheme.bgOne,
-        bgTwo: defaultCustomTheme.bgTwo,
-        borderOne: defaultCustomTheme.borderOne,
-        textColor: defaultCustomTheme.textColor,
-        textColorSecondary: defaultCustomTheme.textColorSecondary,
-    })
+    const customTheme: CustomThemeSettings = reactive({ ...defaultCustomTheme })
     const entityColors: Ref<Array<[string, string]>> = ref([])
     const eyeCandy: Ref<boolean> = ref(false)
     const showOnboarding: Ref<boolean> = ref(true)
@@ -282,12 +283,12 @@ export const useSettingsStore = defineStore('settings', () => {
         collapsedMainMenu.value = uiSettings.collapsedMainMenu
         mainMenuWidthRem.value = uiSettings.mainMenuWidthRem
         frequencyPrecision.value = uiSettings.frequencyPrecision
-        customTheme.accent = uiSettings.customTheme.accent
-        customTheme.bgOne = uiSettings.customTheme.bgOne
-        customTheme.bgTwo = uiSettings.customTheme.bgTwo
-        customTheme.borderOne = uiSettings.customTheme.borderOne
-        customTheme.textColor = uiSettings.customTheme.textColor
-        customTheme.textColorSecondary = uiSettings.customTheme.textColorSecondary
+        // Settings saved before the status colors existed have only the first
+        // six keys; the rest keep their defaults.
+        for (const key of THEME_TOKEN_KEYS) {
+            const saved = uiSettings.customTheme?.[key]
+            if (saved != null) customTheme[key] = saved
+        }
         entityColors.value = uiSettings.entityColors
         eyeCandy.value = uiSettings.eyeCandy
         showOnboarding.value = uiSettings.showOnboarding
@@ -1221,12 +1222,9 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.collapsedMainMenu = collapsedMainMenu.value
                     uiSettings.mainMenuWidthRem = mainMenuWidthRem.value
                     uiSettings.frequencyPrecision = frequencyPrecision.value
-                    uiSettings.customTheme.accent = customTheme.accent
-                    uiSettings.customTheme.bgOne = customTheme.bgOne
-                    uiSettings.customTheme.bgTwo = customTheme.bgTwo
-                    uiSettings.customTheme.borderOne = customTheme.borderOne
-                    uiSettings.customTheme.textColor = customTheme.textColor
-                    uiSettings.customTheme.textColorSecondary = customTheme.textColorSecondary
+                    for (const key of THEME_TOKEN_KEYS) {
+                        uiSettings.customTheme[key] = customTheme[key]
+                    }
                     uiSettings.entityColors = entityColors.value
                     uiSettings.eyeCandy = eyeCandy.value
                     uiSettings.showOnboarding = showOnboarding.value
@@ -1257,14 +1255,25 @@ export const useSettingsStore = defineStore('settings', () => {
         document.documentElement.classList.remove('light-theme')
         document.documentElement.classList.remove('dark-theme')
         document.documentElement.classList.remove('custom-theme')
+        document.documentElement.classList.remove('installed-theme')
 
-        // Clear custom theme CSS variables
-        document.documentElement.style.removeProperty('--colors-accent')
-        document.documentElement.style.removeProperty('--colors-bg-one')
-        document.documentElement.style.removeProperty('--colors-bg-two')
-        document.documentElement.style.removeProperty('--colors-border-one')
-        document.documentElement.style.removeProperty('--colors-text-color')
-        document.documentElement.style.removeProperty('--colors-text-color-secondary')
+        // Clear the variables the custom and installed themes set, so the next
+        // theme's compiled values are not shadowed by the previous one.
+        for (const cssVar of THEME_CSS_VAR_NAMES) {
+            document.documentElement.style.removeProperty(cssVar)
+        }
+
+        // Installed themes carry their whole palette, so they take no compiled
+        // theme class: the neutral one leaves the base palette to supply the
+        // global hues and the variables below win over it.
+        const theme = installedTheme(themeMode.value)
+        if (theme != null) {
+            document.documentElement.classList.add('installed-theme')
+            for (const [cssVar, value] of themeCssVars(theme)) {
+                document.documentElement.style.setProperty(cssVar, value)
+            }
+            return
+        }
 
         if (themeMode.value === ThemeMode.SYSTEM) {
             // considered Alpha and doesn't always work as expected:
@@ -1292,15 +1301,14 @@ export const useSettingsStore = defineStore('settings', () => {
             document.documentElement.classList.add('light-theme')
         } else if (themeMode.value === ThemeMode.CUSTOM) {
             document.documentElement.classList.add('custom-theme')
-            // Apply custom theme CSS variables
-            document.documentElement.style.setProperty('--colors-accent', customTheme.accent)
-            document.documentElement.style.setProperty('--colors-bg-one', customTheme.bgOne)
-            document.documentElement.style.setProperty('--colors-bg-two', customTheme.bgTwo)
-            document.documentElement.style.setProperty('--colors-border-one', customTheme.borderOne)
-            document.documentElement.style.setProperty('--colors-text-color', customTheme.textColor)
+            for (const key of THEME_TOKEN_KEYS) {
+                document.documentElement.style.setProperty(THEME_TOKEN_VARS[key], customTheme[key])
+            }
+            // The variant is not declared for a custom theme, so read it off the
+            // chosen background: a light one has to darken on hover, not wash out.
             document.documentElement.style.setProperty(
-                '--colors-text-color-secondary',
-                customTheme.textColorSecondary,
+                '--colors-surface-hover',
+                surfaceTintFor(customTheme.bgOne),
             )
         } else {
             document.documentElement.classList.add('dark-theme')

@@ -320,6 +320,11 @@ export default {
             entitiesBelowSensors: 'الكيانات أسفل المستشعرات',
             dashboardLineSize: 'حجم خط لوحة المعلومات',
             themeStyle: 'نمط السمة',
+            themeGroups: {
+                builtIn: 'مدمجة',
+                installed: 'مثبتة',
+                custom: 'مخصصة',
+            },
             themeMode: {
                 system: 'النظام',
                 dark: 'داكن',
@@ -352,6 +357,10 @@ export default {
                 border: 'لون الحدود',
                 text: 'لون النص',
                 textSecondary: 'لون النص الثانوي',
+                success: 'نجاح',
+                warning: 'تحذير',
+                error: 'خطأ',
+                info: 'معلومات',
                 export: 'تصدير السمة',
                 import: 'استيراد السمة',
                 copyCode: 'نسخ الرمز',

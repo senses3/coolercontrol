@@ -320,6 +320,11 @@ export default {
             entitiesBelowSensors: '센서 아래 개체',
             dashboardLineSize: '대시보드 선 크기',
             themeStyle: '테마 스타일',
+            themeGroups: {
+                builtIn: '기본 제공',
+                installed: '설치됨',
+                custom: '사용자 지정',
+            },
             themeMode: {
                 system: '시스템',
                 dark: '어두움',
@@ -352,6 +357,10 @@ export default {
                 border: '테두리 색',
                 text: '문자 색',
                 textSecondary: '보조 문자 색',
+                success: '성공',
+                warning: '경고',
+                error: '오류',
+                info: '정보',
                 export: '테마 내보내기',
                 import: '테마 가져오기',
                 copyCode: '코드 복사',

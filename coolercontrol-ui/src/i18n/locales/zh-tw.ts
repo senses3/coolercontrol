@@ -315,6 +315,11 @@ export default {
             entitiesBelowSensors: '實體顯示在傳感器下方',
             dashboardLineSize: '儀表板線條大小',
             themeStyle: '主題樣式',
+            themeGroups: {
+                builtIn: '內建',
+                installed: '已安裝',
+                custom: '自訂',
+            },
             themeMode: {
                 system: '跟隨系統',
                 dark: '深色',
@@ -347,6 +352,10 @@ export default {
                 border: '邊框顏色',
                 text: '文字顏色',
                 textSecondary: '次要文字顏色',
+                success: '成功',
+                warning: '警告',
+                error: '錯誤',
+                info: '資訊',
                 export: '匯出主題',
                 import: '匯入主題',
                 copyCode: '複製代碼',
