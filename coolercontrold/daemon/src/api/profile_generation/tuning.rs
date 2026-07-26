@@ -291,6 +291,30 @@ mod tests {
         ));
     }
 
+    /// Goal: no Performance preset smooths its temp, so every Performance profile reacts at once.
+    /// Method: walk every kind's Performance entry in the embedded file and assert none of them
+    /// sets smoothing.
+    #[test]
+    fn performance_presets_never_smooth() {
+        let kinds = [
+            ("cpu_cooler", &TUNING.cpu_cooler),
+            ("gpu_fan", &TUNING.gpu_fan),
+            ("aio_pump", &TUNING.aio_pump),
+            ("aio_radiator.delta", &TUNING.aio_radiator.delta),
+            ("aio_radiator.liquid", &TUNING.aio_radiator.liquid),
+            ("case.member", &TUNING.case.member),
+            ("laptop", &TUNING.laptop),
+        ];
+        for (kind, presets) in kinds {
+            if let SetupEntry::Graph { smoothing, .. } = presets.get(Preset::Performance) {
+                assert!(
+                    smoothing.is_none(),
+                    "{kind} Performance must follow the raw temp"
+                );
+            }
+        }
+    }
+
     /// Goal: a graph entry referencing a function with no table is rejected. Method: rewrite one
     /// real function reference to a nonexistent name and assert validation fails.
     #[test]

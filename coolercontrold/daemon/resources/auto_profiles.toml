@@ -191,23 +191,26 @@ floor_percent = 1
 
 # ---------------------------------------------------------------------------
 # Laptop fan. Follows an EMA of the CPU temp by default (the runtime strategy can override the
-# source). Unlike the desktop kinds, every laptop preset is EMA-smoothed, with a longer window for
-# more sustain on quieter presets. High knees keep the fan quiet until temps are genuinely high.
+# source). Laptop temps move in fast spikes, so the windows stay short; Performance takes the raw
+# temp so it can react at once. High knees keep the fan quiet until temps are genuinely high.
+#
+# Silent and Balanced open with a 0% entry so the fan idles off below the knee, and their floor is
+# NOT raised to the channel minimum in code. Performance has no 0% entry and keeps the clamp, so it
+# is always spinning.
 # ---------------------------------------------------------------------------
 [laptop.silent]
 type = "graph"
-curve = [[60.0, 20], [80.0, 40], [95.0, 100]]
-smoothing = { ema_window_seconds = 30 }
+curve = [[40.0, 0], [60.0, 20], [80.0, 40], [95.0, 100]]
+smoothing = { ema_window_seconds = 15 }
 function = "laptop_silent"
 
 [laptop.balanced]
 type = "graph"
-curve = [[55.0, 30], [75.0, 60], [90.0, 100]]
-smoothing = { ema_window_seconds = 15 }
+curve = [[40.0, 0], [55.0, 30], [75.0, 60], [90.0, 100]]
+smoothing = { ema_window_seconds = 5 }
 function = "laptop_balanced"
 
 [laptop.performance]
 type = "graph"
 curve = [[50.0, 40], [70.0, 80], [85.0, 100]]
-smoothing = { ema_window_seconds = 10 }
 function = "laptop_performance"
