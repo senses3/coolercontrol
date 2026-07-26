@@ -19,14 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import {
-    mdiAlertOutline,
-    mdiCheck,
-    mdiContentCopy,
-    mdiExport,
-    mdiImport,
-    mdiRestart,
-} from '@mdi/js'
+import { mdiAlertOutline, mdiCheck, mdiContentCopy, mdiImport, mdiRestart } from '@mdi/js'
 import {
     computed,
     inject,
@@ -490,6 +483,10 @@ const applyPastedThemeCode = (): void => {
     })
 }
 
+// DEPRECATED: JSON theme files are no longer offered in the UI. Theme codes are
+// the way to share a custom theme now. The implementation below stays for one
+// release so the removal is a single clean delete, and is referenced once at the
+// end of this block only to keep it compiling.
 const downloadThemeFileName = 'coolercontrol-color-theme.json'
 const downloadThemeHref = computed((): string => {
     const customColorTheme = CustomColorTheme.fromCustomThemeSettings(settingsStore.customTheme)
@@ -527,6 +524,9 @@ const getUploadedJson = (fileInput: any) => {
         // console.log('result', formatted)
     })
 }
+// End of the deprecated JSON theme file support. Delete this block together with
+// the now-unused customTheme.export/import and tooltips.*ThemeFile strings.
+void { downloadThemeHref, downloadThemeDatasetURL, createJsonUploader }
 
 onMounted(() => {
     // Listen for language change events
@@ -738,39 +738,6 @@ onUnmounted(() => {
                         </UiButton>
                     </div>
                 </div>
-                <UiSettingRow v-tooltip.top="t('layout.settings.tooltips.exportThemeFile')">
-                    <template #label>{{ t('layout.settings.customTheme.export') }}</template>
-                    <div class="w-full h-full content-center flex justify-center">
-                        <a
-                            :href="downloadThemeHref"
-                            :download="downloadThemeFileName"
-                            :data-downloadurl="downloadThemeDatasetURL"
-                            class="w-full"
-                        >
-                            <UiButton class="w-full">
-                                <svg-icon
-                                    class="outline-0"
-                                    type="mdi"
-                                    :path="mdiExport"
-                                    :size="deviceStore.getREMSize(1.625)"
-                                />
-                            </UiButton>
-                        </a>
-                    </div>
-                </UiSettingRow>
-                <UiSettingRow v-tooltip.top="t('layout.settings.tooltips.importThemeFile')">
-                    <template #label>{{ t('layout.settings.customTheme.import') }}</template>
-                    <div class="w-full h-full content-center flex justify-center">
-                        <UiButton class="w-full" @click="createJsonUploader">
-                            <svg-icon
-                                class="outline-0"
-                                type="mdi"
-                                :path="mdiImport"
-                                :size="deviceStore.getREMSize(1.625)"
-                            />
-                        </UiButton>
-                    </div>
-                </UiSettingRow>
             </UiSettingsCard>
             <UiSettingsCard
                 id="settings-daemon"
