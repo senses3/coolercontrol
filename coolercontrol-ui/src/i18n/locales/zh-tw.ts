@@ -888,10 +888,13 @@ export default {
         wizards: {
             calibration: {
                 title: '校正風扇',
-                pickIntro: '選擇要校正的風扇。已校正的風扇預設不勾選。',
+                pickIntro: '選擇要校正的風扇。已校正的風扇與韌體控制的風扇預設不勾選。',
                 noFans: '未偵測到可控制的風扇。',
                 selectAll: '全選',
                 calibratedBadge: '已校正',
+                firmwareControlledBadge: '韌體控制',
+                firmwareControlledDesc:
+                    '此通道的設定檔由韌體執行。校正仍然生效：其工作週期對應會寫入交給韌體的曲線。啟動衝擊則不會，因為韌體曲線無法表達。',
                 blockedByAlert: "已阻止：警報 '{name}' 處於觸發狀態",
                 alertsPausedNote: '{count} 個警報監視所選風扇，在每個風扇掃掠期間將暫停。',
                 idleNote:
@@ -1002,7 +1005,7 @@ export default {
             title: '裝置通道設定',
             firmwareControlledProfile: '韌體控制的設定檔',
             firmwareControlledProfileDesc:
-                '啟用後，裝置韌體將管理風扇設定檔。\n適用於對軟體頻繁變更速度反應不佳的硬體。\n僅適用於使用裝置內建溫度感測器的圖表設定檔。\n功能設定不適用。',
+                '啟用後，裝置韌體將管理風扇設定檔。\n適用於對軟體頻繁變更速度反應不佳的硬體。\n僅適用於使用裝置內建溫度感測器的圖表設定檔。\n功能設定不適用。\n對於已校正的通道，曲線各點會經過校正換算，但啟動衝擊不適用。',
             saveError: '儲存通道擴充設定失敗',
             firmwareControlDisabled:
                 '目前設定無法使用韌體控制。\n請為此裝置使用含有受支援內建溫度感測器的圖表設定檔。',

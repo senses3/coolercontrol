@@ -19,7 +19,12 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { instanceToPlain, plainToInstance } from 'class-transformer'
-import { CCChannelSettings, CoolerControlDeviceSettingsDTO } from '../CCSettings.ts'
+import {
+    CCChannelSettings,
+    CoolerControlDeviceSettingsDTO,
+    isFirmwareCurveEnabled,
+} from '../CCSettings.ts'
+import { ChannelExtensionNames } from '../SpeedOptions.ts'
 
 // What the daemon sends for GET /settings/devices.
 const daemonPayload = {
@@ -72,5 +77,42 @@ describe('CoolerControlDeviceSettingsDTO', () => {
 
         expect(fresh.disabled).toBe(false)
         expect(fresh.label).toBeUndefined()
+    })
+})
+
+describe('isFirmwareCurveEnabled', () => {
+    it('pairs each extension with its own flag', () => {
+        expect(
+            isFirmwareCurveEnabled(ChannelExtensionNames.AutoHWCurve, {
+                auto_hw_curve_enabled: true,
+            }),
+        ).toBe(true)
+        expect(
+            isFirmwareCurveEnabled(ChannelExtensionNames.AmdRdnaGpu, {
+                hw_fan_curve_enabled: true,
+            }),
+        ).toBe(true)
+    })
+
+    // Each extension writes its own flag, so the other one is either stale or
+    // belongs to a different channel; treating it as on would badge a channel
+    // the firmware does not actually drive.
+    it('ignores the flag of the other extension', () => {
+        expect(
+            isFirmwareCurveEnabled(ChannelExtensionNames.AutoHWCurve, {
+                hw_fan_curve_enabled: true,
+            }),
+        ).toBe(false)
+        expect(
+            isFirmwareCurveEnabled(ChannelExtensionNames.AmdRdnaGpu, {
+                auto_hw_curve_enabled: true,
+            }),
+        ).toBe(false)
+    })
+
+    it('is false without an extension or without settings', () => {
+        expect(isFirmwareCurveEnabled(undefined, { auto_hw_curve_enabled: true })).toBe(false)
+        expect(isFirmwareCurveEnabled(ChannelExtensionNames.AutoHWCurve, undefined)).toBe(false)
+        expect(isFirmwareCurveEnabled(ChannelExtensionNames.AutoHWCurve, {})).toBe(false)
     })
 })

@@ -945,10 +945,13 @@ export default {
             calibration: {
                 title: 'Étalonner les ventilateurs',
                 pickIntro:
-                    'Sélectionnez les ventilateurs à étalonner. Les ventilateurs déjà étalonnés sont décochés par défaut.',
+                    'Sélectionnez les ventilateurs à étalonner. Les ventilateurs déjà étalonnés et ceux contrôlés par le firmware sont décochés par défaut.',
                 noFans: 'Aucun ventilateur contrôlable détecté.',
                 selectAll: 'Tout sélectionner',
                 calibratedBadge: 'étalonné',
+                firmwareControlledBadge: 'contrôlé par le firmware',
+                firmwareControlledDesc:
+                    "Le firmware gère le profil de ce canal. Un étalonnage s'applique toujours : sa conversion de rapport cyclique est intégrée à la courbe transmise au firmware. L'impulsion de démarrage, non, car une courbe de firmware ne peut pas l'exprimer.",
                 blockedByAlert: "bloqué : l'alerte '{name}' est active",
                 alertsPausedNote:
                     '{count} alerte(s) surveillent les ventilateurs sélectionnés et sont mises en pause pendant le balayage de chaque ventilateur.',
@@ -1068,7 +1071,7 @@ export default {
             title: "Paramètres du canal de l'appareil",
             firmwareControlledProfile: 'Profil contrôlé par le firmware',
             firmwareControlledProfileDesc:
-                "Lorsque cette option est activée, le firmware de l'appareil gère le profil du ventilateur.\nUtile pour le matériel qui réagit mal aux modifications fréquentes de vitesse effectuées par le logiciel.\nDisponible uniquement pour les profils Graph qui utilisent des capteurs de température internes à l'appareil.\nLes paramètres de Fonction ne s'appliquent pas.",
+                "Lorsque cette option est activée, le firmware de l'appareil gère le profil du ventilateur.\nUtile pour le matériel qui réagit mal aux modifications fréquentes de vitesse effectuées par le logiciel.\nDisponible uniquement pour les profils Graph qui utilisent des capteurs de température internes à l'appareil.\nLes paramètres de Fonction ne s'appliquent pas.\nSur un canal étalonné, les points de la courbe sont convertis par l'étalonnage, mais l'impulsion de démarrage ne s'applique pas.",
             saveError: "Échec de l'enregistrement des paramètres de l'extension de canal",
             firmwareControlDisabled:
                 "Le contrôle par firmware n'est pas disponible avec la configuration actuelle.\nUtilisez un profil Graph pour cet appareil avec un capteur de température interne pris en charge.",

@@ -941,10 +941,13 @@ export default {
             calibration: {
                 title: 'Lüfter kalibrieren',
                 pickIntro:
-                    'Wählen Sie die zu kalibrierenden Lüfter aus. Bereits kalibrierte Lüfter sind standardmäßig nicht ausgewählt.',
+                    'Wählen Sie die zu kalibrierenden Lüfter aus. Bereits kalibrierte und firmware-gesteuerte Lüfter sind standardmäßig nicht ausgewählt.',
                 noFans: 'Keine steuerbaren Lüfter erkannt.',
                 selectAll: 'Alle auswählen',
                 calibratedBadge: 'kalibriert',
+                firmwareControlledBadge: 'firmware-gesteuert',
+                firmwareControlledDesc:
+                    'Die Firmware steuert das Profil dieses Kanals. Eine Kalibrierung wirkt weiterhin: Ihre Tastgrad-Zuordnung wird in die an die Firmware übergebene Kurve eingerechnet. Der Anlaufimpuls dagegen nicht, da eine Firmware-Kurve ihn nicht abbilden kann.',
                 blockedByAlert: "blockiert: Warnung '{name}' ist aktiv",
                 alertsPausedNote:
                     '{count} Warnung(en) überwachen die ausgewählten Lüfter und werden während des Durchlaufs der einzelnen Lüfter pausiert.',
@@ -1065,7 +1068,7 @@ export default {
             title: 'Gerätekanal-Einstellungen',
             firmwareControlledProfile: 'Firmware-gesteuertes Profil',
             firmwareControlledProfileDesc:
-                'Wenn aktiviert, steuert die Geräte-Firmware das Lüfterprofil.\nNützlich bei Hardware, die auf häufige softwareseitige Geschwindigkeitsänderungen nicht gut reagiert.\nNur verfügbar für Graph-Profile, die geräteinterne Temperatursensoren verwenden.\nFunktions-Einstellungen gelten nicht.',
+                'Wenn aktiviert, steuert die Geräte-Firmware das Lüfterprofil.\nNützlich bei Hardware, die auf häufige softwareseitige Geschwindigkeitsänderungen nicht gut reagiert.\nNur verfügbar für Graph-Profile, die geräteinterne Temperatursensoren verwenden.\nFunktions-Einstellungen gelten nicht.\nBei einem kalibrierten Kanal werden die Kurvenpunkte über die Kalibrierung umgerechnet, der Anlaufimpuls gilt jedoch nicht.',
             saveError: 'Speichern der Einstellungen der Kanalerweiterung fehlgeschlagen',
             firmwareControlDisabled:
                 'Die Firmware-Steuerung ist mit den aktuellen Einstellungen nicht verfügbar.\nVerwenden Sie ein Graph-Profil für dieses Gerät mit einem unterstützten internen Temperatursensor.',

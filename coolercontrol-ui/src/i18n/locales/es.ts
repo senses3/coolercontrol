@@ -934,10 +934,13 @@ export default {
             calibration: {
                 title: 'Calibrar ventiladores',
                 pickIntro:
-                    'Seleccione los ventiladores a calibrar. Los ya calibrados están desmarcados de forma predeterminada.',
+                    'Seleccione los ventiladores a calibrar. Los ya calibrados y los controlados por firmware están desmarcados de forma predeterminada.',
                 noFans: 'No se detectaron ventiladores controlables.',
                 selectAll: 'Seleccionar todo',
                 calibratedBadge: 'calibrado',
+                firmwareControlledBadge: 'controlado por firmware',
+                firmwareControlledDesc:
+                    'El firmware ejecuta el perfil de este canal. La calibración sigue aplicándose: su conversión de ciclo de trabajo se incorpora a la curva entregada al firmware. El impulso de arranque no, porque una curva de firmware no puede expresarlo.',
                 blockedByAlert: "bloqueado: la alerta '{name}' está activa",
                 alertsPausedNote:
                     '{count} alerta(s) vigilan los ventiladores seleccionados y se pausan durante el barrido de cada ventilador.',
@@ -1056,7 +1059,7 @@ export default {
             title: 'Ajustes del canal del dispositivo',
             firmwareControlledProfile: 'Perfil controlado por firmware',
             firmwareControlledProfileDesc:
-                'Cuando está habilitado, el firmware del dispositivo gestiona el perfil del ventilador.\nÚtil para hardware que no responde bien a cambios de velocidad frecuentes realizados por software.\nSolo disponible para Perfiles de gráfico que utilizan sensores de temperatura internos del dispositivo.\nLos ajustes de Función no se aplican.',
+                'Cuando está habilitado, el firmware del dispositivo gestiona el perfil del ventilador.\nÚtil para hardware que no responde bien a cambios de velocidad frecuentes realizados por software.\nSolo disponible para Perfiles de gráfico que utilizan sensores de temperatura internos del dispositivo.\nLos ajustes de Función no se aplican.\nEn un canal calibrado, los puntos de la curva se convierten mediante la calibración, pero el impulso de arranque no se aplica.',
             saveError: 'Error al guardar los ajustes de la extensión del canal',
             firmwareControlDisabled:
                 'El control por firmware no está disponible con la configuración actual.\nUse un Perfil de gráfico para este dispositivo con un sensor de temperatura interno compatible.',

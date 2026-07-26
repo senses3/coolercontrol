@@ -920,10 +920,13 @@ export default {
             calibration: {
                 title: 'Calibrate Fans',
                 pickIntro:
-                    'Select the fans to calibrate. Already-calibrated fans are unchecked by default.',
+                    'Select the fans to calibrate. Already-calibrated and firmware-controlled fans are unchecked by default.',
                 noFans: 'No controllable fans were detected.',
                 selectAll: 'Select all',
                 calibratedBadge: 'calibrated',
+                firmwareControlledBadge: 'firmware-controlled',
+                firmwareControlledDesc:
+                    "The firmware runs this channel's profile. A calibration still applies: its duty mapping is baked into the curve handed to the firmware. The startup kick is not, because a firmware curve cannot express it.",
                 blockedByAlert: "blocked: alert '{name}' is active",
                 alertsPausedNote:
                     '{count} alert(s) watch the selected fans and are paused while each fan sweeps.',
@@ -1040,7 +1043,7 @@ export default {
             title: 'Device Channel Settings',
             firmwareControlledProfile: 'Firmware-controlled Profile',
             firmwareControlledProfileDesc:
-                'When enabled, the device firmware manages the fan profile.\nUseful for hardware that does not respond well to frequent software speed changes.\nOnly available for Graph Profiles that use device-internal temperature sensors.\nFunction settings do not apply.',
+                'When enabled, the device firmware manages the fan profile.\nUseful for hardware that does not respond well to frequent software speed changes.\nOnly available for Graph Profiles that use device-internal temperature sensors.\nFunction settings do not apply.\nOn a calibrated channel the curve points are mapped through the calibration, but the startup kick does not apply.',
             saveError: 'Failed to save channel extension settings',
             firmwareControlDisabled:
                 'Firmware control is not available with the current settings.\nUse a Graph Profile for this device with a supported internal temperature sensor.',

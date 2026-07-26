@@ -43,6 +43,7 @@ import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
 import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
 import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
+import { isFirmwareCurveEnabled } from '@/models/CCSettings.ts'
 import type { CalibrationBatchEntry, CalibrationStage } from '@/models/Calibration.ts'
 
 const dialogRef: Ref<DynamicDialogInstance> = inject('dialogRef')!
@@ -74,6 +75,7 @@ interface FanRow {
     color: string
     selected: boolean
     alreadyCalibrated: boolean
+    firmwareControlled: boolean
 }
 const fanRows: Ref<Array<FanRow>> = ref([])
 // When launched from Auto-Create, the dialog passes the fans being assigned so they are pre-selected
@@ -97,6 +99,14 @@ const fillFans = (): void => {
             const sc = deviceSettings.sensorsAndChannels.get(channelName)
             const calibrated =
                 calibrationStore.statusFor(device.uid, channelName)?.phase === 'completed'
+            // Under firmware control the daemon bakes the calibration into the
+            // curve it hands the firmware, but the cold-start kick cannot be
+            // expressed there, so a sweep buys less. Still selectable.
+            const firmwareControlled = isFirmwareCurveEnabled(
+                channelInfo.speed_options?.extension,
+                settingsStore.ccDeviceSettings.get(device.uid)?.channel_settings.get(channelName)
+                    ?.extension,
+            )
             fanRows.value.push({
                 deviceUID: device.uid,
                 channelName,
@@ -104,8 +114,9 @@ const fillFans = (): void => {
                 color: sc?.color ?? '#888888',
                 selected: preselectKeys
                     ? preselectKeys.has(`${device.uid}||${channelName}`)
-                    : !calibrated,
+                    : !calibrated && !firmwareControlled,
                 alreadyCalibrated: calibrated,
+                firmwareControlled,
             })
         }
     }
@@ -326,6 +337,17 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                             </span>
                             <span v-else-if="row.alreadyCalibrated" class="text-xs text-accent">
                                 {{ t('components.wizards.calibration.calibratedBadge') }}
+                            </span>
+                            <!-- Independent of the badges above: a channel can be
+                                 both calibrated and firmware-controlled. -->
+                            <span
+                                v-if="row.firmwareControlled"
+                                v-tooltip.top="
+                                    t('components.wizards.calibration.firmwareControlledDesc')
+                                "
+                                class="shrink-0 text-xs text-text-color-secondary"
+                            >
+                                {{ t('components.wizards.calibration.firmwareControlledBadge') }}
                             </span>
                         </div>
                     </template>

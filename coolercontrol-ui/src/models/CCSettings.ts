@@ -17,6 +17,7 @@
  */
 
 import type { UID } from '@/models/Device'
+import { ChannelExtensionNames } from '@/models/SpeedOptions.ts'
 import { plainToInstance, Transform, Type } from 'class-transformer'
 
 /**
@@ -102,4 +103,21 @@ export class ChannelExtensions {
     // Whether to use the internal HW Curve feature, instead of setting regular
     // flat curves. Using this reduces functionality.
     hw_fan_curve_enabled?: boolean
+}
+
+// The channel must expose a firmware-curve extension AND carry the matching
+// toggle. Each extension has its own flag, so the pairing matters: a stale
+// flag from the other extension does not count.
+export function isFirmwareCurveEnabled(
+    extensionName: ChannelExtensionNames | undefined,
+    extensions: ChannelExtensions | undefined,
+): boolean {
+    switch (extensionName) {
+        case ChannelExtensionNames.AutoHWCurve:
+            return extensions?.auto_hw_curve_enabled === true
+        case ChannelExtensionNames.AmdRdnaGpu:
+            return extensions?.hw_fan_curve_enabled === true
+        default:
+            return false
+    }
 }
