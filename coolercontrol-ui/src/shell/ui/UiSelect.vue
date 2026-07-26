@@ -23,9 +23,11 @@ import { mdiCheck, mdiClose, mdiUnfoldMoreHorizontal } from '@mdi/js'
 import { computed } from 'vue'
 import {
     SelectContent,
+    SelectGroup,
     SelectItem,
     SelectItemIndicator,
     SelectItemText,
+    SelectLabel,
     SelectPortal,
     SelectRoot,
     SelectTrigger,
@@ -37,6 +39,8 @@ export interface UiSelectOption {
     label: string
     value: string
     disabled?: boolean
+    /** Options sharing a group are listed together under its heading. */
+    group?: string
 }
 
 const model = defineModel<string | undefined>()
@@ -54,9 +58,23 @@ const props = withDefaults(
 // Render the selected label directly instead of relying on SelectValue
 // mirroring the selected item: items re-mount into the portal on open, which
 // briefly empties the mirrored value and collapses the trigger width.
-const selectedLabel = computed(
-    () => props.options.find((option) => option.value === model.value)?.label,
-)
+const selectedOption = computed(() => props.options.find((option) => option.value === model.value))
+const selectedLabel = computed(() => selectedOption.value?.label)
+
+// Options keep their given order; a group heading is emitted the first time a
+// group is seen. Ungrouped options render exactly as before, with no heading.
+const optionGroups = computed(() => {
+    const groups: Array<{ label?: string; options: UiSelectOption[] }> = []
+    for (const option of props.options) {
+        const last = groups.at(-1)
+        if (last != null && last.label === option.group) {
+            last.options.push(option)
+        } else {
+            groups.push({ label: option.group, options: [option] })
+        }
+    }
+    return groups
+})
 
 defineOptions({ inheritAttrs: false })
 </script>
@@ -69,7 +87,9 @@ defineOptions({ inheritAttrs: false })
             :class="invalid ? 'border-error' : 'border-border-one'"
         >
             <SelectValue class="truncate">
-                <span v-if="selectedLabel">{{ selectedLabel }}</span>
+                <slot v-if="selectedOption" name="value" :option="selectedOption">
+                    {{ selectedLabel }}
+                </slot>
                 <span v-else class="text-text-color-secondary">{{ placeholder }}</span>
             </SelectValue>
             <span class="flex shrink-0 items-center gap-1">
@@ -92,20 +112,31 @@ defineOptions({ inheritAttrs: false })
                 class="z-[1300] max-h-80 min-w-40 overflow-hidden rounded-lg border border-border-one bg-bg-two shadow-overlay-lg"
             >
                 <SelectViewport class="p-1">
-                    <SelectItem
-                        v-for="option in options"
-                        :key="option.value"
-                        :value="option.value"
-                        :disabled="option.disabled"
-                        class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    <SelectGroup
+                        v-for="(group, groupIndex) in optionGroups"
+                        :key="group.label ?? groupIndex"
                     >
-                        <SelectItemText>
-                            <slot name="option" :option="option">{{ option.label }}</slot>
-                        </SelectItemText>
-                        <SelectItemIndicator>
-                            <svg-icon type="mdi" :path="mdiCheck" :size="14" />
-                        </SelectItemIndicator>
-                    </SelectItem>
+                        <SelectLabel
+                            v-if="group.label"
+                            class="px-2 pb-1 pt-2 text-xs font-medium uppercase tracking-wide text-text-color-secondary"
+                        >
+                            {{ group.label }}
+                        </SelectLabel>
+                        <SelectItem
+                            v-for="option in group.options"
+                            :key="option.value"
+                            :value="option.value"
+                            :disabled="option.disabled"
+                            class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-base text-text-color outline-none data-[highlighted]:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                        >
+                            <SelectItemText>
+                                <slot name="option" :option="option">{{ option.label }}</slot>
+                            </SelectItemText>
+                            <SelectItemIndicator>
+                                <svg-icon type="mdi" :path="mdiCheck" :size="14" />
+                            </SelectItemIndicator>
+                        </SelectItem>
+                    </SelectGroup>
                 </SelectViewport>
             </SelectContent>
         </SelectPortal>
