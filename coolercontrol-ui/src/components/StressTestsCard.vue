@@ -30,6 +30,7 @@ import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
+import { DeviceType } from '@/models/Device'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import HelpTooltipIcon from '@/components/info/HelpTooltipIcon.vue'
@@ -89,6 +90,38 @@ const pollStatus = async () => {
 
 const backendLabel = (backend: string) =>
     backend === 'stress_ng' ? 'stress-ng' : t('views.appInfo.builtInBackend')
+
+// Hottest temperature and total power draw across the devices a given test
+// targets. Utilization is useless for judging a stress test: it reads ~100%
+// whether the hardware is near its power limit or nowhere close, so the
+// numbers that tell you whether cooling is actually being exercised are
+// temperature and watts.
+const liveLoad = (types: DeviceType[]): string => {
+    let tempMax: number | undefined
+    let watts: number | undefined
+    for (const device of deviceStore.allDevices()) {
+        if (!types.includes(device.type)) continue
+        const channels = deviceStore.currentDeviceStatus.get(device.uid)
+        if (channels == null) continue
+        for (const values of channels.values()) {
+            const temp = values.temp != null ? Number.parseFloat(values.temp) : Number.NaN
+            if (!Number.isNaN(temp) && (tempMax === undefined || temp > tempMax)) {
+                tempMax = temp
+            }
+            const power = values.watts != null ? Number.parseFloat(values.watts) : Number.NaN
+            if (!Number.isNaN(power)) {
+                watts = (watts ?? 0) + power
+            }
+        }
+    }
+    const parts: string[] = []
+    if (tempMax !== undefined) parts.push(`${tempMax.toFixed(0)}°C`)
+    if (watts !== undefined) parts.push(`${watts.toFixed(0)}W`)
+    return parts.join(' · ')
+}
+
+const cpuLoad = computed(() => liveLoad([DeviceType.CPU]))
+const gpuLoad = computed(() => liveLoad([DeviceType.GPU]))
 
 const startPolling = () => {
     if (!statusPollInterval) {
@@ -321,6 +354,11 @@ onMounted(async () => {
                                             ? t('views.appInfo.active')
                                             : t('views.appInfo.inactive')
                                     }}</span>
+                                    <span
+                                        v-if="cpuActive && cpuLoad"
+                                        class="text-sm font-medium tabular-nums"
+                                        >{{ cpuLoad }}</span
+                                    >
                                     <stress-backend-select
                                         v-if="stressNgAvailable && !cpuActive"
                                         v-model="settingsStore.cpuStressBackend"
@@ -375,6 +413,11 @@ onMounted(async () => {
                                             ? t('views.appInfo.active')
                                             : t('views.appInfo.inactive')
                                     }}</span>
+                                    <span
+                                        v-if="gpuActive && gpuLoad"
+                                        class="text-sm font-medium tabular-nums"
+                                        >{{ gpuLoad }}</span
+                                    >
                                     <stress-backend-select
                                         v-if="stressNgAvailable && !gpuActive"
                                         v-model="settingsStore.gpuStressBackend"
@@ -431,6 +474,13 @@ onMounted(async () => {
                                             ? t('views.appInfo.active')
                                             : t('views.appInfo.inactive')
                                     }}</span>
+                                    <!-- The memory controller sits on the CPU package, so the
+                                      CPU sensors are what reflect RAM stress. -->
+                                    <span
+                                        v-if="ramActive && cpuLoad"
+                                        class="text-sm font-medium tabular-nums"
+                                        >{{ cpuLoad }}</span
+                                    >
                                     <stress-backend-select
                                         v-if="stressNgAvailable && !ramActive"
                                         v-model="settingsStore.ramStressBackend"
