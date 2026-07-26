@@ -62,10 +62,10 @@ const statusColor = computed(() => {
             return 'bg-error'
     }
 })
-// A degraded status jumps straight to the logs, pre-filtered to warnings.
+// The status always leads to the logs; a degraded one pre-filters to warnings.
 const statusTarget = computed(() =>
     daemonState.status === DaemonStatus.OK
-        ? { name: 'section-home' }
+        ? { name: 'home-logs' }
         : { name: 'home-logs', query: { level: 'warn' } },
 )
 

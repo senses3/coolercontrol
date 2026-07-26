@@ -30,13 +30,19 @@ const daemonState = useDaemonState()
 const route = useRoute()
 const { t } = useI18n({ useScope: 'global' })
 
-// Level filter; ?level=warn|error pre-selects (the Home status row deep-links
-// to warnings when the daemon status is degraded).
+// Level filter; ?level=warn|error pre-selects (the status row deep-links to
+// warnings when the daemon status is degraded, and to everything when it is not).
 type LogLevelFilter = 'all' | 'warn' | 'error'
-const levelFilter = ref<LogLevelFilter>(
+const filterFromQuery = (): LogLevelFilter =>
     route.query.level === 'warn' || route.query.level === 'error'
         ? (route.query.level as LogLevelFilter)
-        : 'all',
+        : 'all'
+const levelFilter = ref<LogLevelFilter>(filterFromQuery())
+// Both status targets share this route, so re-entering it only changes the
+// query and the view is not re-created.
+watch(
+    () => route.query.level,
+    () => (levelFilter.value = filterFromQuery()),
 )
 const levelOptions = computed(() => [
     { value: 'all', label: t('layout.shell.homePage.logsAll') },
