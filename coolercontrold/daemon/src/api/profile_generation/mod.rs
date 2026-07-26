@@ -613,7 +613,7 @@ fn build_fixed_profile(name: &str, duty: Duty) -> Profile {
 }
 
 /// Laptop fan. Laptops run hot and hold heat, so every preset uses downward-only hysteresis and
-/// Silent additionally sustains via a long EMA window and a high knee. The temp source follows the
+/// the quieter ones sustain via a short EMA window and a high knee. The temp source follows the
 /// chosen strategy: an EMA of the CPU (default), the CPU temp read directly, or a Mix of CPU and
 /// GPU (Max, so a powered-off dGPU reading 0C is ignored). A Mix request with no GPU temp degrades
 /// to the EMA-CPU default.
@@ -642,6 +642,15 @@ fn add_laptop_fan(
     Ok(())
 }
 
+/// Silent and Balanced idle the fan off below their first knee, so their floor is NOT raised to
+/// the channel minimum. Performance has no 0% entry and keeps the clamp so it stays spinning.
+fn laptop_floor(preset: Preset, min_duty: Duty) -> Option<Duty> {
+    match preset {
+        Preset::Silent | Preset::Balanced => None,
+        Preset::Performance => Some(min_duty),
+    }
+}
+
 /// A laptop fan as a single Graph off the CPU temp, optionally EMA-smoothed.
 fn build_laptop_graph(
     proposal: &mut Proposal,
@@ -656,16 +665,17 @@ fn build_laptop_graph(
     })?;
     let entry = TUNING.laptop.get(preset);
     let name = format!("Laptop Fan ({preset})");
+    let floor = laptop_floor(preset, min_duty);
     let profile_uid = if smooth {
-        build_from_entry(proposal, context, entry, cpu, &name, Some(min_duty))
+        build_from_entry(proposal, context, entry, cpu, &name, floor)
     } else {
-        build_entry_with_source(proposal, entry, cpu.clone(), &name, Some(min_duty))
+        build_entry_with_source(proposal, entry, cpu.clone(), &name, floor)
     };
     Ok(profile_uid)
 }
 
-/// A laptop fan as a Mix(CPU, GPU) Max, each member an EMA-smoothed Graph. Used when the user
-/// picks the Mix strategy and a GPU temp is available.
+/// A laptop fan as a Mix(CPU, GPU) Max, each member a Graph over the preset's source. Used when
+/// the user picks the Mix strategy and a GPU temp is available.
 fn build_laptop_mix(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -704,7 +714,7 @@ fn build_laptop_member(
         entry,
         temp,
         &format!("Laptop {} ({preset})", temp.temp_name),
-        Some(min_duty),
+        laptop_floor(preset, min_duty),
     )
 }
 
@@ -1388,47 +1398,85 @@ mod tests {
         assert!(curve.iter().all(|(_, duty)| *duty >= 50));
     }
 
-    /// Goal: a channel minimum duty raises the laptop fan curve floor so a high-min_duty fan cannot
-    /// stall. Method: generate the default Silent laptop with `min_duty` 50 and assert every duty is
+    /// Goal: the Performance laptop follows the raw temp so it reacts at once. Method: generate
+    /// Performance and assert no EMA sensor was created and the source is the raw CPU temp.
+    #[test]
+    fn laptop_performance_uses_raw_temp() {
+        let response = generate_proposal(
+            &laptop_request(Preset::Performance, None, cpu_only()),
+            &test_context(),
+        )
+        .expect("generates");
+        assert!(response.custom_sensors.is_empty());
+        assert_eq!(response.profiles[0].temp_source(), Some(&cpu_temp()));
+    }
+
+    /// Goal: a channel minimum duty raises the Performance laptop curve floor so a high-min_duty
+    /// fan cannot stall. Method: generate Performance with `min_duty` 50 and assert every duty is
     /// at least 50.
     #[test]
-    fn laptop_floor_clamped_to_min_duty() {
+    fn laptop_performance_floor_clamped_to_min_duty() {
         let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
-        let response =
-            generate_proposal(&laptop_request(Preset::Silent, None, cpu_only()), &context)
-                .expect("generates");
+        let response = generate_proposal(
+            &laptop_request(Preset::Performance, None, cpu_only()),
+            &context,
+        )
+        .expect("generates");
         let curve = response.profiles[0].speed_profile().expect("has curve");
         assert!(curve.iter().all(|(_, duty)| *duty >= 50));
     }
 
-    /// Goal: each member of a laptop Mix gets its curve floor raised to the channel minimum, so the
-    /// Max output cannot stall. Method: generate the Mix strategy with a GPU temp and `min_duty` 50,
-    /// then assert every member graph's duties are at least 50.
+    /// Goal: the quiet laptop presets idle the fan off below their knee even when the channel
+    /// reports a non-zero minimum duty. Method: generate each with `min_duty` 50 and assert the
+    /// curve still has a 0% point.
     #[test]
-    fn laptop_mix_members_floor_clamped_to_min_duty() {
-        let key_temps = KeyTemps {
+    fn laptop_quiet_presets_keep_zero_idle() {
+        for preset in [Preset::Silent, Preset::Balanced] {
+            let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
+            let response = generate_proposal(&laptop_request(preset, None, cpu_only()), &context)
+                .expect("generates");
+            let curve = response.profiles[0].speed_profile().expect("has curve");
+            assert!(
+                curve.iter().any(|(_, duty)| *duty == 0),
+                "{preset} idles the fan off"
+            );
+        }
+    }
+
+    /// Goal: each member of a laptop Mix follows the preset's floor rule, so a quiet preset can
+    /// idle off while Performance cannot stall. Method: generate the Mix strategy with a GPU temp
+    /// and `min_duty` 50 for both a quiet preset and Performance, then assert each member's floor.
+    #[test]
+    fn laptop_mix_members_follow_preset_floor() {
+        let key_temps = || KeyTemps {
             cpu: Some(cpu_temp()),
             gpu: Some(gpu_temp()),
             liquid: None,
             ambient: None,
         };
-        let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
-        let response = generate_proposal(
-            &laptop_request(
-                Preset::Balanced,
-                Some(LaptopTempStrategy::MixCpuGpu),
-                key_temps,
-            ),
-            &context,
-        )
-        .expect("generates");
-        let member_curves: Vec<_> = response
-            .profiles
-            .iter()
-            .filter_map(|p| p.speed_profile())
-            .collect();
-        assert_eq!(member_curves.len(), 2, "two mix members");
-        for curve in member_curves {
+        let member_curves = |preset| {
+            let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
+            let response = generate_proposal(
+                &laptop_request(preset, Some(LaptopTempStrategy::MixCpuGpu), key_temps()),
+                &context,
+            )
+            .expect("generates");
+            response
+                .profiles
+                .iter()
+                .filter_map(|p| p.speed_profile().cloned())
+                .collect::<Vec<_>>()
+        };
+
+        let balanced = member_curves(Preset::Balanced);
+        assert_eq!(balanced.len(), 2, "two mix members");
+        for curve in balanced {
+            assert!(curve.iter().any(|(_, duty)| *duty == 0));
+        }
+
+        let performance = member_curves(Preset::Performance);
+        assert_eq!(performance.len(), 2, "two mix members");
+        for curve in performance {
             assert!(curve.iter().all(|(_, duty)| *duty >= 50));
         }
     }
