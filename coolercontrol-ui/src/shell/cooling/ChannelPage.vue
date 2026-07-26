@@ -91,6 +91,9 @@ const uiSetting = computed(() =>
         ?.sensorsAndChannels.get(props.channelName),
 )
 const channelLabel = computed(() => uiSetting.value?.name ?? props.channelName)
+const defaultLabel = computed(() =>
+    settingsStore.defaultChannelLabel(props.deviceUID, props.channelName),
+)
 const saveChannelName = async (newName: string): Promise<boolean> =>
     await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
 const deviceLabel = computed(
@@ -367,6 +370,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     <EntityTitleRename
                         class="!py-0 !pl-0"
                         :current-name="channelLabel"
+                        :fallback-name="defaultLabel"
                         :save-name-function="saveChannelName"
                     />
                     <span class="truncate text-base text-text-color-secondary">

@@ -142,11 +142,13 @@ module.exports = {
                             white: '#ffffff',
                             pink: '#ff00ff',
                             green: '#00ff00',
-                            success: '#00ff00',
+                            // Pure green and yellow are unreadable on white;
+                            // these hold AAA against the theme's background.
+                            success: '#14532d',
                             red: '#ff0000',
                             error: '#ff0000',
                             yellow: '#ffff00',
-                            warning: '#ffff00',
+                            warning: '#713f12',
                             blue: '#0000ff',
                             info: '#0000ff',
                         },
@@ -168,11 +170,16 @@ module.exports = {
                             white: '#f5f6f9',
                             pink: '#ff007f',
                             green: '#00ff7f',
-                            success: '#00ff7f',
+                            // The dark themes' bright spring green and pale
+                            // yellow wash out on light surfaces, so the two
+                            // status colors darken to keep WCAG AA against both
+                            // bg-one and bg-two. The green/yellow palette hues
+                            // stay as they are: they only tint tag backgrounds.
+                            success: '#166534',
                             red: '#ff5555',
                             error: '#ff5555',
                             yellow: '#f1fa8c',
-                            warning: '#f1fa8c',
+                            warning: '#854d0e',
                             blue: '#568af2',
                             info: '#568af2',
                         },

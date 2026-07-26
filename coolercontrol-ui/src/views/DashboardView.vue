@@ -110,17 +110,26 @@ const createChannelDashboard = (): Dashboard => {
     return dash
 }
 
+// Sensors fall back to their detected label; a dashboard keeps its own name.
+const fallbackName = computed(() =>
+    sensorMode
+        ? settingsStore.defaultChannelLabel(props.deviceUID!, props.channelName!)
+        : dashboard.name,
+)
+
 const saveNameFunction = async (newName: string): Promise<boolean> => {
     if (sensorMode) {
         // User names are persisted as daemon name overrides. An empty name
-        // removes the override and reloads the UI.
+        // removes the override and falls back to the detected label, which has
+        // to be read before saving drops the override it is derived from.
+        const applied = newName.length > 0 ? newName : fallbackName.value
         const success = await settingsStore.saveChannelName(
             props.deviceUID!,
             props.channelName!,
             newName,
         )
         if (!success) return false
-        if (newName.length > 0) channelLabel.value = newName
+        channelLabel.value = applied
         return true
     }
     if (newName.length > 0) {
@@ -521,6 +530,7 @@ onUnmounted(() => {
         <entity-title-rename
             v-if="sensorMode || !isMobile"
             :current-name="sensorMode ? channelLabel : dashboard.name"
+            :fallback-name="fallbackName"
             :save-name-function="saveNameFunction"
         />
         <span v-else class="w-full p-2">

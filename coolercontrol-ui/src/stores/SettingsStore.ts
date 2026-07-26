@@ -360,6 +360,66 @@ export const useSettingsStore = defineStore('settings', () => {
         ccSettings.value = await deviceStore.daemonClient.loadCCSettings()
     }
 
+    function findDevice(deviceUID: UID): Device | undefined {
+        for (const device of deviceStore.allDevices()) {
+            if (device.uid === deviceUID) return device
+        }
+        return undefined
+    }
+
+    /**
+     * The device name shown when no user override is set. Takes the model name
+     * if it's available, before the driver name (HWMon especially).
+     */
+    function detectedDeviceName(device: Device): string {
+        if (device.info?.model != null && device.info.model.length > 0) return device.info.model
+        const deviceOverrides = nameOverrides.value.devices[device.uid]
+        // The daemon serves an active override in place of the device name, so
+        // its detected-name hint is all that is left to fall back to.
+        if (deviceOverrides?.name != null && deviceOverrides.device_name != null) {
+            return deviceOverrides.device_name.split(' (')[0] // Device.nameShort's shortening
+        }
+        return device.nameShort
+    }
+
+    /** The channel label shown when no user override is set. */
+    function detectedChannelLabel(device: Device, channelName: string): string | undefined {
+        // Same boundary resolution as the device name: an active override is
+        // served in place of the detected label, so the hint stands in for it.
+        const channelOverrides = nameOverrides.value.devices[device.uid]?.channels?.[channelName]
+        const served = (label: string | undefined): string | undefined =>
+            channelOverrides?.label != null ? channelOverrides.channel_label : label
+
+        const tempInfo = device.info?.temps.get(channelName)
+        if (tempInfo != null) return served(tempInfo.label)
+        const channelInfo = device.info?.channels.get(channelName)
+        if (channelInfo != null) {
+            if (channelInfo.speed_options != null) {
+                return served(channelInfo.label) ?? deviceStore.toTitleCase(channelName)
+            }
+            if (channelInfo.lighting_modes.length > 0) return deviceStore.toTitleCase(channelName)
+            if (channelInfo.lcd_modes.length > 0) return channelName.toUpperCase()
+            // must be Frequency
+            return served(channelInfo.label) ?? deviceStore.toTitleCase(channelName)
+        }
+        // Load channels are only present in the status.
+        if (channelName.toLowerCase().includes('load')) return channelName
+        return undefined
+    }
+
+    /** The name a device rename field falls back to when it is cleared. */
+    function defaultDeviceName(deviceUID: UID): string {
+        const device = findDevice(deviceUID)
+        return device != null ? detectedDeviceName(device) : deviceUID
+    }
+
+    /** The label a channel rename field falls back to when it is cleared. */
+    function defaultChannelLabel(deviceUID: UID, channelName: string): string {
+        const device = findDevice(deviceUID)
+        const label = device != null ? detectedChannelLabel(device, channelName) : undefined
+        return label ?? deviceStore.toTitleCase(channelName)
+    }
+
     function setDisplayNames(
         devices: Array<Device>,
         deviceSettings: Map<UID, DeviceUISettings>,
@@ -367,53 +427,13 @@ export const useSettingsStore = defineStore('settings', () => {
         for (const device of devices) {
             const settings = deviceSettings.get(device.uid)!
             const overrides = nameOverrides.value.devices[device.uid]
-            // Default display name takes the model name if it's available, before the driver name (HWMon especially):
-            const detectedName =
-                device.info?.model != null && device.info.model.length > 0
-                    ? device.info.model
-                    : device.nameShort
-            settings.displayName = overrides?.name ?? detectedName
-            if (device.status_history.length) {
-                for (const channelStatus of device.status.channels) {
-                    if (channelStatus.name.toLowerCase().includes('load')) {
-                        settings.sensorsAndChannels.get(channelStatus.name)!.channelLabel =
-                            channelStatus.name
-                    }
-                }
-            }
-            if (device.info != null) {
-                for (const [channelName, channelInfo] of device.info.channels.entries()) {
-                    if (channelInfo.speed_options != null) {
-                        settings.sensorsAndChannels.get(channelName)!.channelLabel =
-                            channelInfo.label != null
-                                ? channelInfo.label
-                                : deviceStore.toTitleCase(channelName)
-                    } else if (channelInfo.lighting_modes.length > 0) {
-                        settings.sensorsAndChannels.get(channelName)!.channelLabel =
-                            deviceStore.toTitleCase(channelName)
-                    } else if (channelInfo.lcd_modes.length > 0) {
-                        settings.sensorsAndChannels.get(channelName)!.channelLabel =
-                            channelName.toUpperCase()
-                    } else {
-                        // must be Frequency
-                        settings.sensorsAndChannels.get(channelName)!.channelLabel =
-                            channelInfo.label != null
-                                ? channelInfo.label
-                                : deviceStore.toTitleCase(channelName)
-                    }
-                }
-                for (const [tempName, tempInfo] of device.info.temps.entries()) {
-                    if (settings.sensorsAndChannels.get(tempName) != null) {
-                        settings.sensorsAndChannels.get(tempName)!.channelLabel = tempInfo.label
-                    }
-                }
-            }
+            settings.displayName = overrides?.name ?? detectedDeviceName(device)
             // User-defined labels win over every detected label:
             for (const [channelName, channelSettings] of settings.sensorsAndChannels) {
+                const detected = detectedChannelLabel(device, channelName)
+                if (detected != null) channelSettings.channelLabel = detected
                 const label = overrides?.channels?.[channelName]?.label
-                if (label != null) {
-                    channelSettings.channelLabel = label
-                }
+                if (label != null) channelSettings.channelLabel = label
             }
         }
     }
@@ -421,7 +441,7 @@ export const useSettingsStore = defineStore('settings', () => {
     /**
      * Persists the user-defined device display name as a daemon name
      * override and updates local display state. An empty name removes the
-     * override; the UI then reloads so detected names are re-resolved.
+     * override and falls back to the detected name.
      */
     async function saveDeviceName(deviceUID: UID, newName: string): Promise<boolean> {
         const name = newName.length > 0 ? newName : null
@@ -436,7 +456,12 @@ export const useSettingsStore = defineStore('settings', () => {
             return false
         }
         if (name == null) {
-            await deviceStore.waitAndReload(0)
+            // Resolved before the override is dropped: it is what stands in for
+            // the overridden name the daemon serves.
+            const detected = defaultDeviceName(deviceUID)
+            delete nameOverrides.value.devices[deviceUID]?.name
+            const settings = allUIDeviceSettings.value.get(deviceUID)
+            if (settings != null) settings.displayName = detected
             return true
         }
         const deviceOverrides = (nameOverrides.value.devices[deviceUID] ??= {})
@@ -451,7 +476,7 @@ export const useSettingsStore = defineStore('settings', () => {
     /**
      * Persists the user-defined channel display label as a daemon name
      * override and updates local display state. An empty name removes the
-     * override; the UI then reloads so detected labels are re-resolved.
+     * override and falls back to the detected label.
      */
     async function saveChannelName(
         deviceUID: UID,
@@ -473,16 +498,20 @@ export const useSettingsStore = defineStore('settings', () => {
             })
             return false
         }
+        const channelSettings = allUIDeviceSettings.value
+            .get(deviceUID)
+            ?.sensorsAndChannels.get(channelName)
         if (label == null) {
-            await deviceStore.waitAndReload(0)
+            // Resolved before the override is dropped: it is what stands in for
+            // the overridden label the daemon serves.
+            const detected = defaultChannelLabel(deviceUID, channelName)
+            delete nameOverrides.value.devices[deviceUID]?.channels?.[channelName]?.label
+            if (channelSettings != null) channelSettings.channelLabel = detected
             return true
         }
         const deviceOverrides = (nameOverrides.value.devices[deviceUID] ??= {})
         const channels = (deviceOverrides.channels ??= {})
         const channel = (channels[channelName] ??= {})
-        const channelSettings = allUIDeviceSettings.value
-            .get(deviceUID)
-            ?.sensorsAndChannels.get(channelName)
         if (channel.label == null && channelSettings != null) {
             // First override for this channel: the current display label is
             // the detected one; keep it locally as the reset hint, mirroring
@@ -1524,6 +1553,8 @@ export const useSettingsStore = defineStore('settings', () => {
         nameOverrides,
         saveDeviceName,
         saveChannelName,
+        defaultDeviceName,
+        defaultChannelLabel,
         predefinedColorOptions,
         profiles,
         functions,

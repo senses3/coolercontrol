@@ -510,10 +510,9 @@ const uOptions: uPlot.Options = {
                     ? t('components.axisOptions.rpmMhz')
                     : t('components.axisOptions.krpmGhz'),
             labelGap: deviceStore.getREMSize(1.0),
-            labelSize:
-                settingsStore.frequencyPrecision === 1
-                    ? deviceStore.getREMSize(2.9)
-                    : deviceStore.getREMSize(2.25),
+            // The band has to hold the gap plus the rotated title, or the title
+            // spills into whatever axis comes next (the watts axis, when shown).
+            labelSize: deviceStore.getREMSize(2.9),
             // labelFont, unlike font, seems to take rem values properly, and by is 1rem by default:
             labelFont: `sans-serif`,
             stroke: colors.themeColors.text_color,

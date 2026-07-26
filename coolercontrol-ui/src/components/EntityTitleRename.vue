@@ -24,6 +24,11 @@ import { useI18n } from 'vue-i18n'
 const props = defineProps<{
     currentName: string
     saveNameFunction: (newName: string) => Promise<boolean>
+    /**
+     * The name that applies when the field is cleared, shown as its
+     * placeholder. Defaults to the current name for entities that keep it.
+     */
+    fallbackName?: string
 }>()
 
 const deviceStore = useDeviceStore()
@@ -34,8 +39,10 @@ const nameInput: Ref<string> = ref('')
 const nameInputRef = ref<HTMLInputElement>()
 const isCancelling = ref(false)
 
+const placeholderName = computed(() => props.fallbackName ?? props.currentName)
 const inputWidth = computed(() => {
-    const length = nameInput.value.length || 1
+    // The placeholder needs the same room, or clearing the field truncates it.
+    const length = Math.max(nameInput.value.length, placeholderName.value.length, 1)
     return `${length + 1}ch`
 })
 
@@ -78,7 +85,8 @@ const handleBlur = (): void => {
             id="alert-name-input"
             v-model="nameInput"
             type="text"
-            class="mt-[1px] bg-transparent font-bold text-text-color-secondary outline-none"
+            :placeholder="placeholderName"
+            class="mt-[1px] bg-transparent font-bold text-text-color-secondary outline-none placeholder:font-normal placeholder:opacity-60"
             :style="{ width: inputWidth }"
             @keydown.enter="saveNameInline"
             @keydown.esc="cancelEditName"
