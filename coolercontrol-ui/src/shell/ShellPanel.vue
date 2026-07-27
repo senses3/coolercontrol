@@ -42,11 +42,16 @@ const section = computed(() => {
 // the previous section's offset, with the page you just opened off-screen.
 const panelRef = ref<HTMLElement>()
 
+// Pinned rows are shortcuts that keep pointing at a channel's canonical page,
+// so they are a stale match on any other page, and even on the canonical one
+// they are not where the entry lives. Ignoring them means a channel reveals the
+// same way whether or not it happens to be pinned.
+const notPinned = (element: Element): boolean => element.closest('[data-panel-pinned]') == null
+
 // Channel routes name their target the same way in both sections
 // (cooling/:deviceUID/:channelName and monitoring/sensors/:deviceUID/:channelName),
-// so match on that pair rather than on the href: a panel entry links to the
-// channel's canonical page, which for a fan is Cooling even in the Monitoring
-// panel, so Full chart's monitoring route would otherwise find nothing.
+// so match on that pair rather than on the href: a panel entry may link to the
+// channel's canonical page in the other section, which an href match would miss.
 const entriesForRoute = (root: HTMLElement): Element[] => {
     const { deviceUID, channelName } = route.params
     if (typeof deviceUID === 'string' && typeof channelName === 'string') {
@@ -54,11 +59,11 @@ const entriesForRoute = (root: HTMLElement): Element[] => {
         const encoded = `/${encodeURIComponent(deviceUID)}/${encodeURIComponent(channelName)}`
         const matches = [...root.querySelectorAll('a[href]')].filter((link) => {
             const href = link.getAttribute('href') ?? ''
-            return href.endsWith(raw) || href.endsWith(encoded)
+            return (href.endsWith(raw) || href.endsWith(encoded)) && notPinned(link)
         })
         if (matches.length > 0) return matches
     }
-    return [...root.querySelectorAll('[aria-current="page"]')]
+    return [...root.querySelectorAll('[aria-current="page"]')].filter(notPinned)
 }
 
 const scrollParent = (element: Element): Element | undefined => {
@@ -89,10 +94,8 @@ const isInView = (element: Element): boolean => {
     )
 }
 
-// Only ensure that one entry for this page is on screen. A page can have several
-// entries (pinned plus its device group), so scrolling to the first would yank
-// the list to the pinned copy whenever the one actually clicked was already
-// visible.
+// Only ensure an entry for this page is on screen; never move the list when one
+// already is. Clicking inside a panel would otherwise re-scroll under the user.
 const revealActiveEntry = async (): Promise<void> => {
     await nextTick()
     const root = panelRef.value
