@@ -19,10 +19,9 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { computed, defineAsyncComponent, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from '@/shell/toast'
-import { useDialog } from '@/shell/dialog'
 import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import { mdiChartLine, mdiInformationSlabCircleOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -30,6 +29,7 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
 import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
 import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
+import { useCalibrationCurve } from '@/composables/useCalibrationCurve.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import type { UID } from '@/models/Device.ts'
 
@@ -47,19 +47,15 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const toast = useToast()
-const dialog = useDialog()
 const { completedStatusText } = useCalibrationStatusText()
 const { blockingAlertName, watchingAlertCount } = useAlertCalibrationGuard()
+const { openCurve } = useCalibrationCurve(props.deviceUID, props.channelName)
 
 // An Active alert on this fan blocks calibration (the daemon rejects it);
 // alerts merely watching it are paused during the sweep.
 const blockingAlert = computed(() => blockingAlertName(props.deviceUID, props.channelName))
 const watchedByAlerts = computed(
     () => watchingAlertCount([{ deviceUID: props.deviceUID, channelName: props.channelName }]) > 0,
-)
-
-const calibrationCurveDialog = defineAsyncComponent(
-    () => import('@/components/CalibrationCurveDialog.vue'),
 )
 
 const calibrationStatus = computed(() =>
@@ -132,26 +128,10 @@ async function onCancelCalibration(): Promise<void> {
 }
 
 function onViewCurve(): void {
-    const status = calibrationStatus.value
-    const calibration = status?.phase === 'completed' ? status.calibration : undefined
     // Close the host popover first: it returns focus to its trigger on close,
     // which would pull focus back out of the dialog if it went second.
     emit('request-close')
-    dialog.open(calibrationCurveDialog, {
-        props: {
-            header: t('components.calibrationCurve.dialogTitle'),
-            position: 'center',
-            modal: true,
-            dismissableMask: true,
-            style: { width: '80vw', maxWidth: '60rem' },
-            breakpoints: { '1199px': '90vw', '767px': '95vw' },
-        },
-        data: {
-            deviceUID: props.deviceUID,
-            channelName: props.channelName,
-            calibration,
-        },
-    })
+    openCurve()
 }
 
 async function onClearCalibration(): Promise<void> {

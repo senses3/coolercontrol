@@ -27,6 +27,7 @@ import { useFailAlert } from '@/composables/useFailAlert.ts'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
 import ChannelMiniGraph from '@/shell/cooling/ChannelMiniGraph.vue'
 import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
 import type { CoolingChannel } from '@/shell/cooling/channels.ts'
@@ -120,6 +121,10 @@ const isUnhealthy = computed(() =>
                             class="shrink-0 text-error"
                         />
                     </UiTooltip>
+                    <CalibrationBadge
+                        :device-u-i-d="channel.deviceUID"
+                        :channel-name="channel.channelName"
+                    />
                 </div>
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>

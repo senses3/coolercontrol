@@ -32,6 +32,7 @@ import { v4 as uuidV4 } from 'uuid'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
+import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
 import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
@@ -419,6 +420,11 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :device-u-i-d="deviceUID"
                     :channel-name="channelName"
                     :chosen-profile="controlMode === 'automatic' ? selectedProfile : undefined"
+                />
+                <CalibrationBadge
+                    :device-u-i-d="deviceUID"
+                    :channel-name="channelName"
+                    :size="20"
                 />
                 <UiButton
                     class="ml-auto"
