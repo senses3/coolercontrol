@@ -70,12 +70,23 @@ const scrollParent = (element: Element): Element | undefined => {
     return undefined
 }
 
+// The scroll area washes out its top and bottom edges, so an entry sitting in
+// those bands is technically inside the viewport but hard to read. Measure the
+// fades rather than repeating their heights, which differ top from bottom.
+const fadeHeight = (container: Element, edge: 'top' | 'bottom'): number => {
+    const fade = container.parentElement?.querySelector(`[data-fade="${edge}"]`)
+    return fade?.getBoundingClientRect().height ?? 0
+}
+
 const isInView = (element: Element): boolean => {
     const container = scrollParent(element)
     if (container == null) return true
     const bounds = element.getBoundingClientRect()
     const view = container.getBoundingClientRect()
-    return bounds.top >= view.top && bounds.bottom <= view.bottom
+    return (
+        bounds.top >= view.top + fadeHeight(container, 'top') &&
+        bounds.bottom <= view.bottom - fadeHeight(container, 'bottom')
+    )
 }
 
 // Only ensure that one entry for this page is on screen. A page can have several
@@ -89,7 +100,9 @@ const revealActiveEntry = async (): Promise<void> => {
     const entries = entriesForRoute(root)
     if (entries.length === 0) return
     if (entries.some(isInView)) return
-    entries[0].scrollIntoView({ block: 'nearest' })
+    // Centred rather than 'nearest': nearest parks the entry flush against an
+    // edge, which is exactly where the fade is.
+    entries[0].scrollIntoView({ block: 'center' })
 }
 watch(() => route.fullPath, revealActiveEntry)
 onMounted(revealActiveEntry)
