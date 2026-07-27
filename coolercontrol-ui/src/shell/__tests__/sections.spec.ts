@@ -23,11 +23,11 @@ import en from '@/i18n/locales/en.ts'
 import { StartupPage } from '@/models/UISettings.ts'
 import { PLUGINS_SECTION, SHELL_SECTIONS, sectionById, startupRouteName } from '../sections.ts'
 
-const mainSource = import.meta.glob('../../main.ts', {
+const routerSource = import.meta.glob('../../router/index.ts', {
     query: '?raw',
     import: 'default',
     eager: true,
-})['../../main.ts'] as string
+})['../../router/index.ts'] as string
 
 describe('shell sections', () => {
     it('defines the five rail sections in order', () => {
@@ -63,16 +63,13 @@ describe('shell sections', () => {
         expect(sectionById('plugins')?.routeName).toBe('plugins-overview')
     })
 
-    // The `startup-page` route resolves its redirect through useSettingsStore(),
-    // and the router's first navigation runs inside app.use(router). If pinia
-    // were installed after that, the redirect would throw and the app would
-    // never boot, which no type-check or build would catch.
-    it('installs pinia before the router in main.ts', () => {
-        const pinia = mainSource.indexOf('app.use(createPinia())')
-        const router = mainSource.indexOf('app.use(router)')
-        expect(pinia, 'app.use(createPinia()) in main.ts').toBeGreaterThan(-1)
-        expect(router, 'app.use(router) in main.ts').toBeGreaterThan(-1)
-        expect(pinia).toBeLessThan(router)
+    // The settings store's setup calls useI18n() and inject(), so it can only be
+    // created from inside a component setup. Route redirects and guards resolve
+    // outside any component, so a store call there throws during the router's
+    // first navigation and the app never boots. Neither type-check nor build
+    // catches it. Resolve such targets in a component instead (see ShellRail).
+    it('uses no pinia stores in the router', () => {
+        expect(routerSource).not.toMatch(/use[A-Za-z]*Store\s*\(/)
     })
 
     it('maps every startup page onto a real section route', () => {
