@@ -271,6 +271,10 @@ impl Default for LcdCarouselSettings {
     }
 }
 
+/// Upper bound for `CoolerControlSettings::startup_delay`. Some systems need a
+/// long wait before their hardware answers, so this is generous.
+pub const STARTUP_DELAY_SECONDS_MAX: u16 = 120;
+
 /// General Settings for `CoolerControl`
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema)]

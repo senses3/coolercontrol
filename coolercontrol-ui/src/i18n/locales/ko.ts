@@ -338,6 +338,12 @@ export default {
             closeToTray: '트레이에서 닫기',
             zoom: '확대/축소',
             desktopStartupDelay: '데스크톱 시작 지연',
+            groups: {
+                startup: '시작',
+                performance: '성능',
+                devices: '장치 및 감지',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '시작 시 설정 적용',
             deviceDelayAtStartup: '장치 시작 시 지연',
             pollingRate: '폴링 레이트',
@@ -387,6 +393,8 @@ export default {
                 zoom: 'UI 확대/축소 수준을 수동으로 설정합니다.',
                 desktopStartupDelay:
                     '데스크톱 애플리케이션 시작 전에 (몇 초 정도의) 지연 시간을 추가합니다.\n로그인 시 데스크톱 애플리케이션이 자동으로 시작되거나 너무 빨리 시작될 때\n발생하는 문제를 해결하는 데 도움이 됨',
+                unlockRange: '권장 범위를 벗어난 값 허용',
+                lockRange: '권장 범위로 제한',
                 applySettingsOnStartup:
                     '데몬 시작 시 및 절전 모드에서 깨어날 때 설정을 자동으로 적용함',
                 deviceDelayAtStartup:

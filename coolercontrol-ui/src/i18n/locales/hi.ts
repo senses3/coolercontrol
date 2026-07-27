@@ -338,6 +338,12 @@ export default {
             closeToTray: 'ट्रे में बंद करें',
             zoom: 'ज़ूम',
             desktopStartupDelay: 'डेस्कटॉप स्टार्टअप विलंब',
+            groups: {
+                startup: 'स्टार्टअप',
+                performance: 'प्रदर्शन',
+                devices: 'उपकरण और पहचान',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'स्टार्टअप पर सेटिंग्स लागू करें',
             deviceDelayAtStartup: 'स्टार्टअप पर उपकरण विलंब',
             pollingRate: 'पोलिंग दर',
@@ -388,6 +394,8 @@ export default {
                 zoom: 'UI ज़ूम स्तर को मैन्युअल रूप से सेट करें।',
                 desktopStartupDelay:
                     'डेस्कटॉप एप्लिकेशन शुरू करने से पहले कुछ देरी जोड़ता है (सेकंड में)।\nलॉगिन पर स्वचालित रूप से शुरू होने या बहुत जल्दी शुरू होने से उत्पन्न होने वाली समस्याओं में मदद करता है',
+                unlockRange: 'अनुशंसित सीमा के बाहर के मान की अनुमति दें',
+                lockRange: 'अनुशंसित सीमा तक सीमित रखें',
                 applySettingsOnStartup:
                     'डेमन स्टार्टअप पर और नींद से जागने पर स्वचालित रूप से सेटिंग्स लागू करें',
                 deviceDelayAtStartup:

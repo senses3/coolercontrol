@@ -343,6 +343,12 @@ export default {
             closeToTray: 'Cerrar a bandeja',
             zoom: 'Zoom',
             desktopStartupDelay: 'Retraso de inicio de escritorio',
+            groups: {
+                startup: 'Inicio',
+                performance: 'Rendimiento',
+                devices: 'Dispositivos y detección',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Aplicar configuración al inicio',
             deviceDelayAtStartup: 'Retraso de dispositivo al inicio',
             pollingRate: 'Tasa de sondeo',
@@ -394,6 +400,8 @@ export default {
                 zoom: 'Establecer manualmente el nivel de zoom de la interfaz de usuario.',
                 desktopStartupDelay:
                     'Agrega un retraso antes de iniciar la aplicación de escritorio (en segundos).\nAyuda con problemas que surgen al tener la aplicación de escritorio\niniciada automáticamente al iniciar sesión o al iniciar demasiado rápido',
+                unlockRange: 'Permitir valores fuera del rango recomendado',
+                lockRange: 'Restringir al rango recomendado',
                 applySettingsOnStartup:
                     'Aplicar automáticamente la configuración al iniciar el daemon y al despertar del sueño',
                 deviceDelayAtStartup:

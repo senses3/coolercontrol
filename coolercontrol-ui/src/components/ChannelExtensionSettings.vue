@@ -173,7 +173,7 @@ defineExpose({
             disabled: isPopupOpen,
         }"
     >
-        <popover-root @update:open="(open) => (isPopupOpen = open)">
+        <popover-root v-model:open="isPopupOpen">
             <popover-trigger
                 class="h-[2.375rem] gap-1.5 rounded-lg border-2 border-border-one bg-control !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
             >
@@ -257,6 +257,7 @@ defineExpose({
                             <channel-calibration-panel
                                 :device-u-i-d="deviceUID"
                                 :channel-name="channelName"
+                                @request-close="isPopupOpen = false"
                             />
                         </div>
                     </div>

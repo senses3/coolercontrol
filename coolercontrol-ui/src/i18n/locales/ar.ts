@@ -338,6 +338,12 @@ export default {
             closeToTray: 'الإغلاق إلى شريط المهام',
             zoom: 'تكبير',
             desktopStartupDelay: 'تأخير بدء تشغيل سطح المكتب',
+            groups: {
+                startup: 'بدء التشغيل',
+                performance: 'الأداء',
+                devices: 'الأجهزة والاكتشاف',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'تطبيق الإعدادات عند بدء التشغيل',
             deviceDelayAtStartup: 'تأخير الجهاز عند بدء التشغيل',
             pollingRate: 'معدل الاستطلاع',
@@ -388,6 +394,8 @@ export default {
                 zoom: 'تعيين مستوى تكبير واجهة المستخدم يدويًا.',
                 desktopStartupDelay:
                     'يضيف بعض التأخير قبل بدء تشغيل تطبيق سطح المكتب (بالثواني).\nيساعد في حل المشكلات التي تنشأ من بدء تشغيل تطبيق سطح المكتب\nتلقائيًا عند تسجيل الدخول أو البدء بسرعة كبيرة',
+                unlockRange: 'السماح بقيم خارج النطاق الموصى به',
+                lockRange: 'التقييد بالنطاق الموصى به',
                 applySettingsOnStartup:
                     'تطبيق الإعدادات تلقائيًا عند بدء تشغيل الخدمة وعند الاستيقاظ من وضع السكون',
                 deviceDelayAtStartup:

@@ -338,6 +338,12 @@ export default {
             closeToTray: 'トレイに閉じる',
             zoom: 'ズーム',
             desktopStartupDelay: 'デスクトップ起動遅延',
+            groups: {
+                startup: '起動',
+                performance: 'パフォーマンス',
+                devices: 'デバイスと検出',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '起動時に設定を適用',
             deviceDelayAtStartup: '起動時のデバイス遅延',
             pollingRate: 'ポーリングレート',
@@ -389,6 +395,8 @@ export default {
                 zoom: '手動でUIズームレベルを設定します。',
                 desktopStartupDelay:
                     'デスクトップアプリケーションを起動する前に遅延を追加します（秒単位）。\nデスクトップアプリケーションがログイン時に自動的に起動されるか、\nあまりにも早く起動することから生じる問題を解決するのに役立ちます。',
+                unlockRange: '推奨範囲外の値を許可する',
+                lockRange: '推奨範囲内に制限する',
                 applySettingsOnStartup:
                     'デーモン起動時およびスリープから復帰時に自動的に設定を適用します',
                 deviceDelayAtStartup:

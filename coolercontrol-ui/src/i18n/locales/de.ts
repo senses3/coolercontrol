@@ -343,6 +343,12 @@ export default {
             closeToTray: 'In Tray minimieren',
             zoom: 'Zoom',
             desktopStartupDelay: 'Desktop-Startverzögerung',
+            groups: {
+                startup: 'Start',
+                performance: 'Leistung',
+                devices: 'Geräte & Erkennung',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Einstellungen beim Start anwenden',
             deviceDelayAtStartup: 'Geräteverzögerung beim Start',
             pollingRate: 'Abfragerate',
@@ -395,6 +401,8 @@ export default {
                 zoom: 'Legen Sie manuell den Zoom-Level der Benutzeroberfläche fest.',
                 desktopStartupDelay:
                     'Fügt eine Verzögerung vor dem Start der Desktop-Anwendung hinzu (in Sekunden).\nHilft bei Problemen, die dadurch entstehen, dass die Desktop-Anwendung\nautomatisch beim Login gestartet wird oder zu schnell startet',
+                unlockRange: 'Werte außerhalb des empfohlenen Bereichs zulassen',
+                lockRange: 'Auf den empfohlenen Bereich beschränken',
                 applySettingsOnStartup:
                     'Einstellungen automatisch beim Daemon-Start und beim Aufwachen aus dem Ruhezustand anwenden',
                 deviceDelayAtStartup:

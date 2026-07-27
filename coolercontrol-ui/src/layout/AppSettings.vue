@@ -39,6 +39,8 @@ import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
 import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
+import UiSettingGroup from '@/shell/ui/UiSettingGroup.vue'
+import UiLockToggle from '@/shell/ui/UiLockToggle.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -326,6 +328,43 @@ const liquidctlInit = computed({
 const pollRate: Ref<number> = ref(settingsStore.ccSettings.poll_rate)
 watch(pollRate, () => {
     applyGenericDaemonChange()
+})
+
+// Bounded daemon settings: the recommended band, and the hard bounds the lock
+// toggle opens up to. Outside the band the input colors itself as a warning.
+const STARTUP_DELAY_SAFE = { min: 2, max: 20 }
+const STARTUP_DELAY_FULL = { min: 0, max: 120 }
+const POLL_RATE_SAFE = { min: 1.0, max: 5.0 }
+const POLL_RATE_FULL = { min: 0.5, max: 5.0 }
+
+type Band = { min: number; max: number }
+const outsideBand = (value: number, band: Band): boolean => value < band.min || value > band.max
+
+// A saved value already outside its band comes up unlocked, so a reload never
+// silently pulls it back in.
+const startupDelayUnlocked: Ref<boolean> = ref(
+    outsideBand(settingsStore.ccSettings.startup_delay, STARTUP_DELAY_SAFE),
+)
+const pollRateUnlocked: Ref<boolean> = ref(outsideBand(pollRate.value, POLL_RATE_SAFE))
+const startupDelayBounds = computed(() =>
+    startupDelayUnlocked.value ? STARTUP_DELAY_FULL : STARTUP_DELAY_SAFE,
+)
+const pollRateBounds = computed(() => (pollRateUnlocked.value ? POLL_RATE_FULL : POLL_RATE_SAFE))
+
+// Re-locking pulls an out-of-band value back in, so the lock and the value
+// never disagree. Poll rate goes through pollRate, whose watcher owns the
+// daemon restart prompt; an in-band value is left alone and prompts nothing.
+watch(startupDelayUnlocked, (unlocked) => {
+    if (unlocked) return
+    settingsStore.ccSettings.startup_delay = _.clamp(
+        settingsStore.ccSettings.startup_delay,
+        STARTUP_DELAY_SAFE.min,
+        STARTUP_DELAY_SAFE.max,
+    )
+})
+watch(pollRateUnlocked, (unlocked) => {
+    if (unlocked) return
+    pollRate.value = _.clamp(pollRate.value, POLL_RATE_SAFE.min, POLL_RATE_SAFE.max)
 })
 
 // This interface is used for exporting/importing custom HEX color themes
@@ -744,232 +783,278 @@ onUnmounted(() => {
                 class="break-inside-avoid"
                 :title="t('views.daemon.title')"
             >
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.applySettingsOnStartup'),
-                    }"
-                    :label="t('layout.settings.applySettingsOnStartup')"
-                >
-                    <UiSwitch v-model="settingsStore.ccSettings.apply_on_boot" />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.deviceDelayAtStartup'),
-                    }"
-                    :label="t('layout.settings.deviceDelayAtStartup')"
-                >
-                    <UiNumberInput
-                        v-model="settingsStore.ccSettings.startup_delay"
-                        :min="1"
-                        :max="30"
-                        :suffix="t('common.secondAbbr')"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.pollingRate'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.1)"
+                <UiSettingGroup :title="t('layout.settings.groups.startup')">
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.applySettingsOnStartup'),
+                        }"
+                        :label="t('layout.settings.applySettingsOnStartup')"
+                    >
+                        <UiSwitch v-model="settingsStore.ccSettings.apply_on_boot" />
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.deviceDelayAtStartup'),
+                        }"
+                        :label="t('layout.settings.deviceDelayAtStartup')"
+                    >
+                        <div class="flex items-center gap-1">
+                            <UiLockToggle
+                                v-model="startupDelayUnlocked"
+                                v-tooltip.top="
+                                    startupDelayUnlocked
+                                        ? t('layout.settings.tooltips.lockRange')
+                                        : t('layout.settings.tooltips.unlockRange')
+                                "
+                            />
+                            <UiNumberInput
+                                v-model="settingsStore.ccSettings.startup_delay"
+                                :min="startupDelayBounds.min"
+                                :max="startupDelayBounds.max"
+                                :safe-min="STARTUP_DELAY_SAFE.min"
+                                :safe-max="STARTUP_DELAY_SAFE.max"
+                                :suffix="t('common.secondAbbr')"
                             />
                         </div>
-                        <div>
-                            {{ t('layout.settings.pollingRate') }}
-                        </div></template
+                    </UiSettingRow>
+                </UiSettingGroup>
+                <UiSettingGroup :title="t('layout.settings.groups.performance')">
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.pollingRate'),
+                        }"
                     >
-                    <UiNumberInput
-                        v-model="pollRate"
-                        :min="0.5"
-                        :max="5.0"
-                        :step="0.5"
-                        :suffix="t('common.secondAbbr')"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.compressApiPayload'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
-                            />
-                        </div>
-                        <div>
-                            {{ t('layout.settings.compressApiPayload') }}
-                        </div></template
-                    >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.compress"
-                        @click="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.sensorsAutoDetect'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
-                            />
-                        </div>
-                        <div>
-                            {{ t('layout.settings.sensorsAutoDetect') }}
-                        </div></template
-                    >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.sensors_auto_detect"
-                        @update:model-value="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.sensorsConfig'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
-                            />
-                        </div>
-                        <div>
-                            {{ t('layout.settings.sensorsConfig') }}
-                        </div></template
-                    >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.sensors_conf_enabled"
-                        @update:model-value="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.deviceListener'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
-                            />
-                        </div>
-                        <div>
-                            {{ t('layout.settings.deviceListener') }}
-                        </div></template
-                    >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.device_listener_enabled"
-                        @update:model-value="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.liquidctlIntegration'),
-                    }"
-                >
-                    <template #label
-                        ><div
-                            class="flex items-center"
-                            v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.1)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.pollingRate') }}
+                            </div></template
                         >
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
+                        <div class="flex items-center gap-1">
+                            <UiLockToggle
+                                v-model="pollRateUnlocked"
+                                v-tooltip.top="
+                                    pollRateUnlocked
+                                        ? t('layout.settings.tooltips.lockRange')
+                                        : t('layout.settings.tooltips.unlockRange')
+                                "
+                            />
+                            <UiNumberInput
+                                v-model="pollRate"
+                                :min="pollRateBounds.min"
+                                :max="pollRateBounds.max"
+                                :safe-min="POLL_RATE_SAFE.min"
+                                :safe-max="POLL_RATE_SAFE.max"
+                                :step="0.5"
+                                :suffix="t('common.secondAbbr')"
                             />
                         </div>
-                        <div>
-                            {{ t('layout.settings.liquidctlIntegration') }}
-                        </div></template
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.compressApiPayload'),
+                        }"
                     >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.liquidctl_integration"
-                        @update:model-value="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.liquidctlDeviceInit'),
-                    }"
-                    :label="t('layout.settings.liquidctlDeviceInit')"
-                >
-                    <UiSwitch
-                        v-model="liquidctlInit"
-                        :disabled="!settingsStore.ccSettings.liquidctl_integration"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.hideDuplicateDevices'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
-                            />
-                        </div>
-                        <div>
-                            {{ t('layout.settings.hideDuplicateDevices') }}
-                        </div></template
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.compressApiPayload') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.compress"
+                            @click="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                </UiSettingGroup>
+                <UiSettingGroup :title="t('layout.settings.groups.devices')">
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.sensorsAutoDetect'),
+                        }"
                     >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.hide_duplicate_devices"
-                        :disabled="!settingsStore.ccSettings.liquidctl_integration"
-                        @update:model-value="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
-                <UiSettingRow
-                    v-tooltip.top="{
-                        escape: false,
-                        value: t('layout.settings.tooltips.drivePowerState'),
-                    }"
-                >
-                    <template #label
-                        ><div v-tooltip.top="'Triggers an automatic daemon restart'">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiRestart"
-                                :size="deviceStore.getREMSize(1.0)"
-                            />
-                        </div>
-                        <div>
-                            {{ t('layout.settings.drivePowerState') }}
-                        </div></template
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.sensorsAutoDetect') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.sensors_auto_detect"
+                            @update:model-value="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.sensorsConfig'),
+                        }"
                     >
-                    <UiSwitch
-                        v-model="settingsStore.ccSettings.drivetemp_suspend"
-                        @update:model-value="applyGenericDaemonChange"
-                    />
-                </UiSettingRow>
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.sensorsConfig') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.sensors_conf_enabled"
+                            @update:model-value="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.deviceListener'),
+                        }"
+                    >
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.deviceListener') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.device_listener_enabled"
+                            @update:model-value="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.drivePowerState'),
+                        }"
+                    >
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.drivePowerState') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.drivetemp_suspend"
+                            @update:model-value="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                </UiSettingGroup>
+                <UiSettingGroup :title="t('layout.settings.groups.liquidctl')">
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.liquidctlIntegration'),
+                        }"
+                    >
+                        <template #label
+                            ><div
+                                class="flex items-center"
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.liquidctlIntegration') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.liquidctl_integration"
+                            @update:model-value="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.liquidctlDeviceInit'),
+                        }"
+                        :label="t('layout.settings.liquidctlDeviceInit')"
+                    >
+                        <UiSwitch
+                            v-model="liquidctlInit"
+                            :disabled="!settingsStore.ccSettings.liquidctl_integration"
+                        />
+                    </UiSettingRow>
+                    <UiSettingRow
+                        v-tooltip.top="{
+                            escape: false,
+                            value: t('layout.settings.tooltips.hideDuplicateDevices'),
+                        }"
+                    >
+                        <template #label
+                            ><div
+                                v-tooltip.top="t('layout.settings.tooltips.triggersDaemonRestart')"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiRestart"
+                                    :size="deviceStore.getREMSize(1.0)"
+                                />
+                            </div>
+                            <div>
+                                {{ t('layout.settings.hideDuplicateDevices') }}
+                            </div></template
+                        >
+                        <UiSwitch
+                            v-model="settingsStore.ccSettings.hide_duplicate_devices"
+                            :disabled="!settingsStore.ccSettings.liquidctl_integration"
+                            @update:model-value="applyGenericDaemonChange"
+                        />
+                    </UiSettingRow>
+                </UiSettingGroup>
             </UiSettingsCard>
             <UiSettingsCard
                 id="settings-desktop"

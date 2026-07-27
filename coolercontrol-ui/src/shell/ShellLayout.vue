@@ -37,26 +37,23 @@ const isMobile = computed(() => width.value < 768)
 
 const minPanelWidthRem = 14
 const panelRef = ref<InstanceType<typeof SplitterPanel>>()
-const groupRef = ref<InstanceType<typeof SplitterGroup>>()
-const groupWidthPx = ref(1600)
 const remPx = deviceStore.getREMSize(1)
 
-const panelWidthPercent = ref(20)
-const calcPercent = (rem: number): number => Math.min((rem * remPx * 100) / groupWidthPx.value, 50)
-const panelMinPercent = computed(() => calcPercent(minPanelWidthRem))
+// Sized in px (size-unit) so the saved rem width applies as-is. Percent sizing
+// needed the group's measured width, which is only known after the panel has
+// already registered its default-size, so the saved width was both ignored and
+// then overwritten by the initial resize event. default-size is read once at
+// registration; the store stays the source of truth.
+const minPanelWidthPx = minPanelWidthRem * remPx
+const panelWidthPx = computed(() => settingsStore.mainMenuWidthRem * remPx)
 
-const onPanelResize = (sizePercent: number): void => {
-    if (panelRef.value?.isCollapsed || sizePercent < panelMinPercent.value) return
-    panelWidthPercent.value = sizePercent
-    settingsStore.mainMenuWidthRem =
-        Math.round(((sizePercent / 100) * groupWidthPx.value * 10) / remPx) / 10
+const onPanelResize = (sizePx: number): void => {
+    if (panelRef.value?.isCollapsed || sizePx < minPanelWidthPx) return
+    settingsStore.mainMenuWidthRem = Math.round((sizePx * 10) / remPx) / 10
 }
 
 onMounted(() => {
     if (isMobile.value) return
-    const groupEl: HTMLElement | undefined = groupRef.value?.$el
-    if (groupEl != null) groupWidthPx.value = groupEl.getBoundingClientRect().width
-    panelWidthPercent.value = calcPercent(settingsStore.mainMenuWidthRem)
     if (settingsStore.collapsedMainMenu) {
         // timeout needed as the auto-expand happens after onMounted code.
         setTimeout(() => panelRef.value?.collapse())
@@ -129,17 +126,13 @@ onUnmounted(() => {
         <ShellRail />
         <div class="flex min-w-0 flex-1 flex-col pb-2 pr-2">
             <ShellHeader />
-            <SplitterGroup
-                ref="groupRef"
-                direction="horizontal"
-                :keyboard-resize-by="10"
-                class="min-h-0 flex-1"
-            >
+            <SplitterGroup direction="horizontal" :keyboard-resize-by="10" class="min-h-0 flex-1">
                 <SplitterPanel
                     ref="panelRef"
                     collapsible
-                    :default-size="panelWidthPercent"
-                    :min-size="panelMinPercent"
+                    size-unit="px"
+                    :default-size="panelWidthPx"
+                    :min-size="minPanelWidthPx"
                     class="rounded-lg border-border-one bg-bg-one"
                     :class="{ border: !settingsStore.collapsedMainMenu }"
                     @resize="onPanelResize"

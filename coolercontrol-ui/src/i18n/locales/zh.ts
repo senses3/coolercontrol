@@ -333,6 +333,12 @@ export default {
             closeToTray: '关闭时最小化到托盘',
             zoom: '缩放',
             desktopStartupDelay: '桌面启动延迟',
+            groups: {
+                startup: '启动',
+                performance: '性能',
+                devices: '设备与检测',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '启动时应用设置',
             deviceDelayAtStartup: '启动时设备延迟',
             pollingRate: '轮询速率',
@@ -380,6 +386,8 @@ export default {
                 zoom: '手动设置界面缩放级别。',
                 desktopStartupDelay:
                     '在启动桌面应用程序前添加一些延迟（以秒为单位）。\n有助于解决由于在登录时自动启动桌面应用程序或启动过快而产生的问题',
+                unlockRange: '允许超出推荐范围的值',
+                lockRange: '限制在推荐范围内',
                 applySettingsOnStartup: '在后台启动和从睡眠状态唤醒时自动应用设置',
                 deviceDelayAtStartup:
                     '启动设备通信前的延迟（以秒为单位）。\n有助于处理需要时间初始化或间歇性检测到的设备',
