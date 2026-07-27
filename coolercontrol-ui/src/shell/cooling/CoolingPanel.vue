@@ -240,6 +240,7 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                 handle=".drag-handle"
                 :animation="150"
                 class="flex flex-col gap-0.5"
+                data-panel-pinned
                 @end="persistPinnedOrder"
             >
                 <div

@@ -84,13 +84,17 @@ const bottomFadeStyle = computed(() => fadeStops('top'))
         </ScrollAreaViewport>
         <!-- 1px overhang: fractional viewport heights leave the edge pixel only
              partially covered, letting a hairline of content pass through. -->
+        <!-- data-fade lets callers measure the washed-out bands, so scrolling
+             something into view can keep clear of them (see ShellPanel). -->
         <div
+            data-fade="top"
             class="-top-px h-14"
             :class="[fadeBase, showTopFade ? 'opacity-100' : 'opacity-0']"
             :style="topFadeStyle"
             aria-hidden="true"
         />
         <div
+            data-fade="bottom"
             class="-bottom-px h-28"
             :class="[fadeBase, showBottomFade ? 'opacity-100' : 'opacity-0']"
             :style="bottomFadeStyle"

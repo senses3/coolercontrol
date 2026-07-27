@@ -25,7 +25,12 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { PLUGINS_SECTION, SHELL_SECTIONS, type SectionId } from '@/shell/sections.ts'
+import {
+    PLUGINS_SECTION,
+    SHELL_SECTIONS,
+    type SectionId,
+    startupRouteName,
+} from '@/shell/sections.ts'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
 import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
@@ -44,14 +49,18 @@ const railSections = computed(() => {
 })
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.svg' : '/logo.svg'))
+// The logo resets to the configured startup page, which is what sets it apart
+// from the Home rail button. Resolved here rather than in the `startup-page`
+// route because that runs outside a component, where the store cannot be built.
+const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.startupPage) }))
 </script>
 
 <template>
     <nav class="flex h-full w-20 flex-col items-center gap-1 py-2">
         <RouterLink
             id="logo"
-            :to="{ name: 'section-home' }"
-            class="mb-1 mt-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            :to="startupTarget"
+            class="rounded-lg p-1 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
         >
             <img :src="logoUrl" alt="CoolerControl" class="h-10 w-10" />
         </RouterLink>

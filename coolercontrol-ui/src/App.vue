@@ -18,7 +18,7 @@
 
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
-import { StartupPage } from '@/models/UISettings.ts'
+import { startupRouteName } from '@/shell/sections.ts'
 import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
@@ -288,15 +288,13 @@ onMounted(async () => {
     // reload (the daemon owns the queue, so it survived the suspend/reload).
     const calibrationBatchResumed = await calibrationStore.ensureBatchPolling()
     // Honor the configured startup page, but only when the app opened at the
-    // root URL (startedAtRoot), not on a direct/deep link like /#/home. Targets
-    // remap to the new shell: AppInfo -> Home (its content lives there now),
-    // Controls -> Cooling, HomeDashboard -> Monitoring (home dashboard).
+    // root URL (startedAtRoot), not on a direct/deep link like /#/home. The
+    // `startup-page` route resolves this too, but it ran before settings had
+    // loaded, so it landed on the default; re-apply now that they are in.
     if (startedAtRoot) {
-        const startup = settingsStore.startupPage
-        if (startup === StartupPage.Controls) {
-            await router.replace({ name: 'section-cooling' })
-        } else if (startup === StartupPage.HomeDashboard) {
-            await router.replace({ name: 'section-monitoring' })
+        const target = startupRouteName(settingsStore.startupPage)
+        if (target !== 'section-home') {
+            await router.replace({ name: target })
         }
     }
     applyCustomTheme()

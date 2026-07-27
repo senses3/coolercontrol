@@ -157,6 +157,11 @@ const router = createRouter({
                 {
                     path: '',
                     name: 'startup-page',
+                    // Static on purpose. Resolving the configured startup page
+                    // here would mean reading the settings store, which cannot
+                    // be created outside a component setup (see sections.spec).
+                    // Callers that want the configured page resolve it
+                    // themselves; App.vue applies it at boot.
                     redirect: { name: 'section-home' },
                 },
                 // Legacy route names kept as redirects: wizards, bookmarks,

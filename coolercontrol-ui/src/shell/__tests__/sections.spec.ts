@@ -16,9 +16,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// The app loads reflect-metadata via an injected script, tests must import it themselves.
+import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
-import { PLUGINS_SECTION, SHELL_SECTIONS, sectionById } from '../sections.ts'
+import { StartupPage } from '@/models/UISettings.ts'
+import { PLUGINS_SECTION, SHELL_SECTIONS, sectionById, startupRouteName } from '../sections.ts'
+
+const routerSource = import.meta.glob('../../router/index.ts', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+})['../../router/index.ts'] as string
 
 describe('shell sections', () => {
     it('defines the five rail sections in order', () => {
@@ -52,5 +61,26 @@ describe('shell sections', () => {
     it('resolves sections by id', () => {
         expect(sectionById('cooling')?.routeName).toBe('section-cooling')
         expect(sectionById('plugins')?.routeName).toBe('plugins-overview')
+    })
+
+    // The settings store's setup calls useI18n() and inject(), so it can only be
+    // created from inside a component setup. Route redirects and guards resolve
+    // outside any component, so a store call there throws during the router's
+    // first navigation and the app never boots. Neither type-check nor build
+    // catches it. Resolve such targets in a component instead (see ShellRail).
+    it('uses no pinia stores in the router', () => {
+        expect(routerSource).not.toMatch(/use[A-Za-z]*Store\s*\(/)
+    })
+
+    it('maps every startup page onto a real section route', () => {
+        expect(startupRouteName(StartupPage.AppInfo)).toBe('section-home')
+        expect(startupRouteName(StartupPage.Controls)).toBe('section-cooling')
+        expect(startupRouteName(StartupPage.HomeDashboard)).toBe('section-monitoring')
+        // Every target must be a route the rail actually owns, otherwise the
+        // logo and the boot redirect would navigate nowhere.
+        const railRoutes = new Set(SHELL_SECTIONS.map((s) => s.routeName))
+        for (const page of Object.values(StartupPage)) {
+            expect(railRoutes.has(startupRouteName(page)), String(page)).toBe(true)
+        }
     })
 })
