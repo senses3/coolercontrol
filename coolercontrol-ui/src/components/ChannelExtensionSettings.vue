@@ -28,7 +28,8 @@ import { computed, nextTick, ref, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UID } from '@/models/Device.ts'
 import { ChannelExtensionNames } from '@/models/SpeedOptions.ts'
-import { Profile, ProfileType } from '@/models/Profile.ts'
+import { Profile } from '@/models/Profile.ts'
+import { firmwareCurveApplicable } from '@/shell/cooling/firmwareCurve.ts'
 import { CCChannelSettings, ChannelExtensions } from '@/models/CCSettings.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -88,13 +89,11 @@ for (const device of deviceStore.allDevices()) {
     }
 }
 const hwFanCurveIsApplicable = computed((): boolean => {
-    const p = props.chosenProfile
-    const isApplicable =
-        !!p &&
-        p.p_type === ProfileType.Graph &&
-        p.temp_source?.device_uid === props.deviceUID && // if it's an AMDGPU, that it uses the correct temp sensor:
-        (currentChannelExtension.value !== ChannelExtensionNames.AmdRdnaGpu ||
-            p.temp_source?.temp_name === 'temp1')
+    const isApplicable = firmwareCurveApplicable(
+        props.chosenProfile,
+        props.deviceUID,
+        currentChannelExtension.value,
+    )
     if (!isApplicable) {
         nextTick(() => {
             hwFanCurve.value = false
