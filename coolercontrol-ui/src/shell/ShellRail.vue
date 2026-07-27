@@ -50,7 +50,7 @@ const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.svg' : 
     <nav class="flex h-full w-20 flex-col items-center gap-1 py-2">
         <RouterLink
             id="logo"
-            :to="{ name: 'section-home' }"
+            :to="{ name: 'startup-page' }"
             class="mb-1 mt-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
             <img :src="logoUrl" alt="CoolerControl" class="h-10 w-10" />

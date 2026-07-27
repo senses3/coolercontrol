@@ -16,9 +16,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// The app loads reflect-metadata via an injected script, tests must import it themselves.
+import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
-import { PLUGINS_SECTION, SHELL_SECTIONS, sectionById } from '../sections.ts'
+import { StartupPage } from '@/models/UISettings.ts'
+import { PLUGINS_SECTION, SHELL_SECTIONS, sectionById, startupRouteName } from '../sections.ts'
+
+const mainSource = import.meta.glob('../../main.ts', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+})['../../main.ts'] as string
 
 describe('shell sections', () => {
     it('defines the five rail sections in order', () => {
@@ -52,5 +61,29 @@ describe('shell sections', () => {
     it('resolves sections by id', () => {
         expect(sectionById('cooling')?.routeName).toBe('section-cooling')
         expect(sectionById('plugins')?.routeName).toBe('plugins-overview')
+    })
+
+    // The `startup-page` route resolves its redirect through useSettingsStore(),
+    // and the router's first navigation runs inside app.use(router). If pinia
+    // were installed after that, the redirect would throw and the app would
+    // never boot, which no type-check or build would catch.
+    it('installs pinia before the router in main.ts', () => {
+        const pinia = mainSource.indexOf('app.use(createPinia())')
+        const router = mainSource.indexOf('app.use(router)')
+        expect(pinia, 'app.use(createPinia()) in main.ts').toBeGreaterThan(-1)
+        expect(router, 'app.use(router) in main.ts').toBeGreaterThan(-1)
+        expect(pinia).toBeLessThan(router)
+    })
+
+    it('maps every startup page onto a real section route', () => {
+        expect(startupRouteName(StartupPage.AppInfo)).toBe('section-home')
+        expect(startupRouteName(StartupPage.Controls)).toBe('section-cooling')
+        expect(startupRouteName(StartupPage.HomeDashboard)).toBe('section-monitoring')
+        // Every target must be a route the rail actually owns, otherwise the
+        // logo and the boot redirect would navigate nowhere.
+        const railRoutes = new Set(SHELL_SECTIONS.map((s) => s.routeName))
+        for (const page of Object.values(StartupPage)) {
+            expect(railRoutes.has(startupRouteName(page)), String(page)).toBe(true)
+        }
     })
 })

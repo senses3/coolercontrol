@@ -17,6 +17,7 @@
  */
 
 import { mdiChartLine, mdiCog, mdiFan, mdiHomeOutline, mdiMemory, mdiPowerPlug } from '@mdi/js'
+import { StartupPage } from '@/models/UISettings.ts'
 
 export type SectionId = 'home' | 'cooling' | 'monitoring' | 'devices' | 'settings' | 'plugins'
 
@@ -72,4 +73,18 @@ export const PLUGINS_SECTION: ShellSection = Object.freeze({
 export function sectionById(id: SectionId): ShellSection | undefined {
     if (id === 'plugins') return PLUGINS_SECTION
     return SHELL_SECTIONS.find((section) => section.id === id)
+}
+
+// Where the configured startup page lands in the shell. AppInfo's content moved
+// onto Home, and the home dashboard lives under Monitoring. Single source for
+// the `startup-page` route, the rail logo, and the boot redirect.
+export function startupRouteName(page: StartupPage): string {
+    switch (page) {
+        case StartupPage.Controls:
+            return 'section-cooling'
+        case StartupPage.HomeDashboard:
+            return 'section-monitoring'
+        default:
+            return 'section-home'
+    }
 }

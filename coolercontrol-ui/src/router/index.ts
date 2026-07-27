@@ -19,6 +19,8 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 // @ts-ignore
 import ShellLayout from '@/shell/ShellLayout.vue'
+import { startupRouteName } from '@/shell/sections.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
 
 // Shell section routes. Placeholder pages until each section's phase lands;
 // the settings section reuses the existing settings route.
@@ -157,7 +159,13 @@ const router = createRouter({
                 {
                     path: '',
                     name: 'startup-page',
-                    redirect: { name: 'section-home' },
+                    // Resolved per navigation, so the rail logo and the wizards
+                    // land on whatever startup page is configured. At boot the
+                    // store still holds defaults (settings load after login), so
+                    // App.vue re-applies this once they are in.
+                    redirect: () => ({
+                        name: startupRouteName(useSettingsStore().startupPage),
+                    }),
                 },
                 // Legacy route names kept as redirects: wizards, bookmarks,
                 // and the Qt app navigate by these.
