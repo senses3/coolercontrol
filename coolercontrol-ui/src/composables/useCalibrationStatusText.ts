@@ -66,5 +66,20 @@ export function useCalibrationStatusText() {
             : t('components.channelExtensionSettings.calibration.statusCompleted')
     }
 
-    return { warningText, completedStatusText }
+    // Literal keys on purpose: building them from the stage would hide these
+    // strings from the unused-key sweep and get them pruned.
+    function stageLabel(stage: 'preflight' | 'up_sweep' | 'down_sweep' | 'finalizing'): string {
+        switch (stage) {
+            case 'preflight':
+                return t('components.channelExtensionSettings.calibration.stagePreflight')
+            case 'up_sweep':
+                return t('components.channelExtensionSettings.calibration.stageUpSweep')
+            case 'down_sweep':
+                return t('components.channelExtensionSettings.calibration.stageDownSweep')
+            case 'finalizing':
+                return t('components.channelExtensionSettings.calibration.stageFinalizing')
+        }
+    }
+
+    return { warningText, completedStatusText, stageLabel }
 }

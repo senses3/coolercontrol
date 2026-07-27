@@ -27,8 +27,11 @@ import { useFailAlert } from '@/composables/useFailAlert.ts'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
+import FirmwareCurveBadge from '@/shell/cooling/FirmwareCurveBadge.vue'
 import ChannelMiniGraph from '@/shell/cooling/ChannelMiniGraph.vue'
 import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
+import { HealthEntityType } from '@/models/DeviceHealth.ts'
 import type { CoolingChannel } from '@/shell/cooling/channels.ts'
 
 const props = defineProps<{ channel: CoolingChannel }>()
@@ -81,22 +84,54 @@ const assignedSummary = computed<string>(() => {
     return t('common.unmanaged')
 })
 
-const failsafeTooltip = computed((): string => {
-    const ref = settingsStore.healthFailsafe.find(
+const failsafeRef = computed(() =>
+    settingsStore.healthFailsafe.find(
         (entry) =>
             entry.device_uid === props.channel.deviceUID &&
             entry.name === props.channel.channelName,
-    )
-    const base = t('views.appInfo.failsafeActive')
-    return ref?.reason ? `${base}: ${ref.reason}` : base
-})
-
-const isUnhealthy = computed(() =>
-    settingsStore.healthFailsafe.some(
-        (ref) =>
-            ref.device_uid === props.channel.deviceUID && ref.name === props.channel.channelName,
     ),
 )
+
+// A fan running a profile whose temp source is missing or stale is degraded
+// even though the channel itself reports no failsafe, so fold that in: the
+// panel only flags it on the profile's own row, where it is easy to miss.
+const assignedProfileUID = computed(() => {
+    const uid = daemonSetting.value?.profile_uid
+    return uid != null && uid !== '0' ? uid : undefined
+})
+const profileMissingSource = computed(
+    () =>
+        assignedProfileUID.value != null &&
+        settingsStore.healthMissing.some(
+            (ref) =>
+                ref.entity_type === HealthEntityType.Profile &&
+                ref.entity_uid === assignedProfileUID.value,
+        ),
+)
+const profileStaleSource = computed(
+    () =>
+        assignedProfileUID.value != null &&
+        settingsStore.healthStaleSource.some(
+            (ref) =>
+                ref.entity_type === HealthEntityType.Profile &&
+                ref.entity_uid === assignedProfileUID.value,
+        ),
+)
+
+const isUnhealthy = computed(
+    () => failsafeRef.value != null || profileMissingSource.value || profileStaleSource.value,
+)
+
+const failsafeTooltip = computed((): string => {
+    const lines: Array<string> = []
+    if (failsafeRef.value != null) {
+        const base = t('views.appInfo.failsafeActive')
+        lines.push(failsafeRef.value.reason ? `${base}: ${failsafeRef.value.reason}` : base)
+    }
+    if (profileMissingSource.value) lines.push(t('views.appInfo.missingTempSource'))
+    if (profileStaleSource.value) lines.push(t('views.appInfo.staleTempSource'))
+    return lines.join('\n')
+})
 </script>
 
 <template>
@@ -120,6 +155,14 @@ const isUnhealthy = computed(() =>
                             class="shrink-0 text-error"
                         />
                     </UiTooltip>
+                    <FirmwareCurveBadge
+                        :device-u-i-d="channel.deviceUID"
+                        :channel-name="channel.channelName"
+                    />
+                    <CalibrationBadge
+                        :device-u-i-d="channel.deviceUID"
+                        :channel-name="channel.channelName"
+                    />
                 </div>
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>
