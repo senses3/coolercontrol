@@ -1064,6 +1064,8 @@ export default {
                 buttonRecalibrate: 'Recalibrar',
                 buttonCancel: 'Cancelar',
                 buttonClear: 'Borrar',
+                clearConfirm:
+                    '¿Borrar la calibración de {channel}? Volver a ejecutarla tarda varios minutos.',
                 buttonViewCurve: 'Ver curva',
                 caveatsBanner:
                     'Calibrar varios ventiladores de refrigeración principales a la vez puede aumentar la temperatura del sistema.\nLos ventiladores push-pull de un radiador diagnosticados en paralelo pueden generar lecturas inexactas.\nMantenga el sistema inactivo durante la calibración.',

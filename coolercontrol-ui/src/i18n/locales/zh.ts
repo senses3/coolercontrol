@@ -1011,6 +1011,7 @@ export default {
                 buttonRecalibrate: '重新校准',
                 buttonCancel: '取消',
                 buttonClear: '清除',
+                clearConfirm: '清除 {channel} 的校准？重新运行需要几分钟。',
                 buttonViewCurve: '查看曲线',
                 caveatsBanner:
                     '同时校准多个主要散热风扇可能会提高系统温度。\n并行诊断的推拉式散热排风扇可能产生不准确的读数。\n请在校准期间保持系统处于空闲状态。',

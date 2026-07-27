@@ -1012,6 +1012,7 @@ export default {
                 buttonRecalibrate: '重新校正',
                 buttonCancel: '取消',
                 buttonClear: '清除',
+                clearConfirm: '清除 {channel} 的校準？重新執行需要幾分鐘。',
                 buttonViewCurve: '檢視曲線',
                 caveatsBanner:
                     '同時校正多個主要散熱風扇可能會提高系統溫度。\n平行診斷的推拉式散熱排風扇可能產生不準確的讀數。\n請在校正期間讓系統保持閒置。',

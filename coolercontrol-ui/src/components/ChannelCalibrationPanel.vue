@@ -21,7 +21,6 @@
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useToast } from '@/shell/toast'
 import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import { mdiChartLine, mdiInformationSlabCircleOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -29,8 +28,8 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
 import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
 import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
+import { useCalibrationActions } from '@/composables/useCalibrationActions.ts'
 import { useCalibrationCurve } from '@/composables/useCalibrationCurve.ts'
-import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import type { UID } from '@/models/Device.ts'
 
 const props = defineProps<{
@@ -46,14 +45,25 @@ const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
-const toast = useToast()
-const { completedStatusText } = useCalibrationStatusText()
-const { blockingAlertName, watchingAlertCount } = useAlertCalibrationGuard()
+const { completedStatusText, stageLabel } = useCalibrationStatusText()
+const { watchingAlertCount } = useAlertCalibrationGuard()
 const { openCurve } = useCalibrationCurve(props.deviceUID, props.channelName)
+const {
+    blockingAlert,
+    start: startCalibration,
+    cancel: cancelCalibration,
+    clear: clearCalibration,
+} = useCalibrationActions(props.deviceUID, props.channelName)
 
-// An Active alert on this fan blocks calibration (the daemon rejects it);
-// alerts merely watching it are paused during the sweep.
-const blockingAlert = computed(() => blockingAlertName(props.deviceUID, props.channelName))
+const channelLabel = computed(
+    () =>
+        settingsStore.allUIDeviceSettings
+            .get(props.deviceUID)
+            ?.sensorsAndChannels.get(props.channelName)?.name ?? props.channelName,
+)
+
+// Alerts merely watching this fan are paused during the sweep; an Active one
+// blocks it outright, which `blockingAlert` above reports.
 const watchedByAlerts = computed(
     () => watchingAlertCount([{ deviceUID: props.deviceUID, channelName: props.channelName }]) > 0,
 )
@@ -89,42 +99,12 @@ const calibrationHasWarnings = computed((): boolean => {
     return status?.phase === 'completed' && (status.calibration.warnings?.length ?? 0) > 0
 })
 
-function stageLabel(stage: 'preflight' | 'up_sweep' | 'down_sweep' | 'finalizing'): string {
-    switch (stage) {
-        case 'preflight':
-            return t('components.channelExtensionSettings.calibration.stagePreflight')
-        case 'up_sweep':
-            return t('components.channelExtensionSettings.calibration.stageUpSweep')
-        case 'down_sweep':
-            return t('components.channelExtensionSettings.calibration.stageDownSweep')
-        case 'finalizing':
-            return t('components.channelExtensionSettings.calibration.stageFinalizing')
-    }
-}
-
 async function onStartCalibration(): Promise<void> {
-    const result = await calibrationStore.startCalibration(props.deviceUID, props.channelName)
-    if (result instanceof ErrorResponse) {
-        toast.add({
-            severity: 'error',
-            summary: t('common.error'),
-            detail: result.error || t('components.channelExtensionSettings.calibration.startError'),
-            life: 6000,
-        })
-    }
+    await startCalibration()
 }
 
 async function onCancelCalibration(): Promise<void> {
-    const result = await calibrationStore.cancelCalibration(props.deviceUID, props.channelName)
-    if (result instanceof ErrorResponse) {
-        toast.add({
-            severity: 'error',
-            summary: t('common.error'),
-            detail:
-                result.error || t('components.channelExtensionSettings.calibration.cancelError'),
-            life: 6000,
-        })
-    }
+    await cancelCalibration()
 }
 
 function onViewCurve(): void {
@@ -135,22 +115,7 @@ function onViewCurve(): void {
 }
 
 async function onClearCalibration(): Promise<void> {
-    const result = await calibrationStore.deleteCalibration(props.deviceUID, props.channelName)
-    if (result instanceof ErrorResponse) {
-        toast.add({
-            severity: 'error',
-            summary: t('common.error'),
-            detail: result.error || t('components.channelExtensionSettings.calibration.clearError'),
-            life: 6000,
-        })
-        return
-    }
-    toast.add({
-        severity: 'info',
-        summary: t('components.channelExtensionSettings.calibration.heading'),
-        detail: t('components.channelExtensionSettings.calibration.clearedNotice'),
-        life: 5000,
-    })
+    await clearCalibration(channelLabel.value)
 }
 
 // Resume polling on mount in case a sweep was already running (e.g. the

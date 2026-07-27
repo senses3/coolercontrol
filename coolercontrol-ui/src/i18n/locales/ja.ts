@@ -1052,6 +1052,8 @@ export default {
                 buttonRecalibrate: '再キャリブレーション',
                 buttonCancel: 'キャンセル',
                 buttonClear: 'クリア',
+                clearConfirm:
+                    '{channel} のキャリブレーションを消去しますか？やり直すには数分かかります。',
                 buttonViewCurve: 'カーブを表示',
                 caveatsBanner:
                     '主要な冷却ファンを同時に複数キャリブレーションすると、システム温度が上昇する可能性があります。\nプッシュプル構成のラジエーターファンを並行して診断すると、不正確な読み取り値になる場合があります。\nキャリブレーション中はシステムをアイドル状態に保ってください。',

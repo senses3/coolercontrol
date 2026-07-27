@@ -1040,6 +1040,7 @@ export default {
                 buttonRecalibrate: '재보정',
                 buttonCancel: '취소',
                 buttonClear: '지우기',
+                clearConfirm: '{channel}의 보정을 지우시겠습니까? 다시 실행하면 몇 분이 걸립니다.',
                 buttonViewCurve: '곡선 보기',
                 caveatsBanner:
                     '주요 쿨링 팬 여러 개를 동시에 보정하면 시스템 온도가 올라갈 수 있습니다.\n푸시풀 라디에이터 팬을 병행 진단하면 부정확한 측정값이 나올 수 있습니다.\n보정 중에는 시스템을 유휴 상태로 유지하세요.',

@@ -1072,6 +1072,8 @@ export default {
                 buttonRecalibrate: 'Neu kalibrieren',
                 buttonCancel: 'Abbrechen',
                 buttonClear: 'Zurücksetzen',
+                clearConfirm:
+                    'Kalibrierung für {channel} löschen? Ein erneuter Durchlauf dauert mehrere Minuten.',
                 buttonViewCurve: 'Kurve anzeigen',
                 caveatsBanner:
                     'Mehrere primäre Kühllüfter gleichzeitig zu kalibrieren kann die Systemtemperatur erhöhen.\nGleichzeitig diagnostizierte Push-Pull-Radiatorlüfter können ungenaue Messwerte liefern.\nHalten Sie das System während der Kalibrierung im Leerlauf.',

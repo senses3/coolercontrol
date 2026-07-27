@@ -1077,6 +1077,8 @@ export default {
                 buttonRecalibrate: 'Ré-étalonner',
                 buttonCancel: 'Annuler',
                 buttonClear: 'Effacer',
+                clearConfirm:
+                    "Effacer l'étalonnage de {channel} ? Le relancer prend plusieurs minutes.",
                 buttonViewCurve: 'Voir la courbe',
                 caveatsBanner:
                     "Étalonner plusieurs ventilateurs de refroidissement principaux en même temps peut faire monter la température du système.\nDes ventilateurs push-pull de radiateur diagnostiqués en parallèle peuvent produire des mesures inexactes.\nMaintenez le système au repos pendant l'étalonnage.",

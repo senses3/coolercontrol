@@ -1045,6 +1045,8 @@ export default {
                 buttonRecalibrate: 'Re-calibrate',
                 buttonCancel: 'Cancel',
                 buttonClear: 'Clear',
+                clearConfirm:
+                    'Clear the calibration for {channel}? Running it again takes several minutes.',
                 buttonViewCurve: 'View Curve',
                 caveatsBanner:
                     'Calibrating several primary cooling fans at once can raise system temperature.\nPush-pull radiator fans diagnosed in parallel may produce inaccurate readings.\nKeep the system idle during calibration.',

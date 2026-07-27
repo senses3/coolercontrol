@@ -36,6 +36,10 @@ import _ from 'lodash'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
+import { useSettingsStore } from '@/stores/SettingsStore'
+import { useCalibrationActions } from '@/composables/useCalibrationActions.ts'
+import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
+import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import { ErrorResponse } from '@/models/ErrorResponse'
 import type { Calibration } from '@/models/Calibration'
 import type { UID } from '@/models/Device'
@@ -47,6 +51,8 @@ const { t } = useI18n()
 const deviceStore = useDeviceStore()
 const colors = useThemeColorsStore()
 const calibrationStore = useCalibrationStore()
+const settingsStore = useSettingsStore()
+const { completedStatusText, stageLabel } = useCalibrationStatusText()
 const toast = useToast()
 
 const deviceUID: UID = dialogRef.value.data.deviceUID
@@ -111,7 +117,80 @@ const syncOverridesFrom = (cal: Calibration): void => {
     })
 }
 
+// Everything calibration-related lives here, so the dialog owns the sweep it
+// starts: the chart gives way to progress, and the fresh curve is drawn in
+// place when the daemon finishes.
+const {
+    status: calibrationStatus,
+    phase,
+    blockingAlert,
+    start,
+    cancel,
+    clear,
+} = useCalibrationActions(deviceUID, channelName)
+const busy: Ref<boolean> = ref(false)
+const inProgress = computed(() => phase.value === 'in_progress')
+const channelLabel = computed(
+    () =>
+        settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)
+            ?.name ?? channelName,
+)
+const resultText = computed(() =>
+    calibration.value != null ? completedStatusText(calibration.value) : '',
+)
+const hasWarnings = computed(() => (calibration.value?.warnings?.length ?? 0) > 0)
+const progressPercent = computed(() =>
+    calibrationStatus.value?.phase === 'in_progress' ? calibrationStatus.value.percent : 0,
+)
+const progressStage = computed(() => {
+    const status = calibrationStatus.value
+    if (status?.phase !== 'in_progress') return ''
+    return stageLabel(status.stage)
+})
+const failureText = computed(() =>
+    calibrationStatus.value?.phase === 'failed'
+        ? t('components.channelExtensionSettings.calibration.statusFailed', {
+              message: calibrationStatus.value.message,
+          })
+        : '',
+)
+
+// A finished sweep replaces the record the dialog opened with, so pull the new
+// one in rather than leaving the previous curve on screen.
+watch(
+    () => calibrationStatus.value?.phase,
+    async (next, previous) => {
+        if (next !== 'completed' || previous !== 'in_progress') return
+        const stored = await calibrationStore.getStored(deviceUID, channelName)
+        if (stored == null) return
+        calibration.value = stored
+        syncOverridesFrom(stored)
+    },
+)
+
+const onRecalibrate = async (): Promise<void> => {
+    busy.value = true
+    const started = await start()
+    busy.value = false
+    if (started) calibrationStore.ensurePolling(deviceUID, channelName).catch(() => {})
+}
+
+const onCancelSweep = async (): Promise<void> => {
+    busy.value = true
+    await cancel()
+    busy.value = false
+}
+
+const onClear = async (): Promise<void> => {
+    busy.value = true
+    const cleared = await clear(channelLabel.value)
+    busy.value = false
+    // The curve this dialog exists to show is gone; nothing left to display.
+    if (cleared) dialogRef.value.close()
+}
+
 onMounted(async () => {
+    calibrationStore.ensurePolling(deviceUID, channelName).catch(() => {})
     if (calibration.value != null) {
         syncOverridesFrom(calibration.value)
         return
@@ -364,11 +443,55 @@ const chartOption = (cal: Calibration) => {
             {{ loadError }}
         </div>
         <template v-else-if="calibration != null">
+            <div v-if="inProgress" class="calibration-curve-chart flex flex-col justify-center">
+                <div class="mx-auto w-full max-w-md">
+                    <div class="mb-2 flex items-baseline justify-between text-sm">
+                        <span class="font-medium">{{ progressStage }}</span>
+                        <span class="tabular-nums text-text-color-secondary">
+                            {{ progressPercent }}%
+                        </span>
+                    </div>
+                    <UiProgressBar :value="progressPercent" />
+                </div>
+            </div>
             <v-chart
+                v-else
                 class="calibration-curve-chart"
                 :option="chartOption(calibration)"
                 :autoresize="true"
             />
+            <div :class="['text-sm', hasWarnings ? 'text-warning' : 'text-text-color-secondary']">
+                {{ resultText }}
+            </div>
+            <div v-if="failureText" class="text-sm text-error">{{ failureText }}</div>
+            <div v-if="blockingAlert != null" class="text-sm text-warning">
+                {{
+                    t('components.channelExtensionSettings.calibration.blockedByAlert', {
+                        name: blockingAlert,
+                    })
+                }}
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <UiButton
+                    v-if="inProgress"
+                    variant="outline"
+                    :disabled="busy"
+                    @click="onCancelSweep"
+                >
+                    {{ t('components.channelExtensionSettings.calibration.buttonCancel') }}
+                </UiButton>
+                <UiButton
+                    v-else
+                    variant="outline"
+                    :disabled="busy || blockingAlert != null"
+                    @click="onRecalibrate"
+                >
+                    {{ t('components.channelExtensionSettings.calibration.buttonRecalibrate') }}
+                </UiButton>
+                <UiButton variant="outline" :disabled="busy || inProgress" @click="onClear">
+                    {{ t('components.channelExtensionSettings.calibration.buttonClear') }}
+                </UiButton>
+            </div>
             <div
                 class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-sm border-t border-border-one pt-3"
             >
