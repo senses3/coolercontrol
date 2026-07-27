@@ -57,7 +57,7 @@ import {
 } from '@/shell/panelOrder.ts'
 import { monitoringSensors, type MonitoringSensor } from '@/shell/monitoring/sensors.ts'
 import { channelKind, channelKindIcon, channelSpins } from '@/shell/channelIcon.ts'
-import { channelRoute } from '@/shell/channelRoute.ts'
+import { channelRoute, monitoringChannelRoute } from '@/shell/channelRoute.ts'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import TagChips from '@/shell/TagChips.vue'
@@ -332,8 +332,13 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
     openTagRow.value = open ? rowKey : null
 }
 
+// Pinned rows are shortcuts, so they go to the channel's canonical page.
 const sensorRoute = (sensor: MonitoringSensor) =>
     channelRoute(deviceStore.allDevices(), sensor.deviceUID, sensor.channelName)
+
+// The section's own listing keeps fans on their Monitoring chart instead.
+const listedSensorRoute = (sensor: MonitoringSensor) =>
+    monitoringChannelRoute(deviceStore.allDevices(), sensor.deviceUID, sensor.channelName)
 </script>
 
 <template>
@@ -675,7 +680,7 @@ const sensorRoute = (sensor: MonitoringSensor) =>
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
                 >
                     <RouterLink
-                        :to="sensorRoute(sensor)"
+                        :to="listedSensorRoute(sensor)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
