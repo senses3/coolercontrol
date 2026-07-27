@@ -134,6 +134,9 @@ async function onCancelCalibration(): Promise<void> {
 function onViewCurve(): void {
     const status = calibrationStatus.value
     const calibration = status?.phase === 'completed' ? status.calibration : undefined
+    // Close the host popover first: it returns focus to its trigger on close,
+    // which would pull focus back out of the dialog if it went second.
+    emit('request-close')
     dialog.open(calibrationCurveDialog, {
         props: {
             header: t('components.calibrationCurve.dialogTitle'),
@@ -149,7 +152,6 @@ function onViewCurve(): void {
             calibration,
         },
     })
-    emit('request-close')
 }
 
 async function onClearCalibration(): Promise<void> {
