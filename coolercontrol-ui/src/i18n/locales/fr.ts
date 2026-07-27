@@ -344,6 +344,12 @@ export default {
             closeToTray: "Réduire dans la barre d'état",
             zoom: 'Zoom',
             desktopStartupDelay: 'Délai de démarrage du bureau',
+            groups: {
+                startup: 'Démarrage',
+                performance: 'Performances',
+                devices: 'Périphériques et détection',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Appliquer les paramètres au démarrage',
             deviceDelayAtStartup:
                 "Délai avant de commencer la communication de l'appareil (en secondes).\nAide avec les appareils qui prennent du temps à s'initialiser ou sont détectés de manière intermittente",

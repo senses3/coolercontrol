@@ -341,6 +341,12 @@ export default {
             closeToTray: 'Fechar para a bandeja',
             zoom: 'Zoom',
             desktopStartupDelay: 'Atraso de inicialização do desktop',
+            groups: {
+                startup: 'Inicialização',
+                performance: 'Desempenho',
+                devices: 'Dispositivos e detecção',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Aplicar configurações na inicialização',
             deviceDelayAtStartup: 'Atraso do dispositivo na inicialização',
             pollingRate: 'Taxa de sondagem',

@@ -337,6 +337,12 @@ export default {
             closeToTray: 'Close to Tray',
             zoom: 'Zoom',
             desktopStartupDelay: 'Desktop Startup Delay',
+            groups: {
+                startup: 'Startup',
+                performance: 'Performance',
+                devices: 'Devices & Detection',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Apply Settings on Startup',
             deviceDelayAtStartup: 'Device Delay at Startup',
             pollingRate: 'Polling Rate',

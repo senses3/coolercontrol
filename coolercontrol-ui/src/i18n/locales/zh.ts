@@ -333,6 +333,12 @@ export default {
             closeToTray: '关闭时最小化到托盘',
             zoom: '缩放',
             desktopStartupDelay: '桌面启动延迟',
+            groups: {
+                startup: '启动',
+                performance: '性能',
+                devices: '设备与检测',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '启动时应用设置',
             deviceDelayAtStartup: '启动时设备延迟',
             pollingRate: '轮询速率',

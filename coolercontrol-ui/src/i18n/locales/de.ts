@@ -343,6 +343,12 @@ export default {
             closeToTray: 'In Tray minimieren',
             zoom: 'Zoom',
             desktopStartupDelay: 'Desktop-Startverzögerung',
+            groups: {
+                startup: 'Start',
+                performance: 'Leistung',
+                devices: 'Geräte & Erkennung',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Einstellungen beim Start anwenden',
             deviceDelayAtStartup: 'Geräteverzögerung beim Start',
             pollingRate: 'Abfragerate',

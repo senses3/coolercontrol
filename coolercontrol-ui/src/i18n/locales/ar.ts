@@ -338,6 +338,12 @@ export default {
             closeToTray: 'الإغلاق إلى شريط المهام',
             zoom: 'تكبير',
             desktopStartupDelay: 'تأخير بدء تشغيل سطح المكتب',
+            groups: {
+                startup: 'بدء التشغيل',
+                performance: 'الأداء',
+                devices: 'الأجهزة والاكتشاف',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'تطبيق الإعدادات عند بدء التشغيل',
             deviceDelayAtStartup: 'تأخير الجهاز عند بدء التشغيل',
             pollingRate: 'معدل الاستطلاع',

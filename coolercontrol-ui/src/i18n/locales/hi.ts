@@ -338,6 +338,12 @@ export default {
             closeToTray: 'ट्रे में बंद करें',
             zoom: 'ज़ूम',
             desktopStartupDelay: 'डेस्कटॉप स्टार्टअप विलंब',
+            groups: {
+                startup: 'स्टार्टअप',
+                performance: 'प्रदर्शन',
+                devices: 'उपकरण और पहचान',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'स्टार्टअप पर सेटिंग्स लागू करें',
             deviceDelayAtStartup: 'स्टार्टअप पर उपकरण विलंब',
             pollingRate: 'पोलिंग दर',

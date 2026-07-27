@@ -341,6 +341,12 @@ export default {
             closeToTray: 'Сворачивать в трей',
             zoom: 'Масштаб',
             desktopStartupDelay: 'Задержка запуска приложения',
+            groups: {
+                startup: 'Запуск',
+                performance: 'Производительность',
+                devices: 'Устройства и обнаружение',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Применять настройки при запуске',
             deviceDelayAtStartup: 'Задержка устройств при запуске',
             pollingRate: 'Частота опроса',

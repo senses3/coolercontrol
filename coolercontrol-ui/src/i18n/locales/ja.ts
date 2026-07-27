@@ -338,6 +338,12 @@ export default {
             closeToTray: 'トレイに閉じる',
             zoom: 'ズーム',
             desktopStartupDelay: 'デスクトップ起動遅延',
+            groups: {
+                startup: '起動',
+                performance: 'パフォーマンス',
+                devices: 'デバイスと検出',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '起動時に設定を適用',
             deviceDelayAtStartup: '起動時のデバイス遅延',
             pollingRate: 'ポーリングレート',

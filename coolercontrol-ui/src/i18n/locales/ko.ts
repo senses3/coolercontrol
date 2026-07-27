@@ -338,6 +338,12 @@ export default {
             closeToTray: '트레이에서 닫기',
             zoom: '확대/축소',
             desktopStartupDelay: '데스크톱 시작 지연',
+            groups: {
+                startup: '시작',
+                performance: '성능',
+                devices: '장치 및 감지',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '시작 시 설정 적용',
             deviceDelayAtStartup: '장치 시작 시 지연',
             pollingRate: '폴링 레이트',
