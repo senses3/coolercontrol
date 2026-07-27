@@ -27,6 +27,7 @@ import {
     DeviceUISettings,
     DeviceUISettingsDTO,
     MenuOrderIds,
+    ONBOARDING_TOUR_VERSION,
     SensorAndChannelSettings,
     StartupPage,
     TagSettings,
@@ -170,7 +171,14 @@ export const useSettingsStore = defineStore('settings', () => {
     const customTheme: CustomThemeSettings = reactive({ ...defaultCustomTheme })
     const entityColors: Ref<Array<[string, string]>> = ref([])
     const eyeCandy: Ref<boolean> = ref(false)
-    const showOnboarding: Ref<boolean> = ref(true)
+    // Persisted as the tour version the user has finished. Callers only ask the
+    // yes/no question, so they read the computed below and call
+    // completeOnboarding() rather than writing a flag.
+    const onboardingSeenVersion: Ref<number> = ref(0)
+    const showOnboarding = computed(() => onboardingSeenVersion.value < ONBOARDING_TOUR_VERSION)
+    const completeOnboarding = (): void => {
+        onboardingSeenVersion.value = ONBOARDING_TOUR_VERSION
+    }
     const cpuStressBackend: Ref<'stress_ng' | 'built_in'> = ref('stress_ng')
     const gpuStressBackend: Ref<'stress_ng' | 'built_in'> = ref('built_in')
     const ramStressBackend: Ref<'stress_ng' | 'built_in'> = ref('stress_ng')
@@ -291,7 +299,10 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         entityColors.value = uiSettings.entityColors
         eyeCandy.value = uiSettings.eyeCandy
-        showOnboarding.value = uiSettings.showOnboarding
+        // Legacy configs stored a boolean here: false once the old tour was
+        // dismissed, true when it had never run. Both coerce below the current
+        // version, so either way the reworked tour plays once.
+        onboardingSeenVersion.value = Number(uiSettings.showOnboarding) || 0
         cpuStressBackend.value = uiSettings.cpuStressBackend ?? 'stress_ng'
         gpuStressBackend.value = uiSettings.gpuStressBackend ?? 'built_in'
         ramStressBackend.value = uiSettings.ramStressBackend ?? 'stress_ng'
@@ -1171,7 +1182,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 customTheme,
                 entityColors.value,
                 eyeCandy,
-                showOnboarding,
+                onboardingSeenVersion,
                 cpuStressBackend,
                 gpuStressBackend,
                 ramStressBackend,
@@ -1227,7 +1238,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     }
                     uiSettings.entityColors = entityColors.value
                     uiSettings.eyeCandy = eyeCandy.value
-                    uiSettings.showOnboarding = showOnboarding.value
+                    uiSettings.showOnboarding = onboardingSeenVersion.value
                     uiSettings.cpuStressBackend = cpuStressBackend.value
                     uiSettings.gpuStressBackend = gpuStressBackend.value
                     uiSettings.ramStressBackend = ramStressBackend.value
@@ -1590,6 +1601,7 @@ export const useSettingsStore = defineStore('settings', () => {
         entityColors,
         eyeCandy,
         showOnboarding,
+        completeOnboarding,
         cpuStressBackend,
         gpuStressBackend,
         ramStressBackend,

@@ -717,12 +717,11 @@ export default {
             helpSettingUp: 'Aide à la configuration du contrôle des ventilateurs',
             gettingStartedGraphProfile: 'Profil graphique',
             gettingStartedControlsPage: 'page Contrôles',
-            gettingStartedStep1:
-                'Créez un {profile} dans les Profils de ventilateur et façonnez la courbe.',
+            gettingStartedStep1: 'Ouvrez Refroidissement et choisissez le ventilateur à contrôler.',
             gettingStartedStep2:
-                'Assignez-le sur la {controls} (ou la page du ventilateur). Les Profils ne sont pas appliqués automatiquement.',
+                'Choisissez Configuration guidée, puis Nouveau Profil, pour définir sa courbe de ventilation.',
             gettingStartedStep3:
-                'Réutilisez le même Profil sur autant de ventilateurs que vous le souhaitez.',
+                'Réutilisez ce profil sur autant de ventilateurs que vous le souhaitez.',
             gettingStartedAutoCreate:
                 '{wizard} permet de configurer des profils de base pour tous vos ventilateurs en une seule fois.',
             gettingStartedAutoCreateLink: 'Créer des profils automatiquement',
@@ -1205,19 +1204,19 @@ export default {
             gettingStartedIntro:
                 "Choisissez une visite pour vous orienter. La Visite Rapide couvre l'essentiel en quelques étapes. La Visite Complète vous guide à travers chaque menu et chaque bouton.",
             startTourAgain:
-                'Vous pouvez recommencer cette visite à tout moment depuis la page Infos & Outils.',
+                'Vous pouvez relancer cette visite à tout moment depuis la page Accueil.',
             quickTour: 'Visite Rapide',
             thoroughTour: 'Visite Complète',
             startTour: 'Démarrer la visite',
             maybeLater: 'Peut-être plus tard',
             openGettingStarted: 'Ouvrir la Documentation',
-            finishLater: 'Je vais me débrouiller',
+            finishLater: 'Compris, merci',
             appInfo: 'Infos & Outils',
             appInfoDesc:
                 "Affiche les infos de l'app, le statut du daemon, les journaux, les liens utiles et les outils de test de charge. Un badge sur le logo vous alerte en cas de problème.",
             home: 'Accueil',
             homeDesc:
-                "Votre page d'accueil : l'état du daemon et des appareils en un coup d'œil, ainsi que les journaux, les infos de l'application, des liens utiles et des outils de test de charge.",
+                "La page d'accueil de l'application : état du daemon et santé des périphériques en un coup d'œil, plus les journaux, les infos de l'app, des liens utiles et des outils de test de charge.",
             cooling: 'Refroidissement',
             coolingDesc:
                 "Votre centre de contrôle des ventilateurs : ajustez les vitesses des ventilateurs et des pompes, et appliquez des Profils et des Fonctions à n'importe quel canal.",

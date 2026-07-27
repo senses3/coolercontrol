@@ -698,11 +698,10 @@ export default {
             helpSettingUp: 'ファン制御の設定ヘルプ',
             gettingStartedGraphProfile: 'グラフプロファイル',
             gettingStartedControlsPage: 'コントロールページ',
-            gettingStartedStep1:
-                'ファンプロファイルで{profile}を作成し、ファンカーブを設定します。',
+            gettingStartedStep1: '冷却を開き、制御したいファンを選びます。',
             gettingStartedStep2:
-                '{controls}（またはファン自体のページ）から割り当てます。プロファイルは自動適用されません。',
-            gettingStartedStep3: '同じプロファイルを複数のファンで再利用できます。',
+                'ガイド付きセットアップから新規プロファイルを選び、ファンカーブを設定します。',
+            gettingStartedStep3: 'そのプロファイルは好きなだけ他のファンにも再利用できます。',
             gettingStartedAutoCreate:
                 '{wizard} を使うと、すべてのファンの基本的なプロファイルを一度に設定できます。',
             gettingStartedAutoCreateLink: 'プロファイルの自動作成',
@@ -1175,19 +1174,19 @@ export default {
             welcome: 'CoolerControlへようこそ！',
             gettingStartedIntro:
                 'ツアーを選んで概要を把握しましょう。クイックツアーは数ステップで基本をカバーします。詳細ツアーはすべてのメニューとボタンを案内します。',
-            startTourAgain: '情報とツールページからいつでもこのツアーを再開できます。',
+            startTourAgain: 'このツアーはホームページからいつでも再開できます。',
             quickTour: 'クイックツアー',
             thoroughTour: '詳細ツアー',
             startTour: 'ツアーを開始',
             maybeLater: '後で',
             openGettingStarted: 'はじめに文書を開く',
-            finishLater: '自分でやってみる',
+            finishLater: 'わかりました',
             appInfo: '情報とツール',
             appInfoDesc:
                 'アプリ情報、デーモンステータス、ログ、便利なリンク、ストレステストツールを表示します。ロゴ上のバッジが問題をお知らせします。',
             home: 'ホーム',
             homeDesc:
-                'ランディングページ：デーモンの状態とデバイスの状態が一目でわかり、ログ、アプリ情報、役立つリンク、ストレステストツールも利用できます。',
+                'アプリケーションのホームページ: デーモンの状態とデバイスの健全性を一目で確認でき、ログ、アプリ情報、便利なリンク、ストレステストツールも利用できます。',
             cooling: '冷却',
             coolingDesc:
                 'ファン制御の拠点：ファン速度やポンプを調整し、任意のチャンネルにプロファイルと機能を適用できます。',

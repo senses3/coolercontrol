@@ -208,6 +208,10 @@ export class DeviceUISettings {
     }
 }
 
+// Bump when the tour changes enough that everyone should see it again. 1 was
+// the original tour; 2 reworked it for the new shell.
+export const ONBOARDING_TOUR_VERSION = 2
+
 /**
  * A DTO Class to hold all the UI settings to be persisted by the daemon.
  * The Class-Transformer has issues with Maps, so we have to use Arrays to
@@ -234,7 +238,10 @@ export class UISettingsDTO {
     customTheme: CustomThemeSettings = { ...defaultCustomTheme }
     entityColors: Array<[string, string]> = []
     eyeCandy: boolean = false
-    showOnboarding: boolean = true
+    // The tour version the user has completed; below ONBOARDING_TOUR_VERSION
+    // means it runs again. Legacy configs hold a boolean here, which coerces
+    // to 0 (dismissed) or 1 (never run) and so replays the reworked tour once.
+    showOnboarding: number = 0
     tagNames: Array<string> = []
     tagColors: Array<string> = []
     cpuStressBackend: 'stress_ng' | 'built_in' = 'built_in'

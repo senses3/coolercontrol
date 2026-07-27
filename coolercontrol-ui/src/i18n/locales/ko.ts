@@ -692,10 +692,9 @@ export default {
             helpSettingUp: '팬 제어 설정 도움말',
             gettingStartedGraphProfile: '그래프 프로파일',
             gettingStartedControlsPage: '제어 페이지',
-            gettingStartedStep1: '팬 프로파일에서 {profile}을 만들고 팬 곡선을 조정하세요.',
-            gettingStartedStep2:
-                '{controls}(또는 팬의 자체 페이지)에서 할당하세요. 프로파일은 자동 적용되지 않습니다.',
-            gettingStartedStep3: '동일한 프로파일을 여러 팬에 재사용할 수 있습니다.',
+            gettingStartedStep1: '냉각을 열고 제어할 팬을 선택하세요.',
+            gettingStartedStep2: '가이드 설정에서 새 프로파일을 선택해 팬 곡선을 조정하세요.',
+            gettingStartedStep3: '그 프로파일을 원하는 만큼 다른 팬에도 재사용하세요.',
             gettingStartedAutoCreate:
                 '{wizard}을(를) 사용하면 모든 팬의 기본 프로필을 한 번에 설정할 수 있습니다.',
             gettingStartedAutoCreateLink: '프로필 자동 생성',
@@ -1166,19 +1165,19 @@ export default {
             welcome: 'CoolerControl에 오신 것을 환영합니다!',
             gettingStartedIntro:
                 '투어를 선택하여 둘러보세요. 빠른 투어는 몇 단계로 기본 사항을 다룹니다. 전체 투어는 모든 메뉴와 버튼을 안내합니다.',
-            startTourAgain: '정보 및 도구 페이지에서 언제든지 이 투어를 다시 시작할 수 있습니다.',
+            startTourAgain: '이 둘러보기는 홈 페이지에서 언제든지 다시 시작할 수 있습니다.',
             quickTour: '빠른 투어',
             thoroughTour: '전체 투어',
             startTour: '투어 시작',
             maybeLater: '나중에',
             openGettingStarted: '시작하기 문서 열기',
-            finishLater: '직접 해보기',
+            finishLater: '알겠습니다, 감사합니다',
             appInfo: '정보 및 도구',
             appInfoDesc:
                 '앱 정보, 데몬 상태, 로그, 유용한 링크 및 스트레스 테스트 도구를 확인하세요. 로고에 표시되는 배지가 문제를 알려줍니다.',
             home: '홈',
             homeDesc:
-                '랜딩 페이지: 데몬 상태와 장치 상태를 한눈에 확인하고, 로그, 앱 정보, 유용한 링크, 스트레스 테스트 도구를 제공합니다.',
+                '애플리케이션 홈 페이지: 데몬 상태와 장치 상태를 한눈에 보고, 로그, 앱 정보, 유용한 링크, 스트레스 테스트 도구도 이용할 수 있습니다.',
             cooling: '냉각',
             coolingDesc:
                 '팬 제어 허브: 팬 속도와 펌프를 조정하고 모든 채널에 프로파일과 기능을 적용합니다.',

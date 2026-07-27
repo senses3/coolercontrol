@@ -705,11 +705,10 @@ export default {
             helpSettingUp: 'Ajuda para Configurar Controle de Ventiladores',
             gettingStartedGraphProfile: 'Perfil de Gráfico',
             gettingStartedControlsPage: 'Página de Controles',
-            gettingStartedStep1:
-                'Crie um {profile} em Perfis de ventoinha e ajuste a curva da ventoinha.',
+            gettingStartedStep1: 'Abra Resfriamento e escolha a ventoinha que deseja controlar.',
             gettingStartedStep2:
-                'Atribua-o na {controls} (ou na página da ventoinha). Perfis não são aplicados automaticamente.',
-            gettingStartedStep3: 'Reutilize o mesmo Perfil em quantas ventoinhas quiser.',
+                'Escolha Configuração Guiada e depois Novo Perfil para definir a curva da ventoinha.',
+            gettingStartedStep3: 'Reutilize esse Perfil em quantas ventoinhas quiser.',
             gettingStartedAutoCreate:
                 '{wizard} pode ser usado para configurar perfis básicos para todos os seus ventiladores de uma vez.',
             gettingStartedAutoCreateLink: 'Criar perfis automaticamente',
@@ -1188,20 +1187,19 @@ export default {
             welcome: 'Bem-vindo ao CoolerControl!',
             gettingStartedIntro:
                 'Escolha um tour para se orientar. O Tour Rápido cobre o essencial em poucos passos. O Tour Completo guia você por cada menu e botão.',
-            startTourAgain:
-                'Você pode iniciar este tour novamente a qualquer momento na página Informações e Ferramentas.',
+            startTourAgain: 'Pode iniciar este tour novamente a qualquer momento na página Início.',
             quickTour: 'Tour Rápido',
             thoroughTour: 'Tour Completo',
             startTour: 'Iniciar Tour',
             maybeLater: 'Talvez mais tarde',
             openGettingStarted: 'Abrir Documentação de Introdução',
-            finishLater: 'Vou fazer sozinho',
+            finishLater: 'Entendido, obrigado',
             appInfo: 'Informações e Ferramentas',
             appInfoDesc:
                 'Veja informações do app, status do daemon, logs, links úteis e ferramentas de teste de carga. Um indicador no logo alerta sobre problemas.',
             home: 'Início',
             homeDesc:
-                'Sua página inicial: status do daemon e estado dos dispositivos de relance, além de logs, informações do aplicativo, links úteis e ferramentas de teste de estresse.',
+                'A página inicial da aplicação: estado do daemon e saúde dos dispositivos num relance, além de registos, informações da app, links úteis e ferramentas de teste de esforço.',
             cooling: 'Resfriamento',
             coolingDesc:
                 'Seu centro de controle de ventiladores: ajuste as velocidades de ventiladores e bombas e aplique Perfis e Funções a qualquer canal.',

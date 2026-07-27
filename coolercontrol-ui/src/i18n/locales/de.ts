@@ -707,11 +707,10 @@ export default {
             helpSettingUp: 'Hilfe bei der Einrichtung der Lüftersteuerung',
             gettingStartedGraphProfile: 'Graph-Profil',
             gettingStartedControlsPage: 'Steuerungsseite',
-            gettingStartedStep1:
-                'Erstelle ein {profile} in den Lüfterprofilen und gestalte die Lüfterkurve.',
+            gettingStartedStep1: 'Öffne Kühlung und wähle den Lüfter, den du steuern möchtest.',
             gettingStartedStep2:
-                'Weise es auf der {controls} (oder direkt auf der Lüfter-Seite) zu. Profile werden nicht automatisch angewendet.',
-            gettingStartedStep3: 'Verwende dasselbe Profil für beliebig viele Lüfter.',
+                'Wähle Geführte Einrichtung und dann Neues Profil, um die Lüfterkurve festzulegen.',
+            gettingStartedStep3: 'Verwende dieses Profil für beliebig viele Lüfter.',
             gettingStartedAutoCreate:
                 'Mit {wizard} lassen sich grundlegende Profile für alle Ihre Lüfter auf einmal einrichten.',
             gettingStartedAutoCreateLink: 'Profile automatisch erstellen',
@@ -1195,20 +1194,19 @@ export default {
             welcome: 'Willkommen bei CoolerControl!',
             gettingStartedIntro:
                 'Wählen Sie eine Tour, um sich einen Überblick zu verschaffen. Die schnelle Tour deckt die Grundlagen in wenigen Schritten ab. Die ausführliche Tour führt Sie durch jedes Menü und jede Schaltfläche.',
-            startTourAgain:
-                'Sie können diese Tour jederzeit über die Seite Info & Werkzeuge erneut starten.',
+            startTourAgain: 'Du kannst diese Tour jederzeit über die Seite Start erneut starten.',
             quickTour: 'Schnelle Tour',
             thoroughTour: 'Ausführliche Tour',
             startTour: 'Tour starten',
             maybeLater: 'Vielleicht später',
             openGettingStarted: 'Erste-Schritte-Dokumentation öffnen',
-            finishLater: 'Ich komme alleine zurecht',
+            finishLater: 'Alles klar, danke',
             appInfo: 'Info & Werkzeuge',
             appInfoDesc:
                 'Zeigt App-Info, Daemon-Status, Logs, hilfreiche Links und Stresstest-Werkzeuge an. Ein Symbol auf dem Logo warnt Sie bei Problemen.',
             home: 'Start',
             homeDesc:
-                'Ihre Startseite: Daemon-Status und Gerätezustand auf einen Blick, dazu Logs, App-Info, hilfreiche Links und Stresstest-Werkzeuge.',
+                'Die Startseite der Anwendung: Daemon-Status und Gerätezustand auf einen Blick, dazu Protokolle, App-Infos, hilfreiche Links und Stresstest-Werkzeuge.',
             cooling: 'Kühlung',
             coolingDesc:
                 'Ihre Zentrale für die Lüftersteuerung: Passen Sie Lüftergeschwindigkeiten und Pumpen an und wenden Sie Profile und Funktionen auf jeden Kanal an.',

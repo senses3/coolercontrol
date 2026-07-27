@@ -155,13 +155,14 @@ const buildTourSteps = (): any[] =>
     filterPresent([
         makeStep('#rail-home', 'home'),
         makeStep('#rail-cooling', 'cooling'),
-        makeStep('#modes-switcher', 'modes', 'left-start'),
         makeStep('#rail-monitoring', 'monitoring'),
         makeStep('#rail-devices', 'devices'),
-        makeStep('#rail-settings', 'settings'),
         makeStep('#rail-plugins', 'plugins'),
+        makeStep('#rail-settings', 'settings'),
         makeStep('#access', 'access'),
         makeStep('#restart', 'restartMenu'),
+        // Modes trails the rest: useful, but the least reached for day to day.
+        makeStep('#modes-switcher', 'modes', 'left-start'),
         finishStep(),
     ])
 
@@ -191,7 +192,7 @@ const openGettingStartedDocs = (): void => {
 
 const onTourFinished = (): void => {
     if (isTransitioningMode.value) return
-    settingsStore.showOnboarding = false
+    settingsStore.completeOnboarding()
 }
 
 emitter.on('start-tour', startTour)
@@ -527,27 +528,24 @@ onMounted(async () => {
                                         class="mt-3 ml-2 pl-6 list-decimal text-sm text-text-color-secondary space-y-1"
                                     >
                                         <li>
-                                            {{
-                                                t('views.appInfo.gettingStartedStep1', {
-                                                    profile: t(
-                                                        'views.appInfo.gettingStartedGraphProfile',
-                                                    ),
-                                                })
-                                            }}
+                                            {{ t('views.appInfo.gettingStartedStep1') }}
                                         </li>
                                         <li>
-                                            {{
-                                                t('views.appInfo.gettingStartedStep2', {
-                                                    controls: t(
-                                                        'views.appInfo.gettingStartedControlsPage',
-                                                    ),
-                                                })
-                                            }}
+                                            {{ t('views.appInfo.gettingStartedStep2') }}
                                         </li>
                                         <li>
                                             {{ t('views.appInfo.gettingStartedStep3') }}
                                         </li>
                                     </ol>
+                                    <p class="mt-3 ml-2 text-sm text-text-color-secondary">
+                                        {{
+                                            t('views.appInfo.gettingStartedAutoCreate', {
+                                                wizard: t(
+                                                    'views.appInfo.gettingStartedAutoCreateLink',
+                                                ),
+                                            })
+                                        }}
+                                    </p>
                                 </div>
                                 <div class="mt-4 flex flex-col gap-2 text-sm">
                                     <a

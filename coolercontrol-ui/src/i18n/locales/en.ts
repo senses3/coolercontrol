@@ -695,12 +695,9 @@ export default {
             uiTourDesc: 'Take a guided tour of the application',
             gettingStarted: 'Getting Started',
             helpSettingUp: 'Help setting up fan control',
-            gettingStartedGraphProfile: 'Graph Profile',
-            gettingStartedControlsPage: 'Controls Page',
-            gettingStartedStep1: 'Create a {profile} in Fan Profiles and shape your fan curve.',
-            gettingStartedStep2:
-                "Assign it on the {controls} (or the fan's own page). Profiles are not auto-applied.",
-            gettingStartedStep3: 'Reuse the same Profile on as many fans as you want.',
+            gettingStartedStep1: 'Open Cooling and pick the fan you want to control.',
+            gettingStartedStep2: 'Choose Guided Setup, then New Profile, to shape its fan curve.',
+            gettingStartedStep3: 'Reuse that Profile on as many fans as you like.',
             gettingStartedAutoCreate:
                 '{wizard} can be used to set up basic profiles for all your fans at once.',
             gettingStartedAutoCreateLink: 'Auto-Create Profiles',
@@ -1174,19 +1171,19 @@ export default {
             welcome: 'Welcome to CoolerControl!',
             gettingStartedIntro:
                 'Take a quick tour to get oriented. It walks through the navigation rail and the main areas of the app.',
-            startTourAgain: 'You can start this tour again at any time from the Info & Tools page.',
+            startTourAgain: 'You can start this tour again at any time from the Home page.',
             quickTour: 'Quick Tour',
             thoroughTour: 'Thorough Tour',
             startTour: 'Start Tour',
             maybeLater: 'Maybe Later',
             openGettingStarted: 'Open Getting Started Docs',
-            finishLater: "I'll Do It Myself",
+            finishLater: 'Got It, Thanks',
             appInfo: 'Info & Tools',
             appInfoDesc:
                 'View app info, daemon status, logs, helpful links, and stress test tools. A badge on the logo alerts you to any issues.',
             home: 'Home',
             homeDesc:
-                'Your landing page: daemon status and device health at a glance, plus logs, app info, helpful links, and stress-test tools.',
+                'The application home page: daemon status and device health at a glance, plus logs, app info, helpful links, and stress-test tools.',
             cooling: 'Cooling',
             coolingDesc:
                 'Your fan control hub: adjust fan speeds and pumps, and apply Profiles and Functions to any channel.',

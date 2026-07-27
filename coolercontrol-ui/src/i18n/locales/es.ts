@@ -706,11 +706,10 @@ export default {
             helpSettingUp: 'Ayuda para configurar el control de ventiladores',
             gettingStartedGraphProfile: 'Perfil de Gráfico',
             gettingStartedControlsPage: 'Página de Controles',
-            gettingStartedStep1:
-                'Cree un {profile} en Perfiles de ventilador y ajuste la curva del ventilador.',
+            gettingStartedStep1: 'Abra Refrigeración y elija el ventilador que desea controlar.',
             gettingStartedStep2:
-                'Asígnelo en la {controls} (o en la página del ventilador). Los Perfiles no se aplican automáticamente.',
-            gettingStartedStep3: 'Reutilice el mismo Perfil en tantos ventiladores como desee.',
+                'Elija Configuración Guiada y luego Nuevo Perfil para definir su curva del ventilador.',
+            gettingStartedStep3: 'Reutilice ese Perfil en tantos ventiladores como desee.',
             gettingStartedAutoCreate:
                 '{wizard} permite configurar perfiles básicos para todos sus ventiladores de una sola vez.',
             gettingStartedAutoCreateLink: 'Crear perfiles automáticamente',
@@ -1189,19 +1188,19 @@ export default {
             gettingStartedIntro:
                 'Elija un recorrido para orientarse. El Recorrido Rápido cubre lo esencial en pocos pasos. El Recorrido Detallado lo guía por cada menú y botón.',
             startTourAgain:
-                'Puede iniciar este recorrido nuevamente en cualquier momento desde la página Información y Herramientas.',
+                'Puede iniciar este recorrido de nuevo en cualquier momento desde la página Inicio.',
             quickTour: 'Recorrido Rápido',
             thoroughTour: 'Recorrido Detallado',
             startTour: 'Iniciar Recorrido',
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',
-            finishLater: 'Lo haré yo mismo',
+            finishLater: 'Entendido, gracias',
             appInfo: 'Información y Herramientas',
             appInfoDesc:
                 'Vea información de la app, estado del daemon, registros, enlaces útiles y herramientas de prueba de carga. Una insignia en el logo le alerta sobre problemas.',
             home: 'Inicio',
             homeDesc:
-                'Su página de inicio: estado del daemon y estado de los dispositivos de un vistazo, además de registros, información de la app, enlaces útiles y herramientas de prueba de estrés.',
+                'La página de inicio de la aplicación: estado del daemon y salud de los dispositivos de un vistazo, además de registros, información de la app, enlaces útiles y herramientas de prueba de estrés.',
             cooling: 'Refrigeración',
             coolingDesc:
                 'Su centro de control de ventiladores: ajuste las velocidades de ventiladores y bombas, y aplique Perfiles y Funciones a cualquier canal.',
