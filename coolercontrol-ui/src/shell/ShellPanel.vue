@@ -17,7 +17,7 @@
   -->
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { sectionById, type SectionId } from '@/shell/sections.ts'
@@ -36,10 +36,67 @@ const section = computed(() => {
     const id = route.meta.section as SectionId | undefined
     return id != null ? sectionById(id) : undefined
 })
+
+// Every section shares this one scroll area, so arriving from another section
+// (Monitoring -> Cooling, or a Full chart link back) leaves the list sitting at
+// the previous section's offset, with the page you just opened off-screen.
+const panelRef = ref<HTMLElement>()
+
+// Channel routes name their target the same way in both sections
+// (cooling/:deviceUID/:channelName and monitoring/sensors/:deviceUID/:channelName),
+// so match on that pair rather than on the href: a panel entry links to the
+// channel's canonical page, which for a fan is Cooling even in the Monitoring
+// panel, so Full chart's monitoring route would otherwise find nothing.
+const entriesForRoute = (root: HTMLElement): Element[] => {
+    const { deviceUID, channelName } = route.params
+    if (typeof deviceUID === 'string' && typeof channelName === 'string') {
+        const raw = `/${deviceUID}/${channelName}`
+        const encoded = `/${encodeURIComponent(deviceUID)}/${encodeURIComponent(channelName)}`
+        const matches = [...root.querySelectorAll('a[href]')].filter((link) => {
+            const href = link.getAttribute('href') ?? ''
+            return href.endsWith(raw) || href.endsWith(encoded)
+        })
+        if (matches.length > 0) return matches
+    }
+    return [...root.querySelectorAll('[aria-current="page"]')]
+}
+
+const scrollParent = (element: Element): Element | undefined => {
+    let node = element.parentElement
+    while (node != null) {
+        if (node.scrollHeight > node.clientHeight + 1) return node
+        node = node.parentElement
+    }
+    return undefined
+}
+
+const isInView = (element: Element): boolean => {
+    const container = scrollParent(element)
+    if (container == null) return true
+    const bounds = element.getBoundingClientRect()
+    const view = container.getBoundingClientRect()
+    return bounds.top >= view.top && bounds.bottom <= view.bottom
+}
+
+// Only ensure that one entry for this page is on screen. A page can have several
+// entries (pinned plus its device group), so scrolling to the first would yank
+// the list to the pinned copy whenever the one actually clicked was already
+// visible.
+const revealActiveEntry = async (): Promise<void> => {
+    await nextTick()
+    const root = panelRef.value
+    if (root == null) return
+    const entries = entriesForRoute(root)
+    if (entries.length === 0) return
+    if (entries.some(isInView)) return
+    entries[0].scrollIntoView({ block: 'nearest' })
+}
+watch(() => route.fullPath, revealActiveEntry)
+onMounted(revealActiveEntry)
 </script>
 
 <template>
-    <div class="flex h-full flex-col">
+    <div ref="panelRef" class="flex h-full flex-col">
         <template v-if="section != null">
             <div class="px-3 py-2 text-lg font-medium text-text-color">
                 {{ t(section.labelKey) }}
