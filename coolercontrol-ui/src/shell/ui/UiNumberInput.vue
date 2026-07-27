@@ -27,6 +27,10 @@ const props = withDefaults(
     defineProps<{
         min?: number
         max?: number
+        // Recommended band inside min/max. Values outside it still apply, they
+        // just render in the warning color. Defaults to min/max, i.e. no band.
+        safeMin?: number
+        safeMax?: number
         step?: number
         prefix?: string
         suffix?: string
@@ -35,6 +39,8 @@ const props = withDefaults(
     {
         min: Number.MIN_SAFE_INTEGER,
         max: Number.MAX_SAFE_INTEGER,
+        safeMin: undefined,
+        safeMax: undefined,
         step: 1,
         prefix: '',
         suffix: '',
@@ -90,12 +96,20 @@ const displayValue = computed(() => {
 })
 // Size the input to its content so the suffix hugs the number.
 const inputWidth = computed(() => `${Math.max(displayValue.value.length, 1) + 1}ch`)
+const outsideSafeBand = computed(() => {
+    if (model.value == null) return false
+    if (props.safeMin != null && model.value < props.safeMin) return true
+    return props.safeMax != null && model.value > props.safeMax
+})
 </script>
 
 <template>
     <span
-        class="inline-flex h-10 items-stretch overflow-hidden rounded-lg border border-border-one bg-control"
-        :class="{ 'pointer-events-none opacity-50': disabled }"
+        class="inline-flex h-10 items-stretch overflow-hidden rounded-lg border bg-control"
+        :class="[
+            outsideSafeBand ? 'border-warning' : 'border-border-one',
+            { 'pointer-events-none opacity-50': disabled },
+        ]"
     >
         <button
             type="button"
@@ -118,7 +132,8 @@ const inputWidth = computed(() => `${Math.max(displayValue.value.length, 1) + 1}
                 :max="max"
                 :step="step"
                 :disabled="disabled"
-                class="bg-transparent text-right text-base text-text-color outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                class="bg-transparent text-right text-base outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                :class="outsideSafeBand ? 'text-warning' : 'text-text-color'"
                 :style="{ width: inputWidth }"
                 @change="onInput"
             />

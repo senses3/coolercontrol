@@ -40,6 +40,7 @@ import UiSelect from '@/shell/ui/UiSelect.vue'
 import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
 import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
 import UiSettingGroup from '@/shell/ui/UiSettingGroup.vue'
+import UiLockToggle from '@/shell/ui/UiLockToggle.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -327,6 +328,43 @@ const liquidctlInit = computed({
 const pollRate: Ref<number> = ref(settingsStore.ccSettings.poll_rate)
 watch(pollRate, () => {
     applyGenericDaemonChange()
+})
+
+// Bounded daemon settings: the recommended band, and the hard bounds the lock
+// toggle opens up to. Outside the band the input colors itself as a warning.
+const STARTUP_DELAY_SAFE = { min: 2, max: 20 }
+const STARTUP_DELAY_FULL = { min: 0, max: 120 }
+const POLL_RATE_SAFE = { min: 1.0, max: 5.0 }
+const POLL_RATE_FULL = { min: 0.5, max: 5.0 }
+
+type Band = { min: number; max: number }
+const outsideBand = (value: number, band: Band): boolean => value < band.min || value > band.max
+
+// A saved value already outside its band comes up unlocked, so a reload never
+// silently pulls it back in.
+const startupDelayUnlocked: Ref<boolean> = ref(
+    outsideBand(settingsStore.ccSettings.startup_delay, STARTUP_DELAY_SAFE),
+)
+const pollRateUnlocked: Ref<boolean> = ref(outsideBand(pollRate.value, POLL_RATE_SAFE))
+const startupDelayBounds = computed(() =>
+    startupDelayUnlocked.value ? STARTUP_DELAY_FULL : STARTUP_DELAY_SAFE,
+)
+const pollRateBounds = computed(() => (pollRateUnlocked.value ? POLL_RATE_FULL : POLL_RATE_SAFE))
+
+// Re-locking pulls an out-of-band value back in, so the lock and the value
+// never disagree. Poll rate goes through pollRate, whose watcher owns the
+// daemon restart prompt; an in-band value is left alone and prompts nothing.
+watch(startupDelayUnlocked, (unlocked) => {
+    if (unlocked) return
+    settingsStore.ccSettings.startup_delay = _.clamp(
+        settingsStore.ccSettings.startup_delay,
+        STARTUP_DELAY_SAFE.min,
+        STARTUP_DELAY_SAFE.max,
+    )
+})
+watch(pollRateUnlocked, (unlocked) => {
+    if (unlocked) return
+    pollRate.value = _.clamp(pollRate.value, POLL_RATE_SAFE.min, POLL_RATE_SAFE.max)
 })
 
 // This interface is used for exporting/importing custom HEX color themes
@@ -762,12 +800,24 @@ onUnmounted(() => {
                         }"
                         :label="t('layout.settings.deviceDelayAtStartup')"
                     >
-                        <UiNumberInput
-                            v-model="settingsStore.ccSettings.startup_delay"
-                            :min="1"
-                            :max="120"
-                            :suffix="t('common.secondAbbr')"
-                        />
+                        <div class="flex items-center gap-1">
+                            <UiLockToggle
+                                v-model="startupDelayUnlocked"
+                                v-tooltip.top="
+                                    startupDelayUnlocked
+                                        ? t('layout.settings.tooltips.lockRange')
+                                        : t('layout.settings.tooltips.unlockRange')
+                                "
+                            />
+                            <UiNumberInput
+                                v-model="settingsStore.ccSettings.startup_delay"
+                                :min="startupDelayBounds.min"
+                                :max="startupDelayBounds.max"
+                                :safe-min="STARTUP_DELAY_SAFE.min"
+                                :safe-max="STARTUP_DELAY_SAFE.max"
+                                :suffix="t('common.secondAbbr')"
+                            />
+                        </div>
                     </UiSettingRow>
                 </UiSettingGroup>
                 <UiSettingGroup :title="t('layout.settings.groups.performance')">
@@ -791,13 +841,25 @@ onUnmounted(() => {
                                 {{ t('layout.settings.pollingRate') }}
                             </div></template
                         >
-                        <UiNumberInput
-                            v-model="pollRate"
-                            :min="0.5"
-                            :max="5.0"
-                            :step="0.5"
-                            :suffix="t('common.secondAbbr')"
-                        />
+                        <div class="flex items-center gap-1">
+                            <UiLockToggle
+                                v-model="pollRateUnlocked"
+                                v-tooltip.top="
+                                    pollRateUnlocked
+                                        ? t('layout.settings.tooltips.lockRange')
+                                        : t('layout.settings.tooltips.unlockRange')
+                                "
+                            />
+                            <UiNumberInput
+                                v-model="pollRate"
+                                :min="pollRateBounds.min"
+                                :max="pollRateBounds.max"
+                                :safe-min="POLL_RATE_SAFE.min"
+                                :safe-max="POLL_RATE_SAFE.max"
+                                :step="0.5"
+                                :suffix="t('common.secondAbbr')"
+                            />
+                        </div>
                     </UiSettingRow>
                     <UiSettingRow
                         v-tooltip.top="{

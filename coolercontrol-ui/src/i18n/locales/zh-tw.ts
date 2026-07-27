@@ -386,6 +386,8 @@ export default {
                 zoom: '手動設置UI縮放級別。',
                 desktopStartupDelay:
                     '在啟動桌面應用程式之前添加一些延遲（以秒為單位）。\n有助於解決在登錄時自動啟動桌面應用程式或啟動過快時出現的問題',
+                unlockRange: '允許超出建議範圍的值',
+                lockRange: '限制在建議範圍內',
                 applySettingsOnStartup: '在啟動守護程式和從睡眠中喚醒時自動應用設置',
                 deviceDelayAtStartup:
                     '在開始裝置通信之前的延遲（以秒為單位）。\n有助於需要時間初始化或間歇性檢測到的裝置',

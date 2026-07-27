@@ -398,6 +398,8 @@ export default {
                     'Automatically apply settings on daemon startup and when waking from sleep',
                 deviceDelayAtStartup:
                     'Delay before starting device communication (in seconds).\nHelps with devices that take time to initialize or are intermittently detected',
+                unlockRange: 'Allow values outside the recommended range',
+                lockRange: 'Restrict to the recommended range',
                 pollingRate:
                     'The rate at which sensor data is polled (in seconds).\nA higher poll rate will reduce resource usage, and a lower will increase responsiveness.\nA rate of less than 1.0 should be used with caution.',
                 compressApiPayload: 'Enable API payload compression',

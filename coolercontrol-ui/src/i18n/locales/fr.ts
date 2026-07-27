@@ -407,6 +407,8 @@ export default {
                 zoom: "Définir manuellement le niveau de zoom de l'interface utilisateur.",
                 desktopStartupDelay:
                     "Ajoute un délai avant de démarrer l'application de bureau (en secondes).\nAide à résoudre les problèmes qui surviennent lorsque l'application de bureau\nest démarrée automatiquement à la connexion ou démarre trop rapidement",
+                unlockRange: 'Autoriser les valeurs hors de la plage recommandée',
+                lockRange: 'Limiter à la plage recommandée',
                 applySettingsOnStartup:
                     'Appliquer automatiquement les paramètres au démarrage du daemon et lors de la sortie de veille',
                 deviceDelayAtStartup:

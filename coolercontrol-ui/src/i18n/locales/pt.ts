@@ -398,6 +398,8 @@ export default {
                 zoom: 'Definir manualmente o nível de zoom da interface do usuário.',
                 desktopStartupDelay:
                     'Adiciona um atraso antes de iniciar o aplicativo de desktop (em segundos).\nAjuda com problemas que surgem ao ter o aplicativo de desktop\niniciado automaticamente no login ou iniciado muito rapidamente',
+                unlockRange: 'Permitir valores fora do intervalo recomendado',
+                lockRange: 'Restringir ao intervalo recomendado',
                 applySettingsOnStartup:
                     'Aplicar automaticamente as configurações na inicialização do daemon e ao acordar do sono',
                 deviceDelayAtStartup:
