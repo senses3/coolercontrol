@@ -22,6 +22,7 @@ use crate::device::{ChannelName, UID};
 use crate::overrides::OverridesDocument;
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, CoolerControlSettings, DeviceExtensions,
+    STARTUP_DELAY_SECONDS_MAX,
 };
 use axum::extract::{Path, State};
 use axum::Json;
@@ -179,7 +180,7 @@ impl CoolerControlSettingsDto {
             current_settings.no_init
         };
         let startup_delay = if let Some(delay) = self.startup_delay {
-            Duration::from_secs(u64::from(delay.clamp(0, 30)))
+            Duration::from_secs(u64::from(delay.clamp(0, STARTUP_DELAY_SECONDS_MAX)))
         } else {
             current_settings.startup_delay
         };
@@ -380,6 +381,25 @@ mod tests {
         let merged = dto.merge(current);
         assert!(merged.sensors_auto_detect.not());
         assert!(merged.device_listener_enabled.not());
+    }
+
+    #[test]
+    fn merge_clamps_startup_delay_to_max() {
+        // The API boundary must accept the full documented range and clamp above it.
+        let mut dto = empty_dto();
+        dto.startup_delay = Some(STARTUP_DELAY_SECONDS_MAX);
+        let merged = dto.merge(CoolerControlSettings::default());
+        assert_eq!(
+            merged.startup_delay,
+            Duration::from_secs(u64::from(STARTUP_DELAY_SECONDS_MAX))
+        );
+
+        dto.startup_delay = Some(STARTUP_DELAY_SECONDS_MAX + 1);
+        let merged = dto.merge(CoolerControlSettings::default());
+        assert_eq!(
+            merged.startup_delay,
+            Duration::from_secs(u64::from(STARTUP_DELAY_SECONDS_MAX))
+        );
     }
 
     #[test]

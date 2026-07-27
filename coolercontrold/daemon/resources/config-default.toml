@@ -83,7 +83,7 @@ hide_duplicate_devices = true
 # Will skip initialization calls for liquidctl devices. ONLY USE if you are doing initialiation manually.
 no_init = false
 
-# Startup Delay (seconds) is an integer value between 0 and 10
+# Startup Delay (seconds) is an integer value between 0 and 120
 startup_delay = 2
 
 # For ThinkPads, wheather to use the 'full-speed' option when settings the fan to 100%

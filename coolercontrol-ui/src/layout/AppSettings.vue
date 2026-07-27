@@ -763,7 +763,7 @@ onUnmounted(() => {
                     <UiNumberInput
                         v-model="settingsStore.ccSettings.startup_delay"
                         :min="1"
-                        :max="30"
+                        :max="120"
                         :suffix="t('common.secondAbbr')"
                     />
                 </UiSettingRow>

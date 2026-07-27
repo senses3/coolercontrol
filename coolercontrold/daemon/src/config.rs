@@ -38,7 +38,7 @@ use crate::setting::{
     DeviceExtensions, Function, FunctionKind, FunctionType, FunctionUID, LcdCarouselSettings,
     LcdModeKind, LcdModeName, LcdSettings, LightingSettings, Offset, Profile, ProfileKind,
     ProfileMixFunctionType, ProfileType, ProfileUID, Setting, SettingKind, TempSource,
-    DEFAULT_FUNCTION_UID, DEFAULT_PROFILE_UID,
+    DEFAULT_FUNCTION_UID, DEFAULT_PROFILE_UID, STARTUP_DELAY_SECONDS_MAX,
 };
 
 const DEFAULT_CONFIG_FILE_BYTES: &[u8] = include_bytes!("../resources/config-default.toml");
@@ -985,7 +985,7 @@ impl Config {
                     .unwrap_or(&Item::Value(Value::Integer(Formatted::new(2))))
                     .as_integer()
                     .with_context(|| "startup_delay should be an integer value")?
-                    .clamp(0, 30) as u64,
+                    .clamp(0, i64::from(STARTUP_DELAY_SECONDS_MAX)) as u64,
             );
             let thinkpad_full_speed = settings
                 .get("thinkpad_full_speed")
@@ -2637,6 +2637,37 @@ mod tests {
         };
         assert_eq!(config.device_name("uid1"), Some("NZXT Kraken".to_string()));
         assert_eq!(config.device_name("unknown"), None);
+    }
+
+    // Goal: the startup delay accepts the full documented range and clamps
+    // anything past it, so a hand-edited config cannot stall the daemon forever.
+    #[test]
+    fn startup_delay_clamps_to_max() {
+        let max_written = i64::from(crate::setting::STARTUP_DELAY_SECONDS_MAX);
+        let max_seconds = u64::from(crate::setting::STARTUP_DELAY_SECONDS_MAX);
+        for (written, expected_seconds) in [
+            (-5, 0),
+            (0, 0),
+            (60, 60),
+            (max_written, max_seconds),
+            (max_written + 1, max_seconds),
+        ] {
+            let document = format!("[settings]\nstartup_delay = {written}\n")
+                .parse::<DocumentMut>()
+                .unwrap();
+            let config = Config {
+                path: Path::new("/tmp/config.toml").to_path_buf(),
+                path_ui: Path::new("/tmp/config-ui.json").to_path_buf(),
+                document: RefCell::new(document),
+                generation: Cell::new(0),
+            };
+            let settings = config.get_settings().unwrap();
+            assert_eq!(
+                settings.startup_delay.as_secs(),
+                expected_seconds,
+                "startup_delay = {written}"
+            );
+        }
     }
 
     #[test]
