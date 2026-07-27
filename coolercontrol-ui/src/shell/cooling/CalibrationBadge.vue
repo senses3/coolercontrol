@@ -22,7 +22,8 @@
 // positive signal rather than another always-on badge.
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiChartLine } from '@mdi/js'
+import { mdiSpeedometer, mdiSpeedometerSlow } from '@mdi/js'
+import { computed } from 'vue'
 import { useCalibrationCurve } from '@/composables/useCalibrationCurve.ts'
 import type { UID } from '@/models/Device.ts'
 
@@ -34,6 +35,11 @@ const { calibration, mapped, statusText, openCurve } = useCalibrationCurve(
     props.deviceUID,
     props.channelName,
 )
+
+// The speedometer is the app's calibration mark (Home page, Channel Setup Menu).
+// Its slow variant carries the degraded case in the shape as well as the
+// dimming, so a passthrough calibration still reads as one at a glance.
+const icon = computed(() => (mapped.value ? mdiSpeedometer : mdiSpeedometerSlow))
 </script>
 
 <template>
@@ -45,6 +51,6 @@ const { calibration, mapped, statusText, openCurve } = useCalibrationCurve(
         :class="mapped ? '' : 'opacity-40'"
         @click.stop.prevent="openCurve"
     >
-        <svg-icon type="mdi" :path="mdiChartLine" :size="size" />
+        <svg-icon type="mdi" :path="icon" :size="size" />
     </button>
 </template>
