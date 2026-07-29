@@ -20,6 +20,7 @@
 import { RouterView, useRouter } from 'vue-router'
 import { startupRouteName } from '@/shell/sections.ts'
 import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
+import { TOUR_STEPS } from '@/shell/tour.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
@@ -146,23 +147,11 @@ const finishStep = (): any => ({
 const filterPresent = (list: any[]): any[] =>
     list.filter((s) => document.querySelector(s.attachTo.element) !== null)
 
-// A single tour walks the navigation rail (the new shell's primary nav) plus the
-// header Modes switcher. Section steps fold in concepts that used to have their
-// own old-shell menu items (profiles/functions -> Cooling, dashboards/alerts ->
-// Monitoring, lighting/LCD/custom sensors -> Devices). filterPresent drops any
-// absent anchor (e.g. #rail-plugins when no plugins are installed).
+// filterPresent drops any absent anchor (e.g. #rail-plugins when no plugins are
+// installed).
 const buildTourSteps = (): any[] =>
     filterPresent([
-        makeStep('#rail-home', 'home'),
-        makeStep('#rail-cooling', 'cooling'),
-        makeStep('#rail-monitoring', 'monitoring'),
-        makeStep('#rail-devices', 'devices'),
-        makeStep('#rail-plugins', 'plugins'),
-        makeStep('#rail-settings', 'settings'),
-        makeStep('#access', 'access'),
-        makeStep('#restart', 'restartMenu'),
-        // Modes trails the rest: useful, but the least reached for day to day.
-        makeStep('#modes-switcher', 'modes', 'left-start'),
+        ...TOUR_STEPS.map((step) => makeStep(step.selector, step.key, step.placement)),
         finishStep(),
     ])
 

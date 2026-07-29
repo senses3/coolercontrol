@@ -21,6 +21,7 @@
 
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
+import { TOUR_KEY_PREFIX, TOUR_STEPS } from '@/shell/tour.ts'
 
 const shellFiles = import.meta.glob('../**/*.{ts,vue}', {
     query: '?raw',
@@ -28,10 +29,16 @@ const shellFiles = import.meta.glob('../**/*.{ts,vue}', {
     eager: true,
 }) as Record<string, string>
 
-const KEY_PATTERN = /\bt\(\s*'([a-zA-Z0-9._-]+)'/g
+const localeFiles = import.meta.glob('../../i18n/locales/*.ts', { eager: true }) as Record<
+    string,
+    { default: any }
+>
 
-function resolves(key: string): boolean {
-    let node: any = en
+const KEY_PATTERN = /\bt\(\s*'([a-zA-Z0-9._-]+)'/g
+const LOCALE_COUNT = 12
+
+function resolves(root: any, key: string): boolean {
+    let node: any = root
     for (const part of key.split('.')) {
         node = node?.[part]
         if (node == null) return false
@@ -48,10 +55,29 @@ describe('shell i18n keys', () => {
             for (const match of source.matchAll(KEY_PATTERN)) {
                 const key = match[1]
                 found += 1
-                if (!resolves(key)) missing.push(`${path}: ${key}`)
+                if (!resolves(en, key)) missing.push(`${path}: ${key}`)
             }
         }
         expect(found).toBeGreaterThan(20)
+        expect(missing).toEqual([])
+    })
+
+    // The tour builds its keys from TOUR_STEPS at runtime, so the static sweep
+    // above cannot see them and an unused-key cleanup cannot either. Checking
+    // every locale is the point: a prune once took these out of all twelve.
+    it('resolves every tour step key in every locale', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        expect(locales).toHaveLength(LOCALE_COUNT)
+
+        const missing: string[] = []
+        for (const [path, module] of locales) {
+            for (const step of TOUR_STEPS) {
+                for (const suffix of ['', 'Desc']) {
+                    const key = `${TOUR_KEY_PREFIX}${step.key}${suffix}`
+                    if (!resolves(module.default, key)) missing.push(`${path}: ${key}`)
+                }
+            }
+        }
         expect(missing).toEqual([])
     })
 })
