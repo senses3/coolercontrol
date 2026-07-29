@@ -48,7 +48,7 @@ export default {
         name: 'Name',
         message: 'Nachricht',
         timestamp: 'Zeitstempel',
-        temperature: 'Temperatur',
+        temperature: 'Temp.',
         duty: 'Leistung',
         offset: 'Versatz',
         stay: 'Bleiben',

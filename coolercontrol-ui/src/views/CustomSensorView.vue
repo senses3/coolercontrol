@@ -42,7 +42,6 @@ import { $enum } from 'ts-enum-util'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { DeviceType, UID } from '@/models/Device.ts'
-import { ChannelViewType } from '@/models/UISettings.ts'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
@@ -183,9 +182,6 @@ const chosenOffsetTempSource: Ref<AvailableTemp | undefined> = ref(undefined)
 const chosenTimeAverageTempSource: Ref<AvailableTemp | undefined> = ref(undefined)
 const chosenEmaTempSource: Ref<AvailableTemp | undefined> = ref(undefined)
 const filePath: Ref<string> = ref(customSensor.file_path ?? '')
-const chosenViewType: Ref<ChannelViewType> = ref(
-    deviceSettings.sensorsAndChannels.get(customSensor.id)?.viewType ?? ChannelViewType.Control,
-)
 
 const tempSources: Ref<Array<AvailableTempSources>> = ref([])
 const fillTempSources = async (): Promise<void> => {
@@ -702,10 +698,7 @@ onMounted(async () => {
             </div>
         </div>
     </div>
-    <ScrollAreaRoot
-        v-if="chosenViewType === ChannelViewType.Control"
-        style="--scrollbar-size: 10px"
-    >
+    <ScrollAreaRoot style="--scrollbar-size: 10px">
         <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
             <health-warning kind="custom-sensor" :entity-uid="props.customSensorID" class="mb-4" />
             <div

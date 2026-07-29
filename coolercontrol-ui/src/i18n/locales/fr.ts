@@ -48,7 +48,7 @@ export default {
         name: 'Nom',
         message: 'Message',
         timestamp: 'Horodatage',
-        temperature: 'Température',
+        temperature: 'Temp.',
         duty: 'Puissance',
         offset: 'Décalage',
         stay: 'Rester',
