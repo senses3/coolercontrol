@@ -279,6 +279,7 @@ export default {
             customTheme: {
                 title: 'Custom Theme',
                 accent: 'Accent Color',
+                accentGradientTo: 'Accent Gradient End',
                 bgOne: 'Background Primary',
                 bgTwo: 'Background Secondary',
                 border: 'Border Color',

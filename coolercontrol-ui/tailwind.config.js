@@ -29,6 +29,7 @@ module.exports = {
                     colors: {
                         // dark-theme copy
                         accent: '#568af2',
+                        'accent-gradient-to': '#ff21ff',
                         // Contrast foreground for filled accent/error surfaces. These
                         // placeholders cover the pre-JS flash; ThemeColorsStore recomputes
                         // --colors-accent-fg / --colors-error-fg per theme at runtime.
@@ -65,6 +66,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: 'AccentColor',
+                            // No gradient: the OS palette offers no second brand color.
+                            'accent-gradient-to': 'AccentColor',
                             // accent: 'Highlight',
                             'bg-one': 'Canvas',
                             'bg-two': 'ButtonFace',
@@ -107,6 +110,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#00ff00',
+                            // Flat: a gradient would undercut the contrast guarantee.
+                            'accent-gradient-to': '#00ff00',
                             'bg-one': '#000000',
                             'bg-two': '#000000',
                             'border-one': '#ffffff',
@@ -133,6 +138,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#0000ff',
+                            // Flat: a gradient would undercut the contrast guarantee.
+                            'accent-gradient-to': '#0000ff',
                             'bg-one': '#ffffff',
                             'bg-two': '#ffffff',
                             'border-one': '#000000',
@@ -161,6 +168,9 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#568af2',
+                            // The brand magenta washes out on a light ground, so it
+                            // deepens within its own hue, as success/warning do below.
+                            'accent-gradient-to': '#cc00cc',
                             'bg-one': '#f5f6f9',
                             'bg-two': '#dfe0e0',
                             'border-one': '#3c454d',
@@ -193,6 +203,7 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#568af2',
+                            'accent-gradient-to': '#ff21ff',
                             'bg-one': '#1b1e23',
                             'bg-two': '#2c313c',
                             // 'border-one': '#343b48',

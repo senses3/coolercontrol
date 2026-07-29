@@ -79,14 +79,15 @@ export function getThemeModeDisplayName(mode: string): string {
 }
 
 /**
- * A custom theme carries the same ten tokens an installed theme does, so both
- * are applied through the one variable map in `shell/themes.ts`.
+ * A custom theme carries the same tokens an installed theme does, so both are
+ * applied through the one variable map in `shell/themes.ts`.
  */
 export type CustomThemeSettings = Record<keyof ThemeTokens, Color>
 
 export const defaultCustomTheme: CustomThemeSettings = {
     // default dark-theme
     accent: '86 138 242', //'#568af2'
+    accentGradientTo: '255 33 255', //'#ff21ff'
     bgOne: '27 30 35', //'#1b1e23'
     bgTwo: '44 49 60', //'#2c313c'
     borderOne: '138 149 170 0.25', //'#8a95aa40'

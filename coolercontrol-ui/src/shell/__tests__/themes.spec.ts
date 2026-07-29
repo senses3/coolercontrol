@@ -94,6 +94,25 @@ describe('installed themes', () => {
         }
     })
 
+    /// Goal: the brand gradient stays visible wherever it is drawn. Its far end
+    /// only ever paints a rail indicator, a pill border and a small dot, so it
+    /// is held to the same non-text bar as the other foregrounds rather than to
+    /// body-text contrast. A theme opts out by setting it equal to the accent,
+    /// which the accent's own check already covers.
+    it('keeps the gradient end visible on both surfaces', () => {
+        for (const theme of INSTALLED_THEMES) {
+            const { accent, accentGradientTo } = theme.tokens
+            if (accentGradientTo === accent) continue
+            for (const surface of ['bgOne', 'bgTwo'] as const) {
+                const ratio = contrast(accentGradientTo, theme.tokens[surface])
+                expect(
+                    ratio,
+                    `${theme.id} accentGradientTo on ${surface} is ${ratio.toFixed(2)}:1`,
+                ).toBeGreaterThanOrEqual(MIN_CONTRAST)
+            }
+        }
+    })
+
     /// Goal: cards stay visually distinct from the page behind them. Method:
     /// assert the two surfaces are not the same color.
     it('separates the two surfaces', () => {
