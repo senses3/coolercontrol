@@ -44,6 +44,8 @@ import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard
 import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import { isFirmwareCurveEnabled } from '@/models/CCSettings.ts'
+import { firmwareCurveApplicable } from '@/shell/cooling/firmwareCurve.ts'
+import type { Profile } from '@/models/Profile.ts'
 import type { CalibrationBatchEntry, CalibrationStage } from '@/models/Calibration.ts'
 
 const dialogRef: Ref<DynamicDialogInstance> = inject('dialogRef')!
@@ -88,6 +90,13 @@ const preselectKeys = ((): Set<string> | null => {
         ? null
         : new Set(preselect.map((fan) => `${fan.deviceUID}||${fan.channelName}`))
 })()
+const assignedProfile = (deviceUID: string, channelName: string): Profile | undefined => {
+    const profileUID = settingsStore.allDaemonDeviceSettings
+        .get(deviceUID)
+        ?.settings.get(channelName)?.profile_uid
+    if (profileUID == null || profileUID === '0') return undefined
+    return settingsStore.profiles.find((profile) => profile.uid === profileUID)
+}
 const fillFans = (): void => {
     fanRows.value.length = 0
     for (const device of deviceStore.allDevices()) {
@@ -102,11 +111,21 @@ const fillFans = (): void => {
             // Under firmware control the daemon bakes the calibration into the
             // curve it hands the firmware, but the cold-start kick cannot be
             // expressed there, so a sweep buys less. Still selectable.
-            const firmwareControlled = isFirmwareCurveEnabled(
-                channelInfo.speed_options?.extension,
-                settingsStore.ccDeviceSettings.get(device.uid)?.channel_settings.get(channelName)
-                    ?.extension,
-            )
+            // Opting in is not enough: unless the assigned profile is one the
+            // device can run itself, the daemon keeps computing the curve and
+            // calibration applies in full, so gate on the same condition.
+            const firmwareControlled =
+                isFirmwareCurveEnabled(
+                    channelInfo.speed_options?.extension,
+                    settingsStore.ccDeviceSettings
+                        .get(device.uid)
+                        ?.channel_settings.get(channelName)?.extension,
+                ) &&
+                firmwareCurveApplicable(
+                    assignedProfile(device.uid, channelName),
+                    device.uid,
+                    channelInfo.speed_options?.extension,
+                )
             fanRows.value.push({
                 deviceUID: device.uid,
                 channelName,
