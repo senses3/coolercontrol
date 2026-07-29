@@ -86,7 +86,7 @@ export type CustomThemeSettings = Record<keyof ThemeTokens, Color>
 
 export const defaultCustomTheme: CustomThemeSettings = {
     // default dark-theme
-    accent: '86 138 242', //'#568af2'
+    accent: '77 140 255', //'#4d8cff'
     accentGradientTo: '255 33 255', //'#ff21ff'
     bgOne: '27 30 35', //'#1b1e23'
     bgTwo: '44 49 60', //'#2c313c'

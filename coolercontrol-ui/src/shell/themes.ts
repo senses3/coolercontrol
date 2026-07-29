@@ -64,7 +64,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         name: 'True Black',
         variant: 'dark',
         tokens: {
-            accent: '#568af2',
+            accent: '#4d8cff',
             accentGradientTo: '#ff21ff', // CoolerControl logo magenta
             bgOne: '#000000',
             bgTwo: '#121212',

@@ -28,7 +28,7 @@ module.exports = {
                     // the default theme that appears for a split second on load:
                     colors: {
                         // dark-theme copy
-                        accent: '#568af2',
+                        accent: '#4d8cff',
                         'accent-gradient-to': '#ff21ff',
                         // Contrast foreground for filled accent/error surfaces. These
                         // placeholders cover the pre-JS flash; ThemeColorsStore recomputes
@@ -167,7 +167,7 @@ module.exports = {
                     // mediaQuery: '@media (prefers-color-scheme: light)',
                     extend: {
                         colors: {
-                            accent: '#568af2',
+                            accent: '#4d8cff',
                             // The brand magenta washes out on a light ground, so it
                             // deepens within its own hue, as success/warning do below.
                             'accent-gradient-to': '#cc00cc',
@@ -202,7 +202,7 @@ module.exports = {
                     // mediaQuery: '@media (prefers-color-scheme: dark)',
                     extend: {
                         colors: {
-                            accent: '#568af2',
+                            accent: '#4d8cff',
                             'accent-gradient-to': '#ff21ff',
                             'bg-one': '#1b1e23',
                             'bg-two': '#2c313c',
