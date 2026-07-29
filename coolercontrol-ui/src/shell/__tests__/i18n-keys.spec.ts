@@ -80,4 +80,26 @@ describe('shell i18n keys', () => {
         }
         expect(missing).toEqual([])
     })
+
+    // The enum labels are picked in a model helper rather than a shell file, so
+    // the sweep above never sees them either. A locale missing one falls back to
+    // english mid-dropdown, which reads as a bug rather than a missing string.
+    it('resolves the interface font keys in every locale', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        expect(locales).toHaveLength(LOCALE_COUNT)
+
+        const keys = [
+            'layout.settings.interfaceFont',
+            'layout.settings.tooltips.interfaceFont',
+            'models.interfaceFont.bundled',
+            'models.interfaceFont.system',
+        ]
+        const missing: string[] = []
+        for (const [path, module] of locales) {
+            for (const key of keys) {
+                if (!resolves(module.default, key)) missing.push(`${path}: ${key}`)
+            }
+        }
+        expect(missing).toEqual([])
+    })
 })

@@ -63,6 +63,8 @@ import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import TagChips from '@/shell/TagChips.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
+import { useRouteActive } from '@/shell/routeActive.ts'
+import type { RouteLocationRaw } from 'vue-router'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -339,6 +341,13 @@ const sensorRoute = (sensor: MonitoringSensor) =>
 // The section's own listing keeps fans on their Monitoring chart instead.
 const listedSensorRoute = (sensor: MonitoringSensor) =>
     monitoringChannelRoute(deviceStore.allDevices(), sensor.deviceUID, sensor.channelName)
+
+// The row wrapper needs the same target its link uses, so both read it here.
+const dashboardTarget = (dashboardUID: UID): RouteLocationRaw => ({
+    name: 'monitoring-dashboard',
+    params: { dashboardUID },
+})
+const isRouteActive = useRouteActive()
 </script>
 
 <template>
@@ -357,12 +366,10 @@ const listedSensorRoute = (sensor: MonitoringSensor) =>
                     v-for="dashboard in pinnedDashboards"
                     :key="`pin-${dashboard.uid}`"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(dashboardTarget(dashboard.uid)) }"
                 >
                     <RouterLink
-                        :to="{
-                            name: 'monitoring-dashboard',
-                            params: { dashboardUID: dashboard.uid },
-                        }"
+                        :to="dashboardTarget(dashboard.uid)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
@@ -403,6 +410,7 @@ const listedSensorRoute = (sensor: MonitoringSensor) =>
                     v-for="sensor in pinnedSensors"
                     :key="`pin-${sensor.deviceUID}-${sensor.channelName}`"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(sensorRoute(sensor)) }"
                 >
                     <RouterLink
                         :to="sensorRoute(sensor)"
@@ -433,7 +441,7 @@ const listedSensorRoute = (sensor: MonitoringSensor) =>
                             {{ deviceLabel(sensor.deviceUID) }}
                         </span>
                         <span
-                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
+                            class="ml-auto whitespace-nowrap font-numeric tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{
                                 '!hidden':
                                     openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
@@ -522,9 +530,10 @@ const listedSensorRoute = (sensor: MonitoringSensor) =>
                 v-for="dashboard in orderedDashboards"
                 :key="dashboard.uid"
                 class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                :class="{ 'bg-surface-hover': isRouteActive(dashboardTarget(dashboard.uid)) }"
             >
                 <RouterLink
-                    :to="{ name: 'monitoring-dashboard', params: { dashboardUID: dashboard.uid } }"
+                    :to="dashboardTarget(dashboard.uid)"
                     class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                     exact-active-class="!text-accent"
                 >
@@ -680,6 +689,7 @@ const listedSensorRoute = (sensor: MonitoringSensor) =>
                     v-for="sensor in group.sensors"
                     :key="sensor.channelName"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(listedSensorRoute(sensor)) }"
                 >
                     <RouterLink
                         :to="listedSensorRoute(sensor)"
@@ -716,7 +726,7 @@ const listedSensorRoute = (sensor: MonitoringSensor) =>
                             />
                         </UiTooltip>
                         <span
-                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
+                            class="ml-auto whitespace-nowrap font-numeric tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{
                                 '!hidden':
                                     openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,

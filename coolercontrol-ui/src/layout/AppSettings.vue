@@ -49,7 +49,9 @@ import {
     BUILT_IN_THEME_MODES,
     CustomThemeSettings,
     defaultCustomTheme,
+    getInterfaceFontDisplayName,
     getThemeModeDisplayName,
+    InterfaceFont,
     StartupPage,
     ThemeMode,
 } from '@/models/UISettings.ts'
@@ -63,6 +65,7 @@ import {
     type ThemeSwatch,
     type ThemeTokens,
 } from '@/shell/themes.ts'
+import { decodeThemeCode, encodeThemeCode, type ThemeHexTokens } from '@/shell/themeCode.ts'
 import type { UiSelectOption } from '@/shell/ui/UiSelect.vue'
 import ThemeSwatchStrip from '@/shell/ui/ThemeSwatchStrip.vue'
 import { Color } from '@/models/Device.ts'
@@ -250,7 +253,7 @@ const startupPageOptions = computed(() => [
     { value: StartupPage.Controls, label: t('layout.shell.cooling') },
     { value: StartupPage.HomeDashboard, label: t('models.startupPage.homeDashboard') },
 ])
-// The custom theme carries the same ten tokens an installed theme does. One hex
+// The custom theme carries the same tokens an installed theme does. One hex
 // ref per token, mirrored into the store as `r g b` whenever a picker changes.
 const customThemeHex = reactive({ ...defaultCustomTheme }) as Record<keyof ThemeTokens, Color>
 for (const key of THEME_TOKEN_KEYS) {
@@ -278,6 +281,7 @@ const setCustomColor = (key: keyof ThemeTokens, newHexColor: Color): void => {
 // Label keys predate the token names, so they are mapped rather than derived.
 const CUSTOM_THEME_ROWS: Array<{ key: keyof ThemeTokens; labelKey: string }> = [
     { key: 'accent', labelKey: 'accent' },
+    { key: 'accentGradientTo', labelKey: 'accentGradientTo' },
     { key: 'bgOne', labelKey: 'bgOne' },
     { key: 'bgTwo', labelKey: 'bgTwo' },
     { key: 'borderOne', labelKey: 'border' },
@@ -320,6 +324,21 @@ const frequencyGhz = computed({
     get: () => settingsStore.frequencyPrecision === 1000,
     set: (value: boolean) => (settingsStore.frequencyPrecision = value ? 1000 : 1),
 })
+// Applied immediately rather than on restart: the switch is the preview.
+const interfaceFont = computed({
+    get: () => settingsStore.interfaceFont,
+    set: (value: InterfaceFont) => {
+        settingsStore.interfaceFont = value
+        settingsStore.applyInterfaceFont()
+    },
+})
+const interfaceFontOptions = computed<UiSelectOption[]>(() =>
+    [InterfaceFont.BUNDLED, InterfaceFont.SYSTEM].map((font) => ({
+        label: getInterfaceFontDisplayName(font),
+        value: font,
+    })),
+)
+
 const liquidctlInit = computed({
     get: () => !settingsStore.ccSettings.no_init,
     set: (value: boolean) => (settingsStore.ccSettings.no_init = !value),
@@ -392,7 +411,7 @@ class CustomColorTheme {
             typeof value === 'string' && colorStore.isValidHex(value)
         // Exports written before the status colors existed carry only the first
         // six keys; they still import, and the rest fall back to the defaults.
-        if (LEGACY_THEME_KEYS.some((key) => !valid(jsonObj[key]))) return false
+        if (THEME_TOKEN_KEYS.slice(0, 6).some((key) => !valid(jsonObj[key]))) return false
         for (const key of THEME_TOKEN_KEYS) {
             if (jsonObj[key] == null) jsonObj[key] = colorStore.rgbToHex(defaultCustomTheme[key])
         }
@@ -405,76 +424,27 @@ class CustomColorTheme {
         }
     }
 }
-// Theme code: cct2:<60 hex chars>[<2 hex chars CRC-8>], one RGB triple per
-// token in THEME_TOKEN_KEYS order. Output always includes the checksum; input
-// accepts it with or without. cct1 codes hold only the first six tokens and are
-// still read, so codes shared before the status colors existed keep working.
-const THEME_CODE_PREFIX = 'cct2:'
-const LEGACY_THEME_CODE_PREFIX = 'cct1:'
-const LEGACY_THEME_KEYS = THEME_TOKEN_KEYS.slice(0, 6)
+/** The custom theme as hex, which is what the codec speaks. */
+const customThemeAsHex = (theme: CustomThemeSettings): ThemeHexTokens =>
+    Object.fromEntries(
+        THEME_TOKEN_KEYS.map((key) => [key, colorStore.rgbToHex(theme[key])]),
+    ) as ThemeHexTokens
 
-const crc8 = (bytes: Uint8Array): number => {
-    let crc = 0
-    for (const byte of bytes) {
-        crc ^= byte
-        for (let i = 0; i < 8; i++) {
-            crc = (crc & 0x80) !== 0 ? ((crc << 1) ^ 0x07) & 0xff : (crc << 1) & 0xff
-        }
-    }
-    return crc
-}
-
-const colorToHexBody = (c: Color): string => {
-    const hex = colorStore.rgbToHex(c).toLowerCase()
-    return hex.startsWith('#') ? hex.slice(1) : hex
-}
-
-const hexBodyToBytes = (hex: string): Uint8Array => {
-    const bytes = new Uint8Array(hex.length / 2)
-    for (let i = 0; i < bytes.length; i++) {
-        bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-    }
-    return bytes
-}
-
-const encodeThemeCode = (theme: CustomThemeSettings): string => {
-    const hex = THEME_TOKEN_KEYS.map((key) => colorToHexBody(theme[key])).join('')
-    const cs = crc8(hexBodyToBytes(hex)).toString(16).padStart(2, '0')
-    return THEME_CODE_PREFIX + hex + cs
-}
-
-/** Strips an optional CRC-8 suffix, rejecting a body that fails it. */
-const themeCodeBody = (body: string, hexLength: number): string | null => {
-    let hex: string
-    if (body.length === hexLength) {
-        hex = body
-    } else if (body.length === hexLength + 2) {
-        hex = body.slice(0, hexLength)
-        if (!new RegExp(`^[0-9a-f]{${hexLength}}$`).test(hex)) return null
-        if (crc8(hexBodyToBytes(hex)).toString(16).padStart(2, '0') !== body.slice(hexLength)) {
-            return null
-        }
-    } else {
-        return null
-    }
-    return new RegExp(`^[0-9a-f]{${hexLength}}$`).test(hex) ? hex : null
-}
-
-const decodeThemeCode = (input: string): CustomColorTheme | null => {
-    const trimmed = input.trim().toLowerCase()
-    const legacy = trimmed.startsWith(LEGACY_THEME_CODE_PREFIX)
-    if (!legacy && !trimmed.startsWith(THEME_CODE_PREFIX)) return null
-    const keys = legacy ? LEGACY_THEME_KEYS : THEME_TOKEN_KEYS
-    const hex = themeCodeBody(trimmed.slice(THEME_CODE_PREFIX.length), keys.length * 6)
-    if (hex == null) return null
+/** A decoded code over the defaults, since a cct1 code omits the newer tokens. */
+const themeFromCode = (input: string): CustomColorTheme | null => {
+    const decoded = decodeThemeCode(input)
+    if (decoded == null) return null
     const theme = CustomColorTheme.fromCustomThemeSettings(defaultCustomTheme)
-    keys.forEach((key, index) => {
-        theme[key] = '#' + hex.slice(index * 6, index * 6 + 6)
-    })
+    for (const key of THEME_TOKEN_KEYS) {
+        const value = decoded[key]
+        if (value != null) theme[key] = value
+    }
     return theme
 }
 
-const themeCode = computed((): string => encodeThemeCode(settingsStore.customTheme))
+const themeCode = computed((): string =>
+    encodeThemeCode(customThemeAsHex(settingsStore.customTheme)),
+)
 
 const pasteCodeInput: Ref<string> = ref('')
 const justCopied: Ref<boolean> = ref(false)
@@ -502,7 +472,7 @@ const copyThemeCode = async (): Promise<void> => {
 }
 
 const applyPastedThemeCode = (): void => {
-    const decoded = decodeThemeCode(pasteCodeInput.value)
+    const decoded = themeFromCode(pasteCodeInput.value)
     if (decoded == null) {
         toast.add({
             severity: 'error',
@@ -707,6 +677,16 @@ onUnmounted(() => {
                     :label="t('layout.settings.eyeCandy')"
                 >
                     <UiSwitch v-model="settingsStore.eyeCandy" />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-tooltip.top="t('layout.settings.tooltips.interfaceFont')"
+                    :label="t('layout.settings.interfaceFont')"
+                >
+                    <UiSelect
+                        v-model="interfaceFont"
+                        :options="interfaceFontOptions"
+                        class="w-44"
+                    />
                 </UiSettingRow>
             </UiSettingsCard>
             <UiSettingsCard

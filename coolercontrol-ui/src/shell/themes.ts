@@ -19,7 +19,7 @@
 /**
  * Installed color themes.
  *
- * Each theme carries the ten tokens a theme is allowed to define. The palette
+ * Each theme carries the tokens a theme is allowed to define. The palette
  * hues (pink/green/red/yellow/blue/white) are deliberately NOT themed: they only
  * tint tag backgrounds and stay global.
  *
@@ -35,6 +35,8 @@
 /** The tokens a theme defines. Everything else is derived or global. */
 export interface ThemeTokens {
     accent: string
+    /** Far end of the brand gradient. Equal to `accent` means no gradient. */
+    accentGradientTo: string
     bgOne: string
     bgTwo: string
     borderOne: string
@@ -62,7 +64,8 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         name: 'True Black',
         variant: 'dark',
         tokens: {
-            accent: '#568af2',
+            accent: '#4d8cff',
+            accentGradientTo: '#ff21ff', // CoolerControl logo magenta
             bgOne: '#000000',
             bgTwo: '#121212',
             borderOne: '#2e2e2e',
@@ -80,6 +83,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#bd93f9',
+            accentGradientTo: '#ff79c6', // Dracula pink
             bgOne: '#282a36',
             bgTwo: '#343746',
             borderOne: '#44475a',
@@ -97,6 +101,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#83a598',
+            accentGradientTo: '#d3869b', // Gruvbox bright purple
             bgOne: '#282828',
             bgTwo: '#3c3836',
             borderOne: '#504945',
@@ -114,6 +119,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'light',
         tokens: {
             accent: '#076678',
+            accentGradientTo: '#8f3f71', // Gruvbox faded purple
             bgOne: '#fbf1c7',
             bgTwo: '#ebdbb2',
             borderOne: '#d5c4a1',
@@ -131,6 +137,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#61afef',
+            accentGradientTo: '#c678dd', // One Dark purple
             bgOne: '#282c34',
             bgTwo: '#31363f',
             borderOne: '#3e4451',
@@ -148,6 +155,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'light',
         tokens: {
             accent: '#4078f2',
+            accentGradientTo: '#a626a4', // One Light magenta
             bgOne: '#fafafa',
             bgTwo: '#eaeaeb',
             borderOne: '#d3d3d4',
@@ -165,6 +173,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#cba6f7',
+            accentGradientTo: '#f5c2e7', // Catppuccin Pink
             bgOne: '#1e1e2e',
             bgTwo: '#313244',
             borderOne: '#45475a',
@@ -182,6 +191,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'light',
         tokens: {
             accent: '#8839ef',
+            accentGradientTo: '#c95aab', // Catppuccin Pink, nudged from #ea76cb
             bgOne: '#eff1f5',
             bgTwo: '#e6e9ef',
             borderOne: '#ccd0da',
@@ -199,6 +209,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#7aa2f7',
+            accentGradientTo: '#bb9af7', // Tokyo Night purple
             bgOne: '#1a1b26',
             bgTwo: '#24283b',
             borderOne: '#3b4261',
@@ -216,6 +227,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'light',
         tokens: {
             accent: '#1e63c8', // nudged from #2e7de9
+            accentGradientTo: '#8a46e0', // Tokyo Night purple, nudged from #9854f1
             bgOne: '#e1e2e7',
             bgTwo: '#d4d6e0',
             borderOne: '#a8aecb',
@@ -233,6 +245,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#66d9ef',
+            accentGradientTo: '#ae81ff', // Monokai purple
             bgOne: '#272822',
             bgTwo: '#32332c',
             borderOne: '#49483e',
@@ -250,6 +263,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#88c0d0',
+            accentGradientTo: '#b48ead', // Nord aurora purple
             bgOne: '#2e3440',
             bgTwo: '#3b4252',
             borderOne: '#4c566a',
@@ -267,6 +281,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'dark',
         tokens: {
             accent: '#268bd2',
+            accentGradientTo: '#7479ce', // Solarized violet, nudged from #6c71c4
             bgOne: '#002b36',
             bgTwo: '#073642',
             borderOne: '#586e75',
@@ -284,6 +299,7 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
         variant: 'light',
         tokens: {
             accent: '#1c6a9e', // nudged from #268bd2
+            accentGradientTo: '#6c71c4', // Solarized violet
             bgOne: '#fdf6e3',
             bgTwo: '#eee8d5',
             borderOne: '#c9c2ab',
@@ -318,8 +334,12 @@ export const hexToTriplet = (hex: string): string =>
     ].join(' ')
 
 /**
- * The variable each token drives. Custom themes carry the same ten keys, so
- * both paths apply a theme through this one map.
+ * The variable each token drives. Custom themes carry the same keys, so both
+ * paths apply a theme through this one map.
+ *
+ * This order is the theme-code wire order (see `shell/themeCode.ts`): a `cct1`
+ * code holds the first six entries. Append new tokens, never insert, or every
+ * shared code decodes into the wrong colors. `themeCode.spec.ts` locks it.
  */
 export const THEME_TOKEN_VARS: Record<keyof ThemeTokens, string> = {
     accent: '--colors-accent',
@@ -332,6 +352,7 @@ export const THEME_TOKEN_VARS: Record<keyof ThemeTokens, string> = {
     warning: '--colors-warning',
     error: '--colors-error',
     info: '--colors-info',
+    accentGradientTo: '--colors-accent-gradient-to',
 }
 
 export const THEME_TOKEN_KEYS = Object.keys(THEME_TOKEN_VARS) as Array<keyof ThemeTokens>

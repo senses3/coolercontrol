@@ -26,6 +26,7 @@ import {
     defaultCustomTheme,
     DeviceUISettings,
     DeviceUISettingsDTO,
+    InterfaceFont,
     MenuOrderIds,
     ONBOARDING_TOUR_VERSION,
     SensorAndChannelSettings,
@@ -171,6 +172,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const customTheme: CustomThemeSettings = reactive({ ...defaultCustomTheme })
     const entityColors: Ref<Array<[string, string]>> = ref([])
     const eyeCandy: Ref<boolean> = ref(false)
+    const interfaceFont: Ref<InterfaceFont> = ref(InterfaceFont.BUNDLED)
     // Persisted as the tour version the user has finished. Callers only ask the
     // yes/no question, so they read the computed below and call
     // completeOnboarding() rather than writing a flag.
@@ -299,6 +301,8 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         entityColors.value = uiSettings.entityColors
         eyeCandy.value = uiSettings.eyeCandy
+        interfaceFont.value = uiSettings.interfaceFont ?? InterfaceFont.BUNDLED
+        applyInterfaceFont()
         // Legacy configs stored a boolean here: false once the old tour was
         // dismissed, true when it had never run. Both coerce below the current
         // version, so either way the reworked tour plays once.
@@ -1182,6 +1186,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 customTheme,
                 entityColors.value,
                 eyeCandy,
+                interfaceFont,
                 onboardingSeenVersion,
                 cpuStressBackend,
                 gpuStressBackend,
@@ -1238,6 +1243,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     }
                     uiSettings.entityColors = entityColors.value
                     uiSettings.eyeCandy = eyeCandy.value
+                    uiSettings.interfaceFont = interfaceFont.value
                     uiSettings.showOnboarding = onboardingSeenVersion.value
                     uiSettings.cpuStressBackend = cpuStressBackend.value
                     uiSettings.gpuStressBackend = gpuStressBackend.value
@@ -1258,6 +1264,14 @@ export const useSettingsStore = defineStore('settings', () => {
             console.debug('Saving CC Settings')
             await deviceStore.daemonClient.saveCCSettings(ccSettings.value)
         })
+    }
+
+    // Both font roles live in CSS variables, so the setting is one class.
+    function applyInterfaceFont(): void {
+        document.documentElement.classList.toggle(
+            'system-fonts',
+            interfaceFont.value === InterfaceFont.SYSTEM,
+        )
     }
 
     function applyThemeMode(): void {
@@ -1600,6 +1614,7 @@ export const useSettingsStore = defineStore('settings', () => {
         customTheme,
         entityColors,
         eyeCandy,
+        interfaceFont,
         showOnboarding,
         completeOnboarding,
         cpuStressBackend,
@@ -1662,6 +1677,7 @@ export const useSettingsStore = defineStore('settings', () => {
         applyMissingDelta,
         applyStaleSourceDelta,
         applyThemeMode,
+        applyInterfaceFont,
         tags,
         createTag,
         deleteTag,

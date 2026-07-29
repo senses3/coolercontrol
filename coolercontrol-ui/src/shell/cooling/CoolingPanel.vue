@@ -60,6 +60,8 @@ import { channelSpins } from '@/shell/channelIcon.ts'
 import { useFailAlert } from '@/composables/useFailAlert.ts'
 import TagChips from '@/shell/TagChips.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
+import { useRouteActive } from '@/shell/routeActive.ts'
+import type { RouteLocationRaw } from 'vue-router'
 
 const { t } = useI18n()
 const { createFailAlert: pushFailAlert } = useFailAlert()
@@ -229,6 +231,13 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
     settingsStore.healthStaleSource.some(
         (ref) => ref.entity_type === HealthEntityType.Profile && ref.entity_uid === profileUID,
     )
+
+// The row wrapper needs the same target its link uses, so both read it here.
+const channelTarget = (channel: { deviceUID: UID; channelName: string }): RouteLocationRaw => ({
+    name: 'cooling-channel',
+    params: { deviceUID: channel.deviceUID, channelName: channel.channelName },
+})
+const isRouteActive = useRouteActive()
 </script>
 
 <template>
@@ -247,15 +256,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     v-for="channel in pinnedChannels"
                     :key="`pin-${channel.deviceUID}-${channel.channelName}`"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(channelTarget(channel)) }"
                 >
                     <RouterLink
-                        :to="{
-                            name: 'cooling-channel',
-                            params: {
-                                deviceUID: channel.deviceUID,
-                                channelName: channel.channelName,
-                            },
-                        }"
+                        :to="channelTarget(channel)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
@@ -309,13 +313,13 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         >
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
-                                class="tabular-nums text-text-color"
+                                class="font-numeric tabular-nums text-text-color"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
                             </span>
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                                class="text-sm tabular-nums text-text-color-secondary"
+                                class="text-sm font-numeric tabular-nums text-text-color-secondary"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
                             </span>
@@ -386,15 +390,10 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                     v-for="channel in group.channels"
                     :key="channel.channelName"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(channelTarget(channel)) }"
                 >
                     <RouterLink
-                        :to="{
-                            name: 'cooling-channel',
-                            params: {
-                                deviceUID: channel.deviceUID,
-                                channelName: channel.channelName,
-                            },
-                        }"
+                        :to="channelTarget(channel)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
@@ -443,13 +442,13 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         >
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
-                                class="tabular-nums text-text-color"
+                                class="font-numeric tabular-nums text-text-color"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
                             </span>
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                                class="text-sm tabular-nums text-text-color-secondary"
+                                class="text-sm font-numeric tabular-nums text-text-color-secondary"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
                             </span>

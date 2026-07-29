@@ -447,7 +447,7 @@ const chartOption = (cal: Calibration) => {
                 <div class="mx-auto w-full max-w-md">
                     <div class="mb-2 flex items-baseline justify-between text-sm">
                         <span class="font-medium">{{ progressStage }}</span>
-                        <span class="tabular-nums text-text-color-secondary">
+                        <span class="font-numeric tabular-nums text-text-color-secondary">
                             {{ progressPercent }}%
                         </span>
                     </div>

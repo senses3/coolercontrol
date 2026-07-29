@@ -356,7 +356,7 @@ onMounted(async () => {
                                     }}</span>
                                     <span
                                         v-if="cpuActive && cpuLoad"
-                                        class="text-sm font-medium tabular-nums"
+                                        class="text-sm font-medium font-numeric tabular-nums"
                                         >{{ cpuLoad }}</span
                                     >
                                     <stress-backend-select
@@ -415,7 +415,7 @@ onMounted(async () => {
                                     }}</span>
                                     <span
                                         v-if="gpuActive && gpuLoad"
-                                        class="text-sm font-medium tabular-nums"
+                                        class="text-sm font-medium font-numeric tabular-nums"
                                         >{{ gpuLoad }}</span
                                     >
                                     <stress-backend-select
@@ -478,7 +478,7 @@ onMounted(async () => {
                                       CPU sensors are what reflect RAM stress. -->
                                     <span
                                         v-if="ramActive && cpuLoad"
-                                        class="text-sm font-medium tabular-nums"
+                                        class="text-sm font-medium font-numeric tabular-nums"
                                         >{{ cpuLoad }}</span
                                     >
                                     <stress-backend-select

@@ -50,6 +50,8 @@ import { customSensorNames, deviceChannelLinks, hardwareDevices } from '@/shell/
 import { deviceTypeIcon } from '@/shell/deviceIcon.ts'
 import { pinId } from '@/shell/cooling/channels.ts'
 import { setDeviceChildrenSubset, setTopLevelOrder } from '@/shell/panelOrder.ts'
+import { useRouteActive } from '@/shell/routeActive.ts'
+import type { RouteLocationRaw } from 'vue-router'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -173,6 +175,17 @@ const openTagRow = ref<string | null>(null)
 const onTagOpen = (rowKey: string, open: boolean): void => {
     openTagRow.value = open ? rowKey : null
 }
+
+// The row wrapper needs the same target its link uses, so both read it here.
+const deviceTarget = (deviceUID: UID): RouteLocationRaw => ({
+    name: 'devices-device',
+    params: { deviceUID },
+})
+const customSensorTarget = (customSensorID: string): RouteLocationRaw => ({
+    name: 'device-custom-sensor',
+    params: { customSensorID },
+})
+const isRouteActive = useRouteActive()
 </script>
 
 <template>
@@ -187,9 +200,10 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
             <div v-for="device in devicesList" :key="device.uid" class="flex flex-col gap-0.5">
                 <div
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(deviceTarget(device.uid)) }"
                 >
                     <RouterLink
-                        :to="{ name: 'devices-device', params: { deviceUID: device.uid } }"
+                        :to="deviceTarget(device.uid)"
                         class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
                         exact-active-class="!text-accent"
                     >
@@ -267,12 +281,12 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
                             v-for="sensorName in sensorNamesByDevice.get(device.uid) ?? []"
                             :key="`custom-${sensorName}`"
                             class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                            :class="{
+                                'bg-surface-hover': isRouteActive(customSensorTarget(sensorName)),
+                            }"
                         >
                             <RouterLink
-                                :to="{
-                                    name: 'device-custom-sensor',
-                                    params: { customSensorID: sensorName },
-                                }"
+                                :to="customSensorTarget(sensorName)"
                                 class="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color outline-none"
                                 exact-active-class="!text-accent"
                             >

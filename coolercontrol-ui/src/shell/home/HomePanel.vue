@@ -50,6 +50,7 @@ import { channelRoute } from '@/shell/channelRoute.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
+import { useRouteActive } from '@/shell/routeActive.ts'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -205,6 +206,8 @@ const createAlert = (row: PinnedRow): void => {
         query: { device: row.deviceUID!, channel: row.channelName!, metric: ChannelMetric.Temp },
     })
 }
+
+const isRouteActive = useRouteActive()
 </script>
 
 <template>
@@ -251,6 +254,7 @@ const createAlert = (row: PinnedRow): void => {
                     v-for="row in pinnedRows"
                     :key="row.key"
                     class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                    :class="{ 'bg-surface-hover': isRouteActive(row.to) }"
                 >
                     <RouterLink
                         :to="row.to"
@@ -284,7 +288,7 @@ const createAlert = (row: PinnedRow): void => {
                         </span>
                         <span
                             v-if="row.value"
-                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
+                            class="ml-auto whitespace-nowrap font-numeric tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{ '!hidden': openTagRow === row.key }"
                         >
                             {{ row.value }}

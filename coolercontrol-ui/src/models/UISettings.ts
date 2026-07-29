@@ -79,14 +79,15 @@ export function getThemeModeDisplayName(mode: string): string {
 }
 
 /**
- * A custom theme carries the same ten tokens an installed theme does, so both
- * are applied through the one variable map in `shell/themes.ts`.
+ * A custom theme carries the same tokens an installed theme does, so both are
+ * applied through the one variable map in `shell/themes.ts`.
  */
 export type CustomThemeSettings = Record<keyof ThemeTokens, Color>
 
 export const defaultCustomTheme: CustomThemeSettings = {
     // default dark-theme
-    accent: '86 138 242', //'#568af2'
+    accent: '77 140 255', //'#4d8cff'
+    accentGradientTo: '255 33 255', //'#ff21ff'
     bgOne: '27 30 35', //'#1b1e23'
     bgTwo: '44 49 60', //'#2c313c'
     borderOne: '138 149 170 0.25', //'#8a95aa40'
@@ -96,6 +97,23 @@ export const defaultCustomTheme: CustomThemeSettings = {
     warning: '241 250 140', //'#f1fa8c'
     error: '255 85 85', //'#ff5555'
     info: '86 138 242', //'#568af2'
+}
+
+/**
+ * Which fonts the interface uses. `System` hands both the label and the value
+ * role back to the user's own fonts, which is the only font preference a Qt app
+ * user can express: QtWebEngine has no override UI.
+ */
+export enum InterfaceFont {
+    BUNDLED = 'bundled',
+    SYSTEM = 'system',
+}
+
+export function getInterfaceFontDisplayName(font: InterfaceFont): string {
+    const { t } = i18n.global
+    return font === InterfaceFont.SYSTEM
+        ? t('models.interfaceFont.system')
+        : t('models.interfaceFont.bundled')
 }
 
 export enum ChannelViewType {
@@ -238,6 +256,7 @@ export class UISettingsDTO {
     customTheme: CustomThemeSettings = { ...defaultCustomTheme }
     entityColors: Array<[string, string]> = []
     eyeCandy: boolean = false
+    interfaceFont: InterfaceFont = InterfaceFont.BUNDLED
     // The tour version the user has completed; below ONBOARDING_TOUR_VERSION
     // means it runs again. Legacy configs hold a boolean here, which coerces
     // to 0 (dismissed) or 1 (never run) and so replays the reworked tour once.

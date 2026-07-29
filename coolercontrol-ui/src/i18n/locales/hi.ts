@@ -241,6 +241,7 @@ export default {
             selectLanguage: 'भाषा चुनें',
             fullScreen: 'पूर्ण स्क्रीन',
             eyeCandy: 'विज़ुअल इफ़ेक्ट',
+            interfaceFont: 'इंटरफ़ेस फ़ॉन्ट',
             introduction: 'परिचय',
             startTour: 'टूर शुरू करें',
             timeFormat: 'समय प्रारूप',
@@ -303,6 +304,8 @@ export default {
                 startupPage: 'एप्लिकेशन लोड होने के बाद दिखाया जाने वाला पेज।',
                 eyeCandy:
                     'घूमते पंखे के आइकन जैसे विज़ुअल एनिमेशन सक्षम करें।\nइससे कुछ अतिरिक्त GPU संसाधनों का उपयोग होगा।',
+                interfaceFont:
+                    'CoolerControl के साथ दिए गए फ़ॉन्ट या अपने सिस्टम पर कॉन्फ़िगर किए गए फ़ॉन्ट का उपयोग करें।',
                 fullScreen: 'पूर्ण स्क्रीन मोड टॉगल करें',
                 lineThickness: 'डैशबोर्ड पर चार्ट की रेखा की मोटाई समायोजित करें',
                 startInTray:
@@ -1319,6 +1322,10 @@ export default {
             highContrastDark: 'हाई कंट्रास्ट डार्क',
             highContrastLight: 'हाई कंट्रास्ट लाइट',
             custom: 'कस्टम थीम',
+        },
+        interfaceFont: {
+            bundled: 'शामिल (IBM Plex)',
+            system: 'सिस्टम',
         },
         channelViewType: {
             control: 'नियंत्रण',

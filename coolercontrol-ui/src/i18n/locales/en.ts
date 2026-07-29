@@ -240,6 +240,7 @@ export default {
             selectLanguage: 'Select Language',
             fullScreen: 'Full Screen',
             eyeCandy: 'Eye Candy',
+            interfaceFont: 'Interface Font',
             introduction: 'Introduction',
             startTour: 'Start Tour',
             timeFormat: 'Time Format',
@@ -279,6 +280,7 @@ export default {
             customTheme: {
                 title: 'Custom Theme',
                 accent: 'Accent Color',
+                accentGradientTo: 'Accent Gradient End',
                 bgOne: 'Background Primary',
                 bgTwo: 'Background Secondary',
                 border: 'Border Color',
@@ -302,6 +304,8 @@ export default {
                 startupPage: 'The page shown after the application loads.',
                 eyeCandy:
                     'Enable visual animations like spinning fan icons.\nThis will use some additional GPU resources.',
+                interfaceFont:
+                    'Use the fonts bundled with CoolerControl, or the fonts configured on your system.',
                 fullScreen: 'Toggles full-screen mode',
                 lineThickness: 'Adjust the line thickness of charts on the dashboard',
                 startInTray:
@@ -1315,6 +1319,10 @@ export default {
             highContrastDark: 'High Contrast Dark',
             highContrastLight: 'High Contrast Light',
             custom: 'Custom Theme',
+        },
+        interfaceFont: {
+            bundled: 'Bundled (IBM Plex)',
+            system: 'System',
         },
         channelViewType: {
             control: 'Control',

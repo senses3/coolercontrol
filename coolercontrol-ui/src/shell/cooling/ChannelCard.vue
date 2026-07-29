@@ -201,12 +201,12 @@ const failsafeTooltip = computed((): string => {
         </div>
         <div class="flex items-end justify-between gap-2">
             <div>
-                <span class="text-2xl font-semibold tabular-nums text-text-color">
+                <span class="text-2xl font-semibold font-numeric tabular-nums text-text-color">
                     {{ liveDuty != null ? `${liveDuty}%` : '--' }}
                 </span>
                 <span
                     v-if="liveRpm != null"
-                    class="ml-2 text-sm tabular-nums text-text-color-secondary"
+                    class="ml-2 text-sm font-numeric tabular-nums text-text-color-secondary"
                 >
                     {{ liveRpm }} rpm
                 </span>
@@ -218,8 +218,14 @@ const failsafeTooltip = computed((): string => {
             :color="color"
             class="text-text-color-secondary"
         />
-        <div class="truncate text-sm text-text-color-secondary">
-            {{ assignedSummary }}
+        <div class="flex items-center gap-1.5 text-sm text-text-color-secondary">
+            <!-- Tells a profile-driven fan apart from a fixed duty at a glance;
+                 the summary line alone reads the same either way. -->
+            <span
+                v-if="assignedProfileUID != null"
+                class="h-1.5 w-1.5 shrink-0 rounded-full bg-gradient-to-br from-accent to-accent-gradient-to"
+            />
+            <span class="truncate">{{ assignedSummary }}</span>
         </div>
     </RouterLink>
 </template>

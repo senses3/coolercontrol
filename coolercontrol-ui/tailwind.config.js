@@ -28,7 +28,8 @@ module.exports = {
                     // the default theme that appears for a split second on load:
                     colors: {
                         // dark-theme copy
-                        accent: '#568af2',
+                        accent: '#4d8cff',
+                        'accent-gradient-to': '#ff21ff',
                         // Contrast foreground for filled accent/error surfaces. These
                         // placeholders cover the pre-JS flash; ThemeColorsStore recomputes
                         // --colors-accent-fg / --colors-error-fg per theme at runtime.
@@ -65,6 +66,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: 'AccentColor',
+                            // No gradient: the OS palette offers no second brand color.
+                            'accent-gradient-to': 'AccentColor',
                             // accent: 'Highlight',
                             'bg-one': 'Canvas',
                             'bg-two': 'ButtonFace',
@@ -107,6 +110,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#00ff00',
+                            // Flat: a gradient would undercut the contrast guarantee.
+                            'accent-gradient-to': '#00ff00',
                             'bg-one': '#000000',
                             'bg-two': '#000000',
                             'border-one': '#ffffff',
@@ -133,6 +138,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#0000ff',
+                            // Flat: a gradient would undercut the contrast guarantee.
+                            'accent-gradient-to': '#0000ff',
                             'bg-one': '#ffffff',
                             'bg-two': '#ffffff',
                             'border-one': '#000000',
@@ -160,7 +167,10 @@ module.exports = {
                     // mediaQuery: '@media (prefers-color-scheme: light)',
                     extend: {
                         colors: {
-                            accent: '#568af2',
+                            accent: '#4d8cff',
+                            // The brand magenta washes out on a light ground, so it
+                            // deepens within its own hue, as success/warning do below.
+                            'accent-gradient-to': '#cc00cc',
                             'bg-one': '#f5f6f9',
                             'bg-two': '#dfe0e0',
                             'border-one': '#3c454d',
@@ -192,7 +202,8 @@ module.exports = {
                     // mediaQuery: '@media (prefers-color-scheme: dark)',
                     extend: {
                         colors: {
-                            accent: '#568af2',
+                            accent: '#4d8cff',
+                            'accent-gradient-to': '#ff21ff',
                             'bg-one': '#1b1e23',
                             'bg-two': '#2c313c',
                             // 'border-one': '#343b48',
@@ -232,6 +243,11 @@ module.exports = {
             purple: colors.purple,
         },
         extend: {
+            fontFamily: {
+                // Live values (duty, rpm, temps) carry the numeric face; the
+                // interface-font setting swaps both roles at the variable.
+                numeric: 'var(--font-numeric)',
+            },
             animation: {
                 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'spin-slow': 'spin 2s linear infinite',

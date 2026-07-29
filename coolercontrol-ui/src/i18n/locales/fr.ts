@@ -246,6 +246,7 @@ export default {
             selectLanguage: 'Sélectionner la langue',
             fullScreen: 'Plein écran',
             eyeCandy: 'Effets visuels',
+            interfaceFont: "Police de l'interface",
             introduction: 'Introduction',
             startTour: 'Démarrer la visite',
             timeFormat: "Format de l'heure",
@@ -313,6 +314,8 @@ export default {
                 startupPage: "La page affichée après le chargement de l'application.",
                 eyeCandy:
                     'Activer les animations visuelles comme les icônes de ventilateurs en rotation.\nCela utilisera des ressources GPU supplémentaires.',
+                interfaceFont:
+                    'Utiliser les polices fournies avec CoolerControl ou celles configurées sur votre système.',
                 fullScreen: 'Basculer en mode plein écran',
                 lineThickness:
                     "Ajuster l'épaisseur des lignes des graphiques sur le tableau de bord",
@@ -1349,6 +1352,10 @@ export default {
             highContrastDark: 'Sombre à Haut Contraste',
             highContrastLight: 'Clair à Haut Contraste',
             custom: 'Thème Personnalisé',
+        },
+        interfaceFont: {
+            bundled: 'Fournie (IBM Plex)',
+            system: 'Système',
         },
         channelViewType: {
             control: 'Contrôle',
