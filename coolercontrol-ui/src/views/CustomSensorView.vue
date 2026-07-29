@@ -22,6 +22,7 @@ import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiAlertCircle,
     mdiAlertOutline,
+    mdiChartLine,
     mdiContentSaveOutline,
     mdiFolderSearchOutline,
     mdiMinusThick,
@@ -43,7 +44,7 @@ import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { DeviceType, UID } from '@/models/Device.ts'
 import { ChannelViewType } from '@/models/UISettings.ts'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
 import UiListbox from '@/shell/ui/UiListbox.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -57,6 +58,7 @@ import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
+import TimeChart from '@/components/TimeChart.vue'
 
 interface Props {
     customSensorID?: string
@@ -566,6 +568,12 @@ const chartMinutesChanged = (value: number): void => {
     singleDashboard.value.timeRangeSeconds = value * 60
 }
 const chartKey: Ref<string> = ref(uuidV4())
+
+// The chart canvas consumes plain wheel events for zoom; stop them in the
+// capture phase so the page keeps scrolling. Ctrl+wheel still zooms.
+const onChartWheelCapture = (event: WheelEvent): void => {
+    if (!event.ctrlKey) event.stopPropagation()
+}
 // const inputArea = ref()
 // nextTick(async () => {
 //     const delay = () => new Promise((resolve) => setTimeout(resolve, 100))
@@ -943,6 +951,29 @@ onMounted(async () => {
                         :invalid="chosenEmaTempSource == null"
                     />
                 </div>
+            </div>
+            <div
+                v-if="!shouldCreateSensor"
+                class="mt-6 shrink-0"
+                style="--time-chart-height: 24rem"
+                @wheel.capture="onChartWheelCapture"
+            >
+                <div class="mb-1 flex justify-center">
+                    <RouterLink
+                        :to="{
+                            name: 'monitoring-sensor',
+                            params: {
+                                deviceUID: customSensorsDeviceUID,
+                                channelName: customSensor.id,
+                            },
+                        }"
+                        class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <svg-icon type="mdi" :path="mdiChartLine" :size="16" />
+                        {{ t('layout.shell.coolingPage.fullChart') }}
+                    </RouterLink>
+                </div>
+                <TimeChart :key="chartKey" :dashboard="singleDashboard" />
             </div>
         </ScrollAreaViewport>
         <ScrollAreaScrollbar
