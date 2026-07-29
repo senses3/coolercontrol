@@ -243,6 +243,11 @@ module.exports = {
             purple: colors.purple,
         },
         extend: {
+            fontFamily: {
+                // Live values (duty, rpm, temps) carry the numeric face; the
+                // interface-font setting swaps both roles at the variable.
+                numeric: 'var(--font-numeric)',
+            },
             animation: {
                 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'spin-slow': 'spin 2s linear infinite',
