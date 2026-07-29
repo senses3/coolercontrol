@@ -536,7 +536,10 @@ onUnmounted(() => {
         <span v-else class="w-full p-2">
             <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-full" />
         </span>
-        <div class="flex flex-wrap items-center gap-x-1 justify-end">
+        <!-- ml-auto, not just the parent's justify-between: once a long title
+             wraps this group onto its own line it is the only item there, and
+             justify-between would leave it flush left. -->
+        <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
             <UiButton
                 v-if="hasCoolingPage"
                 variant="outline"
