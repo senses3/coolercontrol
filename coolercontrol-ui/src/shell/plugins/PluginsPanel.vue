@@ -35,6 +35,8 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { usePluginActions } from '@/composables/usePluginActions.ts'
 import { orderedByGroup, setGroupOrder } from '@/shell/panelOrder.ts'
+import { useRouteActive } from '@/shell/routeActive.ts'
+import type { RouteLocationRaw } from 'vue-router'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -110,6 +112,13 @@ const runAction = async (
 const actionButtonClasses =
     'rounded p-1 text-text-color-secondary outline-none hover:text-text-color ' +
     'focus-visible:ring-2 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50'
+
+// The row wrapper needs the same target its link uses, so both read it here.
+const pluginTarget = (pluginId: string): RouteLocationRaw => ({
+    name: 'plugin-page',
+    params: { pluginId },
+})
+const isRouteActive = useRouteActive()
 </script>
 
 <template>
@@ -141,9 +150,10 @@ const actionButtonClasses =
                 v-for="plugin in pluginRows"
                 :key="plugin.id"
                 class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                :class="{ 'bg-surface-hover': isRouteActive(pluginTarget(plugin.id)) }"
             >
                 <RouterLink
-                    :to="{ name: 'plugin-page', params: { pluginId: plugin.id } }"
+                    :to="pluginTarget(plugin.id)"
                     class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 outline-none"
                     :class="
                         plugin.disabled ? 'text-text-color-secondary opacity-60' : 'text-text-color'
