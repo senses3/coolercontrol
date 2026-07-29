@@ -479,7 +479,7 @@ export default {
             chartType: 'Tipo de Gráfico',
             filterSensors: 'Filtrar Sensores',
             mouseActions:
-                'Acciones del ratón en el panel:\n- Resaltar selección para hacer zoom.\n- Desplazar para hacer zoom.\n- Clic derecho para mover cuando se hace zoom.\n- Doble clic para restablecer y reanudar la actualización.\n- Ctrl+clic o clic medio para mostrar todos los sensores en la herramienta de ayuda.',
+                'Acciones del ratón en el panel:\n- Resaltar selección para hacer zoom.\n- Ctrl+Desplazar para hacer zoom.\n- Clic derecho para mover cuando se hace zoom.\n- Doble clic para restablecer y reanudar la actualización.\n- Ctrl+clic o clic medio para mostrar todos los sensores en la herramienta de ayuda.',
             fullPage: 'Página Completa',
             filterTags: 'Filtrar Etiquetas',
             filterByTag: 'Filtrar por Etiqueta',
@@ -635,7 +635,7 @@ export default {
             function: 'Función',
             functionToApply: 'Función a aplicar',
             graphProfileMouseActions:
-                'Acciones del ratón en el Perfil Gráfico:\n- Desplazar para zoom.\n- Clic izquierdo en la línea para añadir punto.\n- Clic derecho en el punto para eliminar.\n- Arrastrar punto para mover.',
+                'Acciones del ratón en el Perfil Gráfico:\n- Ctrl+Desplazar para zoom.\n- Clic izquierdo en la línea para añadir punto.\n- Clic derecho en el punto para eliminar.\n- Arrastrar punto para mover.',
             unsavedChanges: 'Hay cambios no guardados en este Perfil.',
             unsavedChangesHeader: 'Cambios No Guardados',
             newProfile: 'Nuevo Perfil',
@@ -864,13 +864,39 @@ export default {
         onboarding: {
             welcome: '¡Bienvenido a CoolerControl!',
             gettingStartedIntro:
-                'Elija un recorrido para orientarse. El Recorrido Rápido cubre lo esencial en pocos pasos. El Recorrido Detallado lo guía por cada menú y botón.',
+                'Haga un recorrido rápido para orientarse. Recorre la barra de navegación y las áreas principales de la aplicación.',
             startTourAgain:
                 'Puede iniciar este recorrido de nuevo en cualquier momento desde la página Inicio.',
             startTour: 'Iniciar Recorrido',
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',
             finishLater: 'Entendido, gracias',
+            home: 'Inicio',
+            homeDesc:
+                'La página de inicio de la aplicación: estado del daemon y salud de los dispositivos de un vistazo, además de registros, información de la app, enlaces útiles y herramientas de prueba de estrés.',
+            cooling: 'Refrigeración',
+            coolingDesc:
+                'Su centro de control de ventiladores: ajuste las velocidades de ventiladores y bombas, y aplique Perfiles y Funciones a cualquier canal.',
+            monitoring: 'Monitoreo',
+            monitoringDesc:
+                'Cree Paneles, observe cada sensor y configure Alertas para monitorear su sistema en tiempo real.',
+            devices: 'Dispositivos',
+            devicesDesc:
+                'Revise el hardware detectado, configure funciones por dispositivo como iluminación RGB y pantallas LCD, y cree Sensores Personalizados.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Explore y abra los plugins instalados que amplían CoolerControl.',
+            settings: 'Configuración',
+            settingsDesc:
+                'Configure preferencias de interfaz, opciones del daemon y comportamiento del sistema.',
+            access: 'Acceso',
+            accessDesc:
+                'Inicie o cierre sesión y cambie su contraseña, y gestione los Tokens de acceso que dan a herramientas y plugins acceso a la API.',
+            restartMenu: 'Menú de Reinicio',
+            restartMenuDesc:
+                'Recargue la interfaz o reinicie el daemon del sistema cuando sea necesario.',
+            modes: 'Modos',
+            modesDesc:
+                'Los Modos son colecciones guardadas de sus configuraciones. Cambie aquí entre configuraciones como Silencioso y Rendimiento, o gestiónelas.',
             thatsIt: '¡Eso es todo!',
             startNow:
                 'Ya está todo listo. Abra la documentación de Inicio para aprender más, o comience a configurar sus dispositivos.',

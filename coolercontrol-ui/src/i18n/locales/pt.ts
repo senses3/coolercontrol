@@ -478,7 +478,7 @@ export default {
             chartType: 'Tipo de Gráfico',
             filterSensors: 'Filtrar Sensores',
             mouseActions:
-                'Ações do mouse no painel:\n- Destacar seleção para zoom.\n- Deslizar para zoom.\n- Clicar com o botão direito para mover quando zoomado.\n- Clicar duas vezes para redefinir e retomar a atualização.\n- Ctrl+clicar ou clicar com o botão do meio para mostrar todos os sensores na dica de ferramenta.',
+                'Ações do mouse no painel:\n- Destacar seleção para zoom.\n- Ctrl+Deslizar para zoom.\n- Clicar com o botão direito para mover quando zoomado.\n- Clicar duas vezes para redefinir e retomar a atualização.\n- Ctrl+clicar ou clicar com o botão do meio para mostrar todos os sensores na dica de ferramenta.',
             fullPage: 'Tela Cheia',
             filterTags: 'Filtrar Tags',
             filterByTag: 'Filtrar por Tag',
@@ -634,7 +634,7 @@ export default {
             function: 'Função',
             functionToApply: 'Função a aplicar',
             graphProfileMouseActions:
-                'Ações do mouse no Perfil de Gráfico:\n- Role para zoom.\n- Clique esquerdo na linha para adicionar ponto.\n- Clique direito no ponto para remover.\n- Arraste o ponto para mover.',
+                'Ações do mouse no Perfil de Gráfico:\n- Ctrl+Rolar para zoom.\n- Clique esquerdo na linha para adicionar ponto.\n- Clique direito no ponto para remover.\n- Arraste o ponto para mover.',
             unsavedChanges: 'Existem alterações não salvas feitas neste Perfil.',
             unsavedChangesHeader: 'Alterações Não Salvas',
             newProfile: 'Novo Perfil',
@@ -864,12 +864,38 @@ export default {
         onboarding: {
             welcome: 'Bem-vindo ao CoolerControl!',
             gettingStartedIntro:
-                'Escolha um tour para se orientar. O Tour Rápido cobre o essencial em poucos passos. O Tour Completo guia você por cada menu e botão.',
+                'Faça um tour rápido para se orientar. Ele percorre a barra de navegação e as áreas principais do aplicativo.',
             startTourAgain: 'Pode iniciar este tour novamente a qualquer momento na página Início.',
             startTour: 'Iniciar Tour',
             maybeLater: 'Talvez mais tarde',
             openGettingStarted: 'Abrir Documentação de Introdução',
             finishLater: 'Entendido, obrigado',
+            home: 'Início',
+            homeDesc:
+                'A página inicial da aplicação: estado do daemon e saúde dos dispositivos num relance, além de registos, informações da app, links úteis e ferramentas de teste de esforço.',
+            cooling: 'Resfriamento',
+            coolingDesc:
+                'Seu centro de controle de ventiladores: ajuste as velocidades de ventiladores e bombas e aplique Perfis e Funções a qualquer canal.',
+            monitoring: 'Monitoramento',
+            monitoringDesc:
+                'Crie Painéis, acompanhe cada sensor e configure Alertas para monitorar seu sistema em tempo real.',
+            devices: 'Dispositivos',
+            devicesDesc:
+                'Revise o hardware detectado, configure recursos por dispositivo como iluminação RGB e telas LCD, e crie Sensores Personalizados.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Navegue e abra plugins instalados que estendem o CoolerControl.',
+            settings: 'Configurações',
+            settingsDesc:
+                'Configure preferências de interface, opções do daemon e comportamento do sistema.',
+            access: 'Acesso',
+            accessDesc:
+                'Faça login ou logout e altere sua senha, e gerencie os Tokens de acesso que dão a ferramentas e plugins acesso à API.',
+            restartMenu: 'Menu de Reinicialização',
+            restartMenuDesc:
+                'Recarregue a interface ou reinicie o daemon do sistema quando necessário.',
+            modes: 'Modos',
+            modesDesc:
+                'Os Modos são coleções salvas de suas configurações. Alterne aqui entre configurações como Silencioso e Desempenho, ou gerencie-as.',
             thatsIt: 'É isso!',
             startNow:
                 'Está tudo pronto. Abra a documentação de Introdução para saber mais, ou comece a configurar seus dispositivos.',

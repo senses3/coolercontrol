@@ -2277,7 +2277,7 @@ defineExpose({ saveProfileState, contextIsDirty })
             :current-name="currentProfile.name"
             :save-name-function="saveNameFunction"
         />
-        <div class="flex flex-wrap items-center gap-x-1 justify-end">
+        <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
             <template v-if="!hideSave">
                 <UiButton
                     variant="ghost"
