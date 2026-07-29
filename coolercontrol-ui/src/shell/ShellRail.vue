@@ -69,13 +69,19 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
             :id="`rail-${section.id}`"
             :key="section.id"
             :to="{ name: section.routeName }"
-            class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="relative flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             :class="
                 activeSection === section.id
                     ? 'text-accent'
                     : 'text-text-color-secondary hover:text-text-color'
             "
         >
+            <!-- Brand mark for the current section. A theme whose gradient end
+                 equals its accent renders this as a plain accent bar. -->
+            <span
+                v-if="activeSection === section.id"
+                class="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
+            />
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.5)" />
             <span class="text-[0.8125rem] leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
@@ -83,13 +89,17 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
         <RouterLink
             id="rail-settings"
             :to="{ name: 'settings' }"
-            class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="relative flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             :class="
                 activeSection === 'settings'
                     ? 'text-accent'
                     : 'text-text-color-secondary hover:text-text-color'
             "
         >
+            <span
+                v-if="activeSection === 'settings'"
+                class="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
+            />
             <svg-icon type="mdi" :path="mdiCog" :size="deviceStore.getREMSize(1.5)" />
             <span class="text-[0.8125rem] leading-tight">{{ t('layout.shell.settings') }}</span>
         </RouterLink>

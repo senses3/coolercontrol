@@ -40,9 +40,14 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
             v-for="section in SHELL_SECTIONS"
             :key="section.id"
             :to="{ name: section.routeName }"
-            class="flex min-w-14 flex-col items-center justify-center gap-0.5 px-1 outline-none"
+            class="relative flex min-w-14 flex-col items-center justify-center gap-0.5 px-1 outline-none"
             :class="activeSection === section.id ? 'text-accent' : 'text-text-color-secondary'"
         >
+            <!-- The rail's current-section mark, turned on its side. -->
+            <span
+                v-if="activeSection === section.id"
+                class="absolute inset-x-2 top-0 h-[2px] rounded-full bg-gradient-to-r from-accent to-accent-gradient-to"
+            />
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.4)" />
             <span class="text-[0.8125rem] leading-tight">{{ t(section.labelKey) }}</span>
         </RouterLink>
