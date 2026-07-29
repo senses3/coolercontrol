@@ -54,7 +54,7 @@ export default {
         stay: '유지',
         discard: '폐기',
         copy: '(복사)',
-        minuteAbbr: '최소',
+        minuteAbbr: '분',
         rpmAbbr: 'rpm',
         mhzAbbr: 'MHz',
         ghzAbbr: 'GHz',
