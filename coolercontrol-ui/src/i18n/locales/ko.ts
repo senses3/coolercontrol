@@ -853,6 +853,29 @@ export default {
             maybeLater: '나중에',
             openGettingStarted: '시작하기 문서 열기',
             finishLater: '알겠습니다, 감사합니다',
+            home: '홈',
+            homeDesc:
+                '애플리케이션 홈 페이지: 데몬 상태와 장치 상태를 한눈에 보고, 로그, 앱 정보, 유용한 링크, 스트레스 테스트 도구도 이용할 수 있습니다.',
+            cooling: '냉각',
+            coolingDesc:
+                '팬 제어 허브: 팬 속도와 펌프를 조정하고 모든 채널에 프로파일과 기능을 적용합니다.',
+            monitoring: '모니터링',
+            monitoringDesc:
+                '대시보드를 만들고, 모든 센서를 관찰하고, 알림을 설정하여 시스템을 실시간으로 추적하세요.',
+            devices: '장치',
+            devicesDesc:
+                '감지된 하드웨어를 검토하고, RGB 조명이나 LCD 화면 같은 장치별 기능을 구성하고, 커스텀 센서를 만드세요.',
+            plugins: '플러그인',
+            pluginsDesc: 'CoolerControl을 확장하는 설치된 플러그인을 둘러보고 열어보세요.',
+            settings: '설정',
+            settingsDesc: 'UI 기본 설정, 데몬 옵션 및 시스템 동작을 구성합니다.',
+            access: '액세스',
+            accessDesc: '비밀번호를 관리하고 현재 액세스 수준을 확인하세요.',
+            restartMenu: '메뉴 재시작',
+            restartMenuDesc: '필요할 때 UI를 다시 로드하거나 시스템 데몬을 다시 시작하세요.',
+            modes: '모드',
+            modesDesc:
+                '모드는 저장된 설정 모음입니다. 한 번의 클릭으로 무음 및 성능과 같은 구성 사이를 전환할 수 있습니다.',
             thatsIt: '그게 다입니다!',
             startNow:
                 '준비가 끝났습니다. 자세히 알아보려면 시작하기 문서를 열거나, 바로 장치 구성을 시작하세요.',

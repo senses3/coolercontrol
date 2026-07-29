@@ -871,6 +871,31 @@ export default {
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',
             finishLater: 'Entendido, gracias',
+            home: 'Inicio',
+            homeDesc:
+                'La página de inicio de la aplicación: estado del daemon y salud de los dispositivos de un vistazo, además de registros, información de la app, enlaces útiles y herramientas de prueba de estrés.',
+            cooling: 'Refrigeración',
+            coolingDesc:
+                'Su centro de control de ventiladores: ajuste las velocidades de ventiladores y bombas, y aplique Perfiles y Funciones a cualquier canal.',
+            monitoring: 'Monitoreo',
+            monitoringDesc:
+                'Cree Paneles, observe cada sensor y configure Alertas para monitorear su sistema en tiempo real.',
+            devices: 'Dispositivos',
+            devicesDesc:
+                'Revise el hardware detectado, configure funciones por dispositivo como iluminación RGB y pantallas LCD, y cree Sensores Personalizados.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Explore y abra los plugins instalados que amplían CoolerControl.',
+            settings: 'Configuración',
+            settingsDesc:
+                'Configure preferencias de interfaz, opciones del daemon y comportamiento del sistema.',
+            access: 'Acceso',
+            accessDesc: 'Gestione su contraseña y confirme su nivel de acceso actual.',
+            restartMenu: 'Menú de Reinicio',
+            restartMenuDesc:
+                'Recargue la interfaz o reinicie el daemon del sistema cuando sea necesario.',
+            modes: 'Modos',
+            modesDesc:
+                'Los Modos son colecciones guardadas de sus configuraciones. Cambie entre configuraciones como Silencioso y Rendimiento con un solo clic.',
             thatsIt: '¡Eso es todo!',
             startNow:
                 'Ya está todo listo. Abra la documentación de Inicio para aprender más, o comience a configurar sus dispositivos.',

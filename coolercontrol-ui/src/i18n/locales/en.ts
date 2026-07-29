@@ -859,6 +859,30 @@ export default {
             maybeLater: 'Maybe Later',
             openGettingStarted: 'Open Getting Started Docs',
             finishLater: 'Got It, Thanks',
+            home: 'Home',
+            homeDesc:
+                'The application home page: daemon status and device health at a glance, plus logs, app info, helpful links, and stress-test tools.',
+            cooling: 'Cooling',
+            coolingDesc:
+                'Your fan control hub: adjust fan speeds and pumps, and apply Profiles and Functions to any channel.',
+            monitoring: 'Monitoring',
+            monitoringDesc:
+                'Build Dashboards, watch every sensor, and set up Alerts to track your system in real time.',
+            devices: 'Devices',
+            devicesDesc:
+                'Review detected hardware, configure per-device features like RGB lighting and LCD screens, and create Custom Sensors.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Browse and open installed plugins that extend CoolerControl.',
+            settings: 'Settings',
+            settingsDesc: 'Configure UI preferences, daemon options, and system behavior.',
+            access: 'Access',
+            accessDesc:
+                'Log in or out and change your password, and manage Access Tokens that grant tools and plugins API access.',
+            restartMenu: 'Restart Menu',
+            restartMenuDesc: 'Reload the UI or restart the system daemon when needed.',
+            modes: 'Modes',
+            modesDesc:
+                'Modes are saved collections of your settings. Switch between configurations like Silent and Performance, or manage them, right here.',
             thatsIt: "That's it!",
             startNow:
                 "You're all set. Open the Getting Started docs to learn more, or jump in and start configuring your devices.",

@@ -877,6 +877,32 @@ export default {
             maybeLater: 'Vielleicht später',
             openGettingStarted: 'Erste-Schritte-Dokumentation öffnen',
             finishLater: 'Alles klar, danke',
+            home: 'Start',
+            homeDesc:
+                'Die Startseite der Anwendung: Daemon-Status und Gerätezustand auf einen Blick, dazu Protokolle, App-Infos, hilfreiche Links und Stresstest-Werkzeuge.',
+            cooling: 'Kühlung',
+            coolingDesc:
+                'Ihre Zentrale für die Lüftersteuerung: Passen Sie Lüftergeschwindigkeiten und Pumpen an und wenden Sie Profile und Funktionen auf jeden Kanal an.',
+            monitoring: 'Überwachung',
+            monitoringDesc:
+                'Erstellen Sie Dashboards, beobachten Sie jeden Sensor und richten Sie Warnungen ein, um Ihr System in Echtzeit zu verfolgen.',
+            devices: 'Geräte',
+            devicesDesc:
+                'Überprüfen Sie erkannte Hardware, konfigurieren Sie gerätespezifische Funktionen wie RGB-Beleuchtung und LCD-Bildschirme und erstellen Sie benutzerdefinierte Sensoren.',
+            plugins: 'Plugins',
+            pluginsDesc:
+                'Durchsuchen und öffnen Sie installierte Plugins, die CoolerControl erweitern.',
+            settings: 'Einstellungen',
+            settingsDesc:
+                'Konfigurieren Sie UI-Einstellungen, Daemon-Optionen und Systemverhalten.',
+            access: 'Zugriff',
+            accessDesc:
+                'Verwalten Sie Ihr Passwort und bestätigen Sie Ihre aktuelle Zugriffsebene.',
+            restartMenu: 'Neustart-Menü',
+            restartMenuDesc: 'UI neu laden oder Systemdaemon bei Bedarf neu starten.',
+            modes: 'Modi',
+            modesDesc:
+                'Modi sind gespeicherte Sammlungen Ihrer Einstellungen. Wechseln Sie mit einem Klick zwischen Konfigurationen wie Leise und Leistung.',
             thatsIt: "Das war's!",
             startNow:
                 'Sie sind startklar. Öffnen Sie die Erste-Schritte-Dokumentation, um mehr zu erfahren, oder legen Sie los und konfigurieren Sie Ihre Geräte.',

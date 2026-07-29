@@ -883,6 +883,30 @@ export default {
             maybeLater: 'Peut-être plus tard',
             openGettingStarted: 'Ouvrir la Documentation',
             finishLater: 'Compris, merci',
+            home: 'Accueil',
+            homeDesc:
+                "La page d'accueil de l'application : état du daemon et santé des périphériques en un coup d'œil, plus les journaux, les infos de l'app, des liens utiles et des outils de test de charge.",
+            cooling: 'Refroidissement',
+            coolingDesc:
+                "Votre centre de contrôle des ventilateurs : ajustez les vitesses des ventilateurs et des pompes, et appliquez des Profils et des Fonctions à n'importe quel canal.",
+            monitoring: 'Surveillance',
+            monitoringDesc:
+                'Créez des Tableaux de bord, surveillez chaque capteur et configurez des Alertes pour suivre votre système en temps réel.',
+            devices: 'Appareils',
+            devicesDesc:
+                "Passez en revue le matériel détecté, configurez les fonctionnalités propres à chaque appareil comme l'éclairage RGB et les écrans LCD, et créez des Capteurs Personnalisés.",
+            plugins: 'Plugins',
+            pluginsDesc: 'Parcourez et ouvrez les plugins installés qui étendent CoolerControl.',
+            settings: 'Paramètres',
+            settingsDesc:
+                "Configurez les préférences de l'interface, les options du daemon et le comportement du système.",
+            access: 'Accès',
+            accessDesc: "Gérez votre mot de passe et confirmez votre niveau d'accès actuel.",
+            restartMenu: 'Menu de Redémarrage',
+            restartMenuDesc: "Rechargez l'interface ou redémarrez le daemon système si nécessaire.",
+            modes: 'Modes',
+            modesDesc:
+                'Les Modes sont des collections enregistrées de vos paramètres. Basculez entre des configurations comme Silencieux et Performance en un clic.',
             thatsIt: "C'est tout !",
             startNow:
                 'Vous êtes prêt. Ouvrez la documentation pour en savoir plus, ou lancez-vous et configurez vos appareils.',

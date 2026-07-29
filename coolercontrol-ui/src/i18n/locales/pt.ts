@@ -870,6 +870,31 @@ export default {
             maybeLater: 'Talvez mais tarde',
             openGettingStarted: 'Abrir Documentação de Introdução',
             finishLater: 'Entendido, obrigado',
+            home: 'Início',
+            homeDesc:
+                'A página inicial da aplicação: estado do daemon e saúde dos dispositivos num relance, além de registos, informações da app, links úteis e ferramentas de teste de esforço.',
+            cooling: 'Resfriamento',
+            coolingDesc:
+                'Seu centro de controle de ventiladores: ajuste as velocidades de ventiladores e bombas e aplique Perfis e Funções a qualquer canal.',
+            monitoring: 'Monitoramento',
+            monitoringDesc:
+                'Crie Painéis, acompanhe cada sensor e configure Alertas para monitorar seu sistema em tempo real.',
+            devices: 'Dispositivos',
+            devicesDesc:
+                'Revise o hardware detectado, configure recursos por dispositivo como iluminação RGB e telas LCD, e crie Sensores Personalizados.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Navegue e abra plugins instalados que estendem o CoolerControl.',
+            settings: 'Configurações',
+            settingsDesc:
+                'Configure preferências de interface, opções do daemon e comportamento do sistema.',
+            access: 'Acesso',
+            accessDesc: 'Gerencie sua senha e confirme seu nível de acesso atual.',
+            restartMenu: 'Menu de Reinicialização',
+            restartMenuDesc:
+                'Recarregue a interface ou reinicie o daemon do sistema quando necessário.',
+            modes: 'Modos',
+            modesDesc:
+                'Os Modos são coleções salvas de suas configurações. Alterne entre configurações como Silencioso e Desempenho com um único clique.',
             thatsIt: 'É isso!',
             startNow:
                 'Está tudo pronto. Abra a documentação de Introdução para saber mais, ou comece a configurar seus dispositivos.',
