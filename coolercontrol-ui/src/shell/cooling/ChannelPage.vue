@@ -177,6 +177,7 @@ const chainPills = computed<ChainPill[]>(() => {
         pills.push({
             kind: 'tempSource',
             label: tempSourceLabel(source.device_uid, source.temp_name),
+            color: tempSourceColor(source.device_uid, source.temp_name),
             to:
                 custom != null
                     ? { name: 'device-custom-sensor', params: { customSensorID: source.temp_name } }
@@ -233,6 +234,8 @@ const functionByUID = (uid: string): { uid: string; name: string } | undefined =
 const tempSourceLabel = (deviceUID: string, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.name ??
     channelName
+const tempSourceColor = (deviceUID: string, channelName: string): string | undefined =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.color
 const customSensor = (deviceUID: string, channelName: string): CustomSensor | undefined =>
     deviceUID === customSensorsDeviceUID.value
         ? customSensorsByID.value.get(channelName)
