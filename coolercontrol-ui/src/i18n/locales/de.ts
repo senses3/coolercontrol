@@ -483,7 +483,7 @@ export default {
             chartType: 'Diagrammtyp',
             filterSensors: 'Sensoren filtern',
             mouseActions:
-                'Dashboard-Mausaktionen:\n- Markieren zum Zoomen.\n- Scrollen zum Zoomen.\n- Rechtsklick zum Schwenken im gezoomten Zustand.\n- Doppelklick zum Zurücksetzen und fortsetzen der Aktualisierung.\n- Strg+Klick oder Mausklick in der Mitte, um alle Sensoren im Tooltip anzuzeigen.',
+                'Dashboard-Mausaktionen:\n- Markieren zum Zoomen.\n- Strg+Scrollen zum Zoomen.\n- Rechtsklick zum Schwenken im gezoomten Zustand.\n- Doppelklick zum Zurücksetzen und fortsetzen der Aktualisierung.\n- Strg+Klick oder Mausklick in der Mitte, um alle Sensoren im Tooltip anzuzeigen.',
             fullPage: 'Vollseite',
             filterTags: 'Tags filtern',
             filterByTag: 'Nach Tag filtern',
@@ -516,10 +516,11 @@ export default {
             uiTour: 'UI-Tour',
             gettingStarted: 'Erste Schritte',
             helpSettingUp: 'Hilfe bei der Einrichtung der Lüftersteuerung',
-            gettingStartedStep1: 'Öffne Kühlung und wähle den Lüfter, den du steuern möchtest.',
+            gettingStartedStep1:
+                'Öffnen Sie Kühlung und wählen Sie den Lüfter, den Sie steuern möchten.',
             gettingStartedStep2:
-                'Wähle Geführte Einrichtung und dann Neues Profil, um die Lüfterkurve festzulegen.',
-            gettingStartedStep3: 'Verwende dieses Profil für beliebig viele Lüfter.',
+                'Wählen Sie Geführte Einrichtung und dann Neues Profil, um die Lüfterkurve festzulegen.',
+            gettingStartedStep3: 'Verwenden Sie dieses Profil für beliebig viele Lüfter.',
             gettingStartedAutoCreate:
                 'Mit {wizard} lassen sich grundlegende Profile für alle Ihre Lüfter auf einmal einrichten.',
             gettingStartedAutoCreateLink: 'Profile automatisch erstellen',
@@ -640,7 +641,7 @@ export default {
             function: 'Funktion',
             functionToApply: 'Anzuwendende Funktion',
             graphProfileMouseActions:
-                'Grafikprofil Mausaktionen:\n- Scrollen zum Zoomen.\n- Linksklick auf Linie um Punkt hinzuzufügen.\n- Rechtsklick auf Punkt zum Entfernen.\n- Punkt ziehen zum Verschieben.',
+                'Grafikprofil Mausaktionen:\n- Strg+Scrollen zum Zoomen.\n- Linksklick auf Linie um Punkt hinzuzufügen.\n- Rechtsklick auf Punkt zum Entfernen.\n- Punkt ziehen zum Verschieben.',
             unsavedChanges: 'Es gibt ungespeicherte Änderungen an diesem Profil.',
             unsavedChangesHeader: 'Ungespeicherte Änderungen',
             newProfile: 'Neues Profil',
@@ -871,8 +872,8 @@ export default {
         onboarding: {
             welcome: 'Willkommen bei CoolerControl!',
             gettingStartedIntro:
-                'Wählen Sie eine Tour, um sich einen Überblick zu verschaffen. Die schnelle Tour deckt die Grundlagen in wenigen Schritten ab. Die ausführliche Tour führt Sie durch jedes Menü und jede Schaltfläche.',
-            startTourAgain: 'Du kannst diese Tour jederzeit über die Seite Start erneut starten.',
+                'Machen Sie eine kurze Tour, um sich zu orientieren. Sie führt durch die Navigationsleiste und die wichtigsten Bereiche der Anwendung.',
+            startTourAgain: 'Sie können diese Tour jederzeit über die Seite Start erneut starten.',
             startTour: 'Tour starten',
             maybeLater: 'Vielleicht später',
             openGettingStarted: 'Erste-Schritte-Dokumentation öffnen',
@@ -897,12 +898,12 @@ export default {
                 'Konfigurieren Sie UI-Einstellungen, Daemon-Optionen und Systemverhalten.',
             access: 'Zugriff',
             accessDesc:
-                'Verwalten Sie Ihr Passwort und bestätigen Sie Ihre aktuelle Zugriffsebene.',
+                'Melden Sie sich an oder ab und ändern Sie Ihr Passwort. Hier verwalten Sie auch Zugriffstoken, die Werkzeugen und Plugins API-Zugriff gewähren.',
             restartMenu: 'Neustart-Menü',
             restartMenuDesc: 'UI neu laden oder Systemdaemon bei Bedarf neu starten.',
             modes: 'Modi',
             modesDesc:
-                'Modi sind gespeicherte Sammlungen Ihrer Einstellungen. Wechseln Sie mit einem Klick zwischen Konfigurationen wie Leise und Leistung.',
+                'Modi sind gespeicherte Sammlungen Ihrer Einstellungen. Wechseln Sie hier zwischen Konfigurationen wie Leise und Leistung oder verwalten Sie sie.',
             thatsIt: "Das war's!",
             startNow:
                 'Sie sind startklar. Öffnen Sie die Erste-Schritte-Dokumentation, um mehr zu erfahren, oder legen Sie los und konfigurieren Sie Ihre Geräte.',

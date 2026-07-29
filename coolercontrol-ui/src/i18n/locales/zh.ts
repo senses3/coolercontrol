@@ -459,7 +459,7 @@ export default {
             chartType: '图表类型',
             filterSensors: '筛选传感器',
             mouseActions:
-                '仪表盘鼠标操作:\n- 高亮选择以缩放.\n- 滚动以缩放.\n- 右键单击以平移.\n- 双击以重置并继续更新.\n- Ctrl+单击或中键单击以在工具提示中显示所有传感器.',
+                '仪表盘鼠标操作:\n- 高亮选择以缩放.\n- Ctrl+滚动以缩放.\n- 右键单击以平移.\n- 双击以重置并继续更新.\n- Ctrl+单击或中键单击以在工具提示中显示所有传感器.',
             fullPage: '全屏模式',
             filterTags: '筛选标签',
             filterByTag: '按标签筛选',
@@ -608,7 +608,7 @@ export default {
             function: '功能',
             functionToApply: '要应用的功能',
             graphProfileMouseActions:
-                '图表配置文件鼠标操作：\n- 滚动以缩放。\n- 左键点击线条添加点。\n- 右键点击点以移除。\n- 拖动点以移动。',
+                '图表配置文件鼠标操作：\n- Ctrl+滚动以缩放。\n- 左键点击线条添加点。\n- 右键点击点以移除。\n- 拖动点以移动。',
             unsavedChanges: '此配置文件有未保存的更改。',
             unsavedChangesHeader: '未保存的更改',
             newProfile: '新配置文件',
@@ -826,8 +826,7 @@ export default {
         },
         onboarding: {
             welcome: '欢迎使用CoolerControl！',
-            gettingStartedIntro:
-                '选择一个导览来熟悉应用。快速导览用几步介绍核心功能，详细导览会引导您了解每个菜单和按钮。',
+            gettingStartedIntro: '通过快速导览来熟悉应用。它会介绍导航栏和应用的主要区域。',
             startTourAgain: '您可以随时从主页重新启动此导览。',
             startTour: '开始导览',
             maybeLater: '稍后',
@@ -848,11 +847,11 @@ export default {
             settings: '设置',
             settingsDesc: '配置界面偏好、后台服务选项和系统行为。',
             access: '访问',
-            accessDesc: '管理您的密码并确认当前的访问级别。',
+            accessDesc: '登录或退出、修改密码，并管理为工具和插件授予 API 访问权限的访问令牌。',
             restartMenu: '重启菜单',
             restartMenuDesc: '需要时重新加载界面或重启系统后台服务。',
             modes: '模式',
-            modesDesc: '模式是您设置的保存集合。一键在静音和性能等配置之间切换。',
+            modesDesc: '模式是您设置的保存集合。在这里切换静音和性能等配置，或对其进行管理。',
             thatsIt: '就是这样！',
             startNow: '一切就绪。打开入门文档了解更多，或直接开始配置您的设备。',
         },

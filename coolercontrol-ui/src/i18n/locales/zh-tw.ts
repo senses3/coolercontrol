@@ -460,7 +460,7 @@ export default {
             chartType: '圖表類型',
             filterSensors: '篩選傳感器',
             mouseActions:
-                '儀表板滑鼠操作：\n- 選取區域以縮放。\n- 滾動以縮放。\n- 縮放時按右鍵拖曳。\n- 雙擊重置並繼續更新。\n- Ctrl+點擊或中鍵點擊在提示框中顯示所有感應器。',
+                '儀表板滑鼠操作：\n- 選取區域以縮放。\n- Ctrl+滾動以縮放。\n- 縮放時按右鍵拖曳。\n- 雙擊重置並繼續更新。\n- Ctrl+點擊或中鍵點擊在提示框中顯示所有感應器。',
             fullPage: '全屏模式',
             filterTags: '篩選標籤',
             filterByTag: '按標籤篩選',
@@ -609,7 +609,7 @@ export default {
             function: '功能',
             functionToApply: '要套用的功能',
             graphProfileMouseActions:
-                '圖表設定檔滑鼠操作：\n- 捲動以縮放。\n- 左鍵點擊線條新增點。\n- 右鍵點擊點以移除。\n- 拖動點以移動。',
+                '圖表設定檔滑鼠操作：\n- Ctrl+捲動以縮放。\n- 左鍵點擊線條新增點。\n- 右鍵點擊點以移除。\n- 拖動點以移動。',
             unsavedChanges: '此設定檔有未儲存的變更。',
             unsavedChangesHeader: '未儲存的變更',
             newProfile: '新設定檔',
@@ -827,8 +827,7 @@ export default {
         },
         onboarding: {
             welcome: '歡迎使用CoolerControl！',
-            gettingStartedIntro:
-                '選擇一個導覽來熟悉應用。快速導覽用幾個步驟介紹核心功能，詳細導覽會引導您了解每個選單和按鈕。',
+            gettingStartedIntro: '透過快速導覽來熟悉應用。它會介紹導覽列和應用的主要區域。',
             startTourAgain: '您可以隨時從首頁重新啟動此導覽。',
             startTour: '開始導覽',
             maybeLater: '稍後',
@@ -849,11 +848,11 @@ export default {
             settings: '設置',
             settingsDesc: '設定介面偏好、後台服務選項和系統行為。',
             access: '存取',
-            accessDesc: '管理您的密碼並確認目前的存取等級。',
+            accessDesc: '登入或登出、變更密碼，並管理為工具和外掛授予 API 存取權限的存取權杖。',
             restartMenu: '重啟選單',
             restartMenuDesc: '需要時重新載入介面或重啟系統後台服務。',
             modes: '模式',
-            modesDesc: '模式是您設定的儲存集合。一鍵在靜音和效能等配置之間切換。',
+            modesDesc: '模式是您設定的儲存集合。在這裡切換靜音和效能等配置，或進行管理。',
             thatsIt: '就是這樣！',
             startNow: '一切就緒。開啟入門文件了解更多，或直接開始配置您的設備。',
         },

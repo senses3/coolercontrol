@@ -488,7 +488,7 @@ export default {
             chartType: 'Type de Graphique',
             filterSensors: 'Filtrer les Capteurs',
             mouseActions:
-                "Actions de la souris sur le tableau de bord :\n- Mettre en surbrillance la sélection pour zoomer.\n- Faire défiler pour zoomer.\n- Cliquer avec le bouton droit pour faire glisser lorsque zoomé.\n- Double-cliquer pour réinitialiser et reprendre la mise à jour.\n- Ctrl+cliquer ou cliquer avec le bouton du milieu pour afficher tous les capteurs dans l'info-bulle.",
+                "Actions de la souris sur le tableau de bord :\n- Mettre en surbrillance la sélection pour zoomer.\n- Ctrl+Défilement pour zoomer.\n- Cliquer avec le bouton droit pour faire glisser lorsque zoomé.\n- Double-cliquer pour réinitialiser et reprendre la mise à jour.\n- Ctrl+cliquer ou cliquer avec le bouton du milieu pour afficher tous les capteurs dans l'info-bulle.",
             fullPage: 'Pleine Page',
             filterTags: 'Filtrer les Tags',
             filterByTag: 'Filtrer par Tag',
@@ -646,7 +646,7 @@ export default {
             function: 'Fonction',
             functionToApply: 'Fonction à appliquer',
             graphProfileMouseActions:
-                'Actions de la souris pour le profil graphique :\n- Défilement pour zoomer.\n- Clic gauche sur la ligne pour ajouter un point.\n- Clic droit sur un point pour le supprimer.\n- Glisser-déposer pour déplacer un point.',
+                'Actions de la souris pour le profil graphique :\n- Ctrl+Défilement pour zoomer.\n- Clic gauche sur la ligne pour ajouter un point.\n- Clic droit sur un point pour le supprimer.\n- Glisser-déposer pour déplacer un point.',
             unsavedChanges: 'Des modifications non enregistrées ont été apportées à ce profil.',
             unsavedChangesHeader: 'Modifications non enregistrées',
             newProfile: 'Nouveau profil',
@@ -876,7 +876,7 @@ export default {
         onboarding: {
             welcome: 'Bienvenue dans CoolerControl !',
             gettingStartedIntro:
-                "Choisissez une visite pour vous orienter. La Visite Rapide couvre l'essentiel en quelques étapes. La Visite Complète vous guide à travers chaque menu et chaque bouton.",
+                "Faites une visite rapide pour vous orienter. Elle parcourt la barre de navigation et les principales zones de l'application.",
             startTourAgain:
                 'Vous pouvez relancer cette visite à tout moment depuis la page Accueil.',
             startTour: 'Démarrer la visite',
@@ -901,12 +901,13 @@ export default {
             settingsDesc:
                 "Configurez les préférences de l'interface, les options du daemon et le comportement du système.",
             access: 'Accès',
-            accessDesc: "Gérez votre mot de passe et confirmez votre niveau d'accès actuel.",
+            accessDesc:
+                "Connectez-vous ou déconnectez-vous, changez votre mot de passe et gérez les Jetons d'accès qui donnent aux outils et plugins l'accès à l'API.",
             restartMenu: 'Menu de Redémarrage',
             restartMenuDesc: "Rechargez l'interface ou redémarrez le daemon système si nécessaire.",
             modes: 'Modes',
             modesDesc:
-                'Les Modes sont des collections enregistrées de vos paramètres. Basculez entre des configurations comme Silencieux et Performance en un clic.',
+                'Les Modes sont des collections enregistrées de vos paramètres. Basculez ici entre des configurations comme Silencieux et Performance, ou gérez-les.',
             thatsIt: "C'est tout !",
             startNow:
                 'Vous êtes prêt. Ouvrez la documentation pour en savoir plus, ou lancez-vous et configurez vos appareils.',
