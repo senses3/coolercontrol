@@ -309,13 +309,13 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         >
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
-                                class="tabular-nums text-text-color"
+                                class="font-numeric tabular-nums text-text-color"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
                             </span>
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                                class="text-sm tabular-nums text-text-color-secondary"
+                                class="text-sm font-numeric tabular-nums text-text-color-secondary"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
                             </span>
@@ -443,13 +443,13 @@ const isProfileUnhealthy = (profileUID: string): boolean =>
                         >
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
-                                class="tabular-nums text-text-color"
+                                class="font-numeric tabular-nums text-text-color"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
                             </span>
                             <span
                                 v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                                class="text-sm tabular-nums text-text-color-secondary"
+                                class="text-sm font-numeric tabular-nums text-text-color-secondary"
                             >
                                 {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
                             </span>

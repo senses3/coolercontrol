@@ -284,7 +284,7 @@ const createAlert = (row: PinnedRow): void => {
                         </span>
                         <span
                             v-if="row.value"
-                            class="ml-auto whitespace-nowrap tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
+                            class="ml-auto whitespace-nowrap font-numeric tabular-nums text-text-color group-hover:hidden group-has-[:focus-visible]:hidden"
                             :class="{ '!hidden': openTagRow === row.key }"
                         >
                             {{ row.value }}

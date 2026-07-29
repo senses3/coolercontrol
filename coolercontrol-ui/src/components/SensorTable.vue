@@ -471,7 +471,10 @@ onBeforeUnmount(() => {
                                 <span v-if="row.count === 0" class="text-text-color-secondary"
                                     >—</span
                                 >
-                                <span v-else class="inline-flex items-baseline tabular-nums">
+                                <span
+                                    v-else
+                                    class="inline-flex items-baseline font-numeric tabular-nums"
+                                >
                                     <span class="text-right min-w-[3rem]">{{
                                         format(row.min, row.dataType)
                                     }}</span>

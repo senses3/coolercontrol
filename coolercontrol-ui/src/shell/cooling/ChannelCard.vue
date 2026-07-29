@@ -201,12 +201,12 @@ const failsafeTooltip = computed((): string => {
         </div>
         <div class="flex items-end justify-between gap-2">
             <div>
-                <span class="text-2xl font-semibold tabular-nums text-text-color">
+                <span class="text-2xl font-semibold font-numeric tabular-nums text-text-color">
                     {{ liveDuty != null ? `${liveDuty}%` : '--' }}
                 </span>
                 <span
                     v-if="liveRpm != null"
-                    class="ml-2 text-sm tabular-nums text-text-color-secondary"
+                    class="ml-2 text-sm font-numeric tabular-nums text-text-color-secondary"
                 >
                     {{ liveRpm }} rpm
                 </span>

@@ -384,12 +384,12 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 </div>
             </div>
             <div class="ml-auto flex items-center gap-3">
-                <span class="text-2xl font-semibold tabular-nums text-text-color">
+                <span class="text-2xl font-semibold font-numeric tabular-nums text-text-color">
                     {{ liveDuty != null ? `${liveDuty}%` : '--' }}
                 </span>
                 <span
                     v-if="liveRpm != null"
-                    class="text-base tabular-nums text-text-color-secondary"
+                    class="text-base font-numeric tabular-nums text-text-color-secondary"
                 >
                     {{ liveRpm }} rpm
                 </span>
