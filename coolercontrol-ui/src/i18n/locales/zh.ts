@@ -887,10 +887,13 @@ export default {
         wizards: {
             calibration: {
                 title: '校准风扇',
-                pickIntro: '选择要校准的风扇。已校准的风扇默认不勾选。',
+                pickIntro: '选择要校准的风扇。已校准的风扇和固件控制的风扇默认不勾选。',
                 noFans: '未检测到可控制的风扇。',
                 selectAll: '全选',
                 calibratedBadge: '已校准',
+                firmwareControlledBadge: '固件控制',
+                firmwareControlledDesc:
+                    '此通道的配置文件由固件执行。校准仍然生效：其占空比映射会写入交给固件的曲线。启动冲量不会，因为固件曲线无法表达它。',
                 blockedByAlert: "已阻止：警报 '{name}' 处于触发状态",
                 alertsPausedNote: '{count} 个警报监视所选风扇，在每个风扇扫掠期间将暂停。',
                 idleNote:
@@ -1001,7 +1004,7 @@ export default {
             title: '设备通道设置',
             firmwareControlledProfile: '固件控制的配置文件',
             firmwareControlledProfileDesc:
-                '启用后，设备固件将管理风扇配置文件。\n适用于对软件频繁调速反应不佳的硬件。\n仅适用于使用设备内置温度传感器的图表配置文件。\n函数设置不适用。',
+                '启用后，设备固件将管理风扇配置文件。\n适用于对软件频繁调速反应不佳的硬件。\n仅适用于使用设备内置温度传感器的图表配置文件。\n函数设置不适用。\n对于已校准的通道，曲线各点会经过校准换算，但启动冲量不适用。',
             saveError: '保存通道扩展设置失败',
             firmwareControlDisabled:
                 '当前设置无法使用固件控制。\n请为此设备使用带有受支持内置温度传感器的图表配置文件。',

@@ -33,7 +33,7 @@ use strum::{Display, EnumString};
 use tokio::sync::{Semaphore, SemaphorePermit};
 
 use crate::config::Config;
-use crate::device::{DeviceType, UID};
+use crate::device::{DeviceType, Duty, UID};
 use crate::repositories::failsafe::MISSING_STATUS_THRESHOLD;
 use crate::repositories::gpu::amd::{GpuAMD, TEMP_FOR_FAN_CURVE};
 use crate::repositories::gpu::nvidia::{GpuNVidia, NvmlInitResult, StatusNvidiaDeviceSMI};
@@ -562,6 +562,13 @@ impl Repository for GpuRepo {
 
     async fn reinitialize_devices(&self) {
         error!("Reinitializing Devices is not supported for this Repository");
+    }
+
+    /// RDNA3/4 cards clamp non-zero duty into the PMFW speed range, and
+    /// with Zero RPM present `SpeedOptions::min_duty` reports 0, so the
+    /// floor is invisible without this.
+    fn duty_floor(&self, device_uid: &UID, _channel_name: &str) -> Duty {
+        self.gpus_amd.pmfw_duty_floor(device_uid).unwrap_or(0)
     }
 }
 

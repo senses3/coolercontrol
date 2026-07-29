@@ -33,8 +33,8 @@ use crate::calibration::{
 };
 use crate::config::Config;
 use crate::device::{
-    ChannelExtensionNames, ChannelName, ChannelStatus, DeviceType, DeviceUID, Duty, Status,
-    TempStatus, RPM, UID,
+    ChannelExtensionNames, ChannelInfo, ChannelName, ChannelStatus, DeviceType, DeviceUID, Duty,
+    Status, TempStatus, RPM, UID,
 };
 use crate::engine::commanders::graph::GraphProfileCommander;
 use crate::engine::commanders::lcd::{LcdCommander, DEFAULT_LCD_SHUTDOWN_IMAGE};
@@ -355,15 +355,25 @@ impl Engine {
             && &temp_source.device_uid == device_uid
             && hw_curve_enabled
         {
+            let key: ChannelKey = (device_uid.clone(), channel_name.to_string());
+            // The firmware owns the channel now, so the dispatcher's
+            // kick/sustain state for it is stale.
+            self.fan_state_map.forget(&key);
+            let speed_profile = profile.speed_profile().unwrap();
+            // A calibrated channel's curve is drawn in true-duty, which the
+            // firmware cannot interpret. Functions are time-domain and can't
+            // be baked into a static curve, but this mapping is point-wise.
+            let mapped_profile = self.calibration_store.map_curve_points(&key, speed_profile);
             info!(
-                "Applying | hardware internal profile:: {}",
-                self.log_device_channel(device_uid, channel_name)
+                "Applying | hardware internal profile:: {} | calibration mapped: {}",
+                self.log_device_channel(device_uid, channel_name),
+                mapped_profile.is_some()
             );
             repo.apply_setting_speed_profile(
                 device_uid,
                 channel_name,
                 temp_source,
-                profile.speed_profile().unwrap(),
+                mapped_profile.as_deref().unwrap_or(speed_profile),
             )
             .await
         } else if speed_options.fixed_enabled {
@@ -2128,6 +2138,29 @@ impl DiagnosisHost for Engine {
             .ok_or_else(|| anyhow!("no repository for device type {device_type:?}"))?;
         repo.apply_setting_speed_fixed(device_uid, channel_name, duty)
             .await
+    }
+
+    fn duty_floor(&self, device_uid: &UID, channel_name: &str) -> Duty {
+        let Some(device_lock) = self.all_devices.get(device_uid) else {
+            return 0;
+        };
+        let (device_type, info_floor) = {
+            let device = device_lock.borrow();
+            // The raw `min_duty`, not the calibration-widened effective
+            // one: a Smooth calibration reports 0 there by design.
+            let info_floor = device
+                .info
+                .channels
+                .get(channel_name)
+                .and_then(ChannelInfo::speed_options)
+                .map_or(0, |options| options.min_duty);
+            (device.d_type, info_floor)
+        };
+        let repo_floor = self
+            .repos
+            .get(&device_type)
+            .map_or(0, |repo| repo.duty_floor(device_uid, channel_name));
+        info_floor.max(repo_floor).min(100)
     }
 
     async fn hottest_temp(&self, limit_celsius: f64) -> HottestTemp {

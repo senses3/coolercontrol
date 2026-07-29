@@ -19,7 +19,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::device::{DeviceType, UID};
+use crate::device::{DeviceType, Duty, UID};
 use crate::device_health::FailsafeRef;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use crate::Device;
@@ -119,6 +119,16 @@ pub trait Repository {
     /// override this.
     fn failsafing(&self) -> Vec<FailsafeRef> {
         Vec::new()
+    }
+
+    /// Lowest non-zero duty an `apply_setting_speed_fixed` write can
+    /// actually reach on this channel. Anything in `1..floor` is clamped
+    /// up by the driver, so a calibration sweep of that band measures
+    /// one operating point repeatedly. `0` means no clamping beyond what
+    /// `SpeedOptions::min_duty` already reports; only repositories that
+    /// clamp behind the daemon's back override this.
+    fn duty_floor(&self, _device_uid: &UID, _channel_name: &str) -> Duty {
+        0
     }
 }
 
