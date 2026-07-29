@@ -241,6 +241,7 @@ export default {
             selectLanguage: 'اختر اللغة',
             fullScreen: 'ملء الشاشة',
             eyeCandy: 'تأثيرات بصرية',
+            interfaceFont: 'خط الواجهة',
             introduction: 'مقدمة',
             startTour: 'بدء الجولة',
             timeFormat: 'تنسيق الوقت',
@@ -303,6 +304,8 @@ export default {
                 startupPage: 'الصفحة المعروضة بعد تحميل التطبيق.',
                 eyeCandy:
                     'تمكين الرسوم المتحركة المرئية مثل أيقونات المراوح الدوارة.\nسيستخدم هذا بعض موارد وحدة معالجة الرسومات الإضافية.',
+                interfaceFont:
+                    'استخدام الخطوط المرفقة مع CoolerControl أو الخطوط المُعدة على نظامك.',
                 fullScreen: 'تبديل وضع ملء الشاشة',
                 lineThickness: 'ضبط سمك خط الرسوم البيانية على لوحة المعلومات',
                 startInTray:
@@ -1309,6 +1312,10 @@ export default {
             highContrastDark: 'داكن عالي التباين',
             highContrastLight: 'فاتح عالي التباين',
             custom: 'سمة مخصصة',
+        },
+        interfaceFont: {
+            bundled: 'مرفق (IBM Plex)',
+            system: 'النظام',
         },
         channelViewType: {
             control: 'تحكم',

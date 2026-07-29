@@ -244,6 +244,7 @@ export default {
             selectLanguage: 'Seleccionar idioma',
             fullScreen: 'Pantalla completa',
             eyeCandy: 'Efectos visuales',
+            interfaceFont: 'Fuente de la interfaz',
             introduction: 'Introducción',
             startTour: 'Iniciar tour',
             timeFormat: 'Formato de hora',
@@ -306,6 +307,8 @@ export default {
                 startupPage: 'La página que se muestra después de cargar la aplicación.',
                 eyeCandy:
                     'Habilitar animaciones visuales como iconos de ventiladores giratorios.\nEsto utilizará algunos recursos adicionales de la GPU.',
+                interfaceFont:
+                    'Usar las fuentes incluidas con CoolerControl o las configuradas en su sistema.',
                 fullScreen: 'Alternar el modo de pantalla completa',
                 lineThickness: 'Ajustar el grosor de las líneas de los gráficos en el panel',
                 startInTray:
@@ -1337,6 +1340,10 @@ export default {
             highContrastDark: 'Oscuro de Alto Contraste',
             highContrastLight: 'Claro de Alto Contraste',
             custom: 'Tema Personalizado',
+        },
+        interfaceFont: {
+            bundled: 'Incluida (IBM Plex)',
+            system: 'Sistema',
         },
         channelViewType: {
             control: 'Control',

@@ -99,6 +99,23 @@ export const defaultCustomTheme: CustomThemeSettings = {
     info: '86 138 242', //'#568af2'
 }
 
+/**
+ * Which fonts the interface uses. `System` hands both the label and the value
+ * role back to the user's own fonts, which is the only font preference a Qt app
+ * user can express: QtWebEngine has no override UI.
+ */
+export enum InterfaceFont {
+    BUNDLED = 'bundled',
+    SYSTEM = 'system',
+}
+
+export function getInterfaceFontDisplayName(font: InterfaceFont): string {
+    const { t } = i18n.global
+    return font === InterfaceFont.SYSTEM
+        ? t('models.interfaceFont.system')
+        : t('models.interfaceFont.bundled')
+}
+
 export enum ChannelViewType {
     Control = 'Control',
     Dashboard = 'Dashboard',
@@ -239,6 +256,7 @@ export class UISettingsDTO {
     customTheme: CustomThemeSettings = { ...defaultCustomTheme }
     entityColors: Array<[string, string]> = []
     eyeCandy: boolean = false
+    interfaceFont: InterfaceFont = InterfaceFont.BUNDLED
     // The tour version the user has completed; below ONBOARDING_TOUR_VERSION
     // means it runs again. Legacy configs hold a boolean here, which coerces
     // to 0 (dismissed) or 1 (never run) and so replays the reworked tour once.

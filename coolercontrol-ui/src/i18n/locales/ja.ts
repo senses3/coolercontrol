@@ -241,6 +241,7 @@ export default {
             selectLanguage: '言語を選択',
             fullScreen: '全画面表示',
             eyeCandy: '視覚効果',
+            interfaceFont: 'インターフェースのフォント',
             introduction: '紹介',
             startTour: 'ツアーを開始',
             timeFormat: '時間形式',
@@ -303,6 +304,8 @@ export default {
                 startupPage: 'アプリケーション読み込み後に表示されるページ。',
                 eyeCandy:
                     '回転するファンアイコンなどのビジュアルアニメーションを有効にします。\nこれにより追加のGPUリソースが使用されます。',
+                interfaceFont:
+                    'CoolerControl に同梱されたフォント、またはシステムに設定されたフォントを使用します。',
                 fullScreen: '全画面モードを切り替えます',
                 lineThickness: 'ダッシュボード上のチャートの線の太さを調整します',
                 startInTray:
@@ -1322,6 +1325,10 @@ export default {
             highContrastDark: 'ハイコントラストダーク',
             highContrastLight: 'ハイコントラストライト',
             custom: 'カスタムテーマ',
+        },
+        interfaceFont: {
+            bundled: '同梱 (IBM Plex)',
+            system: 'システム',
         },
         channelViewType: {
             control: '制御',

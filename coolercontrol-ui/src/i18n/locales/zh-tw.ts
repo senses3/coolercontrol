@@ -236,6 +236,7 @@ export default {
             selectLanguage: '選擇語言',
             fullScreen: '全屏',
             eyeCandy: '視覺效果',
+            interfaceFont: '介面字型',
             introduction: '引導教程',
             startTour: '開始教程',
             timeFormat: '時間格式',
@@ -297,6 +298,7 @@ export default {
                 frequencyPrecision: '調整顯示頻率值的精確度。',
                 startupPage: '應用程式載入後顯示的頁面。',
                 eyeCandy: '啟用視覺動畫，例如旋轉的風扇圖示。\n這將使用一些額外的 GPU 資源。',
+                interfaceFont: '使用 CoolerControl 隨附的字型，或系統中設定的字型。',
                 fullScreen: '切換全螢幕模式',
                 lineThickness: '調整儀表板上圖表的線條粗細',
                 startInTray: '啟動時，主UI視窗將隱藏，僅\n系統匣圖示可見。',
@@ -1272,6 +1274,10 @@ export default {
             highContrastDark: '高對比度深色',
             highContrastLight: '高對比度淺色',
             custom: '自定義主題',
+        },
+        interfaceFont: {
+            bundled: '內建 (IBM Plex)',
+            system: '系統',
         },
         channelViewType: {
             control: '控制',

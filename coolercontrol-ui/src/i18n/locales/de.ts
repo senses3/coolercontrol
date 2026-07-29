@@ -246,6 +246,7 @@ export default {
             selectLanguage: 'Sprache auswählen',
             fullScreen: 'Vollbild',
             eyeCandy: 'Augenschmaus',
+            interfaceFont: 'Schriftart der Oberfläche',
             introduction: 'Einführung',
             startTour: 'Tour starten',
             timeFormat: 'Zeitformat',
@@ -309,6 +310,8 @@ export default {
                 startupPage: 'Die Seite, die nach dem Laden der Anwendung angezeigt wird.',
                 eyeCandy:
                     'Visuelle Animationen wie drehende Lüftersymbole aktivieren.\nDies beansprucht zusätzliche GPU-Ressourcen.',
+                interfaceFont:
+                    'Die mit CoolerControl gelieferten Schriftarten verwenden oder die auf Ihrem System konfigurierten.',
                 fullScreen: 'Schaltet den Vollbildmodus ein oder aus',
                 lineThickness: 'Passen Sie die Linienstärke der Diagramme im Dashboard an',
                 startInTray:
@@ -1346,6 +1349,10 @@ export default {
             highContrastDark: 'Hoher Kontrast Dunkel',
             highContrastLight: 'Hoher Kontrast Hell',
             custom: 'Benutzerdefiniertes Theme',
+        },
+        interfaceFont: {
+            bundled: 'Mitgeliefert (IBM Plex)',
+            system: 'System',
         },
         channelViewType: {
             control: 'Steuerung',

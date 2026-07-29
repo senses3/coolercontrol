@@ -241,6 +241,7 @@ export default {
             selectLanguage: '언어 선택',
             fullScreen: '전체 화면',
             eyeCandy: '시각 효과',
+            interfaceFont: '인터페이스 글꼴',
             introduction: '소개',
             startTour: '투어 시작',
             timeFormat: '시간 형식',
@@ -303,6 +304,8 @@ export default {
                 startupPage: '애플리케이션 로드 후 표시되는 페이지입니다.',
                 eyeCandy:
                     '회전하는 팬 아이콘과 같은 시각적 애니메이션을 활성화합니다.\n이 기능은 추가적인 GPU 리소스를 사용합니다.',
+                interfaceFont:
+                    'CoolerControl에 포함된 글꼴 또는 시스템에 설정된 글꼴을 사용합니다.',
                 fullScreen: '전체 화면 모드 전환',
                 lineThickness: '대시보드의 차트 선 굵기를 조정',
                 startInTray:
@@ -1309,6 +1312,10 @@ export default {
             highContrastDark: '고대비 어두움',
             highContrastLight: '고대비 밝음',
             custom: '커스텀 테마',
+        },
+        interfaceFont: {
+            bundled: '포함됨 (IBM Plex)',
+            system: '시스템',
         },
         channelViewType: {
             control: '제어',

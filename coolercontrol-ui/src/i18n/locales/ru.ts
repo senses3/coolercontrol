@@ -244,6 +244,7 @@ export default {
             selectLanguage: 'Выбрать язык',
             fullScreen: 'Полный экран',
             eyeCandy: 'Визуальные эффекты',
+            interfaceFont: 'Шрифт интерфейса',
             introduction: 'Введение',
             startTour: 'Начать тур',
             timeFormat: 'Формат времени',
@@ -306,6 +307,8 @@ export default {
                 startupPage: 'Страница, отображаемая после загрузки приложения.',
                 eyeCandy:
                     'Включить визуальные анимации, такие как вращающиеся значки вентиляторов.\nЭто потребует дополнительных ресурсов GPU.',
+                interfaceFont:
+                    'Использовать шрифты, поставляемые с CoolerControl, или шрифты, настроенные в системе.',
                 fullScreen: 'Переключить полноэкранный режим',
                 lineThickness: 'Настроить толщину линий на графиках на панели управления',
                 startInTray:
@@ -1338,6 +1341,10 @@ export default {
             highContrastDark: 'Тёмная с высоким контрастом',
             highContrastLight: 'Светлая с высоким контрастом',
             custom: 'Пользовательская тема',
+        },
+        interfaceFont: {
+            bundled: 'Встроенный (IBM Plex)',
+            system: 'Системный',
         },
         channelViewType: {
             control: 'Управление',

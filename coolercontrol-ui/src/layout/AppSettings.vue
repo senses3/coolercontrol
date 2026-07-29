@@ -49,7 +49,9 @@ import {
     BUILT_IN_THEME_MODES,
     CustomThemeSettings,
     defaultCustomTheme,
+    getInterfaceFontDisplayName,
     getThemeModeDisplayName,
+    InterfaceFont,
     StartupPage,
     ThemeMode,
 } from '@/models/UISettings.ts'
@@ -322,6 +324,21 @@ const frequencyGhz = computed({
     get: () => settingsStore.frequencyPrecision === 1000,
     set: (value: boolean) => (settingsStore.frequencyPrecision = value ? 1000 : 1),
 })
+// Applied immediately rather than on restart: the switch is the preview.
+const interfaceFont = computed({
+    get: () => settingsStore.interfaceFont,
+    set: (value: InterfaceFont) => {
+        settingsStore.interfaceFont = value
+        settingsStore.applyInterfaceFont()
+    },
+})
+const interfaceFontOptions = computed<UiSelectOption[]>(() =>
+    [InterfaceFont.BUNDLED, InterfaceFont.SYSTEM].map((font) => ({
+        label: getInterfaceFontDisplayName(font),
+        value: font,
+    })),
+)
+
 const liquidctlInit = computed({
     get: () => !settingsStore.ccSettings.no_init,
     set: (value: boolean) => (settingsStore.ccSettings.no_init = !value),
@@ -660,6 +677,16 @@ onUnmounted(() => {
                     :label="t('layout.settings.eyeCandy')"
                 >
                     <UiSwitch v-model="settingsStore.eyeCandy" />
+                </UiSettingRow>
+                <UiSettingRow
+                    v-tooltip.top="t('layout.settings.tooltips.interfaceFont')"
+                    :label="t('layout.settings.interfaceFont')"
+                >
+                    <UiSelect
+                        v-model="interfaceFont"
+                        :options="interfaceFontOptions"
+                        class="w-44"
+                    />
                 </UiSettingRow>
             </UiSettingsCard>
             <UiSettingsCard
