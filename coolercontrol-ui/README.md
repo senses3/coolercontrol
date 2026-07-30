@@ -76,6 +76,25 @@ make dev
 - `npm-run-all2` replaces the unmaintained `npm-run-all`, which held `minimatch` 3 and with it the
   same vulnerable `brace-expansion`. Same `run-s` and `run-p` binaries, no script changes.
 
+## Dependency Install Scripts
+
+npm 12 blocks dependency install scripts unless the package is listed in the `allowScripts` field of
+`package.json`. Builders on npm 10 (Ubuntu 22.04) never see this; newer ones warn on every `npm ci`,
+and would fail outright under `--strict-allow-scripts`. All three packages that reach us are denied,
+because none of their scripts do anything this project needs:
+
+- `vue-demi` (via `reka-ui` and `@vueuse/*`) switches its entry files to the installed Vue major.
+  The published `lib/index.mjs`, `lib/index.cjs` and `lib/index.d.ts` are already byte-identical to
+  the `lib/v3/` variants, and we are on Vue 3, so the script rewrites those files with themselves.
+  Only `lib/index.iife.js` differs, and that is the `unpkg`/`jsdelivr` entry, which no bundler uses.
+- `@parcel/watcher` (via `sass`) compiles from source only when no prebuilt binary matches. The
+  lockfile carries all twelve prebuilt platform packages.
+- `core-js` (via `@vitejs/plugin-legacy`) prints a funding banner.
+
+`false` denials are silent rather than merely blocked, and cannot be swept back in by
+`npm install-scripts approve --all`. After dependency bumps, re-review with `npm install-scripts ls`
+and add new entries rather than approving blindly.
+
 ## Formatting
 
 CoolerControl uses [Trunk.io](https://github.com/trunk-io) to format all files for the entire
