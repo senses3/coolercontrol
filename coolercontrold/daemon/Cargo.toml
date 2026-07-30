@@ -110,12 +110,6 @@ aide = { version = "0.15.1", features = [
 # this needs to follow the aide version above (currently 0.9.0)
 schemars = { version = "=0.9.0", features = ["chrono04"] }
 mime = "0.3.17"
-# axum-typed-multipart 0.16.5 requires >=1.88
-axum_typed_multipart = "=0.16.4"
-# axum-typed-multipart-macros is a dependency of axum-typed-multipart that, if pinned, we should pin to the same version
-axum_typed_multipart_macros = "=0.16.4"
-# possible openApi improvement, but doesn't work for us currently:
-#aide-axum-typed-multipart-2 = "0.16.0"
 # TLS support: use ring as the rustls crypto provider (already pulled in by rcgen)
 # to avoid the aws-lc-rs/aws-lc-sys C dependency tree.
 axum-server = { version = "0.8.0", default-features = false, features = [

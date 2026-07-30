@@ -70,6 +70,7 @@ use aide::openapi::{ApiKeyLocation, Contact, License, OpenApi, SecurityScheme, T
 use aide::transform::TransformOpenApi;
 use aide::OperationOutput;
 use anyhow::{anyhow, Result};
+use axum::extract::multipart::MultipartError;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::header::{HeaderName, HeaderValue};
@@ -1207,6 +1208,14 @@ impl From<JsonRejection> for CCError {
     fn from(jr: JsonRejection) -> Self {
         CCError::UserError {
             msg: jr.body_text(),
+        }
+    }
+}
+
+impl From<MultipartError> for CCError {
+    fn from(err: MultipartError) -> Self {
+        CCError::UserError {
+            msg: format!("Invalid multipart form data: {err}"),
         }
     }
 }
