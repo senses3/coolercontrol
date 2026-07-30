@@ -16,11 +16,19 @@ CARGO_VER := $(if $(CARGO),$(shell $(CARGO) --version | awk '{print $$2}'))
 # `-c` not `-C`: BusyBox sort (Alpine) has no `-C`, and would fail into the tokio fallback.
 FEATURES := $(shell printf '1.88\n%s\n' "$(CARGO_VER)" | sort -V -c 2>/dev/null || echo --no-default-features)
 
-.PHONY: build test clippy ci-test dev-run vendor clean clean-app install uninstall
+.PHONY: build sync-app test clippy ci-test dev-run vendor clean clean-app install uninstall
+
+# Mirror the UI build into the embedded asset dir: include_dir! compiles the whole
+# directory in, so stale hashed assets must go first (the glob keeps .gitignore).
+# Skipped without dist/: vendored and source-tarball builds ship a prebuilt app dir.
+sync-app:
+	@if [ -d ../coolercontrol-ui/dist ]; then \
+		$(RM) -rf resources/app/*; \
+		cp -rf ../coolercontrol-ui/dist/* resources/app/; \
+	fi
 
 build: release += --release
-build:
-	@-cp -rf ../coolercontrol-ui/dist/* resources/app/
+build: sync-app
 	@$(CARGO) build --locked $(release) $(FEATURES)
 
 test: release += --release
@@ -43,7 +51,7 @@ ci-test:
 	@#$(CARGO) audit
 	@#$(CARGO) audit --json | jq '.settings.target_arch = null | .settings.target_os = null' | gitlab-report -p audit > gl-sast-report.json
     
-dev-run:
+dev-run: sync-app
 	@$(CARGO) build
 	@sudo ./target/debug/coolercontrold
 
