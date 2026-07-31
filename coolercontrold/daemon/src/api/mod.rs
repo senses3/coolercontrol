@@ -1345,7 +1345,7 @@ mod tests {
         let Ok(checked_in) = std::fs::read_to_string(SPEC_PATH) else {
             return; // Not a full checkout.
         };
-        let generated = serde_json::to_string(&openapi_spec()).expect("the spec serializes");
+        let generated = serde_json::to_string_pretty(&openapi_spec()).expect("the spec serializes");
         if checked_in.trim_end() == generated {
             return;
         }

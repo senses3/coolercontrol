@@ -576,7 +576,9 @@ enum SubCommands {
 /// no runtime of its own.
 fn handle_non_root_commands(args: &Args) -> Result<()> {
     if let Some(SubCommands::OpenApi) = &args.command {
-        println!("{}", serde_json::to_string(&api::openapi_spec())?);
+        // Pretty-printed: the file is checked in, so a merge request diff has to be
+        // readable. Whitespace compresses away to a couple of KB on the wire.
+        println!("{}", serde_json::to_string_pretty(&api::openapi_spec())?);
         exit_successfully();
     }
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {
