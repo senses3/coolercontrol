@@ -75,5 +75,10 @@
     ],
     "overrides": {
         "js-beautify": "^2.0.3"
+    },
+    "allowScripts": {
+        "core-js": false,
+        "@parcel/watcher": false,
+        "vue-demi": false
     }
 }
