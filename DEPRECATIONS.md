@@ -11,5 +11,5 @@ the removal checklist.
 
 | What                                                                                                          | Where                                           | Added | Remove |
 | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----- | ------ |
-| `lcd.colors` no-op field: 4.3.x requires it in config.toml and modes.json                                     | `daemon/src/setting.rs`, `daemon/src/config.rs` | 4.4.0 | 4.6.0  |
-| Alert `channel_source` single-source field: 4.3.x requires it in alerts.json; written as `channel_sources[0]` | `daemon/src/alerts.rs`                          | 4.4.0 | 4.6.0  |
+| `lcd.colors` no-op field: 4.3.x requires it in config.toml and modes.json                                     | `daemon/src/setting.rs`, `daemon/src/config.rs` | 5.0.0 | 5.2.0  |
+| Alert `channel_source` single-source field: 4.3.x requires it in alerts.json; written as `channel_sources[0]` | `daemon/src/alerts.rs`                          | 5.0.0 | 5.2.0  |
