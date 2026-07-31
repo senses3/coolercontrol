@@ -80,7 +80,6 @@ use axum::middleware;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json, Router, ServiceExt};
 use axum_server::tls_rustls::RustlsConfig;
-use derive_more::{Display, Error};
 use log::{debug, info, warn, Level};
 use moro_local::Scope;
 use schemars::JsonSchema;
@@ -92,6 +91,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower::Layer;
@@ -1104,32 +1104,32 @@ struct ErrorResponse {
     error: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Display, Error, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Error, Clone, JsonSchema)]
 pub enum CCError {
-    #[display("Internal Error: {msg}")]
+    #[error("Internal Error: {msg}")]
     InternalError { msg: String },
 
-    #[display("Error with external library: {msg}")]
+    #[error("Error with external library: {msg}")]
     ExternalError { msg: String },
 
-    #[display("Resource not found: {msg}")]
+    #[error("Resource not found: {msg}")]
     NotFound { msg: String },
 
-    #[display("Conflict: {msg}")]
+    #[error("Conflict: {msg}")]
     Conflict { msg: String },
 
-    #[display("{msg}")]
+    #[error("{msg}")]
     UserError { msg: String },
 
-    // #[display("Json serialization error: {}", _0.body_text())]
+    // #[error("Json serialization error: {}", .0.body_text())]
     // JsonRejection(JsonRejection),
-    #[display("{msg}")]
+    #[error("{msg}")]
     InvalidCredentials { msg: String },
 
-    #[display("{msg}")]
+    #[error("{msg}")]
     InsufficientScope { msg: String },
 
-    #[display("{msg}")]
+    #[error("{msg}")]
     TooManyAttempts { msg: String },
 }
 
