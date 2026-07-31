@@ -34,6 +34,7 @@ git add CHANGELOG.md \
     packaging/fedora/coolercontrold.spec \
     packaging/fedora/coolercontrol-rc1.spec \
     packaging/fedora/coolercontrold-rc1.spec \
-    packaging/debian/changelog
+    packaging/debian/changelog \
+    openapi/openapi.json
 git commit -S -m "Release ${RELEASE_VERSION}"
 git tag -s "$RELEASE_VERSION" -m "$RELEASE_VERSION"

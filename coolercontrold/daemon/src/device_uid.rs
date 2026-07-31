@@ -131,6 +131,19 @@ mod tests {
     // -- create_uid_from: the hashing contract -----------------------------------------------
 
     #[test]
+    fn create_uid_from_matches_a_known_sha256_vector() {
+        // Goal: pin the exact UID bytes. UIDs key every persisted setting, so a change in the
+        // hashing crate or in what gets fed to it would silently orphan a user's whole config.
+        // Method: compare against a sha256 of "Hwmon" + the device id, computed independently.
+        let device_id = "/sys/devices/platform/test/hwmon/hwmon0".to_owned();
+        let uid = Device::create_uid_from("ignored", DeviceType::Hwmon, 0, Some(&device_id));
+        assert_eq!(
+            uid,
+            "091c1c7e743cc5404f3476bfde4e489fab977a93127bb319bf9f68393bdb028a"
+        );
+    }
+
+    #[test]
     fn create_uid_from_produces_64_char_lower_hex() {
         // Goal: the UID is always a 64-char lowercase sha256 hex string, and derivation is
         // deterministic. Method: hash the same inputs twice and inspect the output shape.

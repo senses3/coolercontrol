@@ -538,6 +538,10 @@ enum SubCommands {
     List,
     /// Validate all configuration files
     Check,
+    /// Print the `OpenAPI` spec to stdout. Generated from the route table, so it needs
+    /// neither root nor a running daemon. See `make openapi`.
+    #[command(name = "openapi", hide = true)]
+    OpenApi,
     #[command(hide = true)]
     StressCpu {
         #[arg(long)]
@@ -571,6 +575,12 @@ enum SubCommands {
 /// The stress subcommands run synchronously on plain threads, so this needs
 /// no runtime of its own.
 fn handle_non_root_commands(args: &Args) -> Result<()> {
+    if let Some(SubCommands::OpenApi) = &args.command {
+        // Pretty-printed: the file is checked in, so a merge request diff has to be
+        // readable. Whitespace compresses away to a couple of KB on the wire.
+        println!("{}", serde_json::to_string_pretty(&api::openapi_spec())?);
+        exit_successfully();
+    }
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {
         cc_stress::run_cpu_stress(*threads, *timeout)?;
         exit_successfully();

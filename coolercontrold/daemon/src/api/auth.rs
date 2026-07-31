@@ -29,10 +29,9 @@ use axum::middleware::Next;
 use axum::{Extension, Json};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
-use derive_more::Display;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use strum::EnumString;
+use strum::{Display, EnumString};
 use tower_sessions::Session;
 
 const SESSION_USER_ID: &str = "CCAdmin";
@@ -288,6 +287,20 @@ pub enum Permission {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
+
+    /// Goal: the printed and parsed forms of a Permission must stay the same
+    /// string, since Display and EnumString are derived independently.
+    #[test]
+    fn permission_display_round_trips_through_parsing() {
+        for permission in [Permission::Admin, Permission::Guest] {
+            let printed = permission.to_string();
+            let parsed = Permission::from_str(&printed).expect("printed form must parse back");
+            assert_eq!(parsed.to_string(), printed);
+        }
+        assert_eq!(Permission::Admin.to_string(), "Admin");
+        assert_eq!(Permission::Guest.to_string(), "Guest");
+    }
 
     fn encode_basic(username: &str, password: &str) -> String {
         format!("Basic {}", BASE64.encode(format!("{username}:{password}")))

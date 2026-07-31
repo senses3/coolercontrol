@@ -25,7 +25,7 @@ use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use crate::Device;
 use anyhow::Result;
 use async_trait::async_trait;
-use derive_more::{Display, Error};
+use thiserror::Error;
 
 pub type DeviceLock = Rc<RefCell<Device>>;
 pub type DeviceList = Vec<DeviceLock>;
@@ -189,14 +189,14 @@ impl Repositories {
 
 /// Repository Initialization Errors
 /// Particularly useful for handling different initialization situations.
-#[derive(Debug, Clone, Display, Error, PartialEq)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum InitError {
-    #[display("Liquidctl Integration is Disabled")]
+    #[error("Liquidctl Integration is Disabled")]
     LiqctldDisabled,
 
-    #[display("Python Environment Error: {msg}")]
+    #[error("Python Environment Error: {msg}")]
     PythonEnv { msg: String },
 
-    #[display("Connection Error: {msg}")]
+    #[error("Connection Error: {msg}")]
     Connection { msg: String },
 }

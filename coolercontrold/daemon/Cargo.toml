@@ -59,7 +59,7 @@ clap = { version = "4.6.1", features = [
   "derive",
 ] } # Command line argument parser - pkg
 anyhow = "1.0.102"
-derive_more = { version = "2.1.1", features = ["display", "error"] }
+thiserror = "2.0.18"
 tokio = { version = "1.52.3", default-features = false, features = [
   "rt",
   "fs",
@@ -90,8 +90,14 @@ tower-http = { version = "0.6.11", features = [
   "limit",
   "cors",
   "normalize-path",
-  "compression-full",
-  "decompression-full",
+  # br + gzip + deflate, deliberately not the `-full` sets: those add zstd, whose
+  # zstd-sys builds bundled C source. Clients that offer zstd negotiate down to br.
+  "compression-br",
+  "compression-gzip",
+  "compression-deflate",
+  "decompression-br",
+  "decompression-gzip",
+  "decompression-deflate",
   "fs",
 ] }
 tower-sessions = { version = "0.15.0", features = ["private"] }
@@ -110,12 +116,6 @@ aide = { version = "0.15.1", features = [
 # this needs to follow the aide version above (currently 0.9.0)
 schemars = { version = "=0.9.0", features = ["chrono04"] }
 mime = "0.3.17"
-# axum-typed-multipart 0.16.5 requires >=1.88
-axum_typed_multipart = "=0.16.4"
-# axum-typed-multipart-macros is a dependency of axum-typed-multipart that, if pinned, we should pin to the same version
-axum_typed_multipart_macros = "=0.16.4"
-# possible openApi improvement, but doesn't work for us currently:
-#aide-axum-typed-multipart-2 = "0.16.0"
 # TLS support: use ring as the rustls crypto provider (already pulled in by rcgen)
 # to avoid the aws-lc-rs/aws-lc-sys C dependency tree.
 axum-server = { version = "0.8.0", default-features = false, features = [
@@ -175,7 +175,8 @@ nu-glob = "=0.107"
 nvml-wrapper = "0.12.1"
 # libloading 0.9.0 requires rust 1.88
 libloading = "=0.8"
-sha2 = "0.11.0"
+# Held at 0.10 to share one digest stack with the sha2 that cookie/tower-sessions pulls.
+sha2 = "0.10.9"
 argon2 = "0.5"
 subtle = "2.6"
 toml_edit = { version = "0.23.9", features = ["serde"] }

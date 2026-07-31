@@ -26,12 +26,12 @@ use crate::repositories::service_plugin::service_management::{
 use crate::repositories::service_plugin::service_plugin_repo::CC_PLUGIN_USER;
 use crate::repositories::utils::DirectCommand;
 use anyhow::{anyhow, Result};
-use derive_more::Display;
 use std::fs::Permissions;
 use std::ops::Not;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::time::Duration;
+use strum::Display;
 
 const SYSTEMCTL: &str = "systemctl";
 const SYSTEMCTL_TIMEOUT: Duration = Duration::from_secs(10);
@@ -202,21 +202,45 @@ fn create_unit_file(
 }
 
 #[derive(Copy, Clone, Display, Debug, Default, PartialEq, Eq)]
+// Variant names map onto systemd's Restart= values: OnSuccess -> on-success.
+#[strum(serialize_all = "kebab-case")]
 #[allow(dead_code)]
 pub enum SystemdServiceRestartType {
     #[default]
-    #[display("no")]
     No,
-    #[display("always")]
     Always,
-    #[display("on-success")]
     OnSuccess,
-    #[display("on-failure")]
     OnFailure,
-    #[display("on-abnormal")]
     OnAbnormal,
-    #[display("on-abort")]
     OnAbort,
-    #[display("on-watch")]
     OnWatch,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Goal: pin the exact strings written to `Restart=` in a generated unit
+    /// file. systemd rejects the unit outright if these drift, and the Display
+    /// impl is derived, so nothing else would catch a rename.
+    #[test]
+    fn restart_type_renders_systemd_values() {
+        let cases = [
+            (SystemdServiceRestartType::No, "no"),
+            (SystemdServiceRestartType::Always, "always"),
+            (SystemdServiceRestartType::OnSuccess, "on-success"),
+            (SystemdServiceRestartType::OnFailure, "on-failure"),
+            (SystemdServiceRestartType::OnAbnormal, "on-abnormal"),
+            (SystemdServiceRestartType::OnAbort, "on-abort"),
+            (SystemdServiceRestartType::OnWatch, "on-watch"),
+        ];
+        for (restart_type, expected) in cases {
+            assert_eq!(restart_type.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn restart_type_defaults_to_no() {
+        assert_eq!(SystemdServiceRestartType::default().to_string(), "no");
+    }
 }

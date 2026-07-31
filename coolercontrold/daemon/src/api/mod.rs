@@ -70,6 +70,7 @@ use aide::openapi::{ApiKeyLocation, Contact, License, OpenApi, SecurityScheme, T
 use aide::transform::TransformOpenApi;
 use aide::OperationOutput;
 use anyhow::{anyhow, Result};
+use axum::extract::multipart::MultipartError;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{DefaultBodyLimit, Request};
 use axum::http::header::{HeaderName, HeaderValue};
@@ -79,7 +80,6 @@ use axum::middleware;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Json, Router, ServiceExt};
 use axum_server::tls_rustls::RustlsConfig;
-use derive_more::{Display, Error};
 use log::{debug, info, warn, Level};
 use moro_local::Scope;
 use schemars::JsonSchema;
@@ -91,6 +91,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use thiserror::Error;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower::Layer;
@@ -489,6 +490,16 @@ async fn create_api_server(
             .await?;
     }
     Ok(())
+}
+
+/// The `OpenAPI` spec, built straight from the route table. Needs no `AppState`, no hardware and
+/// no listening socket, because aide collects its metadata when a route is declared and never
+/// touches the state value. This is what `coolercontrold openapi` prints and what the freshness
+/// test compares `openapi/openapi.json` against.
+pub fn openapi_spec() -> OpenApi {
+    let mut open_api = OpenApi::default();
+    let _ = router::documented_routes().finish_api_with(&mut open_api, api_docs);
+    open_api
 }
 
 #[allow(clippy::default_trait_access, clippy::too_many_lines)]
@@ -1103,32 +1114,32 @@ struct ErrorResponse {
     error: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Display, Error, Clone, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, Error, Clone, JsonSchema)]
 pub enum CCError {
-    #[display("Internal Error: {msg}")]
+    #[error("Internal Error: {msg}")]
     InternalError { msg: String },
 
-    #[display("Error with external library: {msg}")]
+    #[error("Error with external library: {msg}")]
     ExternalError { msg: String },
 
-    #[display("Resource not found: {msg}")]
+    #[error("Resource not found: {msg}")]
     NotFound { msg: String },
 
-    #[display("Conflict: {msg}")]
+    #[error("Conflict: {msg}")]
     Conflict { msg: String },
 
-    #[display("{msg}")]
+    #[error("{msg}")]
     UserError { msg: String },
 
-    // #[display("Json serialization error: {}", _0.body_text())]
+    // #[error("Json serialization error: {}", .0.body_text())]
     // JsonRejection(JsonRejection),
-    #[display("{msg}")]
+    #[error("{msg}")]
     InvalidCredentials { msg: String },
 
-    #[display("{msg}")]
+    #[error("{msg}")]
     InsufficientScope { msg: String },
 
-    #[display("{msg}")]
+    #[error("{msg}")]
     TooManyAttempts { msg: String },
 }
 
@@ -1207,6 +1218,14 @@ impl From<JsonRejection> for CCError {
     fn from(jr: JsonRejection) -> Self {
         CCError::UserError {
             msg: jr.body_text(),
+        }
+    }
+}
+
+impl From<MultipartError> for CCError {
+    fn from(err: MultipartError) -> Self {
+        CCError::UserError {
+            msg: format!("Invalid multipart form data: {err}"),
         }
     }
 }
@@ -1313,6 +1332,41 @@ pub struct AppState {
 mod tests {
     use super::*;
     use tower::ServiceExt as _;
+
+    /// Repo-root spec, relative to this crate. Absent in vendored/source-tarball builds,
+    /// which ship only the crate, so the freshness test skips rather than fails there.
+    const SPEC_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../openapi/openapi.json");
+
+    /// Goal: catch a stale checked-in spec, which is a release artifact that is easy to forget
+    /// to regenerate. It had already drifted by eight routes before this test existed.
+    /// Method: rebuild the spec from the route table and compare it to the file.
+    #[test]
+    fn checked_in_openapi_spec_is_current() {
+        let Ok(checked_in) = std::fs::read_to_string(SPEC_PATH) else {
+            return; // Not a full checkout.
+        };
+        let generated = serde_json::to_string_pretty(&openapi_spec()).expect("the spec serializes");
+        if checked_in.trim_end() == generated {
+            return;
+        }
+        let paths = |spec: &str| -> Vec<String> {
+            serde_json::from_str::<serde_json::Value>(spec)
+                .ok()
+                .and_then(|doc| doc.get("paths").cloned())
+                .and_then(|paths| paths.as_object().cloned())
+                .map(|paths| paths.keys().cloned().collect())
+                .unwrap_or_default()
+        };
+        let (in_file, in_daemon) = (paths(&checked_in), paths(&generated));
+        let only_in_daemon: Vec<_> = in_daemon.iter().filter(|p| !in_file.contains(p)).collect();
+        let only_in_file: Vec<_> = in_file.iter().filter(|p| !in_daemon.contains(p)).collect();
+        panic!(
+            "openapi/openapi.json is out of date. Regenerate it with `make openapi`.\n\
+             routes missing from the file: {only_in_daemon:?}\n\
+             routes no longer served: {only_in_file:?}\n\
+             (an empty diff here means only schemas or descriptions changed)"
+        );
+    }
 
     /// An empty or blank address is the documented way to turn an address family off,
     /// so it must resolve to `Disabled` and never reach the parser.

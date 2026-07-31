@@ -27,6 +27,7 @@
 # packaging file: metainfo.xml, debian/changelog, fedora *.spec (regular and
 # rc1), OBS .dsc and include-binaries. Substitutions match by regex rather than
 # the previous version, so the script self-heals if files were out of sync.
+# The OpenAPI spec stamps the daemon version too, so it is regenerated last.
 
 set -euo pipefail
 
@@ -113,5 +114,10 @@ sed -i -E "s|coolercontrol-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrol-${NEW_V
 
 # OBS include-binaries: vendor tarball name
 sed -i -E "s|coolercontrold-vendor-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrold-vendor-${NEW_VER}.tar.gz|g" packaging/obs/debian/source/include-binaries
+
+# OpenAPI spec: carries the daemon version in info.version, and a daemon test fails when the
+# checked-in file is stale. Regenerated last so a build failure here does not interrupt the
+# cheap file substitutions above. Needs no running daemon and no root.
+make -C "${REPO_ROOT}" openapi
 
 echo "New version successfully set: ${NEW_VER} (rc1 specs at ${NEW_RC_VER})"
