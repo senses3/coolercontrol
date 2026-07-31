@@ -37,8 +37,10 @@ test:
 
 # The spec comes from the route table, so no daemon, no port and no root are involved.
 # cargo writes its own noise to stderr, leaving stdout as clean JSON.
+# `--offline` not `--locked`: version_bump.sh calls this right after bumping the crate version,
+# and --locked refuses to refresh the lockfile, which would abort the bump partway through.
 openapi:
-	@$(CARGO) run --locked --quiet $(FEATURES) -- openapi > ../openapi/openapi.json
+	@$(CARGO) run --offline --quiet $(FEATURES) -- openapi > ../openapi/openapi.json
 	@echo "Wrote openapi/openapi.json"
 
 

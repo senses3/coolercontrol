@@ -60,10 +60,10 @@ automatically. They are included here for reference:
    8. Merge any website changes to be made.
 
 5. Update OpenAPI specification
-   1. Run `make openapi`. No running daemon and no root needed: the spec is generated from the
-      daemon's route table.
-   2. Commit the new file if it changed. A daemon test fails when it is stale, so this is normally
-      already done.
+   1. Nothing to do: `make bump` regenerates `openapi/openapi.json` (the spec stamps the daemon
+      version) and `make release` commits it. A daemon test fails when the file is stale.
+   2. To regenerate it by hand at any time, run `make openapi`. It needs no running daemon and no
+      root, since the spec is generated from the daemon's route table.
    3. Update Website with new `openapi.spec` file.
 
 6. NixOS Release
