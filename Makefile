@@ -18,7 +18,7 @@ CARGO := $(shell command -v cargo || command -v cargo-1.88 || command -v cargo-1
 	test test-ui test-daemon test-qt \
 	ci-install ci-test ci-test-ui ci-test-daemon ci-test-qt \
 	ci-check ci-fmt ci-local pr-check validate-metadata \
-	clean clean-ui install install-source uninstall dev-run dev-install
+	clean clean-ui install install-source uninstall dev-run dev-install openapi
 
 # Run `make help` for the common developer targets.
 help:
@@ -36,7 +36,8 @@ help:
 	@printf '    make ci-local         Reproduce the CI pipeline locally (full clean, slow)\n\n'
 	@printf '  \033[1mFormat & lint\033[0m\n'
 	@printf '    make ci-fmt           Auto-format all files (trunk)\n'
-	@printf '    make ci-check         Run formatting/lint checks (trunk)\n\n'
+	@printf '    make ci-check         Run formatting/lint checks (trunk)\n'
+	@printf '    make openapi          Regenerate openapi/openapi.json (no daemon needed)\n\n'
 	@printf '  \033[1mRun & install\033[0m\n'
 	@printf '    make dev-run          Incremental build + run daemon locally (sudo)\n'
 	@printf '    make install          Install daemon + Qt binaries (DESTDIR aware)\n'
@@ -71,6 +72,11 @@ test: validate-metadata test-daemon test-ui test-qt
 
 test-daemon:
 	@$(MAKE) -C $(daemon_dir) test
+
+# Regenerate openapi/openapi.json. Needs no running daemon and no root: the spec is
+# built from the daemon's route table. A test fails when the checked-in file is stale.
+openapi:
+	@$(MAKE) -C $(daemon_dir) openapi
 
 test-ui:
 	@$(MAKE) -C $(ui_dir) test

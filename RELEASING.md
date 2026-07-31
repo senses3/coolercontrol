@@ -60,11 +60,11 @@ automatically. They are included here for reference:
    8. Merge any website changes to be made.
 
 5. Update OpenAPI specification
-   1. Build and start a locally running daemon in debug mode with:
-      `sudo systemctl stop coolercontrold && make dev-run`
-   2. Run `cd openapi;./update.sh`
-   3. Commit a new file to repo.
-   4. Update Website with new `openapi.spec` file.
+   1. Run `make openapi`. No running daemon and no root needed: the spec is generated from the
+      daemon's route table.
+   2. Commit the new file if it changed. A daemon test fails when it is stale, so this is normally
+      already done.
+   3. Update Website with new `openapi.spec` file.
 
 6. NixOS Release
    1. You need Nix package manager setup on your system.

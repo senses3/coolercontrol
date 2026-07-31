@@ -16,7 +16,7 @@ CARGO_VER := $(if $(CARGO),$(shell $(CARGO) --version | awk '{print $$2}'))
 # `-c` not `-C`: BusyBox sort (Alpine) has no `-C`, and would fail into the tokio fallback.
 FEATURES := $(shell printf '1.88\n%s\n' "$(CARGO_VER)" | sort -V -c 2>/dev/null || echo --no-default-features)
 
-.PHONY: build sync-app test clippy ci-test dev-run vendor clean clean-app install uninstall
+.PHONY: build sync-app test clippy ci-test dev-run openapi vendor clean clean-app install uninstall
 
 # Mirror the UI build into the embedded asset dir: include_dir! compiles the whole
 # directory in, so stale hashed assets must go first (the glob keeps .gitignore).
@@ -34,6 +34,13 @@ build: sync-app
 test: release += --release
 test:
 	@$(CARGO) test --locked $(release) $(FEATURES)
+
+# The spec comes from the route table, so no daemon, no port and no root are involved.
+# cargo writes its own noise to stderr, leaving stdout as clean JSON.
+openapi:
+	@$(CARGO) run --locked --quiet $(FEATURES) -- openapi > ../openapi/openapi.json
+	@echo "Wrote openapi/openapi.json"
+
 
 clippy: release += --release
 clippy:

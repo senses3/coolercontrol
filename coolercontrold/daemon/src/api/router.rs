@@ -32,7 +32,23 @@ use axum::Extension;
 
 pub fn init(app_state: AppState) -> ApiRouter {
     let token_handle = app_state.token_handle.clone();
-    let router = base_routes()
+    let router = documented_routes();
+    // Only add API doc route for debug builds (safer for production)
+    #[cfg(debug_assertions)]
+    let router = router.route("/api.json", get(base::serve_api_doc));
+
+    router
+        .fallback_service(base::web_app_service())
+        .with_state(app_state)
+        // need an extension here for middleware::from_fn to work and not pass app_state everywhere.
+        .layer(Extension(token_handle))
+}
+
+/// Every route carrying `OpenAPI` metadata, before state, the fallback and the doc route are
+/// attached. None of those three contribute operations, so generating the spec from this alone
+/// yields exactly what `/api.json` serves, with no `AppState` and no running server.
+pub fn documented_routes() -> ApiRouter<AppState> {
+    base_routes()
         .merge(auth_routes())
         .merge(token_routes())
         .merge(device_routes())
@@ -51,16 +67,7 @@ pub fn init(app_state: AppState) -> ApiRouter {
         .merge(detect_routes())
         .merge(stress_test_routes())
         .merge(metrics_routes())
-        .merge(sse_routes());
-    // Only add API doc route for debug builds (safer for production)
-    #[cfg(debug_assertions)]
-    let router = router.route("/api.json", get(base::serve_api_doc));
-
-    router
-        .fallback_service(base::web_app_service())
-        .with_state(app_state)
-        // need an extension here for middleware::from_fn to work and not pass app_state everywhere.
-        .layer(Extension(token_handle))
+        .merge(sse_routes())
 }
 
 fn base_routes() -> ApiRouter<AppState> {
