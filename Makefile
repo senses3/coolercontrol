@@ -138,10 +138,17 @@ uninstall:
 
 # helpful std development & testing targets
 # For testing these make targets require that a system package is already installed
-dev-run: build-qt
-	@sudo echo "Running incremental build"
-	@$(MAKE) -C $(ui_dir) $@
-	@$(MAKE) -C $(daemon_dir) $@
+
+# Authenticate up front, then refresh the sudo timestamp every 50s so a long build never
+# ends on a password prompt. Builds stay unprivileged; only the final step uses sudo. The
+# trap reaps the refresher when the recipe exits, including on failure or Ctrl-C. If sudo
+# caching is disabled the first refresh fails, the loop ends, and sudo just asks as before.
+sudo_keepalive = sudo -v || exit 1; while sudo -n -v 2>/dev/null; do sleep 50; done & \
+	keepalive=$$!; trap 'kill $$keepalive 2>/dev/null' EXIT;
+
+dev-run:
+	@$(sudo_keepalive) \
+	$(MAKE) build-qt && $(MAKE) -C $(ui_dir) $@ && $(MAKE) -C $(daemon_dir) $@
 
 # reproduce the CI pipeline locally: full clean, CI tooling, trunk checks, junit-producing tests
 ci-local: clean ci-install validate-metadata ci-check ci-test-ui ci-test-daemon ci-test-qt
@@ -159,9 +166,9 @@ pr-check: validate-metadata
 	@$(MAKE) -C $(qt_dir) build
 
 # installs the release coolercontrold daemon and desktop app binaries: (need CC pre-installed)
-dev-install: build
-	@sudo $(MAKE) install
-	@sudo systemctl restart coolercontrold
+dev-install:
+	@$(sudo_keepalive) \
+	$(MAKE) build && sudo $(MAKE) install && sudo systemctl restart coolercontrold
 
 validate-metadata:
 	@appstream-util --version || true
