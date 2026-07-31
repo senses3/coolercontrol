@@ -169,7 +169,8 @@ nu-glob = "=0.107"
 nvml-wrapper = "0.12.1"
 # libloading 0.9.0 requires rust 1.88
 libloading = "=0.8"
-sha2 = "0.11.0"
+# Held at 0.10 to share one digest stack with the sha2 that cookie/tower-sessions pulls.
+sha2 = "0.10.9"
 argon2 = "0.5"
 subtle = "2.6"
 toml_edit = { version = "0.23.9", features = ["serde"] }
