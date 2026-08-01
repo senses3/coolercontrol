@@ -428,12 +428,11 @@ void MainWindow::discardPage() const {
   if (m_page->lifecycleState() == QWebEnginePage::LifecycleState::Discarded) {
     return;
   }
-  // Qt refuses states it considers unavailable, e.g. while an unload handler is
-  // pending. Honour that rather than forcing it.
-  if (m_page->recommendedState() != QWebEnginePage::LifecycleState::Discarded) {
-    qDebug() << "Skipping discard, Qt recommends" << static_cast<int>(m_page->recommendedState());
-    return;
-  }
+  // recommendedState is an advisory ceiling on how aggressive to be, not a constraint.
+  // Qt recommends Frozen for a merely hidden page and only reaches for Discarded under
+  // memory pressure, so gating on it would mean never discarding at all. Exceeding the
+  // recommendation is explicitly supported; the documented cost is losing transient page
+  // state, which this UI already throws away on show.
   m_page->setLifecycleState(QWebEnginePage::LifecycleState::Discarded);
   qInfo() << "Renderer discarded while in the tray.";
 }
