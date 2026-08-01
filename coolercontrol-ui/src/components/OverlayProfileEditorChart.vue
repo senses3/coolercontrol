@@ -1095,6 +1095,12 @@ const addScrollEventListeners = (): void => {
     document?.querySelector('.offset-input')?.addEventListener('wheel', offsetScrolled)
 }
 
+// Held at module scope so onUnmounted can reach them. The observer is created inside a
+// delayed timeout, so unmounting before it fires would otherwise strand an observer that
+// nothing can ever disconnect.
+let resizeObserver: ResizeObserver | null = null
+let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
+
 onMounted(async () => {
     // Make sure on selected Point change, that there is only one.
     watch(selectedPointIndex, (dataIndex) => {
@@ -1120,9 +1126,9 @@ onMounted(async () => {
     window.addEventListener('resize', updatePosition)
     addScrollEventListeners()
 
-    setTimeout(() => {
+    graphicsTimeout = setTimeout(() => {
         // debounce because we need to wait for the graph to be rendered
-        const resizeObserver = new ResizeObserver(
+        resizeObserver = new ResizeObserver(
             _.debounce(
                 () => {
                     controlGraph.value?.setOption({
@@ -1145,6 +1151,12 @@ onMounted(async () => {
 onUnmounted(() => {
     window.removeEventListener('resize', updateResponsiveGraphHeight)
     window.removeEventListener('resize', updatePosition)
+    if (graphicsTimeout !== null) {
+        clearTimeout(graphicsTimeout)
+        graphicsTimeout = null
+    }
+    resizeObserver?.disconnect()
+    resizeObserver = null
 })
 </script>
 

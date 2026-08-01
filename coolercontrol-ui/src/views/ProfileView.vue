@@ -1654,15 +1654,23 @@ const canAddPointAfter = (idx: number): boolean => {
     return lowerRoom + upperRoom >= deficit
 }
 
+// Held at module scope so onUnmounted can reach them. Note this computed re-evaluates
+// whenever selectedType or chosenTemp changes, so it re-enters the branch below repeatedly;
+// releasing the previous observer and timeout first keeps exactly one of each alive.
+let resizeObserver: ResizeObserver | null = null
+let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
+
 const showGraph = computed(() => {
     const shouldShow =
         selectedType.value != null &&
         selectedType.value === ProfileType.Graph &&
         chosenTemp.value != null
     if (shouldShow) {
-        setTimeout(() => {
+        if (graphicsTimeout !== null) clearTimeout(graphicsTimeout)
+        resizeObserver?.disconnect()
+        graphicsTimeout = setTimeout(() => {
             // debounce because we need to wait for the graph to be rendered
-            const resizeObserver = new ResizeObserver(
+            resizeObserver = new ResizeObserver(
                 _.debounce(
                     () => {
                         controlGraph.value?.setOption({
@@ -2251,6 +2259,12 @@ onUnmounted(() => {
     window.removeEventListener('resize', updatePosition)
     window.removeEventListener('resize', updateKnobSize)
     stopRepeat()
+    if (graphicsTimeout !== null) {
+        clearTimeout(graphicsTimeout)
+        graphicsTimeout = null
+    }
+    resizeObserver?.disconnect()
+    resizeObserver = null
 })
 
 // Prevent the knob from consuming non-left mouse button clicks (e.g. browser

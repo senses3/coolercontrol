@@ -312,6 +312,7 @@ let lastRafDrawMs = 0
 // several charts, only some of them visible at a time).
 let chartOnScreen = true
 let visibilityObserver: IntersectionObserver | null = null
+let resizeObserver: ResizeObserver | null = null
 const startRaf = () => {
     if (rafId !== null || chart === null || !chartOnScreen) return
     const animate = () => {
@@ -338,9 +339,20 @@ const stopRaf = () => {
     }
 }
 
+// chartKey remounts this component on any dashboard/device settings change, so anything
+// held past unmount is stranded for the life of the page. The observers are the retainers:
+// they keep the chart element reachable, which keeps its listener closures, the uPlot
+// instance and the series arrays alive.
 onUnmounted(() => {
     stopRaf()
     visibilityObserver?.disconnect()
+    visibilityObserver = null
+    resizeObserver?.disconnect()
+    resizeObserver = null
+    // Releases uPlot's canvases and its own listeners, and removes the DOM subtree the
+    // plugin listeners are bound to.
+    chart?.destroy()
+    chart = null
 })
 
 // @ts-ignore
@@ -745,8 +757,8 @@ onMounted(async () => {
         return { width: cwh.width, height: cwh.height }
     }
     chart.setSize(getChartSize())
-    const resizeObserver = new ResizeObserver((_) => {
-        chart!.setSize(getChartSize())
+    resizeObserver = new ResizeObserver((_) => {
+        chart?.setSize(getChartSize())
     })
     resizeObserver.observe(uChartElement)
 
