@@ -47,6 +47,7 @@ import type { Color, UID } from '@/models/Device'
 import { Device } from '@/models/Device'
 import setDefaultSensorAndChannelColors from '@/stores/DeviceColorCreator'
 import { useDeviceStore } from '@/stores/DeviceStore'
+import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
 import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
 import { channelRoute } from '@/shell/channelRoute.ts'
 import router from '@/router'
@@ -92,6 +93,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const { t } = useI18n()
 
     const deviceStore = useDeviceStore() // using another store internally in this way seems ok, as long as we don't have a circular dependency
+    const colorStore = useThemeColorsStore()
     const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
     const predefinedColorOptions: Ref<Array<string>> = ref([
         '#FFFFFF',
@@ -181,9 +183,14 @@ export const useSettingsStore = defineStore('settings', () => {
             (deviceUID, channelName) =>
                 allUIDeviceSettings.value.get(deviceUID)?.sensorsAndChannels.get(channelName)
                     ?.name ?? channelName,
+            // Generated default colours arrive as CSS rgb(), user-set ones as hex. Qt's
+            // QColor parses only hex, so normalise here rather than teaching C++ to read
+            // CSS; an unparsed colour silently renders no swatch at all.
             (deviceUID, channelName) =>
-                allUIDeviceSettings.value.get(deviceUID)?.sensorsAndChannels.get(channelName)
-                    ?.color ?? '',
+                colorStore.rgbToHex(
+                    allUIDeviceSettings.value.get(deviceUID)?.sensorsAndChannels.get(channelName)
+                        ?.color ?? '',
+                ),
             (deviceUID, channelName) =>
                 router.resolve(channelRoute(deviceStore.allDevices(), deviceUID, channelName)).href,
         )
