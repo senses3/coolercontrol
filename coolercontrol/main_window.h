@@ -42,6 +42,10 @@ class MainWindow final : public QMainWindow {
 
   void handleStartInTray();
 
+  // Escape hatch for --no-discard, so a bad interaction on some desktop has a
+  // workaround that does not require a rebuild.
+  void setDiscardEnabled(bool enabled);
+
   static void delay(int millisecondsWait);
 
   void setActiveMode(const QString& modeUID) const;
@@ -107,6 +111,13 @@ class MainWindow final : public QMainWindow {
   QWizard* m_wizard;
   QNetworkAccessManager* m_manager;
   QTimer* m_retryTimer;
+  // Delays the discard so a quick hide/show toggle never pays a page reload.
+  QTimer* m_discardTimer;
+  bool m_discardEnabled{true};
+  // Set when the daemon reconnects while hidden. A discarded page reloads on its own
+  // when reactivated, so the refresh is deferred to the next show instead of
+  // resurrecting a renderer nobody is looking at.
+  mutable bool m_reloadOnShow{false};
   mutable bool m_forceQuit{false};
   mutable bool m_startup{true};
   mutable bool m_webLoadFinished{false};
@@ -156,6 +167,12 @@ class MainWindow final : public QMainWindow {
   void deleteAccessToken(const QString& tokenId) const;
 
   void displayAddressWizard() const;
+
+  // Tears down the renderer process while the window is in the tray. The page object
+  // survives and reloads itself on reactivation.
+  void discardPage() const;
+
+  void restorePage() const;
 
   void setTrayActionToShow() const;
 

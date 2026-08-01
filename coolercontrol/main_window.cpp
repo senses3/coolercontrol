@@ -118,7 +118,8 @@ MainWindow::MainWindow(QWidget* parent)
       m_ipc(new IPC(this)),
       m_wizard(new QWizard(parent)),
       m_manager(new QNetworkAccessManager(parent)),
-      m_retryTimer(new QTimer(parent)) {
+      m_retryTimer(new QTimer(parent)),
+      m_discardTimer(new QTimer(parent)) {
   setCentralWidget(m_view);
   m_profile->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
   m_profile->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
@@ -178,6 +179,11 @@ MainWindow::MainWindow(QWidget* parent)
           Qt::QueuedConnection);
   m_retryTimer->setInterval(DEFAULT_CONNECTION_RETRY_INTERVAL_MS);
   connect(m_retryTimer, &QTimer::timeout, this, &MainWindow::tryDaemonConnection);
+  m_discardTimer->setSingleShot(true);
+  // Sits just above the UI's own stale-history threshold, so the two never disagree
+  // about whether a restore counts as fresh.
+  m_discardTimer->setInterval(DISCARD_DELAY_MS);
+  connect(m_discardTimer, &QTimer::timeout, this, &MainWindow::discardPage);
   connect(m_ipc, &IPC::forceWindowShow, this, [this]() {
     // This is used so the UI Window will show when password input is required
     setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
@@ -398,6 +404,53 @@ void MainWindow::closeEvent(QCloseEvent* event) {
   QApplication::quit();
 }
 
+void MainWindow::setDiscardEnabled(const bool enabled) {
+  m_discardEnabled = enabled;
+  if (!enabled) {
+    qInfo() << "Renderer discarding disabled.";
+  }
+}
+
+/*
+  The renderer is by far the largest part of this app's footprint, and nothing is
+  looking at it while the window sits in the tray. Discarding tears that process down
+  and keeps the page object, which reloads itself when reactivated.
+
+  This is close to free: the UI already reloads on show, because DeviceStore treats
+  being hidden past a threshold as reason enough to refetch rather than reconcile a
+  stale status history. So the reload was already being paid; only the idle renderer
+  was extra.
+*/
+void MainWindow::discardPage() const {
+  if (!m_discardEnabled || isVisible()) {
+    return;
+  }
+  if (m_page->lifecycleState() == QWebEnginePage::LifecycleState::Discarded) {
+    return;
+  }
+  // Qt refuses states it considers unavailable, e.g. while an unload handler is
+  // pending. Honour that rather than forcing it.
+  if (m_page->recommendedState() != QWebEnginePage::LifecycleState::Discarded) {
+    qDebug() << "Skipping discard, Qt recommends" << static_cast<int>(m_page->recommendedState());
+    return;
+  }
+  m_page->setLifecycleState(QWebEnginePage::LifecycleState::Discarded);
+  qInfo() << "Renderer discarded while in the tray.";
+}
+
+void MainWindow::restorePage() const {
+  if (m_page->lifecycleState() != QWebEnginePage::LifecycleState::Active) {
+    m_page->setLifecycleState(QWebEnginePage::LifecycleState::Active);
+    m_reloadOnShow = false;  // reactivation reloads the page by itself
+    return;
+  }
+  if (m_reloadOnShow) {
+    m_reloadOnShow = false;
+    m_uiLoadingStopped = false;
+    m_view->load(getDaemonUrl());
+  }
+}
+
 void MainWindow::hideEvent(QHideEvent* event) {
   if (m_startup && !m_webLoadFinished) {
     // opening/closing the window during initialization can cause issues.
@@ -406,6 +459,7 @@ void MainWindow::hideEvent(QHideEvent* event) {
   }
   delay(100);
   setTrayActionToShow();
+  m_discardTimer->start();
   event->accept();
 }
 
@@ -415,6 +469,8 @@ void MainWindow::showEvent(QShowEvent* event) {
     event->ignore();
     return;
   }
+  m_discardTimer->stop();
+  restorePage();
   delay(100);
   setTrayActionToHide();
   event->accept();
@@ -944,9 +1000,11 @@ void MainWindow::tryDaemonConnection() {
       m_daemonHasWarnings = false;
       m_loginWindowShown = false;
       if (isHidden()) {
-        // if the window was closed/hidden/suspended, this will refresh the app
-        // This is particularly helpful when closed to tray and the daemon reconnects
-        m_view->load(getDaemonUrl());
+        // Refreshing a window nobody is looking at would resurrect the whole renderer,
+        // in exactly the long-idle case this is meant to keep cheap. The tray no longer
+        // depends on the page for its own requests, so defer the refresh to the next
+        // show. A discarded page reloads on reactivation anyway, so it cannot go stale.
+        m_reloadOnShow = true;
       }
       // systray badge update: daemon errors re-checked here; alerts come from the UI.
       requestDaemonErrors();

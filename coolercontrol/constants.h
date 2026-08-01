@@ -42,6 +42,9 @@ constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;
 constexpr int DEFAULT_CONNECTION_TIMEOUT_MS = 8000;
 // 2s is good at startup, so as not to hit the daemon with lots of requests at once (+UI)
 constexpr int DEFAULT_CONNECTION_RETRY_INTERVAL_MS = 2000;
+// How long the window stays hidden before the renderer is torn down. Above the UI's own
+// 7s stale-history threshold, so a restore that reloads and a discard never disagree.
+constexpr int DISCARD_DELAY_MS = 10000;
 const std::string WEBENGINE_PROFILE_NAME = "coolercontrol";
 const std::string ENDPOINT_HEALTH = "/health";
 const std::string ENDPOINT_TOKENS = "/tokens";
