@@ -72,6 +72,8 @@ class MainWindow final : public QMainWindow {
 
   void setTranslations(const QString& translationsJson) const;
 
+  void setPinnedSensors(const QString& sensorsJson) const;
+
  signals:
   void forceQuitSignal();
 
@@ -93,6 +95,8 @@ class MainWindow final : public QMainWindow {
 
   void setTranslationsSignal(const QString& translationsJson) const;
 
+  void setPinnedSensorsSignal(const QString& sensorsJson) const;
+
  protected:
   void closeEvent(QCloseEvent* event) override;
 
@@ -109,6 +113,9 @@ class MainWindow final : public QMainWindow {
   QSystemTrayIcon* m_sysTrayIcon;
   QMenu* m_trayIconMenu;
   QMenu* m_modesTrayMenu;
+  // One disabled row per pinned sensor, created once and re-labelled in place so the
+  // menu layout stays stable for hosts that cache it over DBusMenu.
+  mutable QList<QAction*> m_sensorActions;
   QAction* m_quitAction;
   QAction* m_addressAction;
   QAction* m_showAction;
@@ -171,6 +178,12 @@ class MainWindow final : public QMainWindow {
   void deleteAccessToken(const QString& tokenId) const;
 
   void displayAddressWizard() const;
+
+  // Rebuilds the pinned-sensor rows and refreshes their readings. Driven by the menu's
+  // aboutToShow, so nothing is fetched while the menu is closed.
+  void refreshTraySensors() const;
+
+  void requestSensorValue(int row, const QString& deviceUid, const QString& channelName) const;
 
   // One-time prompt on the first close, correcting the belief that closing the window
   // stops cooling control. Returns true to carry on quitting, false if the user chose

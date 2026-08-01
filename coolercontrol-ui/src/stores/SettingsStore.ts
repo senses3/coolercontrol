@@ -47,6 +47,7 @@ import type { Color, UID } from '@/models/Device'
 import { Device } from '@/models/Device'
 import setDefaultSensorAndChannelColors from '@/stores/DeviceColorCreator'
 import { useDeviceStore } from '@/stores/DeviceStore'
+import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
 import type { AllDaemonDeviceSettings } from '@/models/DaemonSettings'
 import type { NameOverrides } from '@/models/NameOverrides'
 import {
@@ -166,6 +167,23 @@ export const useSettingsStore = defineStore('settings', () => {
     const menuOrder: Ref<Array<MenuOrderIds>> = ref([])
     const expandedMenuIds: Ref<Array<string> | undefined> = ref()
     const pinnedIds: Ref<Array<string>> = ref([])
+
+    // The tray lists the pinned sensors, and Qt fetches their readings itself because
+    // the renderer is gone once the window is in the tray. Only identity and label
+    // travel over IPC; Qt caches them so the list survives a discarded page.
+    const pushTrayPinnedSensors = (): void => {
+        if (!deviceStore.isQtApp()) return
+        const sensors = buildPinnedSensors(
+            deviceStore.allDevices(),
+            pinnedIds.value,
+            (deviceUID, channelName) =>
+                allUIDeviceSettings.value.get(deviceUID)?.sensorsAndChannels.get(channelName)
+                    ?.name ?? channelName,
+        )
+        // @ts-ignore - window.ipc is the QWebChannel bridge, present only in the Qt app.
+        window.ipc?.setPinnedSensors?.(JSON.stringify(sensors))
+    }
+    watch(pinnedIds, () => pushTrayPinnedSensors(), { deep: true })
     const collapsedMainMenu: Ref<boolean> = ref(false)
     const mainMenuWidthRem: Ref<number> = ref(24)
     const frequencyPrecision: Ref<number> = ref(1)
@@ -1661,6 +1679,7 @@ export const useSettingsStore = defineStore('settings', () => {
         alertsActive,
         anyActiveUnsilencedAlert,
         pushTrayAlertState,
+        pushTrayPinnedSensors,
         loadAlertsAndLogs,
         createAlert,
         updateAlert,

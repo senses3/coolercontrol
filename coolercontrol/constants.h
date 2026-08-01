@@ -41,6 +41,8 @@ const std::string SETTING_ACCESS_TOKEN_ID = "accessTokenId";
 const std::string SETTING_GROUP_TRANSLATIONS = "translations";
 // Whether the user has been shown the one-time close-to-tray prompt.
 const std::string SETTING_CLOSE_PROMPT_SHOWN = "closePromptShown";
+// Identity and label of the sensors pinned in the UI, pushed over IPC.
+const std::string SETTING_PINNED_SENSORS = "pinnedSensors";
 const std::string DEFAULT_DAEMON_ADDRESS = "localhost";
 constexpr int DEFAULT_DAEMON_PORT = 11987;
 constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;
@@ -53,6 +55,7 @@ constexpr int DISCARD_DELAY_MS = 10000;
 const std::string WEBENGINE_PROFILE_NAME = "coolercontrol";
 const std::string ENDPOINT_HEALTH = "/health";
 const std::string ENDPOINT_TOKENS = "/tokens";
+const std::string ENDPOINT_STATUS = "/status";
 // Shown in the UI's token list. Kept stable so a re-provision replaces the old entry
 // rather than accumulating one per launch.
 const std::string ACCESS_TOKEN_LABEL = "CoolerControl Desktop";

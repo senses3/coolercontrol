@@ -294,6 +294,10 @@ void MainWindow::initSystemTray() {
   m_trayIconMenu->addSeparator();
   m_trayIconMenu->addAction(m_quitAction);
 
+  // Readings are fetched only while the menu is opening, so nothing polls in the
+  // background and a closed menu costs nothing.
+  connect(m_trayIconMenu, &QMenu::aboutToShow, this, &MainWindow::refreshTraySensors);
+
   m_sysTrayIcon->setContextMenu(m_trayIconMenu);
   m_sysTrayIcon->setIcon(QIcon::fromTheme(
       APP_ID_SYMBOLIC.data(),
@@ -459,6 +463,110 @@ bool MainWindow::offerCloseToTray() const {
 
 void MainWindow::setTranslations(const QString& translationsJson) const {
   cacheUiStrings(translationsJson);
+}
+
+void MainWindow::setPinnedSensors(const QString& sensorsJson) const {
+  QSettings settings;
+  settings.setValue(SETTING_PINNED_SENSORS.data(), sensorsJson);
+  qDebug() << "Cached pinned sensors for the tray menu.";
+}
+
+/*
+  Builds one disabled row per pinned sensor and asks the daemon for each reading.
+
+  Driven by the menu's aboutToShow, so nothing is fetched while the menu is closed and
+  there is no polling loop to leave running. Rows keep their previous text until a reply
+  lands, which matters because some tray hosts render the menu before the requests
+  return, and a row that blinks to "..." on every open reads as broken.
+*/
+void MainWindow::refreshTraySensors() const {
+  const QSettings settings;
+  const auto sensors =
+      QJsonDocument::fromJson(settings.value(SETTING_PINNED_SENSORS.data()).toString().toUtf8())
+          .array();
+  // Grow the row list to match; rows are reused so the menu layout stays stable for
+  // hosts that cache it over DBusMenu.
+  while (m_sensorActions.size() < sensors.size()) {
+    const auto action = new QAction(m_trayIconMenu);
+    action->setEnabled(false);
+    m_trayIconMenu->insertAction(m_modesTrayMenu->menuAction(), action);
+    m_sensorActions.append(action);
+  }
+  for (int row = 0; row < m_sensorActions.size(); ++row) {
+    const auto visible = row < sensors.size();
+    m_sensorActions.at(row)->setVisible(visible);
+    if (!visible) {
+      continue;
+    }
+    const auto sensor = sensors.at(row).toObject();
+    const auto label = sensor.value("label").toString();
+    // The label lives on the action so a reply can rebuild the row without parsing the
+    // text it previously wrote. Only reset the text when the label itself changed,
+    // otherwise the previous reading stays visible until the new one lands.
+    if (m_sensorActions.at(row)->data().toString() != label) {
+      m_sensorActions.at(row)->setData(label);
+      m_sensorActions.at(row)->setText(label);
+    }
+    requestSensorValue(row, sensor.value("deviceUid").toString(),
+                       sensor.value("channelName").toString());
+  }
+}
+
+// Formats whichever fields the daemon reported for this channel. A fan reports both rpm
+// and duty, a PSU rail only watts, a temp only its value, so nothing can be assumed.
+static QString formatSensorReading(const QJsonObject& status) {
+  QStringList parts;
+  for (const auto temp : status.value("temps").toArray()) {
+    parts << QString::number(temp.toObject().value("temp").toDouble(), 'f', 1) % " °C";
+  }
+  for (const auto channelValue : status.value("channels").toArray()) {
+    const auto channel = channelValue.toObject();
+    if (channel.contains("rpm")) {
+      parts << QString::number(channel.value("rpm").toInt()) % " RPM";
+    }
+    if (channel.contains("duty")) {
+      parts << QString::number(channel.value("duty").toDouble(), 'f', 0) % "%";
+    }
+    if (channel.contains("watts")) {
+      parts << QString::number(channel.value("watts").toDouble(), 'f', 1) % " W";
+    }
+    if (channel.contains("freq")) {
+      parts << QString::number(channel.value("freq").toInt()) % " MHz";
+    }
+  }
+  return parts.join(QStringLiteral("  "));
+}
+
+void MainWindow::requestSensorValue(const int row, const QString& deviceUid,
+                                    const QString& channelName) const {
+  if (deviceUid.isEmpty() || channelName.isEmpty()) {
+    return;
+  }
+  QNetworkRequest request;
+  request.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
+  auto url = getEndpointUrl(ENDPOINT_STATUS.data());
+  url.setPath(url.path() % "/" % deviceUid % "/channels/" % channelName);
+  request.setUrl(url);
+  applyAuth(request);
+  const auto reply = m_manager->get(request);
+  connect(reply, &QNetworkReply::sslErrors, reply, qOverload<>(&QNetworkReply::ignoreSslErrors));
+  connect(reply, &QNetworkReply::finished, [reply, row, this]() {
+    if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() >= 300 ||
+        row >= m_sensorActions.size()) {
+      reply->deleteLater();
+      return;
+    }
+    const auto history =
+        QJsonDocument::fromJson(reply->readAll()).object().value("status_history").toArray();
+    if (!history.isEmpty()) {
+      const auto reading = formatSensorReading(history.last().toObject());
+      if (!reading.isEmpty()) {
+        m_sensorActions.at(row)->setText(m_sensorActions.at(row)->data().toString() % "   " %
+                                         reading);
+      }
+    }
+    reply->deleteLater();
+  });
 }
 
 void MainWindow::setDiscardEnabled(const bool enabled) {

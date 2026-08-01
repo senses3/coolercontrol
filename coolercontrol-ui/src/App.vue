@@ -314,6 +314,8 @@ onMounted(async () => {
             // it needs in the active locale; it caches them, since a discarded
             // renderer cannot be asked later.
             ipc.setTranslations(JSON.stringify(buildQtStrings(t)))
+            // Seed the tray's sensor list. The watch only fires on later changes.
+            settingsStore.pushTrayPinnedSensors()
         }
     }
     // Fire-and-forget: SW manages its own SSE connection independently.
