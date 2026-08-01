@@ -17,6 +17,7 @@
  */
 
 use log::debug;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
@@ -27,7 +28,7 @@ const NOTIFICATION_CHANNEL_CAPACITY: usize = 16;
 /// Icon types for desktop notifications.
 /// Each variant maps to a specific icon image displayed in the notification.
 /// Serialized as `snake_case` strings for SSE consumers (Qt app, web UI).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationIcon {
     Triggered = 1,
@@ -39,7 +40,7 @@ pub enum NotificationIcon {
 
 /// A desktop notification event broadcast to connected clients via SSE.
 /// The daemon decides when to notify; clients decide how to display.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DesktopNotification {
     pub title: String,
     pub body: String,

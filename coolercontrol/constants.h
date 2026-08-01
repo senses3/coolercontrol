@@ -46,9 +46,9 @@ const std::string ENDPOINT_HEALTH = "/health";
 const std::string ENDPOINT_MODES = "/modes";
 const std::string ENDPOINT_MODES_ACTIVE = "/modes-active";
 const std::string ENDPOINT_ALERTS = "/alerts";
-const std::string ENDPOINT_SSE_LOGS = "/sse/logs";
-const std::string ENDPOINT_SSE_MODES = "/sse/modes";
-const std::string ENDPOINT_SSE_ALERTS = "/sse/alerts";
-const std::string ENDPOINT_SSE_NOTIFICATIONS = "/sse/notifications";
+const std::string ENDPOINT_SSE = "/sse";
+// Narrows the multiplexed stream to the event kinds this client handles, so the
+// once-per-poll status ticks stay off a connection with no use for them.
+const std::string SSE_EVENTS_QUERY = "events=logs,modes,notifications";
 
 #endif  // CONSTANTS_H

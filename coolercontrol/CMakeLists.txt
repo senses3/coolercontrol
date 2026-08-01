@@ -22,7 +22,9 @@ qt_add_executable(
   address_wizard.cpp
   address_wizard.h
   ipc.cpp
-  ipc.h)
+  ipc.h
+  sse_parser.cpp
+  sse_parser.h)
 
 target_link_libraries(
   coolercontrol PRIVATE Qt::Core Qt::Widgets Qt::WebEngineWidgets

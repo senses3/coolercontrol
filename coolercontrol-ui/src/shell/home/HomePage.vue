@@ -32,7 +32,7 @@ import {
     mdiOpenInNew,
     mdiSpeedometer,
 } from '@mdi/js'
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Emitter, EventType } from 'mitt'
 import type { RouteLocationRaw } from 'vue-router'
@@ -66,7 +66,13 @@ const { t } = useI18n({ useScope: 'global' })
 const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
 const { openShortcutsDialog } = useShortcutsDialog()
 
-const healthCheck = await deviceStore.health()
+// Read from the store rather than awaiting here: a top-level await makes this an
+// async-setup component behind Suspense, so a slow /health blocks navigation to Home
+// entirely. The store already holds a value from startup; refresh it in the background.
+const healthCheck = computed(() => daemonState.healthCheck)
+onMounted(() => {
+    daemonState.refreshHealth()
+})
 
 const badgeColor = computed((): string => {
     switch (daemonState.status) {
@@ -94,14 +100,14 @@ const getDaemonStatusTranslationKey = (daemonStatus: DaemonStatus) =>
 
 const statusRows = computed(
     (): Array<[string, string]> => [
-        [t('views.appInfo.host'), healthCheck.system.name],
-        [t('views.appInfo.uptime'), healthCheck.details.uptime],
-        [t('views.appInfo.version'), healthCheck.details.version],
-        [t('views.appInfo.processId'), String(healthCheck.details.pid)],
-        [t('views.appInfo.memoryUsage'), `${healthCheck.details.memory_mb} MB`],
+        [t('views.appInfo.host'), healthCheck.value.system.name],
+        [t('views.appInfo.uptime'), healthCheck.value.details.uptime],
+        [t('views.appInfo.version'), healthCheck.value.details.version],
+        [t('views.appInfo.processId'), String(healthCheck.value.details.pid)],
+        [t('views.appInfo.memoryUsage'), `${healthCheck.value.details.memory_mb} MB`],
         [
             t('views.appInfo.liquidctl'),
-            healthCheck.details.liquidctl_connected
+            healthCheck.value.details.liquidctl_connected
                 ? t('views.appInfo.connected')
                 : t('views.appInfo.disconnected'),
         ],

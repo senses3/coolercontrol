@@ -87,6 +87,8 @@ export const useDeviceStore = defineStore('device', () => {
     let chromeNetworkErrorCount: number = 0
     const chromeNetworkErrorThreshold: number = 7
     let sessionExpiredHandled: boolean = false
+    // Set only when no service worker is carrying notifications, so they are never raised twice.
+    let inPageNotificationsEnabled: boolean = false
     const { t } = useI18n()
     // -----------------------------------------------------------------------------------------------------------------
 
@@ -882,63 +884,169 @@ export const useDeviceStore = defineStore('device', () => {
         }
     }
 
-    async function updateStatusFromSSE(): Promise<void> {
+    /**
+     * One connection carrying every daemon event kind. The daemon multiplexes them onto
+     * /sse and tags each with its own event name. Browsers cap concurrent connections per
+     * origin over HTTP/1.1 (6 in Chrome, counted per profile rather than per tab), so one
+     * stream per event kind starved the UI's own REST calls once a second tab was open.
+     */
+    async function updateFromSSE(): Promise<void> {
         const thisStore = useDeviceStore()
         const daemonState = useDaemonState()
         const settingsStore = useSettingsStore()
+
+        async function handleStatus(data: string): Promise<void> {
+            const dto = plainToInstance(StatusResponseDTO, JSON.parse(data) as object)
+            await thisStore.updateStatus(dto)
+            await daemonState.setConnected(true)
+            chromeNetworkErrorCount = 0
+        }
+
+        async function handleLog(newLog: string): Promise<void> {
+            logLines.value = appendLogChunk(logLines.value, newLog)
+            if (newLog.includes('ERROR')) {
+                await daemonState.setStatus(DaemonStatus.ERROR)
+            } else if (newLog.includes('WARN')) {
+                if (daemonState.status !== DaemonStatus.ERROR) {
+                    await daemonState.setStatus(DaemonStatus.WARN)
+                }
+            }
+        }
+
+        async function handleMode(data: string): Promise<void> {
+            const modeMessage = plainToInstance(ModeActivated, JSON.parse(data) as object)
+            settingsStore.modeActiveCurrent = modeMessage.uid
+            settingsStore.modeActivePrevious = modeMessage.previous_uid
+            await settingsStore.loadDaemonDeviceSettings() // need to reload all settings after applying mode
+            emitter.emit('active-modes-change-menu')
+        }
+
+        function handleAlert(data: string): void {
+            const alertMessage = plainToInstance(AlertLog, JSON.parse(data) as object)
+            console.debug('Received Alert: ', alertMessage)
+            settingsStore.alertLogs.push(alertMessage)
+            let foundAlert = settingsStore.alerts.find((alert) => alert.uid === alertMessage.uid)
+            if (foundAlert) {
+                foundAlert.state = alertMessage.state
+            }
+            if (alertMessage.state === AlertState.Active) {
+                if (!settingsStore.alertsActive.includes(alertMessage.uid)) {
+                    settingsStore.alertsActive.push(alertMessage.uid)
+                }
+            } else {
+                const activeIndex = settingsStore.alertsActive.findIndex(
+                    (uid) => uid === alertMessage.uid,
+                )
+                if (activeIndex > -1) {
+                    settingsStore.alertsActive.splice(activeIndex, 1)
+                }
+            }
+            // A silenced state change still updates state; only the toast
+            // is muted. The toast tone follows the event, not just the
+            // aggregate state: a partial recovery of a multi-source
+            // alert arrives as resolved while the state stays Active.
+            if (alertMessage.silenced) return
+            if (alertMessage.resolved) {
+                toast.add({
+                    severity: 'info',
+                    summary: t('views.alerts.alertRecovered'),
+                    detail: `${alertMessage.name} - ${alertMessage.message}`,
+                    life: 3000,
+                })
+            } else if (alertMessage.state === AlertState.Error) {
+                toast.add({
+                    severity: 'warn',
+                    summary: t('views.alerts.alertError'),
+                    detail: `${alertMessage.name} - ${alertMessage.message}`,
+                    life: 5000,
+                })
+            } else if (alertMessage.state === AlertState.Active) {
+                toast.add({
+                    severity: 'error',
+                    summary: t('views.alerts.alertTriggered'),
+                    detail: `${alertMessage.name} - ${alertMessage.message}`,
+                    life: 5000,
+                })
+            } else {
+                toast.add({
+                    severity: 'info',
+                    summary: t('views.alerts.alertRecovered'),
+                    detail: `${alertMessage.name} - ${alertMessage.message}`,
+                    life: 3000,
+                })
+            }
+        }
+
+        async function handleEvent(eventName: string, data: string): Promise<void> {
+            switch (eventName) {
+                case 'status':
+                    await handleStatus(data)
+                    return
+                // Device-health transitions arrive as one batch of deltas per subject per tick.
+                case 'missing':
+                    for (const delta of plainToInstance(
+                        SourceDelta,
+                        JSON.parse(data) as Array<object>,
+                    )) {
+                        settingsStore.applyMissingDelta(delta)
+                    }
+                    return
+                case 'stale-source':
+                    for (const delta of plainToInstance(
+                        SourceDelta,
+                        JSON.parse(data) as Array<object>,
+                    )) {
+                        settingsStore.applyStaleSourceDelta(delta)
+                    }
+                    return
+                case 'failsafe':
+                    for (const delta of plainToInstance(
+                        FailsafeDelta,
+                        JSON.parse(data) as Array<object>,
+                    )) {
+                        settingsStore.applyFailsafeDelta(delta)
+                    }
+                    return
+                // Full-state resync the daemon sends when this client lagged the
+                // health broadcast and missed transition batches.
+                case 'health':
+                    settingsStore.applyDeviceHealthSnapshot(
+                        plainToInstance(DeviceHealthDTO, JSON.parse(data) as object),
+                    )
+                    return
+                case 'log':
+                    await handleLog(data)
+                    return
+                case 'mode':
+                    await handleMode(data)
+                    return
+                case 'alert':
+                    handleAlert(data)
+                    return
+                case 'notification':
+                    // Only when the service worker is not carrying them for us.
+                    if (inPageNotificationsEnabled) showDesktopNotification(data)
+                    return
+                default:
+                    // An event kind this client does not know yet. Ignore it rather than
+                    // mis-handling it as a status tick.
+                    console.debug(`Ignoring unknown SSE event: ${eventName}`)
+            }
+        }
+
         async function startSSE(): Promise<void> {
-            // auto-retry only needed for one of the endpoints (as full refresh will happen on re-connect)
-            await fetchEventSource(`${daemonClient.daemonURL}sse/status`, {
+            await fetchEventSource(`${daemonClient.daemonURL}sse`, {
                 credentials: 'include',
                 async onopen(response) {
                     if (response.ok) return
                     if (response.status === 401) {
                         throw new Error('Unauthorized')
                     }
-                    throw new Error(`SSE status error: ${response.status}`)
+                    throw new Error(`SSE error: ${response.status}`)
                 },
                 async onmessage(event) {
-                    // Device-health transitions ride the status connection as named
-                    // events, one batch of deltas per subject per tick.
-                    if (event.event === 'missing') {
-                        for (const delta of plainToInstance(
-                            SourceDelta,
-                            JSON.parse(event.data) as Array<object>,
-                        )) {
-                            settingsStore.applyMissingDelta(delta)
-                        }
-                        return
-                    }
-                    if (event.event === 'stale-source') {
-                        for (const delta of plainToInstance(
-                            SourceDelta,
-                            JSON.parse(event.data) as Array<object>,
-                        )) {
-                            settingsStore.applyStaleSourceDelta(delta)
-                        }
-                        return
-                    }
-                    if (event.event === 'failsafe') {
-                        for (const delta of plainToInstance(
-                            FailsafeDelta,
-                            JSON.parse(event.data) as Array<object>,
-                        )) {
-                            settingsStore.applyFailsafeDelta(delta)
-                        }
-                        return
-                    }
-                    // Full-state resync the daemon sends when this client lagged the
-                    // health broadcast and missed transition batches.
-                    if (event.event === 'health') {
-                        settingsStore.applyDeviceHealthSnapshot(
-                            plainToInstance(DeviceHealthDTO, JSON.parse(event.data) as object),
-                        )
-                        return
-                    }
-                    const dto = plainToInstance(StatusResponseDTO, JSON.parse(event.data) as object)
-                    await thisStore.updateStatus(dto)
-                    await daemonState.setConnected(true)
-                    chromeNetworkErrorCount = 0
+                    if (event.data.length === 0) return // keep-alive message
+                    await handleEvent(event.event, event.data)
                 },
                 async onclose() {
                     // attempt to re-establish connection automatically (resume/restart)
@@ -964,7 +1072,7 @@ export const useDeviceStore = defineStore('device', () => {
                         return
                     }
                     if (err.message === 'Unauthorized') {
-                        console.warn('SSE status returned 401 - reloading for re-authentication.')
+                        console.warn('SSE returned 401 - reloading for re-authentication.')
                         thisStore.handleSessionExpired()
                         throw err // stop retries
                     }
@@ -974,165 +1082,8 @@ export const useDeviceStore = defineStore('device', () => {
                 },
             })
         }
-        console.info('Listening for Status Events')
+        console.info('Listening for Daemon Events')
         return await startSSE()
-    }
-
-    async function updateLogsFromSSE(): Promise<void> {
-        const daemonState = useDaemonState()
-        async function startLogSSE(): Promise<void> {
-            await fetchEventSource(`${daemonClient.daemonURL}sse/logs`, {
-                credentials: 'include',
-                async onmessage(event) {
-                    if (event.data.length === 0) return // keep-alive message
-                    const newLog = event.data
-                    logLines.value = appendLogChunk(logLines.value, newLog)
-                    if (newLog.includes('ERROR')) {
-                        await daemonState.setStatus(DaemonStatus.ERROR)
-                    } else if (newLog.includes('WARN')) {
-                        if (daemonState.status !== DaemonStatus.ERROR) {
-                            await daemonState.setStatus(DaemonStatus.WARN)
-                        }
-                    }
-                },
-                async onclose() {
-                    console.warn('Log SSE closed.')
-                },
-                onerror(err) {
-                    // we only retry with the status SSE
-                    if (
-                        isChromeNetworkError(err) &&
-                        chromeNetworkErrorCount < chromeNetworkErrorThreshold
-                    ) {
-                        // net::ERR_NETWORK_CHANGED - retry
-                        return
-                    }
-                    throw err // rethrow will stop retry
-                },
-            })
-        }
-        console.info('Listening for Log Events')
-        return await startLogSSE()
-    }
-
-    async function updateActiveModeFromSSE(): Promise<void> {
-        const settingsStore = useSettingsStore()
-        async function startModeSSE(): Promise<void> {
-            await fetchEventSource(`${daemonClient.daemonURL}sse/modes`, {
-                credentials: 'include',
-                async onmessage(event) {
-                    if (event.data.length === 0) return // keep-alive message
-                    const modeMessage = plainToInstance(
-                        ModeActivated,
-                        JSON.parse(event.data) as object,
-                    )
-                    settingsStore.modeActiveCurrent = modeMessage.uid
-                    settingsStore.modeActivePrevious = modeMessage.previous_uid
-                    await settingsStore.loadDaemonDeviceSettings() // need to reload all settings after applying mode
-                    emitter.emit('active-modes-change-menu')
-                },
-                async onclose() {
-                    console.warn('Active Mode SSE closed.')
-                },
-                onerror(err) {
-                    // we only retry with the status SSE
-                    if (
-                        isChromeNetworkError(err) &&
-                        chromeNetworkErrorCount < chromeNetworkErrorThreshold
-                    ) {
-                        // net::ERR_NETWORK_CHANGED - retry
-                        return
-                    }
-                    throw err // rethrow will stop retry
-                },
-            })
-        }
-        console.info('Listening for Mode Events')
-        return await startModeSSE()
-    }
-
-    async function updateAlertsFromSSE(): Promise<void> {
-        const settingsStore = useSettingsStore()
-        async function startAlertSSE(): Promise<void> {
-            await fetchEventSource(`${daemonClient.daemonURL}sse/alerts`, {
-                credentials: 'include',
-                async onmessage(event) {
-                    if (event.data.length === 0) return // keep-alive message
-                    const alertMessage = plainToInstance(AlertLog, JSON.parse(event.data) as object)
-                    console.debug('Received Alert: ', alertMessage)
-                    settingsStore.alertLogs.push(alertMessage)
-                    let foundAlert = settingsStore.alerts.find(
-                        (alert) => alert.uid === alertMessage.uid,
-                    )
-                    if (foundAlert) {
-                        foundAlert.state = alertMessage.state
-                    }
-                    if (alertMessage.state === AlertState.Active) {
-                        if (!settingsStore.alertsActive.includes(alertMessage.uid)) {
-                            settingsStore.alertsActive.push(alertMessage.uid)
-                        }
-                    } else {
-                        const activeIndex = settingsStore.alertsActive.findIndex(
-                            (uid) => uid === alertMessage.uid,
-                        )
-                        if (activeIndex > -1) {
-                            settingsStore.alertsActive.splice(activeIndex, 1)
-                        }
-                    }
-                    // A silenced state change still updates state; only the toast
-                    // is muted. The toast tone follows the event, not just the
-                    // aggregate state: a partial recovery of a multi-source
-                    // alert arrives as resolved while the state stays Active.
-                    if (!alertMessage.silenced) {
-                        if (alertMessage.resolved) {
-                            toast.add({
-                                severity: 'info',
-                                summary: t('views.alerts.alertRecovered'),
-                                detail: `${alertMessage.name} - ${alertMessage.message}`,
-                                life: 3000,
-                            })
-                        } else if (alertMessage.state === AlertState.Error) {
-                            toast.add({
-                                severity: 'warn',
-                                summary: t('views.alerts.alertError'),
-                                detail: `${alertMessage.name} - ${alertMessage.message}`,
-                                life: 5000,
-                            })
-                        } else if (alertMessage.state === AlertState.Active) {
-                            toast.add({
-                                severity: 'error',
-                                summary: t('views.alerts.alertTriggered'),
-                                detail: `${alertMessage.name} - ${alertMessage.message}`,
-                                life: 5000,
-                            })
-                        } else {
-                            toast.add({
-                                severity: 'info',
-                                summary: t('views.alerts.alertRecovered'),
-                                detail: `${alertMessage.name} - ${alertMessage.message}`,
-                                life: 3000,
-                            })
-                        }
-                    }
-                },
-                async onclose() {
-                    console.warn('Alerts SSE closed.')
-                },
-                onerror(err) {
-                    // we only retry with the status SSE
-                    if (
-                        isChromeNetworkError(err) &&
-                        chromeNetworkErrorCount < chromeNetworkErrorThreshold
-                    ) {
-                        // net::ERR_NETWORK_CHANGED - retry
-                        return
-                    }
-                    throw err // rethrow will stop retry
-                },
-            })
-        }
-        console.info('Listening for Alert Events')
-        return await startAlertSSE()
     }
 
     async function initNotificationWorker(): Promise<void> {
@@ -1150,25 +1101,22 @@ export const useDeviceStore = defineStore('device', () => {
             return
         }
         // Try Service Worker first for background-independent notifications.
-        // Falls back to in-page SSE when SW is unavailable (self-signed SSL,
+        // Falls back to the page's own stream when SW is unavailable (self-signed SSL,
         // insecure context, or browser without SW support).
+        // It subscribes to notifications alone: the full stream would push a status tick
+        // per second at it forever just to catch the occasional notification.
+        const notificationsUrl = `${daemonClient.daemonURL}sse?events=notifications`
         if ('serviceWorker' in navigator) {
             try {
                 const registration = await navigator.serviceWorker.register('/notification-sw.js')
                 const sw = registration.active || registration.waiting || registration.installing
                 if (sw && sw.state === 'activated') {
-                    sw.postMessage({
-                        type: 'start',
-                        url: `${daemonClient.daemonURL}sse/notifications`,
-                    })
+                    sw.postMessage({ type: 'start', url: notificationsUrl })
                 } else if (sw) {
                     sw.addEventListener('statechange', function listener() {
                         if (sw.state === 'activated') {
                             sw.removeEventListener('statechange', listener)
-                            sw.postMessage({
-                                type: 'start',
-                                url: `${daemonClient.daemonURL}sse/notifications`,
-                            })
+                            sw.postMessage({ type: 'start', url: notificationsUrl })
                         }
                     })
                 }
@@ -1178,7 +1126,9 @@ export const useDeviceStore = defineStore('device', () => {
                 console.warn('Service Worker registration failed, using in-page fallback:', err)
             }
         }
-        startInPageNotificationSSE()
+        // No worker, so raise notifications from the page's own stream instead.
+        inPageNotificationsEnabled = true
+        console.info('Handling notifications in-page.')
     }
 
     const NOTIFICATION_ICON_MAP: Record<string, string> = {
@@ -1189,39 +1139,19 @@ export const useDeviceStore = defineStore('device', () => {
         shutdown: '/icons/shutdown.png',
     }
 
-    function startInPageNotificationSSE(): void {
-        fetchEventSource(`${daemonClient.daemonURL}sse/notifications`, {
-            credentials: 'include',
-            onmessage(event) {
-                if (event.data.length === 0) return
-                try {
-                    const notification = JSON.parse(event.data)
-                    new Notification(notification.title || 'CoolerControl', {
-                        body: notification.body || '',
-                        icon:
-                            NOTIFICATION_ICON_MAP[notification.icon] ||
-                            NOTIFICATION_ICON_MAP['info'],
-                        silent: !notification.audio,
-                        requireInteraction: notification.urgency >= 2,
-                    })
-                } catch (_) {
-                    // Ignore malformed messages.
-                }
-            },
-            onclose() {
-                console.warn('Notification SSE closed.')
-            },
-            onerror(err) {
-                if (
-                    isChromeNetworkError(err) &&
-                    chromeNetworkErrorCount < chromeNetworkErrorThreshold
-                ) {
-                    return
-                }
-                throw err
-            },
-        })
-        console.info('Listening for Notification Events (in-page fallback)')
+    // Raised from the shared /sse stream when no service worker is carrying them.
+    function showDesktopNotification(data: string): void {
+        try {
+            const notification = JSON.parse(data)
+            new Notification(notification.title || 'CoolerControl', {
+                body: notification.body || '',
+                icon: NOTIFICATION_ICON_MAP[notification.icon] || NOTIFICATION_ICON_MAP['info'],
+                silent: !notification.audio,
+                requireInteraction: notification.urgency >= 2,
+            })
+        } catch (_) {
+            // Ignore malformed messages.
+        }
     }
 
     function updateRecentDeviceStatus(): void {
@@ -1303,10 +1233,7 @@ export const useDeviceStore = defineStore('device', () => {
         isDefaultPasswd,
         accessDenied,
         updateStatus,
-        updateStatusFromSSE,
-        updateLogsFromSSE,
-        updateAlertsFromSSE,
-        updateActiveModeFromSSE,
+        updateFromSSE,
         initNotificationWorker,
         currentDeviceStatus,
         round,

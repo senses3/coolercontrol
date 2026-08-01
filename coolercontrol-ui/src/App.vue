@@ -314,13 +314,7 @@ onMounted(async () => {
     // Fire-and-forget: SW manages its own SSE connection independently.
     deviceStore.initNotificationWorker()
     // async functions that run for the lifetime of the application:
-    await Promise.all([
-        deviceStore.updateStatusFromSSE(),
-        deviceStore.updateLogsFromSSE(),
-        deviceStore.updateAlertsFromSSE(),
-        deviceStore.updateActiveModeFromSSE(),
-        signalLoadFinished(),
-    ])
+    await Promise.all([deviceStore.updateFromSSE(), signalLoadFinished()])
 })
 </script>
 
