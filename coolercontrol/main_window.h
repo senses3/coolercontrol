@@ -151,6 +151,10 @@ class MainWindow final : public QMainWindow {
 
   void clearAccessToken() const;
 
+  // Removes a token this app previously owned but no longer holds. Session-only route,
+  // so it runs from the provision path where the cookie is known good.
+  void deleteAccessToken(const QString& tokenId) const;
+
   void displayAddressWizard() const;
 
   void setTrayActionToShow() const;

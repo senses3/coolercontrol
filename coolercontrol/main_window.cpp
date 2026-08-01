@@ -50,10 +50,12 @@
 #include "sse_parser.h"
 
 /*
-  QSettings creates its file 0644 and rewrites it atomically, so permissions reset on
-  every save. Both credentials this app holds live in that file: the session cookie and
-  the daemon access token. The token is the more sensitive of the two, since it does not
-  expire and carries write access, so re-apply owner-only after any credential write.
+  Qt has no API for the settings file's mode, and QSettings creates it 0644. It does
+  preserve the mode across later atomic rewrites (verified on Qt 6.11), so one call once
+  the file exists is enough; this runs on each credential write only so a file that gets
+  recreated cannot silently regress. Both credentials live in that file: the session
+  cookie and the daemon access token. The token is the more sensitive of the two, since
+  it does not expire and carries write access.
 */
 void restrictSettingsFilePermissions(const QSettings& settings) {
   if (!QFile::setPermissions(settings.fileName(),
@@ -584,9 +586,33 @@ void MainWindow::clearAccessToken() const {
   m_accessToken.clear();
   QSettings settings;
   settings.remove(SETTING_ACCESS_TOKEN.data());
-  settings.remove(SETTING_ACCESS_TOKEN_ID.data());
+  // The id is deliberately kept so the next provision can delete the dead token
+  // server-side. Deleting it here is not possible: /tokens is session-only, and a
+  // rejected token usually means there is no valid session to delete it with either.
   settings.sync();
   restrictSettingsFilePermissions(settings);  // the cookie is still in this file
+}
+
+// /tokens is session-only, so this must run while the session cookie is valid and must
+// not carry the bearer header.
+void MainWindow::deleteAccessToken(const QString& tokenId) const {
+  if (tokenId.isEmpty()) {
+    return;
+  }
+  QNetworkRequest deleteRequest;
+  deleteRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
+  auto url = getEndpointUrl(ENDPOINT_TOKENS.data());
+  url.setPath(url.path() + "/" + tokenId);
+  deleteRequest.setUrl(url);
+  const auto deleteReply = m_manager->deleteResource(deleteRequest);
+  connect(deleteReply, &QNetworkReply::sslErrors, deleteReply,
+          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  connect(deleteReply, &QNetworkReply::finished, [deleteReply, tokenId]() {
+    const auto status = deleteReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    // A 404 is fine and expected when the user already revoked it in the UI.
+    qDebug() << "Removed superseded desktop access token" << tokenId << "status:" << status;
+    deleteReply->deleteLater();
+  });
 }
 
 /*
@@ -602,6 +628,9 @@ void MainWindow::provisionAccessToken() const {
   if (!m_accessToken.isEmpty()) {
     return;
   }
+  // Left behind by a previous token this daemon rejected. Deleted once the replacement
+  // exists, so a revoke-and-reconnect cycle cannot accumulate dead entries.
+  const auto supersededId = QSettings().value(SETTING_ACCESS_TOKEN_ID.data()).toString();
   QNetworkRequest tokenRequest;
   tokenRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   tokenRequest.setUrl(getEndpointUrl(ENDPOINT_TOKENS.data()));
@@ -613,7 +642,7 @@ void MainWindow::provisionAccessToken() const {
       m_manager->post(tokenRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
   connect(tokenReply, &QNetworkReply::sslErrors, tokenReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(tokenReply, &QNetworkReply::finished, [tokenReply, this]() {
+  connect(tokenReply, &QNetworkReply::finished, [tokenReply, supersededId, this]() {
     const auto status = tokenReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status >= 300) {
       // Not fatal: the session cookie still works while the renderer is alive, and
@@ -636,6 +665,9 @@ void MainWindow::provisionAccessToken() const {
     settings.sync();
     restrictSettingsFilePermissions(settings);
     qInfo() << "Created a desktop access token for daemon requests.";
+    if (supersededId != rootObj.value("id").toString()) {
+      deleteAccessToken(supersededId);
+    }
     tokenReply->deleteLater();
   });
 }
