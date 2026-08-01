@@ -6097,6 +6097,46 @@
           },
           "502": {
             "description": "Bad Gateway. An error has occurred with an external library."
+          },
+          "200": {
+            "description": "A stream of Server Sent Events. Each frame is `event: <name>` followed by `data: <payload>` and a blank line. Dispatch on the event name. Frames beginning with `:` are keep-alive ticks and carry no data.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEvent"
+                },
+                "examples": {
+                  "status": {
+                    "summary": "One poll tick, sent continuously",
+                    "value": "event: status\ndata: {\"devices\":[{\"uid\":\"8f2a...\",\"name\":\"nct6798\",\"status_history\":[{\"timestamp\":\"2026-08-01T13:22:04.001Z\",\"temps\":[{\"name\":\"CPUTIN\",\"temp\":42.0}],\"channels\":[{\"name\":\"fan1\",\"rpm\":1180,\"duty\":45.0}]}]}]}\n\n"
+                  },
+                  "log": {
+                    "summary": "Raw daemon log text, not JSON",
+                    "value": "event: log\ndata: 2026-08-01T13:22:04.123 INFO coolercontrold Applied setting\n\n"
+                  },
+                  "mode": {
+                    "summary": "A mode became active",
+                    "value": "event: mode\ndata: {\"uid\":\"3c91...\",\"name\":\"Silent\",\"previous_uid\":\"7ab2...\"}\n\n"
+                  },
+                  "alert": {
+                    "summary": "An alert changed state",
+                    "value": "event: alert\ndata: {\"uid\":\"aa10...\",\"name\":\"CPU too hot\",\"state\":\"Active\",\"message\":\"CPUTIN at 95C\",\"silenced\":false,\"resolved\":false}\n\n"
+                  },
+                  "stale-source": {
+                    "summary": "Device-health transitions arrive as a batch of deltas",
+                    "value": "event: stale-source\ndata: [{\"entity_type\":\"Profile\",\"entity_uid\":\"11bd...\",\"entity_name\":\"GPU Curve\",\"present\":false}]\n\n"
+                  },
+                  "notification": {
+                    "summary": "A desktop notification to display",
+                    "value": "event: notification\ndata: {\"title\":\"CoolerControl\",\"body\":\"CPU too hot\",\"icon\":\"triggered\",\"audio\":true,\"urgency\":2}\n\n"
+                  },
+                  "keep-alive": {
+                    "summary": "Sent only when the subscription has been idle; ignore it",
+                    "value": ":\n\n"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6217,6 +6257,29 @@
       }
     },
     "schemas": {
+      "ActiveMode": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "previous_uid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "ActiveModesDto": {
         "type": "object",
         "properties": {
@@ -7743,6 +7806,37 @@
           "weight"
         ]
       },
+      "DesktopNotification": {
+        "description": "A desktop notification event broadcast to connected clients via SSE.\n The daemon decides when to notify; clients decide how to display.",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "audio": {
+            "type": "boolean"
+          },
+          "body": {
+            "type": "string"
+          },
+          "icon": {
+            "$ref": "#/components/schemas/NotificationIcon"
+          },
+          "urgency": {
+            "type": "integer",
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "icon",
+          "audio",
+          "urgency"
+        ]
+      },
       "DetectRequest": {
         "description": "Request body for POST /detect",
         "type": "object",
@@ -8259,6 +8353,35 @@
           "has_dev_port"
         ]
       },
+      "FailsafeDelta": {
+        "description": "SSE delta broadcast when a channel/temp enters or leaves failsafe.",
+        "type": "object",
+        "properties": {
+          "device_uid": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FailsafeKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the node entered failsafe, matching the transition log line (for\n example \"stale readings\" or \"file unreadable\"). Fixed at entry, so a\n latched node never produces reason-only transitions.",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/HealthState"
+          }
+        },
+        "required": [
+          "device_uid",
+          "name",
+          "kind",
+          "reason",
+          "state"
+        ]
+      },
       "FailsafeKind": {
         "description": "Whether a failsafing node is a temp or a control channel. One entry per node\n (a fan is a single `Channel`, not separate rpm/duty entries).",
         "type": "string",
@@ -8654,6 +8777,13 @@
           "CustomSensor",
           "Profile",
           "Lcd"
+        ]
+      },
+      "HealthState": {
+        "type": "string",
+        "enum": [
+          "Detected",
+          "Resolved"
         ]
       },
       "KeyTemps": {
@@ -9188,6 +9318,17 @@
           "modes"
         ]
       },
+      "NotificationIcon": {
+        "description": "Icon types for desktop notifications.\n Each variant maps to a specific icon image displayed in the notification.\n Serialized as `snake_case` strings for SSE consumers (Qt app, web UI).",
+        "type": "string",
+        "enum": [
+          "triggered",
+          "resolved",
+          "error",
+          "info",
+          "shutdown"
+        ]
+      },
       "OverridesDocument": {
         "type": "object",
         "properties": {
@@ -9713,6 +9854,50 @@
           "settings"
         ]
       },
+      "SourceDelta": {
+        "description": "SSE delta broadcast when a missing reference appears or resolves.",
+        "type": "object",
+        "properties": {
+          "channel_name": {
+            "description": "The channel the setting is on. Only set for LCD references.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entity_name": {
+            "description": "Display name: profile/device name, or the sensor id.",
+            "type": "string"
+          },
+          "entity_type": {
+            "$ref": "#/components/schemas/HealthEntityType"
+          },
+          "entity_uid": {
+            "description": "Profile uid, Custom Sensor id, or the owning device uid for an LCD setting.",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TempSource"
+          },
+          "source_device_name": {
+            "description": "Name of the device owning the missing temp, resolved from the live\n device set or the config `devices` list (gone devices stay listed).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/HealthState"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_uid",
+          "entity_name",
+          "source",
+          "state"
+        ]
+      },
       "SourceRef": {
         "description": "A config reference whose temp-source target is absent from the current device\n set. The `entity_*` fields let a client badge and deep-link to the owning\n editor; `source` is the referenced {`device_uid`, `temp_name`}.",
         "type": "object",
@@ -9806,6 +9991,173 @@
           "min_duty",
           "max_duty",
           "fixed_enabled"
+        ]
+      },
+      "SseEvent": {
+        "description": "Every event `/sse` publishes, pairing the SSE event name with its payload.\n\n This is the single source of truth for the wire format. Substreams construct these\n and `Event::from` is the only place an event is named, so the compiler rejects a new\n variant until it has a name and a payload. The `OpenAPI` schema derives from the same\n type, which is what keeps the documentation from drifting away from what is sent.\n\n The serde representation models a frame logically as `{\"event\": ..., \"data\": ...}`.\n The wire form is SSE framing (`event: status\\ndata: {...}`), not that envelope:\n `OpenAPI` 3.1 has no way to describe a stream of tagged frames, so the envelope is the\n closest honest description. `sse_event_names_match_serde_tags` pins the two together.",
+        "oneOf": [
+          {
+            "description": "One poll tick of every device's most recent status.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/StatusResponse"
+              },
+              "event": {
+                "type": "string",
+                "const": "status"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "Temp sources that appeared or disappeared this tick.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceDelta"
+                }
+              },
+              "event": {
+                "type": "string",
+                "const": "missing"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "Temp sources that went stale or recovered this tick.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SourceDelta"
+                }
+              },
+              "event": {
+                "type": "string",
+                "const": "stale-source"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "Channels that entered or left failsafe this tick.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FailsafeDelta"
+                }
+              },
+              "event": {
+                "type": "string",
+                "const": "failsafe"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "Full device-health snapshot, sent to a consumer that lagged the transitions.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/DeviceHealthDto"
+              },
+              "event": {
+                "type": "string",
+                "const": "health"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "One or more daemon log lines, pre-coalesced. Raw text, not JSON.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "string"
+              },
+              "event": {
+                "type": "string",
+                "const": "log"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "The mode that just became active.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ActiveMode"
+              },
+              "event": {
+                "type": "string",
+                "const": "mode"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "An alert whose state changed.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/AlertLog"
+              },
+              "event": {
+                "type": "string",
+                "const": "alert"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          },
+          {
+            "description": "A desktop notification for the client to display.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/DesktopNotification"
+              },
+              "event": {
+                "type": "string",
+                "const": "notification"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
+          }
         ]
       },
       "SseQuery": {

@@ -1472,6 +1472,7 @@ fn sse_routes() -> ApiRouter<AppState> {
                          cap concurrent connections per origin over HTTP/1.1.",
                     )
                     .tag("sse")
+                    .response::<200, sse::SseStream>()
                     .security_requirement("CookieAuth")
                     .security_requirement("BearerAuth")
             })

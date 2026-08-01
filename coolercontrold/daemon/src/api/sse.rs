@@ -16,18 +16,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::alerts::AlertLog;
 use crate::api::actor::{AlertHandle, DeviceHealthHandle, ModeHandle, StatusHandle};
+use crate::api::modes::ActiveMode;
 use crate::api::status::StatusResponse;
 use crate::api::{AppState, CCError};
-use crate::device_health::{DeviceHealthDto, HealthEvent};
+use crate::device_health::{DeviceHealthDto, FailsafeDelta, HealthEvent, SourceDelta};
 use crate::logger::LogBufHandle;
-use crate::notifier::NotificationHandle;
+use crate::notifier::{DesktopNotification, NotificationHandle};
+use aide::generate::GenContext;
+use aide::openapi::{Example, MediaType, Operation, ReferenceOr, Response, SchemaObject};
+use aide::operation::OperationOutput;
 use aide::NoApi;
 use axum::extract::{Query, State};
 use axum::response::sse::{Event, KeepAlive, KeepAliveStream};
 use axum::response::Sse;
 use futures_util::stream::{select_all, SelectAll};
 use futures_util::StreamExt;
+use indexmap::IndexMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
@@ -46,6 +52,169 @@ type EventStream = Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>
 
 /// What every SSE handler returns: the selected substreams merged onto one connection.
 type SseResponse = NoApi<Sse<KeepAliveStream<SelectAll<EventStream>>>>;
+
+/// Every event `/sse` publishes, pairing the SSE event name with its payload.
+///
+/// This is the single source of truth for the wire format. Substreams construct these
+/// and `Event::from` is the only place an event is named, so the compiler rejects a new
+/// variant until it has a name and a payload. The `OpenAPI` schema derives from the same
+/// type, which is what keeps the documentation from drifting away from what is sent.
+///
+/// The serde representation models a frame logically as `{"event": ..., "data": ...}`.
+/// The wire form is SSE framing (`event: status\ndata: {...}`), not that envelope:
+/// `OpenAPI` 3.1 has no way to describe a stream of tagged frames, so the envelope is the
+/// closest honest description. `sse_event_names_match_serde_tags` pins the two together.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(tag = "event", content = "data", rename_all = "kebab-case")]
+pub enum SseEvent {
+    /// One poll tick of every device's most recent status.
+    Status(StatusResponse),
+    /// Temp sources that appeared or disappeared this tick.
+    Missing(Vec<SourceDelta>),
+    /// Temp sources that went stale or recovered this tick.
+    StaleSource(Vec<SourceDelta>),
+    /// Channels that entered or left failsafe this tick.
+    Failsafe(Vec<FailsafeDelta>),
+    /// Full device-health snapshot, sent to a consumer that lagged the transitions.
+    Health(DeviceHealthDto),
+    /// One or more daemon log lines, pre-coalesced. Raw text, not JSON.
+    Log(String),
+    /// The mode that just became active.
+    Mode(ActiveMode),
+    /// An alert whose state changed.
+    Alert(AlertLog),
+    /// A desktop notification for the client to display.
+    Notification(DesktopNotification),
+}
+
+impl From<SseEvent> for Event {
+    fn from(event: SseEvent) -> Self {
+        match event {
+            SseEvent::Status(payload) => json_event("status", &payload),
+            SseEvent::Missing(payload) => json_event("missing", &payload),
+            SseEvent::StaleSource(payload) => json_event("stale-source", &payload),
+            SseEvent::Failsafe(payload) => json_event("failsafe", &payload),
+            SseEvent::Health(payload) => json_event("health", &payload),
+            // The only payload that is not JSON.
+            SseEvent::Log(line) => Event::default().event("log").data(line),
+            SseEvent::Mode(payload) => json_event("mode", &payload),
+            SseEvent::Alert(payload) => json_event("alert", &payload),
+            SseEvent::Notification(payload) => json_event("notification", &payload),
+        }
+    }
+}
+
+fn json_event<T: Serialize>(name: &str, payload: &T) -> Event {
+    Event::default()
+        .event(name)
+        .json_data(payload)
+        .expect("derived DTO serialization cannot fail")
+}
+
+/// Documents the `/sse` 200 response. The handler returns a stream, which aide cannot
+/// describe on its own, so the response is built here from `SseEvent`'s schema plus
+/// literal wire samples.
+pub struct SseStream;
+
+impl OperationOutput for SseStream {
+    type Inner = SseEvent;
+
+    fn operation_response(ctx: &mut GenContext, _operation: &mut Operation) -> Option<Response> {
+        let json_schema = ctx.schema.subschema_for::<SseEvent>();
+        Some(Response {
+            description: "A stream of Server Sent Events. Each frame is `event: <name>` \
+                          followed by `data: <payload>` and a blank line. Dispatch on the \
+                          event name. Frames beginning with `:` are keep-alive ticks and \
+                          carry no data."
+                .to_string(),
+            content: IndexMap::from_iter([(
+                "text/event-stream".into(),
+                MediaType {
+                    schema: Some(SchemaObject {
+                        json_schema,
+                        example: None,
+                        external_docs: None,
+                    }),
+                    examples: wire_examples(),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        })
+    }
+}
+
+/// Literal frames as they arrive, since the schema above models a frame logically
+/// rather than as the bytes on the wire.
+fn wire_examples() -> IndexMap<String, ReferenceOr<Example>> {
+    let sample = |summary: &str, frame: &str| {
+        ReferenceOr::Item(Example {
+            summary: Some(summary.to_string()),
+            value: Some(serde_json::Value::String(frame.to_string())),
+            ..Default::default()
+        })
+    };
+    IndexMap::from_iter([
+        (
+            "status".to_string(),
+            sample(
+                "One poll tick, sent continuously",
+                "event: status\ndata: {\"devices\":[{\"uid\":\"8f2a...\",\"name\":\"nct6798\",\
+                 \"status_history\":[{\"timestamp\":\"2026-08-01T13:22:04.001Z\",\
+                 \"temps\":[{\"name\":\"CPUTIN\",\"temp\":42.0}],\
+                 \"channels\":[{\"name\":\"fan1\",\"rpm\":1180,\"duty\":45.0}]}]}]}\n\n",
+            ),
+        ),
+        (
+            "log".to_string(),
+            sample(
+                "Raw daemon log text, not JSON",
+                "event: log\ndata: 2026-08-01T13:22:04.123 INFO coolercontrold Applied setting\n\n",
+            ),
+        ),
+        (
+            "mode".to_string(),
+            sample(
+                "A mode became active",
+                "event: mode\ndata: {\"uid\":\"3c91...\",\"name\":\"Silent\",\
+                 \"previous_uid\":\"7ab2...\"}\n\n",
+            ),
+        ),
+        (
+            "alert".to_string(),
+            sample(
+                "An alert changed state",
+                "event: alert\ndata: {\"uid\":\"aa10...\",\"name\":\"CPU too hot\",\
+                 \"state\":\"Active\",\"message\":\"CPUTIN at 95C\",\"silenced\":false,\
+                 \"resolved\":false}\n\n",
+            ),
+        ),
+        (
+            "stale-source".to_string(),
+            sample(
+                "Device-health transitions arrive as a batch of deltas",
+                "event: stale-source\ndata: [{\"entity_type\":\"Profile\",\
+                 \"entity_uid\":\"11bd...\",\"entity_name\":\"GPU Curve\",\"present\":false}]\n\n",
+            ),
+        ),
+        (
+            "notification".to_string(),
+            sample(
+                "A desktop notification to display",
+                "event: notification\ndata: {\"title\":\"CoolerControl\",\
+                 \"body\":\"CPU too hot\",\"icon\":\"triggered\",\"audio\":true,\
+                 \"urgency\":2}\n\n",
+            ),
+        ),
+        (
+            "keep-alive".to_string(),
+            sample(
+                "Sent only when the subscription has been idle; ignore it",
+                ":\n\n",
+            ),
+        ),
+    ])
+}
 
 /// A selectable substream of `/sse`. Named after the legacy endpoint it came from, except
 /// that `Status` and `Health` are separate broadcasters that both fed `/sse/status`.
@@ -154,7 +323,7 @@ pub async fn logs(State(app_state): State<AppState>) -> SseResponse {
 }
 
 fn log_stream(log_buf_handle: &LogBufHandle) -> EventStream {
-    let stream = log_lines(log_buf_handle).map(|log| Ok(Event::default().event("log").data(log)));
+    let stream = log_lines(log_buf_handle).map(|log| Ok(SseEvent::Log(log).into()));
     Box::pin(stream)
 }
 
@@ -177,12 +346,10 @@ fn status_stream(status_handle: &StatusHandle) -> EventStream {
     let stream = BroadcastStream::new(status_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
         .map(|status| {
-            Ok(Event::default()
-                .event("status")
-                .json_data(StatusResponse {
-                    devices: status.unwrap_or_default(),
-                })
-                .expect("derived DTO serialization cannot fail"))
+            Ok(SseEvent::Status(StatusResponse {
+                devices: status.unwrap_or_default(),
+            })
+            .into())
         });
     Box::pin(stream)
 }
@@ -214,28 +381,16 @@ fn health_stream(device_health_handle: &DeviceHealthHandle) -> EventStream {
 /// (`missing`, `stale-source`, or `failsafe`).
 fn health_event_to_sse(event: HealthEvent) -> Event {
     match event {
-        HealthEvent::Missing(deltas) => Event::default()
-            .event("missing")
-            .json_data(deltas)
-            .expect("derived DTO serialization cannot fail"),
-        HealthEvent::StaleSource(deltas) => Event::default()
-            .event("stale-source")
-            .json_data(deltas)
-            .expect("derived DTO serialization cannot fail"),
-        HealthEvent::Failsafe(deltas) => Event::default()
-            .event("failsafe")
-            .json_data(deltas)
-            .expect("derived DTO serialization cannot fail"),
+        HealthEvent::Missing(deltas) => SseEvent::Missing(deltas).into(),
+        HealthEvent::StaleSource(deltas) => SseEvent::StaleSource(deltas).into(),
+        HealthEvent::Failsafe(deltas) => SseEvent::Failsafe(deltas).into(),
     }
 }
 
 /// Full-state `health` event sent to a consumer that lagged the broadcast
 /// buffer, so it converges on the current state.
 fn health_snapshot_to_sse(snapshot: DeviceHealthDto) -> Event {
-    Event::default()
-        .event("health")
-        .json_data(snapshot)
-        .expect("derived DTO serialization cannot fail")
+    SseEvent::Health(snapshot).into()
 }
 
 pub async fn modes(State(app_state): State<AppState>) -> SseResponse {
@@ -246,12 +401,7 @@ fn mode_stream(mode_handle: &ModeHandle) -> EventStream {
     let cancel_token = mode_handle.cancel_token();
     let stream = BroadcastStream::new(mode_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
-        .map(|mode_activated| {
-            Ok(Event::default()
-                .event("mode")
-                .json_data(mode_activated.unwrap_or_default())
-                .expect("derived DTO serialization cannot fail"))
-        });
+        .map(|mode_activated| Ok(SseEvent::Mode(mode_activated.unwrap_or_default()).into()));
     Box::pin(stream)
 }
 
@@ -263,12 +413,7 @@ fn alert_stream(alert_handle: &AlertHandle) -> EventStream {
     let cancel_token = alert_handle.cancel_token();
     let stream = BroadcastStream::new(alert_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
-        .map(|alert_state| {
-            Ok(Event::default()
-                .event("alert")
-                .json_data(alert_state.unwrap_or_default())
-                .expect("derived DTO serialization cannot fail"))
-        });
+        .map(|alert_state| Ok(SseEvent::Alert(alert_state.unwrap_or_default()).into()));
     Box::pin(stream)
 }
 
@@ -281,20 +426,123 @@ fn notification_stream(notification_handle: &NotificationHandle) -> EventStream 
     let stream = BroadcastStream::new(notification_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
         .filter_map(|result| async { result.ok() })
-        .map(|notification| {
-            Ok(Event::default()
-                .event("notification")
-                .json_data(notification)
-                .expect("derived DTO serialization cannot fail"))
-        });
+        .map(|notification| Ok(SseEvent::Notification(notification).into()));
     Box::pin(stream)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::notifier::{DesktopNotification, NotificationIcon};
+    use crate::notifier::NotificationIcon;
+
     use tokio_util::sync::CancellationToken;
+
+    /// One value per variant. The match is exhaustive on purpose: a new `SseEvent` variant
+    /// fails to compile here until it is added, which is what keeps the checks below total.
+    fn sample_of_every_variant() -> Vec<SseEvent> {
+        let all = vec![
+            SseEvent::Status(StatusResponse {
+                devices: Vec::with_capacity(0),
+            }),
+            SseEvent::Missing(Vec::with_capacity(0)),
+            SseEvent::StaleSource(Vec::with_capacity(0)),
+            SseEvent::Failsafe(Vec::with_capacity(0)),
+            SseEvent::Health(DeviceHealthDto {
+                failsafe: Vec::with_capacity(0),
+                missing: Vec::with_capacity(0),
+                stale_source: Vec::with_capacity(0),
+            }),
+            SseEvent::Log("a log line\n".to_string()),
+            SseEvent::Mode(ActiveMode::default()),
+            SseEvent::Alert(AlertLog::default()),
+            SseEvent::Notification(DesktopNotification {
+                title: "t".to_string(),
+                body: "b".to_string(),
+                icon: NotificationIcon::Info,
+                audio: false,
+                urgency: 1,
+            }),
+        ];
+        for event in &all {
+            // Exhaustiveness check only; the compiler rejects a missing variant here.
+            match event {
+                SseEvent::Status(_)
+                | SseEvent::Missing(_)
+                | SseEvent::StaleSource(_)
+                | SseEvent::Failsafe(_)
+                | SseEvent::Health(_)
+                | SseEvent::Log(_)
+                | SseEvent::Mode(_)
+                | SseEvent::Alert(_)
+                | SseEvent::Notification(_) => {}
+            }
+        }
+        all
+    }
+
+    /// The event name a frame carries, read back off the serialized SSE frame.
+    fn wire_event_name(event: SseEvent) -> String {
+        let frame = format!("{:?}", Event::from(event));
+        let start = frame.find("event:").expect("every frame names its event") + "event:".len();
+        let rest = &frame[start..];
+        let end = rest
+            .find("\\n")
+            .expect("the event field is newline terminated");
+        rest[..end].trim().to_string()
+    }
+
+    // Goal: the name on the wire and the name in the OpenAPI schema can never diverge.
+    // They come from two places (the `From` match and serde's rename_all), and a rename in
+    // only one of them would silently publish an event no client is listening for.
+    // Methodology: for every variant, compare the SSE event field against the serde tag.
+    #[test]
+    fn sse_event_names_match_serde_tags() {
+        for event in sample_of_every_variant() {
+            let tag = serde_json::to_value(&event).expect("the DTO serializes")["event"]
+                .as_str()
+                .expect("the tag is a string")
+                .to_string();
+            let wire = wire_event_name(event);
+            assert_eq!(wire, tag, "wire event name and serde tag diverged");
+        }
+    }
+
+    // Goal: pin the exact strings. Both clients match on these literals (`DeviceStore.ts`
+    // dispatch and the Qt `SseParser` handler), so a rename is a breaking change that must
+    // be a deliberate edit here rather than a side effect of renaming a variant.
+    #[test]
+    fn sse_event_names_are_stable() {
+        let names: Vec<String> = sample_of_every_variant()
+            .into_iter()
+            .map(wire_event_name)
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                "status",
+                "missing",
+                "stale-source",
+                "failsafe",
+                "health",
+                "log",
+                "mode",
+                "alert",
+                "notification",
+            ]
+        );
+    }
+
+    // Goal: a log frame carries raw text, not JSON. It is the one payload that is not
+    // serialized, and wrapping it in quotes would break both clients' log handling.
+    #[test]
+    fn log_event_carries_raw_text() {
+        let frame = format!("{:?}", Event::from(SseEvent::Log("plain text".to_string())));
+        assert!(frame.contains("plain text"), "{frame}");
+        assert!(
+            frame.contains("\\\"plain text\\\"").not(),
+            "the log line must not be JSON encoded: {frame}"
+        );
+    }
 
     // Goal: an absent events= subscribes to everything, so a client that asks for nothing
     // in particular keeps the old all-streams behavior.
