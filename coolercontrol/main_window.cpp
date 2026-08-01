@@ -21,6 +21,7 @@
 #include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -47,6 +48,19 @@
 #include "constants.h"
 #include "notifier.h"
 #include "sse_parser.h"
+
+/*
+  QSettings creates its file 0644 and rewrites it atomically, so permissions reset on
+  every save. Both credentials this app holds live in that file: the session cookie and
+  the daemon access token. The token is the more sensitive of the two, since it does not
+  expire and carries write access, so re-apply owner-only after any credential write.
+*/
+void restrictSettingsFilePermissions(const QSettings& settings) {
+  if (!QFile::setPermissions(settings.fileName(),
+                             QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+    qWarning() << "Could not restrict permissions on" << settings.fileName();
+  }
+}
 
 class PersistentCookieJar final : public QNetworkCookieJar {
  public:
@@ -77,6 +91,8 @@ class PersistentCookieJar final : public QNetworkCookieJar {
       cookieData.append("\n");
     }
     settings.setValue("networkCookies", cookieData);
+    settings.sync();
+    restrictSettingsFilePermissions(settings);
   }
 
   void load() {
@@ -569,6 +585,8 @@ void MainWindow::clearAccessToken() const {
   QSettings settings;
   settings.remove(SETTING_ACCESS_TOKEN.data());
   settings.remove(SETTING_ACCESS_TOKEN_ID.data());
+  settings.sync();
+  restrictSettingsFilePermissions(settings);  // the cookie is still in this file
 }
 
 /*
@@ -615,6 +633,8 @@ void MainWindow::provisionAccessToken() const {
     QSettings settings;
     settings.setValue(SETTING_ACCESS_TOKEN.data(), m_accessToken);
     settings.setValue(SETTING_ACCESS_TOKEN_ID.data(), rootObj.value("id").toString());
+    settings.sync();
+    restrictSettingsFilePermissions(settings);
     qInfo() << "Created a desktop access token for daemon requests.";
     tokenReply->deleteLater();
   });
