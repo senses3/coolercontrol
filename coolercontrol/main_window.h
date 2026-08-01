@@ -122,7 +122,10 @@ class MainWindow final : public QMainWindow {
 
   // This is empty when there is currently no active mode:
   mutable QString m_activeModeUID{QString()};
-  mutable QByteArray m_passwd{QByteArray()};
+
+  // Bearer token this app owns, so the tray keeps working without a live renderer.
+  // Empty until provisioned from a valid session; cleared on 401.
+  mutable QByteArray m_accessToken{QByteArray()};
 
   void initWizard();
 
@@ -135,6 +138,18 @@ class MainWindow final : public QMainWindow {
   static QUrl getDaemonUrl(bool forceHttp = false);
 
   static QUrl getEndpointUrl(const QString& endpoint, bool forceHttp = false);
+
+  // Every request this app originates goes through here, so the tray keeps working
+  // when the renderer (and with it the session cookie's owner) is gone.
+  void applyAuth(QNetworkRequest& request) const;
+
+  void loadAccessToken() const;
+
+  // Mints a write-capable token off the current session. Write access is required
+  // because the tray's Modes submenu POSTs /modes-active/{uid}.
+  void provisionAccessToken() const;
+
+  void clearAccessToken() const;
 
   void displayAddressWizard() const;
 

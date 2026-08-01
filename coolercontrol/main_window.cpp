@@ -152,6 +152,7 @@ MainWindow::MainWindow(QWidget* parent)
   connect(cookieStore, &QWebEngineCookieStore::cookieRemoved,
           [this](const QNetworkCookie& cookie) { m_manager->cookieJar()->deleteCookie(cookie); });
   cookieStore->loadAllCookies();
+  loadAccessToken();
 
   connect(this, &MainWindow::daemonConnectionLost, this, &MainWindow::reestablishDaemonConnection,
           Qt::QueuedConnection);
@@ -544,10 +545,86 @@ void MainWindow::applyTrayIconNotificationBadge(const bool forceBadge) const {
   }
 }
 
+void MainWindow::loadAccessToken() const {
+  const QSettings settings;
+  m_accessToken = settings.value(SETTING_ACCESS_TOKEN.data()).toByteArray();
+  if (!m_accessToken.isEmpty()) {
+    qInfo() << "Loaded stored daemon access token.";
+  }
+}
+
+void MainWindow::applyAuth(QNetworkRequest& request) const {
+  if (m_accessToken.isEmpty()) {
+    return;  // fall back to the session cookie synced from the web engine
+  }
+  request.setRawHeader("Authorization", "Bearer " + m_accessToken);
+}
+
+void MainWindow::clearAccessToken() const {
+  if (m_accessToken.isEmpty()) {
+    return;
+  }
+  qWarning() << "Daemon rejected the stored access token. Clearing it.";
+  m_accessToken.clear();
+  QSettings settings;
+  settings.remove(SETTING_ACCESS_TOKEN.data());
+  settings.remove(SETTING_ACCESS_TOKEN_ID.data());
+}
+
+/*
+  Mints this app its own bearer token from an authenticated session, so the tray's
+  alerts, modes and notifications survive a daemon restart or a torn-down renderer.
+  Until this exists, the app's only credential is the session cookie synced out of
+  QWebEngineProfile, which means the tray silently stops working whenever the page
+  is not there to re-authenticate.
+
+  /tokens is session-only, so this can only run while the cookie is valid.
+*/
+void MainWindow::provisionAccessToken() const {
+  if (!m_accessToken.isEmpty()) {
+    return;
+  }
+  QNetworkRequest tokenRequest;
+  tokenRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
+  tokenRequest.setUrl(getEndpointUrl(ENDPOINT_TOKENS.data()));
+  tokenRequest.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+  QJsonObject body;
+  body.insert("label", QString::fromStdString(ACCESS_TOKEN_LABEL));
+  body.insert("write_access", true);  // the tray activates Modes
+  const auto tokenReply =
+      m_manager->post(tokenRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
+  connect(tokenReply, &QNetworkReply::sslErrors, tokenReply,
+          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  connect(tokenReply, &QNetworkReply::finished, [tokenReply, this]() {
+    const auto status = tokenReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (status >= 300) {
+      // Not fatal: the session cookie still works while the renderer is alive, and
+      // this is retried on the next successful connection.
+      qWarning() << "Could not create a desktop access token. Status: " << status;
+      tokenReply->deleteLater();
+      return;
+    }
+    const QJsonObject rootObj = QJsonDocument::fromJson(tokenReply->readAll()).object();
+    const auto token = rootObj.value("token").toString();
+    if (token.isEmpty()) {
+      qWarning() << "Access token response contained no token.";
+      tokenReply->deleteLater();
+      return;
+    }
+    m_accessToken = token.toUtf8();
+    QSettings settings;
+    settings.setValue(SETTING_ACCESS_TOKEN.data(), m_accessToken);
+    settings.setValue(SETTING_ACCESS_TOKEN_ID.data(), rootObj.value("id").toString());
+    qInfo() << "Created a desktop access token for daemon requests.";
+    tokenReply->deleteLater();
+  });
+}
+
 void MainWindow::requestDaemonErrors() const {
   QNetworkRequest healthRequest;
   healthRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   healthRequest.setUrl(getEndpointUrl(ENDPOINT_HEALTH.data()));
+  applyAuth(healthRequest);
   const auto healthReply = m_manager->get(healthRequest);
   connect(healthReply, &QNetworkReply::sslErrors, healthReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
@@ -610,6 +687,7 @@ void MainWindow::requestAllModes() const {
   QNetworkRequest modesRequest;
   modesRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   modesRequest.setUrl(getEndpointUrl(ENDPOINT_MODES.data()));
+  applyAuth(modesRequest);
   const auto modesReply = m_manager->get(modesRequest);
   connect(modesReply, &QNetworkReply::sslErrors, modesReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
@@ -648,11 +726,13 @@ void MainWindow::setTrayMenuModes(const QString& modesJson) const {
       auto url = getEndpointUrl(ENDPOINT_MODES_ACTIVE.data());
       url.setPath(url.path() + "/" + modeUID);
       setModeRequest.setUrl(url);
+      applyAuth(setModeRequest);
       const auto setModeReply = m_manager->post(setModeRequest, QByteArray());
       connect(setModeReply, &QNetworkReply::finished, [setModeReply, this]() {
         const auto status =
             setModeReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status == 401) {
+          clearAccessToken();
           m_view->showNormal();  // show window if we have login credentials error
           qWarning() << "Authentication no longer valid when trying to apply Mode. Please login.";
         }
@@ -682,6 +762,7 @@ void MainWindow::requestActiveMode() const {
   QNetworkRequest modesActiveRequest;
   modesActiveRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   modesActiveRequest.setUrl(getEndpointUrl(ENDPOINT_MODES_ACTIVE.data()));
+  applyAuth(modesActiveRequest);
   const auto modesActiveReply = m_manager->get(modesActiveRequest);
   connect(modesActiveReply, &QNetworkReply::sslErrors, modesActiveReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
@@ -710,6 +791,7 @@ void MainWindow::watchDaemonEvents() const {
   auto sseUrl = getEndpointUrl(ENDPOINT_SSE.data(), false);
   sseUrl.setQuery(SSE_EVENTS_QUERY.data());
   sseRequest.setUrl(sseUrl);
+  applyAuth(sseRequest);
   const auto sseReply = m_manager->get(sseRequest);
   connect(sseReply, &QNetworkReply::sslErrors, sseReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
@@ -732,6 +814,7 @@ void MainWindow::watchDaemonEvents() const {
     const auto status = sseReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     qDebug() << "Daemon Event SSE closed with status: " << status;
     if (status == 401) {
+      clearAccessToken();
       qDebug() << "Daemon Event SSE returned 401 - will retry after re-authentication.";
       sseReply->deleteLater();
       return;
@@ -771,6 +854,7 @@ void MainWindow::tryDaemonConnection() {
   QNetworkRequest healthRequest;
   healthRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   healthRequest.setUrl(getEndpointUrl(ENDPOINT_HEALTH.data()));
+  applyAuth(healthRequest);
   const auto healthReply = m_manager->get(healthRequest);
   connect(healthReply, &QNetworkReply::sslErrors, healthReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
@@ -778,6 +862,10 @@ void MainWindow::tryDaemonConnection() {
   connect(healthReply, &QNetworkReply::readyRead, [this, healthReply]() {
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status == 401) {
+      // A stored token the daemon no longer accepts (revoked, or its config was
+      // reset) must not keep us stuck: drop it and let the session flow take over.
+      // The next successful connection provisions a fresh one.
+      clearAccessToken();
       qDebug() << "Daemon connection returned 401 - waiting for authentication...";
       setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
       if (!m_loginWindowShown) {
@@ -788,6 +876,7 @@ void MainWindow::tryDaemonConnection() {
       return;
     }
     m_retryTimer->stop();
+    provisionAccessToken();  // no-op once we hold one
     if (m_startup) {
       requestDaemonErrors();
       requestAllModes();
