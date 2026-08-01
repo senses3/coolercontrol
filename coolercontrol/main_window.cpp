@@ -46,6 +46,7 @@
 
 #include "constants.h"
 #include "notifier.h"
+#include "sse_parser.h"
 
 class PersistentCookieJar final : public QNetworkCookieJar {
  public:
@@ -695,41 +696,44 @@ void MainWindow::requestActiveMode() const {
   });
 }
 
-void MainWindow::startWatchingSSE() const {
-  watchConnectionAndLogs();
-  watchModeActivation();
-  watchNotifications();
-}
+void MainWindow::startWatchingSSE() const { watchDaemonEvents(); }
 
-void MainWindow::watchConnectionAndLogs() const {
-  QNetworkRequest sseLogsRequest;
-  sseLogsRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                              QNetworkRequest::AlwaysNetwork);
-  sseLogsRequest.setUrl(getEndpointUrl(ENDPOINT_SSE_LOGS.data(), false));
-  const auto sseLogsReply = m_manager->get(sseLogsRequest);
-  connect(sseLogsReply, &QNetworkReply::sslErrors, sseLogsReply,
+/*
+  One connection for the three event kinds this client needs. The daemon multiplexes
+  them onto /sse and tags each with its own event name; subscribing narrowly keeps the
+  once-per-poll status ticks off a connection that has no use for them.
+*/
+void MainWindow::watchDaemonEvents() const {
+  QNetworkRequest sseRequest;
+  sseRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
+                          QNetworkRequest::AlwaysNetwork);
+  auto sseUrl = getEndpointUrl(ENDPOINT_SSE.data(), false);
+  sseUrl.setQuery(SSE_EVENTS_QUERY.data());
+  sseRequest.setUrl(sseUrl);
+  const auto sseReply = m_manager->get(sseRequest);
+  connect(sseReply, &QNetworkReply::sslErrors, sseReply,
           qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(this, &MainWindow::dropConnections, sseLogsReply, &QNetworkReply::abort,
+  connect(this, &MainWindow::dropConnections, sseReply, &QNetworkReply::abort,
           Qt::DirectConnection);
-  connect(sseLogsReply, &QNetworkReply::readyRead, [sseLogsReply, this]() {
-    // This is also called for keepAlive ticks - but with semi-filled message
-    const QString log = sseLogsReply->readAll();
-    if (const auto logContainsErrors = log.contains("ERROR");
-        logContainsErrors && !m_daemonHasErrors) {
-      m_daemonHasErrors = true;
-      notifyDaemonErrors();
-    }
-    if (const auto logContainsWarnings = log.contains("WARN");
-        logContainsWarnings && !m_daemonHasWarnings) {
-      m_daemonHasWarnings = true;
-    }
+  // One parser per connection, so a reconnect never resumes on a half-read frame.
+  const auto parser = std::make_shared<SseParser>();
+  connect(sseReply, &QNetworkReply::readyRead, [sseReply, parser, this]() {
+    parser->feed(sseReply->readAll(), [this](const QString& name, const QString& data) {
+      if (name == "log") {
+        handleLogEvent(data);
+      } else if (name == "mode") {
+        handleModeEvent(data);
+      } else if (name == "notification") {
+        handleNotificationEvent(data);
+      }
+    });
   });
-  connect(sseLogsReply, &QNetworkReply::finished, [this, sseLogsReply]() {
-    const auto status = sseLogsReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    qDebug() << "Log Watch SSE closed with status: " << status;
+  connect(sseReply, &QNetworkReply::finished, [this, sseReply]() {
+    const auto status = sseReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    qDebug() << "Daemon Event SSE closed with status: " << status;
     if (status == 401) {
-      qDebug() << "Log Watch SSE returned 401 - will retry after re-authentication.";
-      sseLogsReply->deleteLater();
+      qDebug() << "Daemon Event SSE returned 401 - will retry after re-authentication.";
+      sseReply->deleteLater();
       return;
     }
     // on error or dropped connection will be re-connected once connection is re-established.
@@ -739,8 +743,20 @@ void MainWindow::watchConnectionAndLogs() const {
       emit daemonConnectionLost();
       qInfo() << "Connection to the Daemon Lost";
     }
-    sseLogsReply->deleteLater();
+    sseReply->deleteLater();
   });
+}
+
+void MainWindow::handleLogEvent(const QString& log) const {
+  if (const auto logContainsErrors = log.contains("ERROR");
+      logContainsErrors && !m_daemonHasErrors) {
+    m_daemonHasErrors = true;
+    notifyDaemonErrors();
+  }
+  if (const auto logContainsWarnings = log.contains("WARN");
+      logContainsWarnings && !m_daemonHasWarnings) {
+    m_daemonHasWarnings = true;
+  }
 }
 
 void MainWindow::reestablishDaemonConnection() const {
@@ -807,84 +823,45 @@ void MainWindow::tryDaemonConnection() {
           });
 }
 
-void MainWindow::watchModeActivation() const {
-  QNetworkRequest sseModesRequest;
-  sseModesRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                               QNetworkRequest::AlwaysNetwork);
-  sseModesRequest.setUrl(getEndpointUrl(ENDPOINT_SSE_MODES.data(), false));
-  const auto sseModesReply = m_manager->get(sseModesRequest);
-  connect(sseModesReply, &QNetworkReply::sslErrors, sseModesReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(this, &MainWindow::dropConnections, sseModesReply, &QNetworkReply::abort,
-          Qt::DirectConnection);
-  connect(sseModesReply, &QNetworkReply::readyRead, [sseModesReply, this]() {
-    const QString modeActivated =
-        QString(sseModesReply->readAll()).simplified().replace("event: mode data: ", "");
-    const QJsonObject rootObj = QJsonDocument::fromJson(modeActivated.toUtf8()).object();
-    if (rootObj.isEmpty()) {
-      // This is also called for keepAlive ticks - but semi-empty message
-      return;
-    }
-    const auto currentModeUID = rootObj.value("uid").toString();
-    const auto currentModeName = rootObj.value("name").toString();
-    const auto modeAlreadyActive = currentModeUID == m_activeModeUID;
-    setActiveMode(currentModeUID);
-    if (m_activeModeUID.isEmpty()) {
-      // This will happen if there is currently no active Mode (null)
-      // - such as when applying a setting.
-      return;
-    }
-    const auto msgTitle = modeAlreadyActive ? QString("Mode %1 Already Active").arg(currentModeName)
-                                            : QString("Mode %1 Activated").arg(currentModeName);
-    Notifier::send(msgTitle, "", 4);
-  });
-  connect(sseModesReply, &QNetworkReply::finished, [sseModesReply]() {
-    // on error or dropped connection will be re-connected once connection is re-established.
-    const auto status = sseModesReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    qDebug() << "Modes SSE closed with status: " << status;
-    sseModesReply->deleteLater();
-  });
+void MainWindow::handleModeEvent(const QString& data) const {
+  const QJsonObject rootObj = QJsonDocument::fromJson(data.toUtf8()).object();
+  if (rootObj.isEmpty()) {
+    return;
+  }
+  const auto currentModeUID = rootObj.value("uid").toString();
+  const auto currentModeName = rootObj.value("name").toString();
+  const auto modeAlreadyActive = currentModeUID == m_activeModeUID;
+  setActiveMode(currentModeUID);
+  if (m_activeModeUID.isEmpty()) {
+    // This will happen if there is currently no active Mode (null)
+    // - such as when applying a setting.
+    return;
+  }
+  const auto msgTitle = modeAlreadyActive ? QString("Mode %1 Already Active").arg(currentModeName)
+                                          : QString("Mode %1 Activated").arg(currentModeName);
+  Notifier::send(msgTitle, "", 4);
 }
 
-void MainWindow::watchNotifications() const {
-  QNetworkRequest notifyRequest;
-  notifyRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
-                             QNetworkRequest::AlwaysNetwork);
-  notifyRequest.setUrl(getEndpointUrl(ENDPOINT_SSE_NOTIFICATIONS.data(), false));
-  const auto notifyReply = m_manager->get(notifyRequest);
-  connect(notifyReply, &QNetworkReply::sslErrors, notifyReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(this, &MainWindow::dropConnections, notifyReply, &QNetworkReply::abort,
-          Qt::DirectConnection);
-  connect(notifyReply, &QNetworkReply::readyRead, [notifyReply]() {
-    const QString raw =
-        QString(notifyReply->readAll()).simplified().replace("event: notification data: ", "");
-    const QJsonObject obj = QJsonDocument::fromJson(raw.toUtf8()).object();
-    if (obj.isEmpty()) {
-      // Keep-alive ticks produce semi-empty messages.
-      return;
-    }
-    const auto title = obj.value("title").toString();
-    const auto body = obj.value("body").toString();
-    const auto iconStr = obj.value("icon").toString();
-    const auto audio = obj.value("audio").toBool();
-    const auto urgency = obj.value("urgency").toInt(1);
-    // Map icon string to u8 matching NotificationIcon enum values.
-    int iconNum = 4;  // default: info
-    if (iconStr == "triggered") {
-      iconNum = 1;
-    } else if (iconStr == "resolved") {
-      iconNum = 2;
-    } else if (iconStr == "error") {
-      iconNum = 3;
-    } else if (iconStr == "shutdown") {
-      iconNum = 5;
-    }
-    Notifier::send(title, body, iconNum, audio, urgency);
-  });
-  connect(notifyReply, &QNetworkReply::finished, [notifyReply]() {
-    const auto status = notifyReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    qDebug() << "Notifications SSE closed with status: " << status;
-    notifyReply->deleteLater();
-  });
+void MainWindow::handleNotificationEvent(const QString& data) const {
+  const QJsonObject obj = QJsonDocument::fromJson(data.toUtf8()).object();
+  if (obj.isEmpty()) {
+    return;
+  }
+  const auto title = obj.value("title").toString();
+  const auto body = obj.value("body").toString();
+  const auto iconStr = obj.value("icon").toString();
+  const auto audio = obj.value("audio").toBool();
+  const auto urgency = obj.value("urgency").toInt(1);
+  // Map icon string to u8 matching NotificationIcon enum values.
+  int iconNum = 4;  // default: info
+  if (iconStr == "triggered") {
+    iconNum = 1;
+  } else if (iconStr == "resolved") {
+    iconNum = 2;
+  } else if (iconStr == "error") {
+    iconNum = 3;
+  } else if (iconStr == "shutdown") {
+    iconNum = 5;
+  }
+  Notifier::send(title, body, iconNum, audio, urgency);
 }

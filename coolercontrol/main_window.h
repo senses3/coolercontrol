@@ -148,11 +148,13 @@ class MainWindow final : public QMainWindow {
 
   void requestActiveMode() const;
 
-  void watchConnectionAndLogs() const;
+  void watchDaemonEvents() const;
 
-  void watchModeActivation() const;
+  void handleLogEvent(const QString& log) const;
 
-  void watchNotifications() const;
+  void handleModeEvent(const QString& data) const;
+
+  void handleNotificationEvent(const QString& data) const;
 
   void showVersionMismatchDialog(const QString& daemonVersion) const;
 
