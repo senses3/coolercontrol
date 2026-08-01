@@ -122,6 +122,7 @@ class MainWindow final : public QMainWindow {
     QString label;
     QAction* action;
   };
+
   mutable QList<TraySensor> m_traySensors;
   // Holds the rows once there are too many to sit in the main menu.
   QMenu* m_sensorsTrayMenu;
@@ -194,15 +195,23 @@ class MainWindow final : public QMainWindow {
 
   // Rebuilds the pinned-sensor rows and refreshes their readings. Driven by the menu's
   // aboutToShow, so nothing is fetched while the menu is closed.
-  void refreshTraySensors() const;
+  void refreshTraySensors();
 
   void stopTraySensorPolling() const;
 
   // Rebuilds the rows and decides whether they sit inline or in a submenu.
-  void buildTraySensorRows(const QJsonArray& sensors) const;
+  void buildTraySensorRows(const QJsonArray& sensors);
 
   // One bulk status request, applied to every row.
   void pollTraySensors() const;
+
+  // Shows the window on the channel's own page. The route is resolved by the UI, which
+  // owns the rule that a controllable fan belongs on Cooling and a custom sensor on its
+  // editor; Qt only navigates.
+  void openTraySensorPage(const QString& route);
+
+  // Filled swatch matching the colour the Monitoring panel uses for this sensor.
+  static QIcon sensorColorIcon(const QString& color);
 
   // One-time prompt on the first close, correcting the belief that closing the window
   // stops cooling control. Returns true to carry on quitting, false if the user chose

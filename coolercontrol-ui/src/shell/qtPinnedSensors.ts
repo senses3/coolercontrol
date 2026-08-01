@@ -24,6 +24,11 @@
 // Only sensor pins are pushed. `pinnedIds` also holds dashboard UIDs, which are
 // distinguished here by matching against the known sensor set rather than by guessing
 // at the id format.
+//
+// Colour and route are resolved here rather than in Qt: the colour falls back through
+// the same accessor the Monitoring panel uses, and channelRoute deliberately sends a
+// controllable fan to its Cooling page and a custom sensor to its editor. Duplicating
+// either rule in C++ would let the tray drift away from the rest of the UI.
 
 import type { Device, UID } from '@/models/Device'
 import { monitoringSensors } from '@/shell/monitoring/sensors.ts'
@@ -38,12 +43,18 @@ export interface QtPinnedSensor {
     channelName: string
     label: string
     isTemp: boolean
+    /** Effective colour (user's if set, else the generated default), as the panel shows it. */
+    color: string
+    /** Resolved canonical target, so Qt never has to reimplement channelRoute. */
+    route: string
 }
 
 export function buildPinnedSensors(
     devices: Iterable<Device>,
     pinnedIds: string[],
     label: (deviceUid: UID, channelName: string) => string,
+    color: (deviceUid: UID, channelName: string) => string,
+    route: (deviceUid: UID, channelName: string) => string,
 ): QtPinnedSensor[] {
     const known = new Map<string, { deviceUID: UID; channelName: string; isTemp: boolean }>()
     for (const group of monitoringSensors(devices)) {
@@ -60,5 +71,7 @@ export function buildPinnedSensors(
             channelName: s.channelName,
             label: label(s.deviceUID, s.channelName),
             isTemp: s.isTemp,
+            color: color(s.deviceUID, s.channelName),
+            route: route(s.deviceUID, s.channelName),
         }))
 }

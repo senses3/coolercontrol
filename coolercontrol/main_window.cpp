@@ -32,6 +32,7 @@
 #include <QMessageBox>
 #include <QNetworkCookieJar>
 #include <QNetworkReply>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QShortcut>
 #include <QStringBuilder>  // for % operator
@@ -489,7 +490,7 @@ void MainWindow::setPinnedSensors(const QString& sensorsJson) const {
   closed, and this client never subscribes to the status stream. One bulk request per
   tick covers every row, so the cost does not grow with the number of pins.
 */
-void MainWindow::refreshTraySensors() const {
+void MainWindow::refreshTraySensors() {
   const QSettings settings;
   const auto json = settings.value(SETTING_PINNED_SENSORS.data()).toString();
   if (json != m_builtSensorsJson) {
@@ -506,7 +507,53 @@ void MainWindow::refreshTraySensors() const {
 
 void MainWindow::stopTraySensorPolling() const { m_sensorPollTimer->stop(); }
 
-void MainWindow::buildTraySensorRows(const QJsonArray& sensors) const {
+QIcon MainWindow::sensorColorIcon(const QString& color) {
+  const QColor swatch(color);
+  if (!swatch.isValid()) {
+    return {};  // no colour set: fall back to a plain row rather than a black square
+  }
+  constexpr int size = 32;  // generous, so hosts that scale the icon up stay sharp
+  QPixmap pixmap(size, size);
+  pixmap.fill(Qt::transparent);
+  QPainter painter(&pixmap);
+  painter.setRenderHint(QPainter::Antialiasing);
+  painter.setBrush(swatch);
+  painter.setPen(Qt::NoPen);
+  painter.drawEllipse(pixmap.rect().adjusted(6, 6, -6, -6));
+  return {pixmap};
+}
+
+/*
+  Opens the window on the sensor's own page.
+
+  The route arrives already resolved and percent-encoded from the UI. It is still
+  validated here: it crosses a process boundary and embeds channel names, and one branch
+  below hands it to runJavaScript.
+*/
+void MainWindow::openTraySensorPage(const QString& route) {
+  static const QRegularExpression safeRoute(QStringLiteral("^#?/[A-Za-z0-9/_.~%-]*$"));
+  if (!safeRoute.match(route).hasMatch()) {
+    qWarning() << "Ignoring a tray route that is not a plain path:" << route;
+    return;
+  }
+  const auto fragment = route.startsWith('#') ? route : QStringLiteral("#") % route;
+  setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
+  if (m_page->lifecycleState() == QWebEnginePage::LifecycleState::Active) {
+    m_page->runJavaScript(QStringLiteral("location.hash = '%1'").arg(fragment));
+  } else {
+    // Discarded: reactivating reloads anyway, so load straight to the target instead of
+    // landing on the home page and navigating a second time.
+    m_page->setLifecycleState(QWebEnginePage::LifecycleState::Active);
+    m_reloadOnShow = false;
+    m_uiLoadingStopped = false;
+    m_view->load(QUrl(getDaemonUrl().toString() % "/" % fragment));
+  }
+  showNormal();
+  raise();
+  activateWindow();
+}
+
+void MainWindow::buildTraySensorRows(const QJsonArray& sensors) {
   for (const auto& sensor : m_traySensors) {
     delete sensor.action;  // removes it from whichever menu holds it
   }
@@ -521,7 +568,15 @@ void MainWindow::buildTraySensorRows(const QJsonArray& sensors) const {
     const auto sensor = sensorValue.toObject();
     const auto label = sensor.value("label").toString();
     const auto action = new QAction(label, useSubmenu ? m_sensorsTrayMenu : m_trayIconMenu);
-    action->setEnabled(false);  // a reading, not a command
+    // A colour swatch, matching the Monitoring panel, so a row reads as that sensor
+    // rather than as a disabled menu entry.
+    action->setIcon(sensorColorIcon(sensor.value("color").toString()));
+    const auto route = sensor.value("route").toString();
+    if (route.isEmpty()) {
+      action->setEnabled(false);
+    } else {
+      connect(action, &QAction::triggered, this, [this, route]() { openTraySensorPage(route); });
+    }
     if (useSubmenu) {
       m_sensorsTrayMenu->addAction(action);
     } else {

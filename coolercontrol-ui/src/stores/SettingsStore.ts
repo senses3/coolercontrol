@@ -48,6 +48,8 @@ import { Device } from '@/models/Device'
 import setDefaultSensorAndChannelColors from '@/stores/DeviceColorCreator'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
+import { channelRoute } from '@/shell/channelRoute.ts'
+import router from '@/router'
 import type { AllDaemonDeviceSettings } from '@/models/DaemonSettings'
 import type { NameOverrides } from '@/models/NameOverrides'
 import {
@@ -179,6 +181,11 @@ export const useSettingsStore = defineStore('settings', () => {
             (deviceUID, channelName) =>
                 allUIDeviceSettings.value.get(deviceUID)?.sensorsAndChannels.get(channelName)
                     ?.name ?? channelName,
+            (deviceUID, channelName) =>
+                allUIDeviceSettings.value.get(deviceUID)?.sensorsAndChannels.get(channelName)
+                    ?.color ?? '',
+            (deviceUID, channelName) =>
+                router.resolve(channelRoute(deviceStore.allDevices(), deviceUID, channelName)).href,
         )
         // @ts-ignore - window.ipc is the QWebChannel bridge, present only in the Qt app.
         window.ipc?.setPinnedSensors?.(JSON.stringify(sensors))

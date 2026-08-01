@@ -43,14 +43,23 @@ const device = (uid: string, temps: string[], channels: string[]): Device =>
     }) as unknown as Device
 
 const labelOf = (_uid: string, channelName: string) => `label:${channelName}`
+const colorOf = (_uid: string, channelName: string) => `#c0${channelName.length}`
+const routeOf = (uid: string, channelName: string) => `#/monitoring/sensors/${uid}/${channelName}`
 
 describe('qt pinned sensors', () => {
     const devices = [device('d1', ['temp1', 'temp2'], ['fan1']), device('d2', ['temp1'], ['fan1'])]
 
     it('resolves pins to identity and label', () => {
-        const out = buildPinnedSensors(devices, [pinId('d1', 'temp1')], labelOf)
+        const out = buildPinnedSensors(devices, [pinId('d1', 'temp1')], labelOf, colorOf, routeOf)
         expect(out).toEqual([
-            { deviceUid: 'd1', channelName: 'temp1', label: 'label:temp1', isTemp: true },
+            {
+                deviceUid: 'd1',
+                channelName: 'temp1',
+                label: 'label:temp1',
+                isTemp: true,
+                color: '#c05',
+                route: '#/monitoring/sensors/d1/temp1',
+            },
         ])
     })
 
@@ -59,6 +68,8 @@ describe('qt pinned sensors', () => {
             devices,
             ['a-dashboard-uuid', pinId('d2', 'fan1'), 'another-uuid'],
             labelOf,
+            colorOf,
+            routeOf,
         )
         expect(out.map((s) => `${s.deviceUid}/${s.channelName}`)).toEqual(['d2/fan1'])
     })
@@ -68,6 +79,8 @@ describe('qt pinned sensors', () => {
             devices,
             [pinId('d2', 'fan1'), pinId('d1', 'temp1')],
             labelOf,
+            colorOf,
+            routeOf,
         )
         expect(out.map((s) => s.deviceUid)).toEqual(['d2', 'd1'])
     })
@@ -80,7 +93,9 @@ describe('qt pinned sensors', () => {
             pinId('d2', 'temp1'),
             pinId('d2', 'fan1'),
         ]
-        expect(buildPinnedSensors(devices, many, labelOf)).toHaveLength(many.length)
+        expect(buildPinnedSensors(devices, many, labelOf, colorOf, routeOf)).toHaveLength(
+            many.length,
+        )
     })
 
     it('marks temps so the tray can tell them from channels', () => {
@@ -88,6 +103,8 @@ describe('qt pinned sensors', () => {
             devices,
             [pinId('d1', 'temp1'), pinId('d1', 'fan1')],
             labelOf,
+            colorOf,
+            routeOf,
         )
         expect(out.map((s) => s.isTemp)).toEqual([true, false])
     })
