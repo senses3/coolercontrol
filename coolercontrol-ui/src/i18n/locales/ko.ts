@@ -1228,7 +1228,7 @@ export default {
     desktop: {
         closePrompt: {
             title: '트레이로 닫으시겠습니까?',
-            body: '어느 쪽을 선택하든 냉각 제어는 백그라운드에서 계속 실행됩니다. CoolerControl을 트레이에 두어 빠르게 다시 열거나, 완전히 종료할 수 있습니다.',
+            body: 'CoolerControl 데몬은 어느 쪽이든 백그라운드에서 계속 실행되므로 냉각 설정은 그대로 유지됩니다. 빠른 접근과 데스크톱 알림을 위해 UI를 트레이에 두거나, 완전히 종료할 수 있습니다.',
             keepInTray: '트레이에 두기',
             quit: '종료',
             remember: '내 선택 기억하기',

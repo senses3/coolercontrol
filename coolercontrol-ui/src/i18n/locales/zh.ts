@@ -1189,7 +1189,7 @@ export default {
     desktop: {
         closePrompt: {
             title: '关闭到系统托盘？',
-            body: '无论哪种方式，散热控制都会在后台继续运行。CoolerControl 可以留在系统托盘中以便快速重新打开，也可以完全退出。',
+            body: '无论哪种方式，CoolerControl 守护进程都会在后台继续运行，散热设置保持生效。可以将界面保留在系统托盘中以便快速访问并接收桌面通知，也可以完全退出。',
             keepInTray: '保留在托盘',
             quit: '退出',
             remember: '记住我的选择',

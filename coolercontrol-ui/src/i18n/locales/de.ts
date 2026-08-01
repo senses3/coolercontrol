@@ -1264,7 +1264,7 @@ export default {
     desktop: {
         closePrompt: {
             title: 'In den Tray minimieren?',
-            body: 'Die Lüftersteuerung läuft in beiden Fällen im Hintergrund weiter. CoolerControl kann im Tray bleiben, damit Sie es schnell wieder öffnen können, oder ganz beendet werden.',
+            body: 'Der CoolerControl-Daemon läuft in beiden Fällen im Hintergrund weiter, Ihre Kühlungseinstellungen bleiben also aktiv. Behalten Sie die Oberfläche im Tray für schnellen Zugriff und Desktop-Benachrichtigungen, oder beenden Sie sie ganz.',
             keepInTray: 'Im Tray behalten',
             quit: 'Beenden',
             remember: 'Auswahl merken',

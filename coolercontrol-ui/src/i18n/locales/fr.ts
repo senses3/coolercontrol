@@ -1267,7 +1267,7 @@ export default {
     desktop: {
         closePrompt: {
             title: 'Réduire dans la zone de notification ?',
-            body: 'Le contrôle du refroidissement continue de fonctionner en arrière-plan dans les deux cas. CoolerControl peut rester dans la zone de notification pour être rouvert rapidement, ou être quitté complètement.',
+            body: "Le démon CoolerControl continue de fonctionner en arrière-plan dans les deux cas, vos réglages de refroidissement restent donc actifs. Gardez l'interface dans la zone de notification pour un accès rapide et les notifications du bureau, ou quittez-la complètement.",
             keepInTray: 'Garder dans la zone de notification',
             quit: 'Quitter',
             remember: 'Mémoriser mon choix',

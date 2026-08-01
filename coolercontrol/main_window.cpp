@@ -435,10 +435,11 @@ bool MainWindow::offerCloseToTray() const {
   dialog.setWindowTitle(uiString("closePrompt.title", tr("Close to System Tray?")));
   dialog.setIcon(QMessageBox::Question);
   dialog.setText(uiString("closePrompt.title", tr("Close to System Tray?")));
-  dialog.setInformativeText(uiString(
-      "closePrompt.body", tr("Cooling control keeps running in the background either way. "
-                             "CoolerControl can stay in the system tray so you can reopen it "
-                             "quickly, or quit entirely.")));
+  dialog.setInformativeText(
+      uiString("closePrompt.body",
+               tr("The CoolerControl daemon keeps running in the background either way, so "
+                  "your cooling settings stay active. Keep the UI in the system tray for "
+                  "quick access and desktop notifications, or quit it entirely.")));
   const auto trayButton = dialog.addButton(uiString("closePrompt.keepInTray", tr("Keep in Tray")),
                                            QMessageBox::AcceptRole);
   dialog.addButton(uiString("closePrompt.quit", tr("Quit")), QMessageBox::RejectRole);

@@ -1190,7 +1190,7 @@ export default {
     desktop: {
         closePrompt: {
             title: '關閉至系統託盤？',
-            body: '無論哪種方式，散熱控制都會在背景繼續執行。CoolerControl 可以留在系統託盤中以便快速重新開啟，也可以完全結束。',
+            body: '無論哪種方式，CoolerControl 守護行程都會在背景繼續執行，散熱設定保持生效。可以將介面保留在系統託盤中以便快速存取並接收桌面通知，也可以完全結束。',
             keepInTray: '保留在託盤',
             quit: '結束',
             remember: '記住我的選擇',

@@ -1254,7 +1254,7 @@ export default {
     desktop: {
         closePrompt: {
             title: 'Fechar para a bandeja do sistema?',
-            body: 'O controlo de refrigeração continua a funcionar em segundo plano de qualquer forma. O CoolerControl pode ficar na bandeja do sistema para ser reaberto rapidamente, ou ser encerrado por completo.',
+            body: 'O daemon do CoolerControl continua a funcionar em segundo plano de qualquer forma, pelo que as suas definições de refrigeração permanecem ativas. Mantenha a interface na bandeja do sistema para acesso rápido e notificações no ambiente de trabalho, ou encerre-a por completo.',
             keepInTray: 'Manter na bandeja',
             quit: 'Sair',
             remember: 'Memorizar a minha escolha',
