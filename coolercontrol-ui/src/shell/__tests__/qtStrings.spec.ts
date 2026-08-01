@@ -58,6 +58,56 @@ describe('qt string bridge', () => {
         expect(missing).toEqual([])
     })
 
+    // Unlike most strings, these leave the SPA entirely, so a locale missing one shows
+    // English inside an otherwise translated dialog. Cheap to enforce, easy to lose.
+    it('defines every desktop key in every locale', () => {
+        const locales = import.meta.glob('../../i18n/locales/*.ts', { eager: true }) as Record<
+            string,
+            { default: any }
+        >
+        const entries = Object.entries(locales).filter(([p]) => !p.endsWith('index.d.ts'))
+        expect(entries).toHaveLength(12)
+
+        const flatten = (obj: any, prefix = ''): [string, string][] =>
+            Object.entries(obj).flatMap(([k, v]) =>
+                typeof v === 'object' && v !== null
+                    ? flatten(v, `${prefix}${k}.`)
+                    : ([[`${prefix}${k}`, String(v)]] as [string, string][]),
+            )
+        const expected = flatten((en as any).desktop)
+            .map(([k]) => k)
+            .sort()
+
+        const problems: string[] = []
+        for (const [path, mod] of entries) {
+            const name = path.split('/').pop()
+            const desktop = mod.default?.desktop
+            if (desktop == null) {
+                problems.push(`${name}: no desktop section`)
+                continue
+            }
+            const flat = flatten(desktop)
+            const keys = flat.map(([k]) => k).sort()
+            for (const k of expected) {
+                if (!keys.includes(k)) problems.push(`${name}: missing ${k}`)
+            }
+            for (const [k, v] of flat) {
+                if (v.trim() === '') problems.push(`${name}: empty ${k}`)
+            }
+            // Qt substitutes these with QString::arg, so a translation that drops them
+            // silently loses the version numbers or the docs link.
+            const byKey = Object.fromEntries(flat)
+            if (!byKey['wizard.introDocs']?.includes('%1')) {
+                problems.push(`${name}: wizard.introDocs lost %1`)
+            }
+            const mismatch = byKey['versionMismatch.text'] ?? ''
+            if (!mismatch.includes('%1') || !mismatch.includes('%2')) {
+                problems.push(`${name}: versionMismatch.text lost %1/%2`)
+            }
+        }
+        expect(problems).toEqual([])
+    })
+
     // Guards the half of the contract TypeScript cannot see: Qt asks for these by
     // string literal, so a key dropped here becomes a silent English fallback there.
     it('pushes every key the Qt app looks up', () => {

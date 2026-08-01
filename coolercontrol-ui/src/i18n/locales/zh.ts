@@ -1184,6 +1184,53 @@ export default {
             hasErrors: '错误',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '关闭到系统托盘？',
+            body: '无论哪种方式，散热控制都会在后台继续运行。CoolerControl 可以留在系统托盘中以便快速重新打开，也可以完全退出。',
+            keepInTray: '保留在托盘',
+            quit: '退出',
+            remember: '记住我的选择',
+        },
+        tray: {
+            show: '显示(&S)',
+            hide: '隐藏(&H)',
+            daemonAddress: '守护进程地址(&D)',
+            quit: '退出(&Q)',
+            modes: '模式',
+        },
+        wizard: {
+            windowTitle: '守护进程连接错误',
+            apply: '应用(&A)',
+            retry: '重试(&R)',
+            quitApp: '退出应用(&Q)',
+            introFailed: '无法与 CoolerControl 守护进程建立连接。',
+            introCheckService: '请确认 systemd 服务正在运行且可用。',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: '请查看 %1 获取安装说明。',
+            introDocsLink: '文档网站',
+            introCommands: '以下命令有助于启用和检查守护进程状态:',
+            introCustomAddress: '如果您为连接守护进程配置了非默认地址，可在以下步骤中设置:',
+            addressTitle: '守护进程地址 - 桌面应用程序',
+            addressSubtitle: '请根据需要调整地址字段。',
+            hostLabel: '主机地址:',
+            hostTooltip: '用于与守护进程通信的 IPv4、IPv6 地址或主机名。',
+            portLabel: '端口:',
+            portTooltip: '用于与守护进程通信的端口号。',
+            sslTooltip: '启用或禁用 SSL/TLS (HTTPS)',
+            defaults: '默认值',
+            defaultsTooltip: '将守护进程地址重置为默认值',
+        },
+        versionMismatch: {
+            title: '版本不匹配',
+            text: '桌面应用版本 (%1) 与守护进程版本 (%2) 不匹配。',
+            informative: '请重启桌面应用以加载正确的界面版本。',
+            quitApp: '退出应用(&Q)',
+            continueAnyway: '仍然继续',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: '会话已过期',

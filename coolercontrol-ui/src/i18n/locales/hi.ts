@@ -1232,6 +1232,54 @@ export default {
             hasErrors: 'त्रुटियां हैं',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'सिस्टम ट्रे में बंद करें?',
+            body: 'दोनों ही स्थितियों में कूलिंग नियंत्रण पृष्ठभूमि में चलता रहता है। CoolerControl सिस्टम ट्रे में रह सकता है ताकि आप इसे तुरंत फिर से खोल सकें, या पूरी तरह बंद किया जा सकता है।',
+            keepInTray: 'ट्रे में रखें',
+            quit: 'बंद करें',
+            remember: 'मेरा चयन याद रखें',
+        },
+        tray: {
+            show: 'दिखाएँ',
+            hide: 'छिपाएँ',
+            daemonAddress: 'डीमन पता',
+            quit: 'बंद करें',
+            modes: 'मोड',
+        },
+        wizard: {
+            windowTitle: 'डीमन कनेक्शन त्रुटि',
+            apply: 'लागू करें',
+            retry: 'पुनः प्रयास',
+            quitApp: 'ऐप बंद करें',
+            introFailed: 'CoolerControl डीमन से कनेक्शन स्थापित नहीं हो सका।',
+            introCheckService: 'कृपया सुनिश्चित करें कि systemd सेवा चल रही है और उपलब्ध है।',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'इंस्टॉलेशन निर्देशों के लिए %1 देखें।',
+            introDocsLink: 'दस्तावेज़ वेबसाइट',
+            introCommands: 'डीमन की स्थिति सक्षम करने और जाँचने के लिए कुछ उपयोगी कमांड:',
+            introCustomAddress:
+                'यदि आपने डीमन से कनेक्ट करने के लिए गैर-मानक पता कॉन्फ़िगर किया है, तो आप इसे निम्न चरणों में सेट कर सकते हैं:',
+            addressTitle: 'डीमन पता - डेस्कटॉप अनुप्रयोग',
+            addressSubtitle: 'आवश्यकतानुसार पता फ़ील्ड समायोजित करें।',
+            hostLabel: 'होस्ट पता:',
+            hostTooltip: 'डीमन से संचार के लिए उपयोग किया जाने वाला IPv4, IPv6 पता या होस्टनाम।',
+            portLabel: 'पोर्ट:',
+            portTooltip: 'डीमन से संचार के लिए उपयोग किया जाने वाला पोर्ट नंबर।',
+            sslTooltip: 'SSL/TLS (HTTPS) सक्षम या अक्षम करें',
+            defaults: 'डिफ़ॉल्ट',
+            defaultsTooltip: 'डीमन पते को डिफ़ॉल्ट मानों पर रीसेट करें',
+        },
+        versionMismatch: {
+            title: 'संस्करण बेमेल',
+            text: 'डेस्कटॉप ऐप संस्करण (%1) डीमन संस्करण (%2) से मेल नहीं खाता।',
+            informative: 'सही इंटरफ़ेस संस्करण लोड करने के लिए कृपया डेस्कटॉप ऐप पुनः आरंभ करें।',
+            quitApp: 'ऐप बंद करें',
+            continueAnyway: 'फिर भी जारी रखें',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'सत्र समाप्त हो गया',

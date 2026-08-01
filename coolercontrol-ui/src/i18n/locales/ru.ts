@@ -1252,6 +1252,55 @@ export default {
             hasErrors: 'Есть ошибки',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Свернуть в трей?',
+            body: 'Управление охлаждением в любом случае продолжит работать в фоновом режиме. CoolerControl может остаться в трее, чтобы его можно было быстро открыть снова, либо завершить работу полностью.',
+            keepInTray: 'Оставить в трее',
+            quit: 'Выйти',
+            remember: 'Запомнить мой выбор',
+        },
+        tray: {
+            show: '&Показать',
+            hide: '&Скрыть',
+            daemonAddress: '&Адрес службы',
+            quit: '&Выход',
+            modes: 'Режимы',
+        },
+        wizard: {
+            windowTitle: 'Ошибка подключения к службе',
+            apply: '&Применить',
+            retry: '&Повторить',
+            quitApp: '&Выйти',
+            introFailed: 'Не удалось установить соединение со службой CoolerControl.',
+            introCheckService: 'Убедитесь, что служба systemd запущена и доступна.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Инструкции по установке смотрите на %1.',
+            introDocsLink: 'сайте документации',
+            introCommands: 'Полезные команды для включения и проверки состояния службы:',
+            introCustomAddress:
+                'Если вы настроили нестандартный адрес для подключения к службе, его можно указать на следующих шагах:',
+            addressTitle: 'Адрес службы - Настольное приложение',
+            addressSubtitle: 'При необходимости измените поля адреса.',
+            hostLabel: 'Адрес узла:',
+            hostTooltip: 'Адрес IPv4, IPv6 или имя узла для связи со службой.',
+            portLabel: 'Порт:',
+            portTooltip: 'Номер порта для связи со службой.',
+            sslTooltip: 'Включить или отключить SSL/TLS (HTTPS)',
+            defaults: 'По умолчанию',
+            defaultsTooltip: 'Сбросить адрес службы к значениям по умолчанию',
+        },
+        versionMismatch: {
+            title: 'Несовпадение версий',
+            text: 'Версия настольного приложения (%1) не совпадает с версией службы (%2).',
+            informative:
+                'Перезапустите настольное приложение, чтобы загрузить правильную версию интерфейса.',
+            quitApp: '&Выйти',
+            continueAnyway: 'Всё равно продолжить',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Сессия истекла',

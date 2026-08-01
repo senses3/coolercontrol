@@ -1249,6 +1249,56 @@ export default {
             hasErrors: 'Tem Erros',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Fechar para a bandeja do sistema?',
+            body: 'O controlo de refrigeração continua a funcionar em segundo plano de qualquer forma. O CoolerControl pode ficar na bandeja do sistema para ser reaberto rapidamente, ou ser encerrado por completo.',
+            keepInTray: 'Manter na bandeja',
+            quit: 'Sair',
+            remember: 'Memorizar a minha escolha',
+        },
+        tray: {
+            show: '&Mostrar',
+            hide: '&Ocultar',
+            daemonAddress: 'Endereço do &daemon',
+            quit: '&Sair',
+            modes: 'Modos',
+        },
+        wizard: {
+            windowTitle: 'Erro de ligação ao daemon',
+            apply: '&Aplicar',
+            retry: '&Tentar novamente',
+            quitApp: '&Sair',
+            introFailed: 'Não foi possível estabelecer uma ligação ao daemon do CoolerControl.',
+            introCheckService:
+                'Certifique-se de que o serviço systemd está em execução e disponível.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Consulte o %1 para obter instruções de instalação.',
+            introDocsLink: 'site de documentação',
+            introCommands: 'Alguns comandos úteis para ativar e verificar o estado do daemon:',
+            introCustomAddress:
+                'Se configurou um endereço não predefinido para ligar ao daemon, pode defini-lo nos passos seguintes:',
+            addressTitle: 'Endereço do daemon - Aplicação de ambiente de trabalho',
+            addressSubtitle: 'Ajuste os campos de endereço conforme necessário.',
+            hostLabel: 'Endereço do anfitrião:',
+            hostTooltip:
+                'O endereço IPv4, IPv6 ou o nome de anfitrião a utilizar para comunicar com o daemon.',
+            portLabel: 'Porta:',
+            portTooltip: 'O número de porta a utilizar para comunicar com o daemon.',
+            sslTooltip: 'Ativar ou desativar SSL/TLS (HTTPS)',
+            defaults: 'Predefinições',
+            defaultsTooltip: 'Repor o endereço do daemon para os valores predefinidos',
+        },
+        versionMismatch: {
+            title: 'Versões incompatíveis',
+            text: 'A versão da aplicação (%1) não corresponde à versão do daemon (%2).',
+            informative: 'Reinicie a aplicação para carregar a versão correta da interface.',
+            quitApp: '&Sair',
+            continueAnyway: 'Continuar mesmo assim',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sessão expirada',

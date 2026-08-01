@@ -1250,6 +1250,58 @@ export default {
             hasErrors: 'Tiene Errores',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '¿Cerrar a la bandeja del sistema?',
+            body: 'El control de refrigeración sigue funcionando en segundo plano en cualquier caso. CoolerControl puede permanecer en la bandeja del sistema para volver a abrirlo rápidamente, o cerrarse por completo.',
+            keepInTray: 'Mantener en la bandeja',
+            quit: 'Salir',
+            remember: 'Recordar mi elección',
+        },
+        tray: {
+            show: '&Mostrar',
+            hide: '&Ocultar',
+            daemonAddress: 'Dirección del &demonio',
+            quit: '&Salir',
+            modes: 'Modos',
+        },
+        wizard: {
+            windowTitle: 'Error de conexión con el demonio',
+            apply: '&Aplicar',
+            retry: '&Reintentar',
+            quitApp: '&Salir',
+            introFailed: 'No se pudo establecer una conexión con el demonio de CoolerControl.',
+            introCheckService:
+                'Asegúrese de que el servicio de systemd esté en ejecución y disponible.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Consulte el %1 para ver las instrucciones de instalación.',
+            introDocsLink: 'sitio de documentación',
+            introCommands:
+                'Algunos comandos útiles para activar y verificar el estado del demonio:',
+            introCustomAddress:
+                'Si ha configurado una dirección no estándar para conectarse al demonio, puede establecerla en los siguientes pasos:',
+            addressTitle: 'Dirección del demonio - Aplicación de escritorio',
+            addressSubtitle: 'Ajuste los campos de dirección según sea necesario.',
+            hostLabel: 'Dirección del host:',
+            hostTooltip:
+                'La dirección IPv4, IPv6 o el nombre de host que se usará para comunicarse con el demonio.',
+            portLabel: 'Puerto:',
+            portTooltip: 'El número de puerto que se usará para comunicarse con el demonio.',
+            sslTooltip: 'Activar o desactivar SSL/TLS (HTTPS)',
+            defaults: 'Valores predeterminados',
+            defaultsTooltip: 'Restablecer la dirección del demonio a los valores predeterminados',
+        },
+        versionMismatch: {
+            title: 'Versiones incompatibles',
+            text: 'La versión de la aplicación de escritorio (%1) no coincide con la versión del demonio (%2).',
+            informative:
+                'Reinicie la aplicación de escritorio para cargar la versión correcta de la interfaz.',
+            quitApp: '&Salir',
+            continueAnyway: 'Continuar de todos modos',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sesión expirada',

@@ -49,6 +49,7 @@
 #include "constants.h"
 #include "notifier.h"
 #include "sse_parser.h"
+#include "translations.h"
 
 /*
   Qt has no API for the settings file's mode, and QSettings creates it 0644. It does
@@ -207,13 +208,14 @@ MainWindow::MainWindow(QWidget* parent)
 }
 
 void MainWindow::initWizard() {
-  m_wizard->setWindowTitle("Daemon Connection Error");
+  m_wizard->setWindowTitle(uiString("wizard.windowTitle", tr("Daemon Connection Error")));
   m_wizard->setOption(QWizard::IndependentPages, true);
-  m_wizard->setButtonText(QWizard::WizardButton::FinishButton, "&Apply");
+  m_wizard->setButtonText(QWizard::WizardButton::FinishButton,
+                          uiString("wizard.apply", tr("&Apply")));
   m_wizard->setOption(QWizard::CancelButtonOnLeft, true);
-  m_wizard->setButtonText(QWizard::CustomButton1, "&Retry");
+  m_wizard->setButtonText(QWizard::CustomButton1, uiString("wizard.retry", tr("&Retry")));
   m_wizard->setOption(QWizard::HaveCustomButton1, true);
-  m_wizard->setButtonText(QWizard::HelpButton, "&Quit App");
+  m_wizard->setButtonText(QWizard::HelpButton, uiString("wizard.quitApp", tr("&Quit App")));
   m_wizard->setOption(QWizard::HaveHelpButton, true);
   m_wizard->addPage(new IntroPage(m_wizard));
   const auto addressPage = new AddressPage(m_wizard);
@@ -256,8 +258,9 @@ void MainWindow::initSystemTray() {
       QIcon::fromTheme(APP_ID.data(), QIcon(":/icons/org.coolercontrol.CoolerControl.svg")),
       tr("CoolerControl"), m_sysTrayIcon);
   ccHeader->setDisabled(true);
-  m_showAction = m_ipc->getStartInTray() ? new QAction(tr("&Show"), m_sysTrayIcon)
-                                         : new QAction(tr("&Hide"), m_sysTrayIcon);
+  m_showAction = m_ipc->getStartInTray()
+                     ? new QAction(uiString("tray.show", tr("&Show")), m_sysTrayIcon)
+                     : new QAction(uiString("tray.hide", tr("&Hide")), m_sysTrayIcon);
   connect(
       m_showAction, &QAction::triggered, this,
       [this]() {
@@ -271,18 +274,19 @@ void MainWindow::initSystemTray() {
       },
       Qt::QueuedConnection);
 
-  m_addressAction = new QAction(tr("&Daemon Address"), m_sysTrayIcon);
+  m_addressAction =
+      new QAction(uiString("tray.daemonAddress", tr("&Daemon Address")), m_sysTrayIcon);
   connect(m_addressAction, &QAction::triggered, [this]() { displayAddressWizard(); });
 
-  m_quitAction =
-      new QAction(QIcon::fromTheme("application-exit", QIcon()), tr("&Quit"), m_sysTrayIcon);
+  m_quitAction = new QAction(QIcon::fromTheme("application-exit", QIcon()),
+                             uiString("tray.quit", tr("&Quit")), m_sysTrayIcon);
   connect(m_quitAction, &QAction::triggered, this, &MainWindow::forceQuit, Qt::QueuedConnection);
   m_trayIconMenu = new QMenu(this);
   m_trayIconMenu->setTitle("CoolerControl");
   m_trayIconMenu->addAction(ccHeader);
   m_trayIconMenu->addSeparator();
   m_modesTrayMenu = new QMenu(this);
-  m_modesTrayMenu->setTitle("Modes");
+  m_modesTrayMenu->setTitle(uiString("tray.modes", tr("Modes")));
   m_modesTrayMenu->setEnabled(false);
   m_trayIconMenu->addMenu(m_modesTrayMenu);
   m_trayIconMenu->addAction(m_showAction);
@@ -453,27 +457,7 @@ bool MainWindow::offerCloseToTray() const {
 }
 
 void MainWindow::setTranslations(const QString& translationsJson) const {
-  const auto obj = QJsonDocument::fromJson(translationsJson.toUtf8()).object();
-  if (obj.isEmpty()) {
-    qWarning() << "Ignoring empty translation payload from the UI.";
-    return;
-  }
-  QSettings settings;
-  settings.beginGroup(SETTING_GROUP_TRANSLATIONS.data());
-  // Replace wholesale so a locale change cannot leave stale strings behind.
-  settings.remove(QString());
-  for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
-    settings.setValue(it.key(), it.value().toString());
-  }
-  settings.endGroup();
-  qDebug() << "Cached" << obj.size() << "UI strings for Qt-rendered dialogs.";
-}
-
-QString MainWindow::uiString(const QString& key, const QString& fallback) {
-  const QSettings settings;
-  const auto value =
-      settings.value(QString(SETTING_GROUP_TRANSLATIONS.data()) % "/" % key).toString();
-  return value.isEmpty() ? fallback : value;
+  cacheUiStrings(translationsJson);
 }
 
 void MainWindow::setDiscardEnabled(const bool enabled) {
@@ -615,21 +599,30 @@ void MainWindow::delay(const int millisecondsWait) {
   loop.exec();
 }
 
-void MainWindow::setTrayActionToShow() const { m_showAction->setText(tr("&Show")); }
+void MainWindow::setTrayActionToShow() const {
+  m_showAction->setText(uiString("tray.show", tr("&Show")));
+}
 
-void MainWindow::setTrayActionToHide() const { m_showAction->setText(tr("&Hide")); }
+void MainWindow::setTrayActionToHide() const {
+  m_showAction->setText(uiString("tray.hide", tr("&Hide")));
+}
 
 void MainWindow::showVersionMismatchDialog(const QString& daemonVersion) const {
   const auto appVersion = QString::fromStdString(COOLER_CONTROL_VERSION);
   QMessageBox dialog;
-  dialog.setWindowTitle(tr("Version Mismatch"));
+  dialog.setWindowTitle(uiString("versionMismatch.title", tr("Version Mismatch")));
   dialog.setIcon(QMessageBox::Warning);
-  dialog.setText(tr("The desktop app version (%1) does not match the daemon version (%2).")
-                     .arg(appVersion, daemonVersion));
+  dialog.setText(
+      uiString("versionMismatch.text", tr("The desktop app version (%1) does not match the daemon "
+                                          "version (%2)."))
+          .arg(appVersion, daemonVersion));
   dialog.setInformativeText(
-      tr("Please restart the desktop app to load the correct interface version."));
-  const auto quitButton = dialog.addButton(tr("&Quit App"), QMessageBox::AcceptRole);
-  dialog.addButton(tr("Continue Anyway"), QMessageBox::RejectRole);
+      uiString("versionMismatch.informative",
+               tr("Please restart the desktop app to load the correct interface version.")));
+  const auto quitButton = dialog.addButton(uiString("versionMismatch.quitApp", tr("&Quit App")),
+                                           QMessageBox::AcceptRole);
+  dialog.addButton(uiString("versionMismatch.continueAnyway", tr("Continue Anyway")),
+                   QMessageBox::RejectRole);
   dialog.setDefaultButton(quitButton);
   dialog.exec();
   if (dialog.clickedButton() == quitButton) {

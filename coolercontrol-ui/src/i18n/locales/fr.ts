@@ -1262,6 +1262,57 @@ export default {
             hasErrors: 'A des Erreurs',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Réduire dans la zone de notification ?',
+            body: 'Le contrôle du refroidissement continue de fonctionner en arrière-plan dans les deux cas. CoolerControl peut rester dans la zone de notification pour être rouvert rapidement, ou être quitté complètement.',
+            keepInTray: 'Garder dans la zone de notification',
+            quit: 'Quitter',
+            remember: 'Mémoriser mon choix',
+        },
+        tray: {
+            show: '&Afficher',
+            hide: '&Masquer',
+            daemonAddress: 'Adresse du &démon',
+            quit: '&Quitter',
+            modes: 'Modes',
+        },
+        wizard: {
+            windowTitle: 'Erreur de connexion au démon',
+            apply: '&Appliquer',
+            retry: '&Réessayer',
+            quitApp: '&Quitter',
+            introFailed: "La connexion au démon CoolerControl n'a pas pu être établie.",
+            introCheckService:
+                'Veuillez vérifier que le service systemd est démarré et disponible.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: "Consultez le %1 pour les instructions d'installation.",
+            introDocsLink: 'site de documentation',
+            introCommands: "Quelques commandes utiles pour activer et vérifier l'état du démon :",
+            introCustomAddress:
+                'Si vous avez configuré une adresse non standard pour vous connecter au démon, vous pouvez la définir aux étapes suivantes :',
+            addressTitle: 'Adresse du démon - Application de bureau',
+            addressSubtitle: "Ajustez les champs d'adresse si nécessaire.",
+            hostLabel: "Adresse de l'hôte :",
+            hostTooltip:
+                "L'adresse IPv4, IPv6 ou le nom d'hôte à utiliser pour communiquer avec le démon.",
+            portLabel: 'Port :',
+            portTooltip: 'Le numéro de port à utiliser pour communiquer avec le démon.',
+            sslTooltip: 'Activer ou désactiver SSL/TLS (HTTPS)',
+            defaults: 'Valeurs par défaut',
+            defaultsTooltip: "Réinitialiser l'adresse du démon aux valeurs par défaut",
+        },
+        versionMismatch: {
+            title: 'Version incompatible',
+            text: "La version de l'application de bureau (%1) ne correspond pas à la version du démon (%2).",
+            informative:
+                "Veuillez redémarrer l'application de bureau pour charger la bonne version de l'interface.",
+            quitApp: '&Quitter',
+            continueAnyway: 'Continuer quand même',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Session expirée',

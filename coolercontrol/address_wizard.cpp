@@ -21,23 +21,41 @@
 #include <QLineEdit>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
+#include <QStringBuilder>
 #include <QVBoxLayout>
 
 #include "constants.h"
+#include "translations.h"
 
 IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
+  // Assembled from parts so the shell commands stay out of translation, and so the
+  // docs link can be placed wherever a language needs it.
+  const auto docsLink = QStringLiteral(
+                            "<a href=\"https://docs.coolercontrol.org\" "
+                            "target=\"_blank\">%1</a>")
+                            .arg(uiString("wizard.introDocsLink", tr("docs website")));
   m_label = new QLabel(
-      "<p>A connection to the CoolerControl Daemon could not be established.<br/>"
-      "Please make sure that the systemd service is running and available.</p>"
-      "<p>Check the <a href=\"https://docs.coolercontrol.org\" target=\"_blank\">docs website</a>"
-      " for installation instructions.</p>"
-      "<p>Some helpful commands to enable and verify the daemon status:</p>"
+      "<p>" %
+      uiString("wizard.introFailed",
+               tr("A connection to the CoolerControl Daemon could not be established.")) %
+      "<br/>" %
+      uiString("wizard.introCheckService",
+               tr("Please make sure that the systemd service is running and available.")) %
+      "</p><p>" %
+      uiString("wizard.introDocs", tr("Check the %1 for installation instructions."))
+          .arg(docsLink) %
+      "</p><p>" %
+      uiString("wizard.introCommands",
+               tr("Some helpful commands to enable and verify the daemon status:")) %
+      "</p>"
       "<p><code>"
       "sudo systemctl enable --now coolercontrold<br />"
       "sudo systemctl status coolercontrold<br />"
-      "</code></p>"
-      "<p>If you have configured a non-standard address to connect to the daemon, you can set it "
-      "in the following steps: </p>");
+      "</code></p><p>" %
+      uiString("wizard.introCustomAddress",
+               tr("If you have configured a non-standard address to connect to the daemon, "
+                  "you can set it in the following steps:")) %
+      "</p>");
   m_label->setWordWrap(true);
   m_label->setOpenExternalLinks(true);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::LinksAccessibleByMouse);
@@ -48,31 +66,34 @@ IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
 }
 
 AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
-  setTitle("Daemon Address - Desktop Application");
-  setSubTitle("Adjust the address fields as necessary.");
+  setTitle(uiString("wizard.addressTitle", tr("Daemon Address - Desktop Application")));
+  setSubTitle(uiString("wizard.addressSubtitle", tr("Adjust the address fields as necessary.")));
 
-  auto* addressLabel = new QLabel("Host address:");
+  auto* addressLabel = new QLabel(uiString("wizard.hostLabel", tr("Host address:")));
   m_addressLineEdit = new QLineEdit;
   addressLabel->setBuddy(m_addressLineEdit);
   m_addressLineEdit->setToolTip(
-      "The IPv4, IPv6 address or hostname to use to communicate with the daemon.");
+      uiString("wizard.hostTooltip",
+               tr("The IPv4, IPv6 address or hostname to use to communicate with the daemon.")));
   m_addressLineEdit->setValidator(
       new QRegularExpressionValidator(QRegularExpression("[0-9a-zA-Z.-]+")));
   registerField("address", m_addressLineEdit);
 
-  auto* portLabel = new QLabel("Port:");
+  auto* portLabel = new QLabel(uiString("wizard.portLabel", tr("Port:")));
   m_portLineEdit = new QLineEdit;
   portLabel->setBuddy(m_portLineEdit);
-  m_portLineEdit->setToolTip("The port number to use to communicate with the daemon.");
+  m_portLineEdit->setToolTip(
+      uiString("wizard.portTooltip", tr("The port number to use to communicate with the daemon.")));
   m_portLineEdit->setValidator(new QIntValidator(80, 65535, m_portLineEdit));
   registerField("port", m_portLineEdit);
 
   m_sslCheckbox = new QCheckBox("SSL/TLS");
-  m_sslCheckbox->setToolTip("Enable or disable SSL/TLS (HTTPS)");
+  m_sslCheckbox->setToolTip(uiString("wizard.sslTooltip", tr("Enable or disable SSL/TLS (HTTPS)")));
   registerField("ssl", m_sslCheckbox);
 
-  m_defaultButton = new QPushButton("Defaults");
-  m_defaultButton->setToolTip("Reset the daemon address to default values");
+  m_defaultButton = new QPushButton(uiString("wizard.defaults", tr("Defaults")));
+  m_defaultButton->setToolTip(
+      uiString("wizard.defaultsTooltip", tr("Reset the daemon address to default values")));
   connect(m_defaultButton, &QPushButton::clicked, [this]() { resetAddressInputValues(); });
 
   auto* layout = new QGridLayout;

@@ -1223,6 +1223,54 @@ export default {
             hasErrors: 'لديه أخطاء',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'الإغلاق إلى شريط المهام؟',
+            body: 'يستمر التحكم في التبريد بالعمل في الخلفية في كلتا الحالتين. يمكن أن يبقى CoolerControl في شريط المهام لإعادة فتحه بسرعة، أو الخروج منه تمامًا.',
+            keepInTray: 'الإبقاء في شريط المهام',
+            quit: 'خروج',
+            remember: 'تذكر اختياري',
+        },
+        tray: {
+            show: 'إظهار',
+            hide: 'إخفاء',
+            daemonAddress: 'عنوان الخدمة',
+            quit: 'خروج',
+            modes: 'الأوضاع',
+        },
+        wizard: {
+            windowTitle: 'خطأ في الاتصال بالخدمة',
+            apply: 'تطبيق',
+            retry: 'إعادة المحاولة',
+            quitApp: 'إنهاء التطبيق',
+            introFailed: 'تعذر إنشاء اتصال بخدمة CoolerControl.',
+            introCheckService: 'يرجى التأكد من أن خدمة systemd قيد التشغيل ومتاحة.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'راجع %1 للاطلاع على تعليمات التثبيت.',
+            introDocsLink: 'موقع التوثيق',
+            introCommands: 'بعض الأوامر المفيدة لتفعيل حالة الخدمة والتحقق منها:',
+            introCustomAddress:
+                'إذا قمت بضبط عنوان غير قياسي للاتصال بالخدمة، يمكنك تعيينه في الخطوات التالية:',
+            addressTitle: 'عنوان الخدمة - تطبيق سطح المكتب',
+            addressSubtitle: 'عدّل حقول العنوان حسب الحاجة.',
+            hostLabel: 'عنوان المضيف:',
+            hostTooltip: 'عنوان IPv4 أو IPv6 أو اسم المضيف المستخدم للتواصل مع الخدمة.',
+            portLabel: 'المنفذ:',
+            portTooltip: 'رقم المنفذ المستخدم للتواصل مع الخدمة.',
+            sslTooltip: 'تفعيل أو تعطيل SSL/TLS (HTTPS)',
+            defaults: 'الإعدادات الافتراضية',
+            defaultsTooltip: 'إعادة تعيين عنوان الخدمة إلى القيم الافتراضية',
+        },
+        versionMismatch: {
+            title: 'عدم تطابق الإصدار',
+            text: 'إصدار تطبيق سطح المكتب (%1) لا يطابق إصدار الخدمة (%2).',
+            informative: 'يرجى إعادة تشغيل تطبيق سطح المكتب لتحميل إصدار الواجهة الصحيح.',
+            quitApp: 'إنهاء التطبيق',
+            continueAnyway: 'المتابعة على أي حال',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'انتهت الجلسة',

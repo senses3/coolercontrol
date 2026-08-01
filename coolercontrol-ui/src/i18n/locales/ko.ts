@@ -1223,6 +1223,54 @@ export default {
             hasErrors: '오류 발생',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '트레이로 닫으시겠습니까?',
+            body: '어느 쪽을 선택하든 냉각 제어는 백그라운드에서 계속 실행됩니다. CoolerControl을 트레이에 두어 빠르게 다시 열거나, 완전히 종료할 수 있습니다.',
+            keepInTray: '트레이에 두기',
+            quit: '종료',
+            remember: '내 선택 기억하기',
+        },
+        tray: {
+            show: '표시(&S)',
+            hide: '숨기기(&H)',
+            daemonAddress: '데몬 주소(&D)',
+            quit: '종료(&Q)',
+            modes: '모드',
+        },
+        wizard: {
+            windowTitle: '데몬 연결 오류',
+            apply: '적용(&A)',
+            retry: '재시도(&R)',
+            quitApp: '앱 종료(&Q)',
+            introFailed: 'CoolerControl 데몬에 연결할 수 없습니다.',
+            introCheckService: 'systemd 서비스가 실행 중이며 사용 가능한지 확인하십시오.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: '설치 방법은 %1를 참조하십시오.',
+            introDocsLink: '문서 사이트',
+            introCommands: '데몬을 활성화하고 상태를 확인하는 데 유용한 명령:',
+            introCustomAddress:
+                '데몬 연결에 기본이 아닌 주소를 설정한 경우 다음 단계에서 지정할 수 있습니다:',
+            addressTitle: '데몬 주소 - 데스크톱 애플리케이션',
+            addressSubtitle: '필요에 따라 주소 항목을 조정하십시오.',
+            hostLabel: '호스트 주소:',
+            hostTooltip: '데몬과 통신하는 데 사용할 IPv4, IPv6 주소 또는 호스트 이름입니다.',
+            portLabel: '포트:',
+            portTooltip: '데몬과 통신하는 데 사용할 포트 번호입니다.',
+            sslTooltip: 'SSL/TLS (HTTPS) 사용 여부를 전환합니다',
+            defaults: '기본값',
+            defaultsTooltip: '데몬 주소를 기본값으로 되돌립니다',
+        },
+        versionMismatch: {
+            title: '버전 불일치',
+            text: '데스크톱 앱 버전(%1)이 데몬 버전(%2)과 일치하지 않습니다.',
+            informative: '올바른 인터페이스 버전을 불러오려면 데스크톱 앱을 다시 시작하십시오.',
+            quitApp: '앱 종료(&Q)',
+            continueAnyway: '무시하고 계속',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: '세션 만료됨',

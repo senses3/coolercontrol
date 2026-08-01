@@ -1240,6 +1240,47 @@ export default {
             quit: 'Quit',
             remember: 'Remember my choice',
         },
+        tray: {
+            show: '&Show',
+            hide: '&Hide',
+            daemonAddress: '&Daemon Address',
+            quit: '&Quit',
+            modes: 'Modes',
+        },
+        // Shown when the daemon cannot be reached, so the UI itself may never have
+        // loaded. Qt falls back to English until a successful run caches these.
+        wizard: {
+            windowTitle: 'Daemon Connection Error',
+            apply: '&Apply',
+            retry: '&Retry',
+            quitApp: '&Quit App',
+            introFailed: 'A connection to the CoolerControl Daemon could not be established.',
+            introCheckService:
+                'Please make sure that the systemd service is running and available.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Check the %1 for installation instructions.',
+            introDocsLink: 'docs website',
+            introCommands: 'Some helpful commands to enable and verify the daemon status:',
+            introCustomAddress:
+                'If you have configured a non-standard address to connect to the daemon, you can set it in the following steps:',
+            addressTitle: 'Daemon Address - Desktop Application',
+            addressSubtitle: 'Adjust the address fields as necessary.',
+            hostLabel: 'Host address:',
+            hostTooltip:
+                'The IPv4, IPv6 address or hostname to use to communicate with the daemon.',
+            portLabel: 'Port:',
+            portTooltip: 'The port number to use to communicate with the daemon.',
+            sslTooltip: 'Enable or disable SSL/TLS (HTTPS)',
+            defaults: 'Defaults',
+            defaultsTooltip: 'Reset the daemon address to default values',
+        },
+        versionMismatch: {
+            title: 'Version Mismatch',
+            text: 'The desktop app version (%1) does not match the daemon version (%2).',
+            informative: 'Please restart the desktop app to load the correct interface version.',
+            quitApp: '&Quit App',
+            continueAnyway: 'Continue Anyway',
+        },
     },
     device_store: {
         unauthorized: {

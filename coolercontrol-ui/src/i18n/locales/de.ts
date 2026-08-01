@@ -1259,6 +1259,58 @@ export default {
             hasErrors: 'Hat Fehler',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'In den Tray minimieren?',
+            body: 'Die Lüftersteuerung läuft in beiden Fällen im Hintergrund weiter. CoolerControl kann im Tray bleiben, damit Sie es schnell wieder öffnen können, oder ganz beendet werden.',
+            keepInTray: 'Im Tray behalten',
+            quit: 'Beenden',
+            remember: 'Auswahl merken',
+        },
+        tray: {
+            show: '&Anzeigen',
+            hide: '&Ausblenden',
+            daemonAddress: '&Daemon-Adresse',
+            quit: '&Beenden',
+            modes: 'Modi',
+        },
+        wizard: {
+            windowTitle: 'Daemon-Verbindungsfehler',
+            apply: '&Anwenden',
+            retry: '&Wiederholen',
+            quitApp: '&App beenden',
+            introFailed: 'Es konnte keine Verbindung zum CoolerControl-Daemon hergestellt werden.',
+            introCheckService:
+                'Bitte stellen Sie sicher, dass der systemd-Dienst läuft und verfügbar ist.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Installationsanweisungen finden Sie auf der %1.',
+            introDocsLink: 'Dokumentationswebsite',
+            introCommands:
+                'Einige nützliche Befehle, um den Daemon-Status zu aktivieren und zu prüfen:',
+            introCustomAddress:
+                'Wenn Sie eine abweichende Adresse für die Verbindung zum Daemon konfiguriert haben, können Sie diese in den folgenden Schritten festlegen:',
+            addressTitle: 'Daemon-Adresse - Desktop-Anwendung',
+            addressSubtitle: 'Passen Sie die Adressfelder nach Bedarf an.',
+            hostLabel: 'Host-Adresse:',
+            hostTooltip:
+                'Die IPv4-, IPv6-Adresse oder der Hostname für die Kommunikation mit dem Daemon.',
+            portLabel: 'Port:',
+            portTooltip: 'Die Portnummer für die Kommunikation mit dem Daemon.',
+            sslTooltip: 'SSL/TLS (HTTPS) aktivieren oder deaktivieren',
+            defaults: 'Standardwerte',
+            defaultsTooltip: 'Die Daemon-Adresse auf die Standardwerte zurücksetzen',
+        },
+        versionMismatch: {
+            title: 'Versionskonflikt',
+            text: 'Die Version der Desktop-App (%1) stimmt nicht mit der Daemon-Version (%2) überein.',
+            informative:
+                'Bitte starten Sie die Desktop-App neu, um die passende Oberflächenversion zu laden.',
+            quitApp: '&App beenden',
+            continueAnyway: 'Trotzdem fortfahren',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sitzung abgelaufen',

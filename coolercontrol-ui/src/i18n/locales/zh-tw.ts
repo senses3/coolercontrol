@@ -1185,6 +1185,53 @@ export default {
             hasErrors: '錯誤',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '關閉至系統託盤？',
+            body: '無論哪種方式，散熱控制都會在背景繼續執行。CoolerControl 可以留在系統託盤中以便快速重新開啟，也可以完全結束。',
+            keepInTray: '保留在託盤',
+            quit: '結束',
+            remember: '記住我的選擇',
+        },
+        tray: {
+            show: '顯示(&S)',
+            hide: '隱藏(&H)',
+            daemonAddress: '守護行程位址(&D)',
+            quit: '結束(&Q)',
+            modes: '模式',
+        },
+        wizard: {
+            windowTitle: '守護行程連線錯誤',
+            apply: '套用(&A)',
+            retry: '重試(&R)',
+            quitApp: '結束應用程式(&Q)',
+            introFailed: '無法與 CoolerControl 守護行程建立連線。',
+            introCheckService: '請確認 systemd 服務正在執行且可用。',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: '請查看 %1 取得安裝說明。',
+            introDocsLink: '文件網站',
+            introCommands: '以下指令有助於啟用與檢查守護行程狀態:',
+            introCustomAddress: '如果您為連線守護行程設定了非預設位址，可在以下步驟中設定:',
+            addressTitle: '守護行程位址 - 桌面應用程式',
+            addressSubtitle: '請依需要調整位址欄位。',
+            hostLabel: '主機位址:',
+            hostTooltip: '用於與守護行程通訊的 IPv4、IPv6 位址或主機名稱。',
+            portLabel: '連接埠:',
+            portTooltip: '用於與守護行程通訊的連接埠號碼。',
+            sslTooltip: '啟用或停用 SSL/TLS (HTTPS)',
+            defaults: '預設值',
+            defaultsTooltip: '將守護行程位址重設為預設值',
+        },
+        versionMismatch: {
+            title: '版本不符',
+            text: '桌面應用程式版本 (%1) 與守護行程版本 (%2) 不符。',
+            informative: '請重新啟動桌面應用程式以載入正確的介面版本。',
+            quitApp: '結束應用程式(&Q)',
+            continueAnyway: '仍然繼續',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: '工作階段已過期',

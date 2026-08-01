@@ -1236,6 +1236,55 @@ export default {
             hasErrors: 'エラーあり',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'トレイに閉じますか？',
+            body: 'いずれの場合も冷却制御はバックグラウンドで動作し続けます。CoolerControl をトレイに残してすぐに再表示できるようにするか、完全に終了できます。',
+            keepInTray: 'トレイに残す',
+            quit: '終了',
+            remember: '選択を記憶する',
+        },
+        tray: {
+            show: '表示(&S)',
+            hide: '非表示(&H)',
+            daemonAddress: 'デーモンアドレス(&D)',
+            quit: '終了(&Q)',
+            modes: 'モード',
+        },
+        wizard: {
+            windowTitle: 'デーモン接続エラー',
+            apply: '適用(&A)',
+            retry: '再試行(&R)',
+            quitApp: 'アプリを終了(&Q)',
+            introFailed: 'CoolerControl デーモンに接続できませんでした。',
+            introCheckService: 'systemd サービスが実行中で利用可能であることを確認してください。',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'インストール手順については %1 を参照してください。',
+            introDocsLink: 'ドキュメントサイト',
+            introCommands: 'デーモンの有効化と状態確認に役立つコマンド:',
+            introCustomAddress:
+                'デーモンへの接続に標準以外のアドレスを設定している場合は、次の手順で指定できます:',
+            addressTitle: 'デーモンアドレス - デスクトップアプリケーション',
+            addressSubtitle: '必要に応じてアドレス項目を調整してください。',
+            hostLabel: 'ホストアドレス:',
+            hostTooltip: 'デーモンとの通信に使用する IPv4、IPv6 アドレスまたはホスト名。',
+            portLabel: 'ポート:',
+            portTooltip: 'デーモンとの通信に使用するポート番号。',
+            sslTooltip: 'SSL/TLS (HTTPS) の有効・無効を切り替えます',
+            defaults: '既定値',
+            defaultsTooltip: 'デーモンアドレスを既定値に戻します',
+        },
+        versionMismatch: {
+            title: 'バージョンの不一致',
+            text: 'デスクトップアプリのバージョン (%1) がデーモンのバージョン (%2) と一致しません。',
+            informative:
+                '正しいインターフェースバージョンを読み込むため、デスクトップアプリを再起動してください。',
+            quitApp: 'アプリを終了(&Q)',
+            continueAnyway: 'このまま続行',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'セッションの有効期限切れ',

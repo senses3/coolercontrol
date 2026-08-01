@@ -18,8 +18,11 @@
 #include <QCommandLineParser>
 #include <QDBusInterface>
 #include <QDir>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QLoggingCategory>
 #include <QStandardPaths>
+#include <QTranslator>
 #include <optional>
 
 #include "constants.h"
@@ -141,6 +144,16 @@ int main(int argc, char* argv[]) {
   // https://doc.qt.io/qt-6/qstandardpaths.html
   // settings: ~/.config/{app_id}/{app_id}.conf
   const QApplication a(argc, argv);
+
+  // Qt supplies its own strings for standard dialog buttons (Cancel, Back, Next, OK).
+  // Without this catalogue they stay English next to our translated text. It follows the
+  // system locale rather than the UI's chosen language, which is the best available
+  // signal this early: the UI has not loaded yet, and Qt only reads this at startup.
+  QTranslator qtTranslator;
+  if (qtTranslator.load(QLocale(), "qtbase", "_",
+                        QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+    QCoreApplication::installTranslator(&qtTranslator);
+  }
 
   QApplication::setWindowIcon(QIcon::fromTheme(
       APP_ID.data(), QIcon(":/icons/org.coolercontrol.CoolerControl-symbolic.svg")));

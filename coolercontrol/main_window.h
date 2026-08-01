@@ -177,10 +177,6 @@ class MainWindow final : public QMainWindow {
   // the tray.
   bool offerCloseToTray() const;
 
-  // Looks up a string the UI pushed over IPC, falling back to the built-in English when
-  // the UI has not run yet (first launch, or a cache cleared by a settings reset).
-  static QString uiString(const QString& key, const QString& fallback);
-
   // Tears down the renderer process while the window is in the tray. The page object
   // survives and reloads itself on reactivation.
   void discardPage() const;
