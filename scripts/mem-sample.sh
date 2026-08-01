@@ -24,6 +24,23 @@
 #   * To attribute JS-side retention, do not use this script or CDP Performance.getMetrics:
 #     both report allocator capacity or unswept garbage. Use HeapProfiler.takeHeapSnapshot,
 #     which forces a full GC and exposes per-node detachedness.
+#
+# When A/B testing a setting or a Chromium flag, three things will hand you a confident
+# wrong answer. All three did, before being caught:
+#
+#   * Confirm the UI is actually on screen before you sample. A window showing the login
+#     dialog, an "Access Denied" page, or nothing at all composites almost nothing, so it
+#     measures low and reads as a win. An entire flag comparison was produced this way and
+#     had to be thrown out. Assert real content (a chart or canvas present, no auth-error
+#     text) and refuse to record a sample otherwise; a screenshot is what exposed it.
+#   * Do not wipe the app's config/profile between runs. A fresh profile makes the web UI
+#     try the default password first, which the daemon counts as a failed login. Six of
+#     those trigger an exponential lockout of up to 15 minutes (see MAX_FAILED_ATTEMPTS in
+#     the daemon's api/actor/auth.rs), and the rest of the series then measures a locked
+#     out app. Log in once and reuse the profile.
+#   * The baseline drifts several MB across a session as caches warm, so a single-run
+#     difference under roughly 10 MB is noise. Re-measure the baseline between
+#     configurations and compare medians of repeated samples, not one reading against one.
 
 set -uo pipefail
 
