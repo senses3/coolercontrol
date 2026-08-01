@@ -1265,6 +1265,7 @@ export default {
             daemonAddress: 'Endereço do &daemon',
             quit: '&Sair',
             modes: 'Modos',
+            sensors: 'Sensores',
         },
         wizard: {
             windowTitle: 'Erro de ligação ao daemon',

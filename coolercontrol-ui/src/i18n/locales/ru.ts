@@ -1268,6 +1268,7 @@ export default {
             daemonAddress: '&Адрес службы',
             quit: '&Выход',
             modes: 'Режимы',
+            sensors: 'Датчики',
         },
         wizard: {
             windowTitle: 'Ошибка подключения к службе',

@@ -1278,6 +1278,7 @@ export default {
             daemonAddress: 'Adresse du &démon',
             quit: '&Quitter',
             modes: 'Modes',
+            sensors: 'Capteurs',
         },
         wizard: {
             windowTitle: 'Erreur de connexion au démon',

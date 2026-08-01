@@ -121,7 +121,8 @@ MainWindow::MainWindow(QWidget* parent)
       m_wizard(new QWizard(parent)),
       m_manager(new QNetworkAccessManager(parent)),
       m_retryTimer(new QTimer(parent)),
-      m_discardTimer(new QTimer(parent)) {
+      m_discardTimer(new QTimer(parent)),
+      m_sensorPollTimer(new QTimer(parent)) {
   setCentralWidget(m_view);
   m_profile->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
   m_profile->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
@@ -186,6 +187,8 @@ MainWindow::MainWindow(QWidget* parent)
   // about whether a restore counts as fresh.
   m_discardTimer->setInterval(DISCARD_DELAY_MS);
   connect(m_discardTimer, &QTimer::timeout, this, &MainWindow::discardPage);
+  m_sensorPollTimer->setInterval(TRAY_SENSOR_POLL_MS);
+  connect(m_sensorPollTimer, &QTimer::timeout, this, &MainWindow::pollTraySensors);
   connect(m_ipc, &IPC::forceWindowShow, this, [this]() {
     // This is used so the UI Window will show when password input is required
     setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
@@ -285,6 +288,12 @@ void MainWindow::initSystemTray() {
   m_trayIconMenu->setTitle("CoolerControl");
   m_trayIconMenu->addAction(ccHeader);
   m_trayIconMenu->addSeparator();
+  // Pinned-sensor rows go above Modes, either inline or inside this submenu once there
+  // are enough of them to crowd the main menu.
+  m_sensorsTrayMenu = new QMenu(this);
+  m_sensorsTrayMenu->setTitle(uiString("tray.sensors", tr("Sensors")));
+  m_trayIconMenu->addMenu(m_sensorsTrayMenu);
+  m_sensorsTrayMenu->menuAction()->setVisible(false);
   m_modesTrayMenu = new QMenu(this);
   m_modesTrayMenu->setTitle(uiString("tray.modes", tr("Modes")));
   m_modesTrayMenu->setEnabled(false);
@@ -297,6 +306,7 @@ void MainWindow::initSystemTray() {
   // Readings are fetched only while the menu is opening, so nothing polls in the
   // background and a closed menu costs nothing.
   connect(m_trayIconMenu, &QMenu::aboutToShow, this, &MainWindow::refreshTraySensors);
+  connect(m_trayIconMenu, &QMenu::aboutToHide, this, &MainWindow::stopTraySensorPolling);
 
   m_sysTrayIcon->setContextMenu(m_trayIconMenu);
   m_sysTrayIcon->setIcon(QIcon::fromTheme(
@@ -472,55 +482,72 @@ void MainWindow::setPinnedSensors(const QString& sensorsJson) const {
 }
 
 /*
-  Builds one disabled row per pinned sensor and asks the daemon for each reading.
+  Rebuilds the pinned-sensor rows and keeps their readings fresh while the menu is open.
 
-  Driven by the menu's aboutToShow, so nothing is fetched while the menu is closed and
-  there is no polling loop to leave running. Rows keep their previous text until a reply
-  lands, which matters because some tray hosts render the menu before the requests
-  return, and a row that blinks to "..." on every open reads as broken.
+  Values are polled rather than fetched once, so a menu left open shows live numbers.
+  Polling runs only between aboutToShow and aboutToHide: nothing ticks while the menu is
+  closed, and this client never subscribes to the status stream. One bulk request per
+  tick covers every row, so the cost does not grow with the number of pins.
 */
 void MainWindow::refreshTraySensors() const {
   const QSettings settings;
-  const auto sensors =
-      QJsonDocument::fromJson(settings.value(SETTING_PINNED_SENSORS.data()).toString().toUtf8())
-          .array();
-  // Grow the row list to match; rows are reused so the menu layout stays stable for
-  // hosts that cache it over DBusMenu.
-  while (m_sensorActions.size() < sensors.size()) {
-    const auto action = new QAction(m_trayIconMenu);
-    action->setEnabled(false);
-    m_trayIconMenu->insertAction(m_modesTrayMenu->menuAction(), action);
-    m_sensorActions.append(action);
+  const auto json = settings.value(SETTING_PINNED_SENSORS.data()).toString();
+  if (json != m_builtSensorsJson) {
+    buildTraySensorRows(QJsonDocument::fromJson(json.toUtf8()).array());
+    m_builtSensorsJson = json;
   }
-  for (int row = 0; row < m_sensorActions.size(); ++row) {
-    const auto visible = row < sensors.size();
-    m_sensorActions.at(row)->setVisible(visible);
-    if (!visible) {
-      continue;
-    }
-    const auto sensor = sensors.at(row).toObject();
+  if (m_traySensors.isEmpty()) {
+    return;
+  }
+  m_sensorPollTicks = 0;
+  pollTraySensors();  // do not wait a full interval for the first reading
+  m_sensorPollTimer->start();
+}
+
+void MainWindow::stopTraySensorPolling() const { m_sensorPollTimer->stop(); }
+
+void MainWindow::buildTraySensorRows(const QJsonArray& sensors) const {
+  for (const auto& sensor : m_traySensors) {
+    delete sensor.action;  // removes it from whichever menu holds it
+  }
+  m_traySensors.clear();
+
+  // Past a handful, rows crowd out Modes/Show/Quit, so give them their own submenu.
+  const auto useSubmenu = sensors.size() > TRAY_SENSORS_INLINE_MAX;
+  m_sensorsTrayMenu->setTitle(uiString("tray.sensors", tr("Sensors")));
+  m_sensorsTrayMenu->menuAction()->setVisible(useSubmenu && !sensors.isEmpty());
+
+  for (const auto sensorValue : sensors) {
+    const auto sensor = sensorValue.toObject();
     const auto label = sensor.value("label").toString();
-    // The label lives on the action so a reply can rebuild the row without parsing the
-    // text it previously wrote. Only reset the text when the label itself changed,
-    // otherwise the previous reading stays visible until the new one lands.
-    if (m_sensorActions.at(row)->data().toString() != label) {
-      m_sensorActions.at(row)->setData(label);
-      m_sensorActions.at(row)->setText(label);
+    const auto action = new QAction(label, useSubmenu ? m_sensorsTrayMenu : m_trayIconMenu);
+    action->setEnabled(false);  // a reading, not a command
+    if (useSubmenu) {
+      m_sensorsTrayMenu->addAction(action);
+    } else {
+      m_trayIconMenu->insertAction(m_sensorsTrayMenu->menuAction(), action);
     }
-    requestSensorValue(row, sensor.value("deviceUid").toString(),
-                       sensor.value("channelName").toString());
+    m_traySensors.append(TraySensor{sensor.value("deviceUid").toString(),
+                                    sensor.value("channelName").toString(), label, action});
   }
 }
 
 // Formats whichever fields the daemon reported for this channel. A fan reports both rpm
 // and duty, a PSU rail only watts, a temp only its value, so nothing can be assumed.
-static QString formatSensorReading(const QJsonObject& status) {
+static QString formatSensorReading(const QJsonObject& status, const QString& channelName) {
   QStringList parts;
-  for (const auto temp : status.value("temps").toArray()) {
-    parts << QString::number(temp.toObject().value("temp").toDouble(), 'f', 1) % " °C";
+  for (const auto tempValue : status.value("temps").toArray()) {
+    const auto temp = tempValue.toObject();
+    if (temp.value("name").toString() != channelName) {
+      continue;
+    }
+    parts << QString::number(temp.value("temp").toDouble(), 'f', 1) % " °C";
   }
   for (const auto channelValue : status.value("channels").toArray()) {
     const auto channel = channelValue.toObject();
+    if (channel.value("name").toString() != channelName) {
+      continue;
+    }
     if (channel.contains("rpm")) {
       parts << QString::number(channel.value("rpm").toInt()) % " RPM";
     }
@@ -537,32 +564,41 @@ static QString formatSensorReading(const QJsonObject& status) {
   return parts.join(QStringLiteral("  "));
 }
 
-void MainWindow::requestSensorValue(const int row, const QString& deviceUid,
-                                    const QString& channelName) const {
-  if (deviceUid.isEmpty() || channelName.isEmpty()) {
+void MainWindow::pollTraySensors() const {
+  if (++m_sensorPollTicks > TRAY_SENSOR_POLL_MAX_TICKS) {
+    stopTraySensorPolling();
     return;
   }
   QNetworkRequest request;
   request.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
-  auto url = getEndpointUrl(ENDPOINT_STATUS.data());
-  url.setPath(url.path() % "/" % deviceUid % "/channels/" % channelName);
-  request.setUrl(url);
+  request.setUrl(getEndpointUrl(ENDPOINT_STATUS.data()));
+  request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
   applyAuth(request);
-  const auto reply = m_manager->get(request);
+  // An empty body asks for the most recent status only, a few KB for every device.
+  const auto reply = m_manager->post(request, QByteArray("{}"));
   connect(reply, &QNetworkReply::sslErrors, reply, qOverload<>(&QNetworkReply::ignoreSslErrors));
-  connect(reply, &QNetworkReply::finished, [reply, row, this]() {
-    if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() >= 300 ||
-        row >= m_sensorActions.size()) {
+  connect(reply, &QNetworkReply::finished, [reply, this]() {
+    if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() >= 300) {
       reply->deleteLater();
       return;
     }
-    const auto history =
-        QJsonDocument::fromJson(reply->readAll()).object().value("status_history").toArray();
-    if (!history.isEmpty()) {
-      const auto reading = formatSensorReading(history.last().toObject());
-      if (!reading.isEmpty()) {
-        m_sensorActions.at(row)->setText(m_sensorActions.at(row)->data().toString() % "   " %
-                                         reading);
+    const auto devices =
+        QJsonDocument::fromJson(reply->readAll()).object().value("devices").toArray();
+    for (const auto& sensor : m_traySensors) {
+      for (const auto deviceValue : devices) {
+        const auto device = deviceValue.toObject();
+        if (device.value("uid").toString() != sensor.deviceUid) {
+          continue;
+        }
+        const auto history = device.value("status_history").toArray();
+        if (history.isEmpty()) {
+          break;
+        }
+        const auto reading = formatSensorReading(history.last().toObject(), sensor.channelName);
+        if (!reading.isEmpty()) {
+          sensor.action->setText(sensor.label % "   " % reading);
+        }
+        break;
       }
     }
     reply->deleteLater();

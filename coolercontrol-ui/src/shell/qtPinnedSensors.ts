@@ -29,8 +29,9 @@ import type { Device, UID } from '@/models/Device'
 import { monitoringSensors } from '@/shell/monitoring/sensors.ts'
 import { pinId } from '@/shell/cooling/channels.ts'
 
-/** Kept small so opening the menu is a bounded burst of requests, not a fan-out. */
-export const MAX_TRAY_SENSORS = 5
+// No cap: the user pinned these deliberately, and the tray moves them into a submenu
+// once there are enough to crowd the main menu. Readings cost one bulk request per poll
+// regardless of how many are pinned, so the list length does not drive request volume.
 
 export interface QtPinnedSensor {
     deviceUid: UID
@@ -54,7 +55,6 @@ export function buildPinnedSensors(
     return pinnedIds
         .map((id) => known.get(id))
         .filter((s): s is NonNullable<typeof s> => s != null)
-        .slice(0, MAX_TRAY_SENSORS)
         .map((s) => ({
             deviceUid: s.deviceUID,
             channelName: s.channelName,

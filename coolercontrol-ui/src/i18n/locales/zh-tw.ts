@@ -1201,6 +1201,7 @@ export default {
             daemonAddress: '守護行程位址(&D)',
             quit: '結束(&Q)',
             modes: '模式',
+            sensors: '感測器',
         },
         wizard: {
             windowTitle: '守護行程連線錯誤',

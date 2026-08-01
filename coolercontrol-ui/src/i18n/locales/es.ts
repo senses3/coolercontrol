@@ -1266,6 +1266,7 @@ export default {
             daemonAddress: 'Dirección del &demonio',
             quit: '&Salir',
             modes: 'Modos',
+            sensors: 'Sensores',
         },
         wizard: {
             windowTitle: 'Error de conexión con el demonio',

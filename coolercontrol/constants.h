@@ -52,6 +52,15 @@ constexpr int DEFAULT_CONNECTION_RETRY_INTERVAL_MS = 2000;
 // How long the window stays hidden before the renderer is torn down. Above the UI's own
 // 7s stale-history threshold, so a restore that reloads and a discard never disagree.
 constexpr int DISCARD_DELAY_MS = 10000;
+// Above this many pinned sensors the rows move into their own submenu, so they stop
+// competing with Modes/Show/Quit for room in the main tray menu.
+constexpr int TRAY_SENSORS_INLINE_MAX = 5;
+// Readings refresh on this cadence while the tray menu is open, and not at all while it
+// is closed. One bulk status request per tick, regardless of how many sensors are pinned.
+constexpr int TRAY_SENSOR_POLL_MS = 1500;
+// Stops the poll if a tray host never tells us the menu closed. Without this a missed
+// aboutToHide would leave the timer running for the life of the process.
+constexpr int TRAY_SENSOR_POLL_MAX_TICKS = 80;
 const std::string WEBENGINE_PROFILE_NAME = "coolercontrol";
 const std::string ENDPOINT_HEALTH = "/health";
 const std::string ENDPOINT_TOKENS = "/tokens";

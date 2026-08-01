@@ -1275,6 +1275,7 @@ export default {
             daemonAddress: '&Daemon-Adresse',
             quit: '&Beenden',
             modes: 'Modi',
+            sensors: 'Sensoren',
         },
         wizard: {
             windowTitle: 'Daemon-Verbindungsfehler',

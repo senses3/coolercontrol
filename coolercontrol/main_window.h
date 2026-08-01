@@ -18,6 +18,7 @@
 #define MAINWINDOW_H
 
 #include <QCloseEvent>
+#include <QJsonArray>
 #include <QMainWindow>
 #include <QMenu>
 #include <QNetworkAccessManager>
@@ -113,9 +114,19 @@ class MainWindow final : public QMainWindow {
   QSystemTrayIcon* m_sysTrayIcon;
   QMenu* m_trayIconMenu;
   QMenu* m_modesTrayMenu;
-  // One disabled row per pinned sensor, created once and re-labelled in place so the
-  // menu layout stays stable for hosts that cache it over DBusMenu.
-  mutable QList<QAction*> m_sensorActions;
+  // One disabled row per pinned sensor. Rebuilt only when the pinned set changes, so
+  // the menu layout stays stable for hosts that cache it over DBusMenu.
+  struct TraySensor {
+    QString deviceUid;
+    QString channelName;
+    QString label;
+    QAction* action;
+  };
+  mutable QList<TraySensor> m_traySensors;
+  // Holds the rows once there are too many to sit in the main menu.
+  QMenu* m_sensorsTrayMenu;
+  // The pinned-sensor payload the current rows were built from.
+  mutable QString m_builtSensorsJson;
   QAction* m_quitAction;
   QAction* m_addressAction;
   QAction* m_showAction;
@@ -124,6 +135,8 @@ class MainWindow final : public QMainWindow {
   QTimer* m_retryTimer;
   // Delays the discard so a quick hide/show toggle never pays a page reload.
   QTimer* m_discardTimer;
+  QTimer* m_sensorPollTimer;
+  mutable int m_sensorPollTicks{0};
   bool m_discardEnabled{true};
   // Set when the daemon reconnects while hidden. A discarded page reloads on its own
   // when reactivated, so the refresh is deferred to the next show instead of
@@ -183,7 +196,13 @@ class MainWindow final : public QMainWindow {
   // aboutToShow, so nothing is fetched while the menu is closed.
   void refreshTraySensors() const;
 
-  void requestSensorValue(int row, const QString& deviceUid, const QString& channelName) const;
+  void stopTraySensorPolling() const;
+
+  // Rebuilds the rows and decides whether they sit inline or in a submenu.
+  void buildTraySensorRows(const QJsonArray& sensors) const;
+
+  // One bulk status request, applied to every row.
+  void pollTraySensors() const;
 
   // One-time prompt on the first close, correcting the belief that closing the window
   // stops cooling control. Returns true to carry on quitting, false if the user chose

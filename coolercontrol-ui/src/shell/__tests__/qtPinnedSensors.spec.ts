@@ -24,7 +24,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { type Device, DeviceType } from '@/models/Device.ts'
-import { buildPinnedSensors, MAX_TRAY_SENSORS } from '@/shell/qtPinnedSensors.ts'
+import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
 import { pinId } from '@/shell/cooling/channels.ts'
 
 const device = (uid: string, temps: string[], channels: string[]): Device =>
@@ -72,7 +72,7 @@ describe('qt pinned sensors', () => {
         expect(out.map((s) => s.deviceUid)).toEqual(['d2', 'd1'])
     })
 
-    it('caps the list so opening the menu stays a bounded burst', () => {
+    it('passes through every pinned sensor, however many', () => {
         const many = [
             pinId('d1', 'temp1'),
             pinId('d1', 'temp2'),
@@ -80,8 +80,7 @@ describe('qt pinned sensors', () => {
             pinId('d2', 'temp1'),
             pinId('d2', 'fan1'),
         ]
-        expect(many.length).toBeGreaterThanOrEqual(MAX_TRAY_SENSORS)
-        expect(buildPinnedSensors(devices, many, labelOf)).toHaveLength(MAX_TRAY_SENSORS)
+        expect(buildPinnedSensors(devices, many, labelOf)).toHaveLength(many.length)
     })
 
     it('marks temps so the tray can tell them from channels', () => {

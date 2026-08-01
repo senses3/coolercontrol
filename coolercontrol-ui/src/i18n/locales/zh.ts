@@ -1200,6 +1200,7 @@ export default {
             daemonAddress: '守护进程地址(&D)',
             quit: '退出(&Q)',
             modes: '模式',
+            sensors: '传感器',
         },
         wizard: {
             windowTitle: '守护进程连接错误',

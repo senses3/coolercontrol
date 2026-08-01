@@ -1252,6 +1252,7 @@ export default {
             daemonAddress: 'デーモンアドレス(&D)',
             quit: '終了(&Q)',
             modes: 'モード',
+            sensors: 'センサー',
         },
         wizard: {
             windowTitle: 'デーモン接続エラー',

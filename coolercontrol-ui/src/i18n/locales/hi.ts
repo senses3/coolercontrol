@@ -1248,6 +1248,7 @@ export default {
             daemonAddress: 'डीमन पता',
             quit: 'बंद करें',
             modes: 'मोड',
+            sensors: 'सेंसर',
         },
         wizard: {
             windowTitle: 'डीमन कनेक्शन त्रुटि',

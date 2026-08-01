@@ -1239,6 +1239,7 @@ export default {
             daemonAddress: '데몬 주소(&D)',
             quit: '종료(&Q)',
             modes: '모드',
+            sensors: '센서',
         },
         wizard: {
             windowTitle: '데몬 연결 오류',

@@ -1239,6 +1239,7 @@ export default {
             daemonAddress: 'عنوان الخدمة',
             quit: 'خروج',
             modes: 'الأوضاع',
+            sensors: 'المستشعرات',
         },
         wizard: {
             windowTitle: 'خطأ في الاتصال بالخدمة',
