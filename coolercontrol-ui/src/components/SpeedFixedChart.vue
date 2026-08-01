@@ -25,7 +25,7 @@ import { type UID } from '@/models/Device'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
-import { onMounted, Ref, ref, toRaw, watch } from 'vue'
+import { onMounted, onUnmounted, Ref, ref, toRaw, watch } from 'vue'
 
 echarts.use([CanvasRenderer, GaugeChart])
 
@@ -262,12 +262,16 @@ watch(rawStore.currentDeviceStatus, () => {
     })
 })
 
+// Held at module scope so onUnmounted can reach it. An observer left connected keeps the
+// gauge element, and everything its callback closes over, reachable for the life of the page.
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
     const getGaugeBase = (rect: DOMRect): number => Math.min(rect.width, rect.height)
     const gaugeEl: HTMLElement = fixedGaugeChart.value?.$el!
     gaugeBasePx.value = getGaugeBase(gaugeEl.getBoundingClientRect())
 
-    const resizeObserver = new ResizeObserver((_) => {
+    resizeObserver = new ResizeObserver((_) => {
         gaugeBasePx.value = getGaugeBase(gaugeEl.getBoundingClientRect())
         fixedGaugeChart.value?.setOption({
             series: [
@@ -334,6 +338,11 @@ onMounted(() => {
             ],
         })
     })
+})
+
+onUnmounted(() => {
+    resizeObserver?.disconnect()
+    resizeObserver = null
 })
 </script>
 
