@@ -23,6 +23,7 @@
 #include <QMenu>
 #include <QNetworkAccessManager>
 #include <QPainter>
+#include <QSslCertificate>
 #include <QSystemTrayIcon>
 #include <QWebChannel>
 #include <QWebEngineCertificateError>
@@ -192,6 +193,14 @@ class MainWindow final : public QMainWindow {
   void deleteAccessToken(const QString& tokenId) const;
 
   void displayAddressWizard() const;
+
+  // Decides whether to trust a daemon certificate, prompting when trust on first use
+  // requires it. `silent` suppresses the prompt for background requests, which must not
+  // pop dialogs; those simply fail until a page load establishes the pin.
+  bool confirmCertificate(const QString& host, int port, const QSslCertificate& leaf, bool silent);
+
+  // Replaces the blanket ignoreSslErrors() every request used to do.
+  void applyTlsPolicy(QNetworkReply* reply) const;
 
   // Rebuilds the pinned-sensor rows and refreshes their readings. Driven by the menu's
   // aboutToShow, so nothing is fetched while the menu is closed.

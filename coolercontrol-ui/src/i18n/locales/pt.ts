@@ -1267,6 +1267,17 @@ export default {
             modes: 'Modos',
             sensors: 'Sensores',
         },
+        cert: {
+            title: 'Certificado do daemon não verificado',
+            changedTitle: 'Certificado alterado',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: 'O %1 usa um certificado autoassinado que não pode ser verificado automaticamente. Continue apenas se reconhecer este daemon.',
+            changedBody:
+                'O certificado de %1 não é o anteriormente aprovado. Pode significar que o daemon foi reinstalado ou que algo está a intercetar a ligação.',
+            fingerprint: 'Impressão digital (SHA-256):',
+            trust: 'Confiar neste certificado',
+            cancel: 'Cancelar',
+        },
         wizard: {
             windowTitle: 'Erro de ligação ao daemon',
             apply: '&Aplicar',
@@ -1289,6 +1300,9 @@ export default {
             portLabel: 'Porta:',
             portTooltip: 'O número de porta a utilizar para comunicar com o daemon.',
             sslTooltip: 'Ativar ou desativar SSL/TLS (HTTPS)',
+            strictTls: 'Validar certificado',
+            strictTlsTooltip:
+                'Exigir um certificado que valide normalmente. Deixe desativado para usar o certificado autoassinado do daemon, aprovado na primeira utilização para daemons remotos.',
             defaults: 'Predefinições',
             defaultsTooltip: 'Repor o endereço do daemon para os valores predefinidos',
         },

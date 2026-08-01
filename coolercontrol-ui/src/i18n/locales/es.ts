@@ -1268,6 +1268,17 @@ export default {
             modes: 'Modos',
             sensors: 'Sensores',
         },
+        cert: {
+            title: 'Certificado del demonio no verificado',
+            changedTitle: 'El certificado ha cambiado',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 usa un certificado autofirmado que no se puede verificar automáticamente. Continúe solo si reconoce este demonio.',
+            changedBody:
+                'El certificado de %1 no es el que se aprobó anteriormente. Puede significar que el demonio se reinstaló o que algo está interceptando la conexión.',
+            fingerprint: 'Huella digital (SHA-256):',
+            trust: 'Confiar en este certificado',
+            cancel: 'Cancelar',
+        },
         wizard: {
             windowTitle: 'Error de conexión con el demonio',
             apply: '&Aplicar',
@@ -1291,6 +1302,9 @@ export default {
             portLabel: 'Puerto:',
             portTooltip: 'El número de puerto que se usará para comunicarse con el demonio.',
             sslTooltip: 'Activar o desactivar SSL/TLS (HTTPS)',
+            strictTls: 'Validar certificado',
+            strictTlsTooltip:
+                'Exigir un certificado que se valide normalmente. Déjelo desactivado para usar el certificado autofirmado del demonio, que se aprueba en el primer uso para demonios remotos.',
             defaults: 'Valores predeterminados',
             defaultsTooltip: 'Restablecer la dirección del demonio a los valores predeterminados',
         },

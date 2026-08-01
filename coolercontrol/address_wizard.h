@@ -46,6 +46,7 @@ class AddressPage final : public QWizardPage {
   QLineEdit* m_addressLineEdit;
   QLineEdit* m_portLineEdit;
   QCheckBox* m_sslCheckbox;
+  QCheckBox* m_strictTlsCheckbox;
   QPushButton* m_defaultButton;
 };
 #endif  // ADDRESSWIZARD_H

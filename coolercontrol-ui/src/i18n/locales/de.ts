@@ -1277,6 +1277,17 @@ export default {
             modes: 'Modi',
             sensors: 'Sensoren',
         },
+        cert: {
+            title: 'Nicht verifiziertes Daemon-Zertifikat',
+            changedTitle: 'Zertifikat geändert',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 verwendet ein selbstsigniertes Zertifikat, das nicht automatisch überprüft werden kann. Fahren Sie nur fort, wenn Sie diesen Daemon kennen.',
+            changedBody:
+                'Das Zertifikat für %1 ist nicht das zuvor vertraute. Das kann bedeuten, dass der Daemon neu installiert wurde, oder dass die Verbindung abgefangen wird.',
+            fingerprint: 'Fingerabdruck (SHA-256):',
+            trust: 'Diesem Zertifikat vertrauen',
+            cancel: 'Abbrechen',
+        },
         wizard: {
             windowTitle: 'Daemon-Verbindungsfehler',
             apply: '&Anwenden',
@@ -1300,6 +1311,9 @@ export default {
             portLabel: 'Port:',
             portTooltip: 'Die Portnummer für die Kommunikation mit dem Daemon.',
             sslTooltip: 'SSL/TLS (HTTPS) aktivieren oder deaktivieren',
+            strictTls: 'Zertifikat überprüfen',
+            strictTlsTooltip:
+                'Ein normal überprüfbares Zertifikat verlangen. Ausgeschaltet lassen, um das selbstsignierte Zertifikat des Daemons zu verwenden, dem bei entfernten Daemons beim ersten Verbinden vertraut wird.',
             defaults: 'Standardwerte',
             defaultsTooltip: 'Die Daemon-Adresse auf die Standardwerte zurücksetzen',
         },

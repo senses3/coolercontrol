@@ -1241,6 +1241,17 @@ export default {
             modes: '모드',
             sensors: '센서',
         },
+        cert: {
+            title: '확인되지 않은 데몬 인증서',
+            changedTitle: '인증서가 변경됨',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1은(는) 자동으로 확인할 수 없는 자체 서명 인증서를 사용합니다. 이 데몬을 알고 있는 경우에만 계속하십시오.',
+            changedBody:
+                '%1의 인증서가 이전에 신뢰한 것과 다릅니다. 데몬이 다시 설치되었거나 연결이 가로채이고 있을 수 있습니다.',
+            fingerprint: '지문 (SHA-256):',
+            trust: '이 인증서 신뢰',
+            cancel: '취소',
+        },
         wizard: {
             windowTitle: '데몬 연결 오류',
             apply: '적용(&A)',
@@ -1261,6 +1272,9 @@ export default {
             portLabel: '포트:',
             portTooltip: '데몬과 통신하는 데 사용할 포트 번호입니다.',
             sslTooltip: 'SSL/TLS (HTTPS) 사용 여부를 전환합니다',
+            strictTls: '인증서 검증',
+            strictTlsTooltip:
+                '정상적으로 검증되는 인증서를 요구합니다. 꺼두면 데몬의 자체 서명 인증서를 사용하며, 원격 데몬은 첫 연결 시 신뢰합니다.',
             defaults: '기본값',
             defaultsTooltip: '데몬 주소를 기본값으로 되돌립니다',
         },

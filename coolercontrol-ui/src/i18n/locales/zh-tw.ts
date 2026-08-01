@@ -1203,6 +1203,17 @@ export default {
             modes: '模式',
             sensors: '感測器',
         },
+        cert: {
+            title: '未驗證的守護行程憑證',
+            changedTitle: '憑證已變更',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 使用自簽憑證，無法自動驗證。僅在您確認此守護行程時繼續。',
+            changedBody:
+                '%1 的憑證與先前信任的不同。這可能表示守護行程已重新安裝，或連線正被攔截。',
+            fingerprint: '指紋 (SHA-256):',
+            trust: '信任此憑證',
+            cancel: '取消',
+        },
         wizard: {
             windowTitle: '守護行程連線錯誤',
             apply: '套用(&A)',
@@ -1222,6 +1233,9 @@ export default {
             portLabel: '連接埠:',
             portTooltip: '用於與守護行程通訊的連接埠號碼。',
             sslTooltip: '啟用或停用 SSL/TLS (HTTPS)',
+            strictTls: '驗證憑證',
+            strictTlsTooltip:
+                '要求可正常驗證的憑證。保持關閉則使用守護行程的自簽憑證，遠端守護行程在首次連線時受信任。',
             defaults: '預設值',
             defaultsTooltip: '將守護行程位址重設為預設值',
         },

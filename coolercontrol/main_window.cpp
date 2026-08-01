@@ -50,6 +50,7 @@
 #include "constants.h"
 #include "notifier.h"
 #include "sse_parser.h"
+#include "tls_trust.h"
 #include "translations.h"
 
 /*
@@ -239,6 +240,7 @@ void MainWindow::initWizard() {
     settings.setValue(SETTING_DAEMON_ADDRESS.data(), m_wizard->field("address").toString());
     settings.setValue(SETTING_DAEMON_PORT.data(), m_wizard->field("port").toInt());
     settings.setValue(SETTING_DAEMON_SSL_ENABLED.data(), m_wizard->field("ssl").toBool());
+    settings.setValue(SETTING_TLS_STRICT.data(), m_wizard->field("strictTls").toBool());
     m_changeAddress = true;
     emit dropConnections();
     delay(300);  // give signals a moment to process.
@@ -335,28 +337,25 @@ void MainWindow::initSystemTray() {
 }
 
 void MainWindow::initWebUI() {
-  connect(m_page, &QWebEnginePage::certificateError, [](QWebEngineCertificateError error) {
-    QList<QSslCertificate> chain = error.certificateChain();
-    qDebug() << error.description()
-             << tr(" there are %1 certificates in chain. From %2")
-                    .arg(chain.count())
-                    .arg(error.url().toDisplayString());
-    auto has_self_signed = false;
-    foreach (QSslCertificate cert, chain) {
-      qDebug() << tr("name: %1 expires:%2 isSelf-signed: %3")
-                      .arg(cert.subjectDisplayName(), cert.expiryDate().toString(),
-                           cert.isSelfSigned() ? "yes" : "no");
-      if (cert.isSelfSigned()) {
-        has_self_signed = true;
-      }
-    }
-    if (error.type() == QWebEngineCertificateError::CertificateAuthorityInvalid &&
-        has_self_signed) {
-      qInfo() << "Accepting self-signed certificate.";
-      return error.acceptCertificate();
-    }
-    return error.defer();
-  });
+  connect(m_page, &QWebEnginePage::certificateError, this,
+          [this](const QWebEngineCertificateError& error) {
+            const auto chain = error.certificateChain();
+            const auto host = error.url().host();
+            const auto port = error.url().port(DEFAULT_DAEMON_PORT);
+            const auto leaf = chain.isEmpty() ? QSslCertificate() : chain.first();
+            qDebug() << "Certificate error from" << error.url().toDisplayString() << ":"
+                     << error.description();
+            // A page load is the one moment a prompt makes sense, so this is where trust
+            // on first use is established. Every other request consults the pin it leaves
+            // behind rather than asking again.
+            if (confirmCertificate(host, port, leaf, false)) {
+              auto accepted = error;
+              accepted.acceptCertificate();
+            } else {
+              auto rejected = error;
+              rejected.rejectCertificate();
+            }
+          });
   m_view->load(getDaemonUrl());
   connect(m_view, &QWebEngineView::loadFinished, [this](const bool pageLoadedSuccessfully) {
     if (!pageLoadedSuccessfully) {
@@ -631,7 +630,7 @@ void MainWindow::pollTraySensors() const {
   applyAuth(request);
   // An empty body asks for the most recent status only, a few KB for every device.
   const auto reply = m_manager->post(request, QByteArray("{}"));
-  connect(reply, &QNetworkReply::sslErrors, reply, qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(reply);
   connect(reply, &QNetworkReply::finished, [reply, this]() {
     if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() >= 300) {
       reply->deleteLater();
@@ -657,6 +656,83 @@ void MainWindow::pollTraySensors() const {
       }
     }
     reply->deleteLater();
+  });
+}
+
+/*
+  Trust decision for a daemon certificate, plus the prompt when one is needed.
+
+  The daemon is self-signed by default, so refusing everything unsigned by a CA would
+  break every install. Loopback is accepted silently; a remote daemon is pinned on first
+  use after the user confirms, and a pin that later stops matching asks again with
+  different wording, because that is the case worth interrupting for.
+*/
+bool MainWindow::confirmCertificate(const QString& host, const int port,
+                                    const QSslCertificate& leaf, const bool silent) {
+  const auto decision = tls_trust::decide(host, port, leaf, false);
+  if (decision == tls_trust::Decision::Accept) {
+    return true;
+  }
+  if (decision == tls_trust::Decision::Reject) {
+    qWarning() << "Refusing the certificate for" << host << "(strict TLS is enabled)";
+    return false;
+  }
+  if (silent) {
+    // Background requests must not raise dialogs. They fail until a page load has
+    // established the pin, and the retry timer picks them up afterwards.
+    return false;
+  }
+  const auto changed = decision == tls_trust::Decision::AskChanged;
+  const auto print = tls_trust::fingerprint(leaf);
+  QMessageBox dialog;
+  dialog.setIcon(changed ? QMessageBox::Warning : QMessageBox::Question);
+  dialog.setWindowTitle(changed ? uiString("cert.changedTitle", tr("Certificate Changed"))
+                                : uiString("cert.title", tr("Unverified Daemon Certificate")));
+  dialog.setText(changed ? uiString("cert.changedTitle", tr("Certificate Changed"))
+                         : uiString("cert.title", tr("Unverified Daemon Certificate")));
+  const auto body =
+      changed
+          ? uiString("cert.changedBody",
+                     tr("The certificate for %1 is not the one previously trusted. This "
+                        "can mean the daemon was reinstalled, or that something is "
+                        "intercepting the connection."))
+          : uiString("cert.body", tr("%1 uses a self-signed certificate, which cannot be verified "
+                                     "automatically. Continue only if you recognise this daemon."));
+  dialog.setInformativeText(body.arg(host) % "\n\n" %
+                            uiString("cert.fingerprint", tr("Fingerprint (SHA-256):")) % "\n" %
+                            print);
+  const auto trustButton = dialog.addButton(uiString("cert.trust", tr("Trust This Certificate")),
+                                            QMessageBox::AcceptRole);
+  dialog.addButton(uiString("cert.cancel", tr("Cancel")), QMessageBox::RejectRole);
+  dialog.setDefaultButton(changed ? nullptr : trustButton);
+  dialog.exec();
+  if (dialog.clickedButton() != trustButton) {
+    qWarning() << "User declined the certificate for" << host;
+    return false;
+  }
+  tls_trust::storePin(host, port, print);
+  qInfo() << "Pinned the daemon certificate for" << host;
+  return true;
+}
+
+/*
+  Every request used to call ignoreSslErrors() unconditionally, which meant the session
+  cookie and the access token travelled over a channel nothing verified. They now consult
+  the same policy as the page load, silently: a background request cannot raise a dialog,
+  so it fails until a page load has pinned the certificate.
+*/
+void MainWindow::applyTlsPolicy(QNetworkReply* reply) const {
+  connect(reply, &QNetworkReply::sslErrors, reply, [reply, this](const QList<QSslError>& errors) {
+    const auto chain = reply->sslConfiguration().peerCertificateChain();
+    const auto leaf = chain.isEmpty() ? QSslCertificate() : chain.first();
+    const auto url = reply->url();
+    if (const_cast<MainWindow*>(this)->confirmCertificate(url.host(), url.port(DEFAULT_DAEMON_PORT),
+                                                          leaf, true)) {
+      reply->ignoreSslErrors();
+      return;
+    }
+    qWarning() << "Refusing" << url.toDisplayString() << "over an unverified"
+               << "connection:" << errors.size() << "TLS error(s)";
   });
 }
 
@@ -925,8 +1001,7 @@ void MainWindow::deleteAccessToken(const QString& tokenId) const {
   url.setPath(url.path() + "/" + tokenId);
   deleteRequest.setUrl(url);
   const auto deleteReply = m_manager->deleteResource(deleteRequest);
-  connect(deleteReply, &QNetworkReply::sslErrors, deleteReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(deleteReply);
   connect(deleteReply, &QNetworkReply::finished, [deleteReply, tokenId]() {
     const auto status = deleteReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     // A 404 is fine and expected when the user already revoked it in the UI.
@@ -960,8 +1035,7 @@ void MainWindow::provisionAccessToken() const {
   body.insert("write_access", true);  // the tray activates Modes
   const auto tokenReply =
       m_manager->post(tokenRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
-  connect(tokenReply, &QNetworkReply::sslErrors, tokenReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(tokenReply);
   connect(tokenReply, &QNetworkReply::finished, [tokenReply, supersededId, this]() {
     const auto status = tokenReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status >= 300) {
@@ -998,8 +1072,7 @@ void MainWindow::requestDaemonErrors() const {
   healthRequest.setUrl(getEndpointUrl(ENDPOINT_HEALTH.data()));
   applyAuth(healthRequest);
   const auto healthReply = m_manager->get(healthRequest);
-  connect(healthReply, &QNetworkReply::sslErrors, healthReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(healthReply);
   connect(healthReply, &QNetworkReply::readyRead, [healthReply, this]() {
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status == 401) {
@@ -1061,8 +1134,7 @@ void MainWindow::requestAllModes() const {
   modesRequest.setUrl(getEndpointUrl(ENDPOINT_MODES.data()));
   applyAuth(modesRequest);
   const auto modesReply = m_manager->get(modesRequest);
-  connect(modesReply, &QNetworkReply::sslErrors, modesReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(modesReply);
   connect(modesReply, &QNetworkReply::finished, [modesReply, this]() {
     const auto status = modesReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const QString modesJson = modesReply->readAll();
@@ -1136,8 +1208,7 @@ void MainWindow::requestActiveMode() const {
   modesActiveRequest.setUrl(getEndpointUrl(ENDPOINT_MODES_ACTIVE.data()));
   applyAuth(modesActiveRequest);
   const auto modesActiveReply = m_manager->get(modesActiveRequest);
-  connect(modesActiveReply, &QNetworkReply::sslErrors, modesActiveReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(modesActiveReply);
   connect(modesActiveReply, &QNetworkReply::finished, [modesActiveReply, this]() {
     const auto status =
         modesActiveReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
@@ -1165,8 +1236,7 @@ void MainWindow::watchDaemonEvents() const {
   sseRequest.setUrl(sseUrl);
   applyAuth(sseRequest);
   const auto sseReply = m_manager->get(sseRequest);
-  connect(sseReply, &QNetworkReply::sslErrors, sseReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(sseReply);
   connect(this, &MainWindow::dropConnections, sseReply, &QNetworkReply::abort,
           Qt::DirectConnection);
   // One parser per connection, so a reconnect never resumes on a half-read frame.
@@ -1228,8 +1298,7 @@ void MainWindow::tryDaemonConnection() {
   healthRequest.setUrl(getEndpointUrl(ENDPOINT_HEALTH.data()));
   applyAuth(healthRequest);
   const auto healthReply = m_manager->get(healthRequest);
-  connect(healthReply, &QNetworkReply::sslErrors, healthReply,
-          qOverload<>(&QNetworkReply::ignoreSslErrors));
+  applyTlsPolicy(healthReply);
   qDebug() << "Attempting to establish connection to the daemon...";
   connect(healthReply, &QNetworkReply::readyRead, [this, healthReply]() {
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();

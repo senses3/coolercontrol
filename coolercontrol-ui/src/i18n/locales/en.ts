@@ -1250,6 +1250,17 @@ export default {
         },
         // Shown when the daemon cannot be reached, so the UI itself may never have
         // loaded. Qt falls back to English until a successful run caches these.
+        cert: {
+            title: 'Unverified Daemon Certificate',
+            changedTitle: 'Certificate Changed',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 uses a self-signed certificate, which cannot be verified automatically. Continue only if you recognise this daemon.',
+            changedBody:
+                'The certificate for %1 is not the one previously trusted. This can mean the daemon was reinstalled, or that something is intercepting the connection.',
+            fingerprint: 'Fingerprint (SHA-256):',
+            trust: 'Trust This Certificate',
+            cancel: 'Cancel',
+        },
         wizard: {
             windowTitle: 'Daemon Connection Error',
             apply: '&Apply',
@@ -1272,6 +1283,9 @@ export default {
             portLabel: 'Port:',
             portTooltip: 'The port number to use to communicate with the daemon.',
             sslTooltip: 'Enable or disable SSL/TLS (HTTPS)',
+            strictTls: 'Validate certificate',
+            strictTlsTooltip:
+                "Require a certificate that validates normally. Leave off to use the daemon's self-signed certificate, which is trusted on first use for remote daemons.",
             defaults: 'Defaults',
             defaultsTooltip: 'Reset the daemon address to default values',
         },

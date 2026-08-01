@@ -1254,6 +1254,17 @@ export default {
             modes: 'モード',
             sensors: 'センサー',
         },
+        cert: {
+            title: '検証されていないデーモン証明書',
+            changedTitle: '証明書が変更されました',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 は自己署名証明書を使用しており、自動的に検証できません。このデーモンに心当たりがある場合のみ続行してください。',
+            changedBody:
+                '%1 の証明書が以前に信頼したものと異なります。デーモンが再インストールされたか、接続が傍受されている可能性があります。',
+            fingerprint: 'フィンガープリント (SHA-256):',
+            trust: 'この証明書を信頼する',
+            cancel: 'キャンセル',
+        },
         wizard: {
             windowTitle: 'デーモン接続エラー',
             apply: '適用(&A)',
@@ -1274,6 +1285,9 @@ export default {
             portLabel: 'ポート:',
             portTooltip: 'デーモンとの通信に使用するポート番号。',
             sslTooltip: 'SSL/TLS (HTTPS) の有効・無効を切り替えます',
+            strictTls: '証明書を検証する',
+            strictTlsTooltip:
+                '通常どおり検証できる証明書を要求します。オフのままにすると、デーモンの自己署名証明書を使用し、リモートデーモンでは初回接続時に信頼します。',
             defaults: '既定値',
             defaultsTooltip: 'デーモンアドレスを既定値に戻します',
         },

@@ -43,6 +43,11 @@ const std::string SETTING_GROUP_TRANSLATIONS = "translations";
 const std::string SETTING_CLOSE_PROMPT_SHOWN = "closePromptShown";
 // Identity and label of the sensors pinned in the UI, pushed over IPC.
 const std::string SETTING_PINNED_SENSORS = "pinnedSensors";
+// Require a normally valid TLS certificate. Off by default, because the daemon ships a
+// self-signed one and the common case is a loopback connection.
+const std::string SETTING_TLS_STRICT = "tlsStrict";
+// SHA-256 pins accepted by the user for remote daemons, keyed by host:port.
+const std::string SETTING_GROUP_TLS_PINS = "tlsPins";
 const std::string DEFAULT_DAEMON_ADDRESS = "localhost";
 constexpr int DEFAULT_DAEMON_PORT = 11987;
 constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;

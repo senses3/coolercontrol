@@ -97,8 +97,8 @@ describe('qt string bridge', () => {
             // Qt substitutes these with QString::arg, so a translation that drops them
             // silently loses the version numbers or the docs link.
             const byKey = Object.fromEntries(flat)
-            if (!byKey['wizard.introDocs']?.includes('%1')) {
-                problems.push(`${name}: wizard.introDocs lost %1`)
+            for (const key of ['wizard.introDocs', 'cert.body', 'cert.changedBody']) {
+                if (!byKey[key]?.includes('%1')) problems.push(`${name}: ${key} lost %1`)
             }
             const mismatch = byKey['versionMismatch.text'] ?? ''
             if (!mismatch.includes('%1') || !mismatch.includes('%2')) {

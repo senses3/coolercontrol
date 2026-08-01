@@ -1202,6 +1202,17 @@ export default {
             modes: '模式',
             sensors: '传感器',
         },
+        cert: {
+            title: '未验证的守护进程证书',
+            changedTitle: '证书已更改',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 使用自签名证书，无法自动验证。仅在您确认此守护进程时继续。',
+            changedBody:
+                '%1 的证书与先前信任的不同。这可能表示守护进程已重新安装，或连接正被拦截。',
+            fingerprint: '指纹 (SHA-256):',
+            trust: '信任此证书',
+            cancel: '取消',
+        },
         wizard: {
             windowTitle: '守护进程连接错误',
             apply: '应用(&A)',
@@ -1221,6 +1232,9 @@ export default {
             portLabel: '端口:',
             portTooltip: '用于与守护进程通信的端口号。',
             sslTooltip: '启用或禁用 SSL/TLS (HTTPS)',
+            strictTls: '验证证书',
+            strictTlsTooltip:
+                '要求可正常验证的证书。保持关闭则使用守护进程的自签名证书，远程守护进程在首次连接时受信任。',
             defaults: '默认值',
             defaultsTooltip: '将守护进程地址重置为默认值',
         },

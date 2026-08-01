@@ -89,6 +89,16 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
 
   m_sslCheckbox = new QCheckBox("SSL/TLS");
   m_sslCheckbox->setToolTip(uiString("wizard.sslTooltip", tr("Enable or disable SSL/TLS (HTTPS)")));
+
+  // Off by default: the daemon ships a self-signed certificate, so requiring a valid
+  // chain would break the default install. Remote daemons are still protected, by
+  // pinning the certificate the first time the user confirms it.
+  m_strictTlsCheckbox = new QCheckBox(uiString("wizard.strictTls", tr("Validate certificate")));
+  m_strictTlsCheckbox->setToolTip(
+      uiString("wizard.strictTlsTooltip",
+               tr("Require a certificate that validates normally. Leave off to use the daemon's "
+                  "self-signed certificate, which is trusted on first use for remote daemons.")));
+  registerField("strictTls", m_strictTlsCheckbox);
   registerField("ssl", m_sslCheckbox);
 
   m_defaultButton = new QPushButton(uiString("wizard.defaults", tr("Defaults")));
@@ -103,8 +113,9 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   layout->addWidget(portLabel, 1, 0);
   layout->addWidget(m_portLineEdit, 1, 1);
   layout->addWidget(m_sslCheckbox, 2, 0, 1, 2);
-  layout->addItem(spacer, 3, 0, 1, 2);
-  layout->addWidget(m_defaultButton, 4, 0, 1, 1);
+  layout->addWidget(m_strictTlsCheckbox, 3, 0, 1, 2);
+  layout->addItem(spacer, 4, 0, 1, 2);
+  layout->addWidget(m_defaultButton, 5, 0, 1, 1);
   setLayout(layout);
 
   const QSettings settings;
@@ -114,10 +125,12 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
       QString::number(settings.value(SETTING_DAEMON_PORT.data(), DEFAULT_DAEMON_PORT).toInt()));
   m_sslCheckbox->setChecked(
       settings.value(SETTING_DAEMON_SSL_ENABLED.data(), DEFAULT_DAEMON_SSL_ENABLED).toBool());
+  m_strictTlsCheckbox->setChecked(settings.value(SETTING_TLS_STRICT.data(), false).toBool());
 }
 
 void AddressPage::resetAddressInputValues() const {
   m_addressLineEdit->setText(DEFAULT_DAEMON_ADDRESS.data());
   m_portLineEdit->setText(QString::number(DEFAULT_DAEMON_PORT));
   m_sslCheckbox->setChecked(DEFAULT_DAEMON_SSL_ENABLED);
+  m_strictTlsCheckbox->setChecked(false);
 }

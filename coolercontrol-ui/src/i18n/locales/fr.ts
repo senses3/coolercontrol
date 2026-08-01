@@ -1280,6 +1280,17 @@ export default {
             modes: 'Modes',
             sensors: 'Capteurs',
         },
+        cert: {
+            title: 'Certificat du démon non vérifié',
+            changedTitle: 'Certificat modifié',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 utilise un certificat auto-signé, qui ne peut pas être vérifié automatiquement. Ne continuez que si vous reconnaissez ce démon.',
+            changedBody:
+                "Le certificat de %1 n'est pas celui approuvé précédemment. Cela peut signifier que le démon a été réinstallé, ou que la connexion est interceptée.",
+            fingerprint: 'Empreinte (SHA-256) :',
+            trust: 'Faire confiance à ce certificat',
+            cancel: 'Annuler',
+        },
         wizard: {
             windowTitle: 'Erreur de connexion au démon',
             apply: '&Appliquer',
@@ -1302,6 +1313,9 @@ export default {
             portLabel: 'Port :',
             portTooltip: 'Le numéro de port à utiliser pour communiquer avec le démon.',
             sslTooltip: 'Activer ou désactiver SSL/TLS (HTTPS)',
+            strictTls: 'Valider le certificat',
+            strictTlsTooltip:
+                'Exiger un certificat vérifiable normalement. Laissez désactivé pour utiliser le certificat auto-signé du démon, approuvé à la première connexion pour les démons distants.',
             defaults: 'Valeurs par défaut',
             defaultsTooltip: "Réinitialiser l'adresse du démon aux valeurs par défaut",
         },

@@ -26,7 +26,9 @@ qt_add_executable(
   sse_parser.cpp
   sse_parser.h
   translations.cpp
-  translations.h)
+  translations.h
+  tls_trust.cpp
+  tls_trust.h)
 
 target_link_libraries(
   coolercontrol PRIVATE Qt::Core Qt::Widgets Qt::WebEngineWidgets
