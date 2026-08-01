@@ -70,6 +70,10 @@ class IPC final : public QObject {
 
   void setAlertsActive(bool active) const;
 
+  // JSON map of the strings Qt renders itself, in the UI's active locale. Qt has no
+  // translation pipeline, and a discarded renderer cannot be asked, so these are cached.
+  void setTranslations(const QString& translationsJson) const;
+
   void forceQuit() const;
 
   void forceRefresh() const;

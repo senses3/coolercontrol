@@ -1230,6 +1230,17 @@ export default {
             hasErrors: 'Has Errors',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Close to System Tray?',
+            body: 'Cooling control keeps running in the background either way. CoolerControl can stay in the system tray so you can reopen it quickly, or quit entirely.',
+            keepInTray: 'Keep in Tray',
+            quit: 'Quit',
+            remember: 'Remember my choice',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Session expired',

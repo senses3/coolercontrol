@@ -33,6 +33,8 @@ IPC::IPC(QObject* parent)
           &MainWindow::acknowledgeDaemonErrors, Qt::QueuedConnection);
   connect(m_mainWindow, &MainWindow::setAlertsActiveSignal, m_mainWindow,
           &MainWindow::setAlertsActive, Qt::QueuedConnection);
+  connect(m_mainWindow, &MainWindow::setTranslationsSignal, m_mainWindow,
+          &MainWindow::setTranslations, Qt::QueuedConnection);
   connect(m_mainWindow, &MainWindow::forceQuitSignal, m_mainWindow, &MainWindow::forceQuit,
           Qt::QueuedConnection);
   connect(m_mainWindow, &MainWindow::forceRefreshSignal, m_mainWindow, &MainWindow::forceRefresh,
@@ -99,6 +101,10 @@ void IPC::acknowledgeDaemonIssues() const { emit m_mainWindow->acknowledgeDaemon
 
 void IPC::setAlertsActive(const bool active) const {
   emit m_mainWindow->setAlertsActiveSignal(active);
+}
+
+void IPC::setTranslations(const QString& translationsJson) const {
+  emit m_mainWindow->setTranslationsSignal(translationsJson);
 }
 
 void IPC::syncSettings() const { m_settings->sync(); }
