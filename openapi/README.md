@@ -11,6 +11,29 @@ when the checked-in file is stale, so it should rarely be out of date.
 
 The daemon also serves the same document at `/api.json`, but only in debug builds.
 
+## Server Sent Events
+
+`GET /sse` carries every event kind on one connection, each tagged with its own event name:
+`status`, `missing`, `stale-source`, `failsafe`, `health`, `log`, `mode`, `alert`, `notification`.
+Gate on the event name. The optional `events` query parameter narrows the subscription to a
+comma-separated subset of `status`, `health`, `logs`, `modes`, `alerts`, `notifications`; an unknown
+value is a 400.
+
+Prefer it to the per-stream `/sse/{logs,status,modes,alerts,notifications}` endpoints, which are
+deprecated. Browsers cap concurrent connections per origin over HTTP/1.1 (6 in Chrome, counted per
+profile rather than per tab), so a client that opens one connection per event kind starves its own
+ordinary requests. That was the bug this endpoint exists to fix.
+
+Subscribe narrowly when you only want rare events. `status` alone is a few KB every poll interval,
+so a notifications-only consumer that takes the full stream moves tens of MB an hour for nothing.
+
+Protocol matters for the same reason. The daemon serves both on one port:
+
+| scheme  | protocol | per-origin connection limit     |
+| ------- | -------- | ------------------------------- |
+| `http`  | HTTP/1.1 | 6, and streams compete for them |
+| `https` | HTTP/2   | multiplexed, no practical limit |
+
 ## Hosting note
 
 The file is pretty-printed so that merge request diffs are readable. Indentation is almost pure
