@@ -18,6 +18,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
@@ -388,6 +389,14 @@ void MainWindow::closeEvent(QCloseEvent* event) {
   if (isVisible()) {
     m_ipc->saveWindowGeometry(saveGeometry());
   }
+  if (!m_forceQuit && !m_ipc->getCloseToTray() && !offerCloseToTray()) {
+    // Chose the tray. Hide now whether or not they asked us to remember it, otherwise
+    // the window would simply refuse to close.
+    delay(100);
+    hide();
+    event->ignore();
+    return;
+  }
   if (m_ipc->getCloseToTray() && !m_forceQuit) {
     delay(100);
     hide();
@@ -402,6 +411,69 @@ void MainWindow::closeEvent(QCloseEvent* event) {
   m_page->deleteLater();
   delay(200);
   QApplication::quit();
+}
+
+/*
+  Users leave the window open because they believe closing it stops cooling control. It
+  does not: coolercontrold runs as its own service either way. Correcting that once, at
+  the moment it matters, is what makes the tray worth entering, and everything the tray
+  saves depends on people actually using it.
+
+  Returns true when the app should carry on quitting, false when the user chose the tray.
+  Shown once ever; the choice can be changed in settings afterwards.
+*/
+bool MainWindow::offerCloseToTray() const {
+  QSettings settings;
+  if (settings.value(SETTING_CLOSE_PROMPT_SHOWN.data(), false).toBool()) {
+    return true;  // asked already, and closeToTray is off, so quit
+  }
+  QMessageBox dialog;
+  dialog.setWindowTitle(uiString("closePrompt.title", tr("Close to System Tray?")));
+  dialog.setIcon(QMessageBox::Question);
+  dialog.setText(uiString("closePrompt.title", tr("Close to System Tray?")));
+  dialog.setInformativeText(uiString(
+      "closePrompt.body", tr("Cooling control keeps running in the background either way. "
+                             "CoolerControl can stay in the system tray so you can reopen it "
+                             "quickly, or quit entirely.")));
+  const auto trayButton = dialog.addButton(uiString("closePrompt.keepInTray", tr("Keep in Tray")),
+                                           QMessageBox::AcceptRole);
+  dialog.addButton(uiString("closePrompt.quit", tr("Quit")), QMessageBox::RejectRole);
+  dialog.setDefaultButton(trayButton);
+  QCheckBox remember(uiString("closePrompt.remember", tr("Remember my choice")));
+  remember.setChecked(true);
+  dialog.setCheckBox(&remember);
+  dialog.exec();
+
+  const auto keepInTray = dialog.clickedButton() == trayButton;
+  settings.setValue(SETTING_CLOSE_PROMPT_SHOWN.data(), true);
+  if (remember.isChecked()) {
+    m_ipc->setCloseToTray(keepInTray);
+  }
+  return !keepInTray;
+}
+
+void MainWindow::setTranslations(const QString& translationsJson) const {
+  const auto obj = QJsonDocument::fromJson(translationsJson.toUtf8()).object();
+  if (obj.isEmpty()) {
+    qWarning() << "Ignoring empty translation payload from the UI.";
+    return;
+  }
+  QSettings settings;
+  settings.beginGroup(SETTING_GROUP_TRANSLATIONS.data());
+  // Replace wholesale so a locale change cannot leave stale strings behind.
+  settings.remove(QString());
+  for (auto it = obj.constBegin(); it != obj.constEnd(); ++it) {
+    settings.setValue(it.key(), it.value().toString());
+  }
+  settings.endGroup();
+  qDebug() << "Cached" << obj.size() << "UI strings for Qt-rendered dialogs.";
+}
+
+QString MainWindow::uiString(const QString& key, const QString& fallback) {
+  const QSettings settings;
+  const auto value =
+      settings.value(QString(SETTING_GROUP_TRANSLATIONS.data()) % "/" % key).toString();
+  return value.isEmpty() ? fallback : value;
 }
 
 void MainWindow::setDiscardEnabled(const bool enabled) {

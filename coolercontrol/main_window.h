@@ -70,6 +70,8 @@ class MainWindow final : public QMainWindow {
   // Set by the UI over IPC: whether any enabled, active, unsilenced alert exists.
   void setAlertsActive(bool active) const;
 
+  void setTranslations(const QString& translationsJson) const;
+
  signals:
   void forceQuitSignal();
 
@@ -88,6 +90,8 @@ class MainWindow final : public QMainWindow {
   void acknowledgeDaemonErrorsSignal() const;
 
   void setAlertsActiveSignal(bool active) const;
+
+  void setTranslationsSignal(const QString& translationsJson) const;
 
  protected:
   void closeEvent(QCloseEvent* event) override;
@@ -167,6 +171,15 @@ class MainWindow final : public QMainWindow {
   void deleteAccessToken(const QString& tokenId) const;
 
   void displayAddressWizard() const;
+
+  // One-time prompt on the first close, correcting the belief that closing the window
+  // stops cooling control. Returns true to carry on quitting, false if the user chose
+  // the tray.
+  bool offerCloseToTray() const;
+
+  // Looks up a string the UI pushed over IPC, falling back to the built-in English when
+  // the UI has not run yet (first launch, or a cache cleared by a settings reset).
+  static QString uiString(const QString& key, const QString& fallback);
 
   // Tears down the renderer process while the window is in the tray. The page object
   // survives and reloads itself on reactivation.

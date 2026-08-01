@@ -36,6 +36,11 @@ const std::string SETTING_ZOOM_FACTOR = "zoomFactor";
 const std::string SETTING_WINDOW_GEOMETRY = "windowGeometry";
 const std::string SETTING_ACCESS_TOKEN = "accessToken";
 const std::string SETTING_ACCESS_TOKEN_ID = "accessTokenId";
+// Strings the UI pushes over IPC for Qt-rendered dialogs, cached so a discarded
+// renderer does not have to be asked.
+const std::string SETTING_GROUP_TRANSLATIONS = "translations";
+// Whether the user has been shown the one-time close-to-tray prompt.
+const std::string SETTING_CLOSE_PROMPT_SHOWN = "closePromptShown";
 const std::string DEFAULT_DAEMON_ADDRESS = "localhost";
 constexpr int DEFAULT_DAEMON_PORT = 11987;
 constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;
