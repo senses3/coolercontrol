@@ -22,6 +22,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import defaultHealthCheck, { type HealthCheck } from '@/models/HealthCheck.ts'
 
 export enum DaemonStatus {
     OK = 'Ok',
@@ -40,13 +41,12 @@ export const useDaemonState = defineStore('daemonState', () => {
     const status: Ref<DaemonStatus> = ref(DaemonStatus.ERROR)
     const connected: Ref<boolean> = ref(false)
     const preDisconnectedStatus: Ref<DaemonStatus> = ref(DaemonStatus.ERROR)
+    // Kept here so views render it without their own blocking fetch. Falls back to
+    // defaultHealthCheck's empty values until the first refresh lands.
+    const healthCheck: Ref<HealthCheck> = ref(defaultHealthCheck())
 
     async function init(): Promise<void> {
-        const deviceStore = useDeviceStore()
-        const healthCheck = await deviceStore.health()
-        systemName.value = healthCheck.system.name
-        warnings.value = healthCheck.details.warnings
-        errors.value = healthCheck.details.errors
+        await refreshHealth()
         connected.value = true
         if (errors.value > 0) {
             await setStatus(DaemonStatus.ERROR)
@@ -55,6 +55,16 @@ export const useDaemonState = defineStore('daemonState', () => {
         } else {
             await setStatus(DaemonStatus.OK)
         }
+    }
+
+    // daemonClient.health() falls back to defaults instead of throwing, so callers
+    // may fire this without awaiting it.
+    async function refreshHealth(): Promise<void> {
+        const deviceStore = useDeviceStore()
+        healthCheck.value = await deviceStore.health()
+        systemName.value = healthCheck.value.system.name
+        warnings.value = healthCheck.value.details.warnings
+        errors.value = healthCheck.value.details.errors
     }
 
     async function setStatus(newStatus: DaemonStatus) {
@@ -123,9 +133,11 @@ export const useDaemonState = defineStore('daemonState', () => {
     console.debug(`Daemon State Store created`)
     return {
         init,
+        refreshHealth,
         setStatus,
         setConnected,
         acknowledgeLogIssues,
+        healthCheck,
         systemName,
         warnings,
         errors,
