@@ -6054,13 +6054,68 @@
         ]
       }
     },
+    "/sse": {
+      "get": {
+        "tags": [
+          "sse"
+        ],
+        "summary": "Server Sent Events",
+        "description": "Subscribes to every event stream on one connection. Optional `events` query parameter narrows the subscription to a comma-separated subset of: status, health, logs, modes, alerts, notifications. Prefer this over the per-stream endpoints: browsers cap concurrent connections per origin over HTTP/1.1.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "events",
+            "description": "Comma-separated substreams to subscribe to. All of them when absent.",
+            "schema": {
+              "description": "Comma-separated substreams to subscribe to. All of them when absent.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/sse/logs": {
       "get": {
         "tags": [
           "sse"
         ],
         "summary": "Log Server Sent Events",
-        "description": "Subscribes and returns the Server Sent Events for a Log stream",
+        "description": "Deprecated: use GET /sse?events=logs. Subscribes and returns the Server Sent Events for a Log stream",
         "security": [
           {
             "CookieAuth": []
@@ -6077,7 +6132,7 @@
           "sse"
         ],
         "summary": "Recent Status Server Sent Events",
-        "description": "Subscribes and returns the Server Sent Events for a Status stream",
+        "description": "Deprecated: use GET /sse?events=status,health. Subscribes and returns the Server Sent Events for a Status stream",
         "security": [
           {
             "CookieAuth": []
@@ -6094,7 +6149,7 @@
           "sse"
         ],
         "summary": "Activated Mode Events",
-        "description": "Subscribes and returns the Server Sent Events for a ModeActivated stream",
+        "description": "Deprecated: use GET /sse?events=modes. Subscribes and returns the Server Sent Events for a ModeActivated stream",
         "security": [
           {
             "CookieAuth": []
@@ -6111,7 +6166,7 @@
           "sse"
         ],
         "summary": "Alert Events",
-        "description": "Subscribes and returns Events for when an Alert State has changed",
+        "description": "Deprecated: use GET /sse?events=alerts. Subscribes and returns Events for when an Alert State has changed",
         "security": [
           {
             "CookieAuth": []
@@ -6128,7 +6183,7 @@
           "sse"
         ],
         "summary": "Desktop Notification Events",
-        "description": "Subscribes and returns Events for desktop notifications that should be displayed to the user",
+        "description": "Deprecated: use GET /sse?events=notifications. Subscribes and returns Events for desktop notifications that should be displayed to the user",
         "security": [
           {
             "CookieAuth": []
@@ -9752,6 +9807,18 @@
           "max_duty",
           "fixed_enabled"
         ]
+      },
+      "SseQuery": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "description": "Comma-separated substreams to subscribe to. All of them when absent.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       },
       "StartCalibrationBatchRequest": {
         "description": "Body for `POST /calibrations/batch/start`. `concurrency` is how many\n sweeps run at once (1 = sequential); omitted or 0 is treated as 1, and\n the daemon clamps it to the channel count.",

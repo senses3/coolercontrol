@@ -16,16 +16,23 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::api::actor::{AlertHandle, DeviceHealthHandle, ModeHandle, StatusHandle};
 use crate::api::status::StatusResponse;
-use crate::api::AppState;
+use crate::api::{AppState, CCError};
 use crate::device_health::{DeviceHealthDto, HealthEvent};
 use crate::logger::LogBufHandle;
+use crate::notifier::NotificationHandle;
 use aide::NoApi;
-use axum::extract::State;
-use axum::response::sse::{Event, KeepAlive};
+use axum::extract::{Query, State};
+use axum::response::sse::{Event, KeepAlive, KeepAliveStream};
 use axum::response::Sse;
+use futures_util::stream::{select_all, SelectAll};
 use futures_util::StreamExt;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
+use std::ops::Not;
+use std::pin::Pin;
 use std::time::Duration;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
 use tokio_stream::wrappers::BroadcastStream;
@@ -33,14 +40,122 @@ use zbus::export::futures_core::Stream;
 
 const DEFAULT_KEEP_ALIVE_INTERVAL_SECONDS: u64 = 30;
 
-pub async fn logs(
-    State(AppState { log_buf_handle, .. }): State<AppState>,
-) -> NoApi<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
-    let log_stream =
-        log_lines(&log_buf_handle).map(|log| Ok(Event::default().event("log").data(log)));
-    NoApi(Sse::new(log_stream).keep_alive(
+/// One merged connection's event source. Boxed so the selected substreams, which have
+/// unrelated concrete types, can share a `Vec`.
+type EventStream = Pin<Box<dyn Stream<Item = Result<Event, Infallible>> + Send>>;
+
+/// What every SSE handler returns: the selected substreams merged onto one connection.
+type SseResponse = NoApi<Sse<KeepAliveStream<SelectAll<EventStream>>>>;
+
+/// A selectable substream of `/sse`. Named after the legacy endpoint it came from, except
+/// that `Status` and `Health` are separate broadcasters that both fed `/sse/status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Substream {
+    Status,
+    Health,
+    Logs,
+    Modes,
+    Alerts,
+    Notifications,
+}
+
+impl Substream {
+    /// Every substream, the default when `?events=` is absent.
+    pub const ALL: [Self; 6] = [
+        Self::Status,
+        Self::Health,
+        Self::Logs,
+        Self::Modes,
+        Self::Alerts,
+        Self::Notifications,
+    ];
+
+    fn parse(token: &str) -> Option<Self> {
+        match token {
+            "status" => Some(Self::Status),
+            "health" => Some(Self::Health),
+            "logs" => Some(Self::Logs),
+            "modes" => Some(Self::Modes),
+            "alerts" => Some(Self::Alerts),
+            "notifications" => Some(Self::Notifications),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SseQuery {
+    /// Comma-separated substreams to subscribe to. All of them when absent.
+    events: Option<String>,
+}
+
+/// Multiplexes every event kind onto one connection. Browsers cap concurrent connections
+/// per origin over HTTP/1.1 (6 in Chrome, counted per profile rather than per tab), so a
+/// client opening one stream per event kind starves its own ordinary requests.
+pub async fn combined(
+    Query(query): Query<SseQuery>,
+    State(app_state): State<AppState>,
+) -> Result<SseResponse, CCError> {
+    let selected = parse_substreams(query.events.as_deref())?;
+    Ok(sse_response(&app_state, &selected))
+}
+
+/// Maps `?events=` to its substreams. Rejects rather than silently ignoring an unknown
+/// token, so a typo surfaces as a 400 instead of a stream that never delivers.
+fn parse_substreams(events: Option<&str>) -> Result<Vec<Substream>, CCError> {
+    let Some(events) = events else {
+        return Ok(Substream::ALL.to_vec());
+    };
+    if events.trim().is_empty() {
+        return Err(CCError::UserError {
+            msg: "The 'events' parameter must name at least one event stream".to_string(),
+        });
+    }
+    let mut selected = Vec::with_capacity(Substream::ALL.len());
+    for token in events.split(',').map(str::trim) {
+        let substream = Substream::parse(token).ok_or_else(|| CCError::UserError {
+            msg: format!(
+                "Unknown SSE event stream: '{token}'. \
+                 Valid values: status, health, logs, modes, alerts, notifications"
+            ),
+        })?;
+        if selected.contains(&substream).not() {
+            selected.push(substream);
+        }
+    }
+    debug_assert!(
+        selected.is_empty().not(),
+        "a non-empty events= yields a stream"
+    );
+    Ok(selected)
+}
+
+/// Builds the merged SSE response for the given substreams.
+fn sse_response(app_state: &AppState, selected: &[Substream]) -> SseResponse {
+    debug_assert!(selected.is_empty().not(), "a substream must be selected");
+    let mut streams: Vec<EventStream> = Vec::with_capacity(selected.len());
+    for substream in selected {
+        streams.push(match substream {
+            Substream::Status => status_stream(&app_state.status_handle),
+            Substream::Health => health_stream(&app_state.device_health_handle),
+            Substream::Logs => log_stream(&app_state.log_buf_handle),
+            Substream::Modes => mode_stream(&app_state.mode_handle),
+            Substream::Alerts => alert_stream(&app_state.alert_handle),
+            Substream::Notifications => notification_stream(&app_state.notification_handle),
+        });
+    }
+    NoApi(Sse::new(select_all(streams)).keep_alive(
         KeepAlive::new().interval(Duration::from_secs(DEFAULT_KEEP_ALIVE_INTERVAL_SECONDS)),
     ))
+}
+
+pub async fn logs(State(app_state): State<AppState>) -> SseResponse {
+    sse_response(&app_state, &[Substream::Logs])
+}
+
+fn log_stream(log_buf_handle: &LogBufHandle) -> EventStream {
+    let stream = log_lines(log_buf_handle).map(|log| Ok(Event::default().event("log").data(log)));
+    Box::pin(stream)
 }
 
 /// Live log lines for one subscriber. Bursts arrive pre-coalesced (multi-line) from the
@@ -53,16 +168,15 @@ fn log_lines(log_buf_handle: &LogBufHandle) -> impl Stream<Item = String> + use<
         .filter_map(|result| async { result.ok() })
 }
 
-pub async fn status(
-    State(AppState {
-        status_handle,
-        device_health_handle,
-        ..
-    }): State<AppState>,
-) -> NoApi<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+pub async fn status(State(app_state): State<AppState>) -> SseResponse {
+    sse_response(&app_state, &[Substream::Status, Substream::Health])
+}
+
+fn status_stream(status_handle: &StatusHandle) -> EventStream {
     let cancel_token = status_handle.cancel_token();
-    let status_stream =
-        BroadcastStream::new(status_handle.broadcaster().subscribe()).map(|status| {
+    let stream = BroadcastStream::new(status_handle.broadcaster().subscribe())
+        .take_until(async move { cancel_token.cancelled().await })
+        .map(|status| {
             Ok(Event::default()
                 .event("status")
                 .json_data(StatusResponse {
@@ -70,26 +184,30 @@ pub async fn status(
                 })
                 .expect("derived DTO serialization cannot fail"))
         });
-    // Device-health transitions ride the status connection as named events so we
-    // do not open another SSE connection (browsers cap at 6 per origin).
-    let health_subscription = device_health_handle.broadcaster().subscribe();
-    let health_stream = BroadcastStream::new(health_subscription).then(move |event| {
-        let health_handle = device_health_handle.clone();
-        async move {
-            let event = match event {
-                Ok(event) => health_event_to_sse(event),
-                // This consumer missed transitions; resync it with the full
-                // current snapshot instead of leaving it permanently stale.
-                Err(BroadcastStreamRecvError::Lagged(_)) => {
-                    health_snapshot_to_sse(health_handle.get_all().await)
-                }
-            };
-            Ok(event)
-        }
-    });
-    let combined = futures_util::stream::select(status_stream, health_stream)
-        .take_until(async move { cancel_token.cancelled().await });
-    NoApi(Sse::new(combined))
+    Box::pin(stream)
+}
+
+fn health_stream(device_health_handle: &DeviceHealthHandle) -> EventStream {
+    let cancel_token = device_health_handle.cancel_token();
+    let subscription = device_health_handle.broadcaster().subscribe();
+    let handle = device_health_handle.clone();
+    let stream = BroadcastStream::new(subscription)
+        .take_until(async move { cancel_token.cancelled().await })
+        .then(move |event| {
+            let health_handle = handle.clone();
+            async move {
+                let event = match event {
+                    Ok(event) => health_event_to_sse(event),
+                    // This consumer missed transitions; resync it with the full
+                    // current snapshot instead of leaving it permanently stale.
+                    Err(BroadcastStreamRecvError::Lagged(_)) => {
+                        health_snapshot_to_sse(health_handle.get_all().await)
+                    }
+                };
+                Ok(event)
+            }
+        });
+    Box::pin(stream)
 }
 
 /// Maps one tick's device-health transition batch to its named SSE event
@@ -120,11 +238,13 @@ fn health_snapshot_to_sse(snapshot: DeviceHealthDto) -> Event {
         .expect("derived DTO serialization cannot fail")
 }
 
-pub async fn modes(
-    State(AppState { mode_handle, .. }): State<AppState>,
-) -> NoApi<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+pub async fn modes(State(app_state): State<AppState>) -> SseResponse {
+    sse_response(&app_state, &[Substream::Modes])
+}
+
+fn mode_stream(mode_handle: &ModeHandle) -> EventStream {
     let cancel_token = mode_handle.cancel_token();
-    let modes_stream = BroadcastStream::new(mode_handle.broadcaster().subscribe())
+    let stream = BroadcastStream::new(mode_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
         .map(|mode_activated| {
             Ok(Event::default()
@@ -132,16 +252,16 @@ pub async fn modes(
                 .json_data(mode_activated.unwrap_or_default())
                 .expect("derived DTO serialization cannot fail"))
         });
-    NoApi(Sse::new(modes_stream).keep_alive(
-        KeepAlive::new().interval(Duration::from_secs(DEFAULT_KEEP_ALIVE_INTERVAL_SECONDS)),
-    ))
+    Box::pin(stream)
 }
 
-pub async fn alerts(
-    State(AppState { alert_handle, .. }): State<AppState>,
-) -> NoApi<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+pub async fn alerts(State(app_state): State<AppState>) -> SseResponse {
+    sse_response(&app_state, &[Substream::Alerts])
+}
+
+fn alert_stream(alert_handle: &AlertHandle) -> EventStream {
     let cancel_token = alert_handle.cancel_token();
-    let alert_stream = BroadcastStream::new(alert_handle.broadcaster().subscribe())
+    let stream = BroadcastStream::new(alert_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
         .map(|alert_state| {
             Ok(Event::default()
@@ -149,19 +269,16 @@ pub async fn alerts(
                 .json_data(alert_state.unwrap_or_default())
                 .expect("derived DTO serialization cannot fail"))
         });
-    NoApi(Sse::new(alert_stream).keep_alive(
-        KeepAlive::new().interval(Duration::from_secs(DEFAULT_KEEP_ALIVE_INTERVAL_SECONDS)),
-    ))
+    Box::pin(stream)
 }
 
-pub async fn notifications(
-    State(AppState {
-        notification_handle,
-        ..
-    }): State<AppState>,
-) -> NoApi<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
+pub async fn notifications(State(app_state): State<AppState>) -> SseResponse {
+    sse_response(&app_state, &[Substream::Notifications])
+}
+
+fn notification_stream(notification_handle: &NotificationHandle) -> EventStream {
     let cancel_token = notification_handle.cancel_token();
-    let notification_stream = BroadcastStream::new(notification_handle.broadcaster().subscribe())
+    let stream = BroadcastStream::new(notification_handle.broadcaster().subscribe())
         .take_until(async move { cancel_token.cancelled().await })
         .filter_map(|result| async { result.ok() })
         .map(|notification| {
@@ -170,15 +287,119 @@ pub async fn notifications(
                 .json_data(notification)
                 .expect("derived DTO serialization cannot fail"))
         });
-    NoApi(Sse::new(notification_stream).keep_alive(
-        KeepAlive::new().interval(Duration::from_secs(DEFAULT_KEEP_ALIVE_INTERVAL_SECONDS)),
-    ))
+    Box::pin(stream)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::notifier::{DesktopNotification, NotificationIcon};
     use tokio_util::sync::CancellationToken;
+
+    // Goal: an absent events= subscribes to everything, so a client that asks for nothing
+    // in particular keeps the old all-streams behavior.
+    #[test]
+    fn absent_events_selects_every_substream() {
+        let selected = parse_substreams(None).expect("absent is valid");
+        assert_eq!(selected, Substream::ALL.to_vec());
+    }
+
+    // Goal: every token maps to exactly its own substream and nothing else, since a token
+    // that quietly selected the wrong stream would look like a daemon that never sends.
+    #[test]
+    fn each_token_selects_only_its_substream() {
+        let cases = [
+            ("status", Substream::Status),
+            ("health", Substream::Health),
+            ("logs", Substream::Logs),
+            ("modes", Substream::Modes),
+            ("alerts", Substream::Alerts),
+            ("notifications", Substream::Notifications),
+        ];
+        for (token, expected) in cases {
+            let selected = parse_substreams(Some(token)).expect("token is valid");
+            assert_eq!(selected, vec![expected], "token '{token}' mis-mapped");
+        }
+    }
+
+    // Goal: the multi-token form the UI and the legacy /sse/status alias rely on, including
+    // whitespace tolerance and de-duplication of a repeated token.
+    #[test]
+    fn multiple_tokens_parse_in_order_without_duplicates() {
+        let selected = parse_substreams(Some("status, health ,status")).expect("valid");
+        assert_eq!(selected, vec![Substream::Status, Substream::Health]);
+    }
+
+    // Goal: negative space. A typo must fail loudly at the boundary and name the offending
+    // token, rather than opening a connection that silently delivers nothing.
+    #[test]
+    fn unknown_token_is_rejected_and_named() {
+        let err = parse_substreams(Some("status,bogus")).expect_err("bogus is invalid");
+        let CCError::UserError { msg } = err else {
+            panic!("an unknown token must be a UserError, which maps to 400");
+        };
+        assert!(
+            msg.contains("bogus"),
+            "the message must name the token: {msg}"
+        );
+    }
+
+    // Goal: negative space. `?events=` with no value is a client mistake, not a request for
+    // every stream and not a connection that yields nothing.
+    #[test]
+    fn empty_events_is_rejected() {
+        for empty in ["", "  "] {
+            let err = parse_substreams(Some(empty)).expect_err("empty is invalid");
+            assert!(matches!(err, CCError::UserError { .. }));
+        }
+    }
+
+    // Goal: merged substreams both deliver on one connection, tagged with their own event
+    // names, which is the whole point of the combined endpoint.
+    // Methodology: merge the two substreams that can be built without a full AppState,
+    // publish one item on each, and check both arrive with the right event names.
+    #[test]
+    fn merged_substreams_deliver_both_event_kinds() {
+        crate::rt::test_runtime(async {
+            let cancel_token = CancellationToken::new();
+            let log_handle = LogBufHandle::new(cancel_token.clone());
+            let notification_handle = NotificationHandle::new(cancel_token);
+            let mut merged = std::pin::pin!(select_all(vec![
+                log_stream(&log_handle),
+                notification_stream(&notification_handle),
+            ]));
+            log_handle
+                .broadcaster()
+                .send("a log line\n".to_string())
+                .expect("subscriber exists");
+            notification_handle
+                .broadcaster()
+                .send(DesktopNotification {
+                    title: "t".to_string(),
+                    body: "b".to_string(),
+                    icon: NotificationIcon::Info,
+                    audio: false,
+                    urgency: 1,
+                })
+                .expect("subscriber exists");
+            let mut seen = Vec::with_capacity(2);
+            for _ in 0..2 {
+                let event = merged.next().await.expect("an event is pending");
+                let event = event.expect("the substreams are Infallible");
+                // Event has no accessors, so read the wire form it will serialize to.
+                seen.push(format!("{event:?}"));
+            }
+            let wire = seen.join("");
+            assert!(
+                wire.contains("log"),
+                "the log substream must deliver: {wire}"
+            );
+            assert!(
+                wire.contains("notification"),
+                "the notification substream must deliver: {wire}"
+            );
+        });
+    }
 
     // Goal: a subscriber that lags the broadcast channel must silently skip missed lines,
     // never yielding empty items (the old behavior mapped Lagged to empty SSE events).
