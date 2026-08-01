@@ -68,6 +68,9 @@ constexpr int TRAY_SENSOR_POLL_MS = 1500;
 constexpr int TRAY_SENSOR_POLL_MAX_TICKS = 80;
 const std::string WEBENGINE_PROFILE_NAME = "coolercontrol";
 const std::string ENDPOINT_HEALTH = "/health";
+// Unauthenticated, and answers {"shake": true}. Used to confirm the configured address
+// really is a CoolerControl daemon before rendering whatever is there.
+const std::string ENDPOINT_HANDSHAKE = "/handshake";
 const std::string ENDPOINT_TOKENS = "/tokens";
 const std::string ENDPOINT_STATUS = "/status";
 // Shown in the UI's token list. Kept stable so a re-provision replaces the old entry

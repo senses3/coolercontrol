@@ -32,6 +32,7 @@
 
 #include "address_wizard.h"
 #include "ipc.h"
+#include "origin_filter.h"
 
 // forward declaration:
 class IPC;
@@ -134,6 +135,7 @@ class MainWindow final : public QMainWindow {
   QAction* m_showAction;
   QWizard* m_wizard;
   QNetworkAccessManager* m_manager;
+  OriginFilter* m_originFilter;
   QTimer* m_retryTimer;
   // Delays the discard so a quick hide/show toggle never pays a page reload.
   QTimer* m_discardTimer;
@@ -193,6 +195,11 @@ class MainWindow final : public QMainWindow {
   void deleteAccessToken(const QString& tokenId) const;
 
   void displayAddressWizard() const;
+
+  // Confirms the configured address answers as a CoolerControl daemon, then loads it.
+  // Guards the two places an unverified address can first be rendered: startup, and
+  // applying a new address from the wizard.
+  void loadVerifiedDaemonUi();
 
   // Decides whether to trust a daemon certificate, prompting when trust on first use
   // requires it. `silent` suppresses the prompt for background requests, which must not

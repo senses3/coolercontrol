@@ -28,7 +28,9 @@ qt_add_executable(
   translations.cpp
   translations.h
   tls_trust.cpp
-  tls_trust.h)
+  tls_trust.h
+  origin_filter.cpp
+  origin_filter.h)
 
 target_link_libraries(
   coolercontrol PRIVATE Qt::Core Qt::Widgets Qt::WebEngineWidgets

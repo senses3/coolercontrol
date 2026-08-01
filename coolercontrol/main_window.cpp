@@ -49,6 +49,7 @@
 
 #include "constants.h"
 #include "notifier.h"
+#include "origin_filter.h"
 #include "sse_parser.h"
 #include "tls_trust.h"
 #include "translations.h"
@@ -122,6 +123,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_ipc(new IPC(this)),
       m_wizard(new QWizard(parent)),
       m_manager(new QNetworkAccessManager(parent)),
+      m_originFilter(new OriginFilter(this)),
       m_retryTimer(new QTimer(parent)),
       m_discardTimer(new QTimer(parent)),
       m_sensorPollTimer(new QTimer(parent)) {
@@ -168,6 +170,9 @@ MainWindow::MainWindow(QWidget* parent)
             request.accept();
             setWindowState(windowState() ^ Qt::WindowFullScreen);
           });
+  // Confine the engine to the configured daemon before anything is loaded.
+  m_originFilter->setDaemonUrl(getDaemonUrl());
+  m_profile->setUrlRequestInterceptor(m_originFilter);
   m_view->setPage(m_page);
   m_manager->setCookieJar(new PersistentCookieJar(m_manager));
   const auto cookieStore = m_profile->cookieStore();
@@ -231,7 +236,7 @@ void MainWindow::initWizard() {
     if (which == 6) {  // Retry CustomButton1
       delay(500);
       m_uiLoadingStopped = false;
-      m_view->load(getDaemonUrl());
+      loadVerifiedDaemonUi();
       m_wizard->hide();
     }
   });
@@ -247,7 +252,8 @@ void MainWindow::initWizard() {
     m_startup = true;
     m_changeAddress = false;
     m_uiLoadingStopped = false;
-    m_view->load(getDaemonUrl());
+    m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
+    loadVerifiedDaemonUi();
   });
 }
 
@@ -356,7 +362,7 @@ void MainWindow::initWebUI() {
               rejected.rejectCertificate();
             }
           });
-  m_view->load(getDaemonUrl());
+  loadVerifiedDaemonUi();
   connect(m_view, &QWebEngineView::loadFinished, [this](const bool pageLoadedSuccessfully) {
     if (!pageLoadedSuccessfully) {
       if (m_uiLoadRetryCount < MAX_UI_LOAD_RETRIES) {
@@ -378,6 +384,52 @@ void MainWindow::initWebUI() {
         m_retryTimer->start();
       }
     }
+  });
+}
+
+/*
+  Confirms the configured address is a CoolerControl daemon before rendering it.
+
+  The address is user-configurable, so without this a typo can point an embedded browser
+  at an arbitrary site. /handshake is unauthenticated and answers {"shake": true}, so the
+  check works before login and costs one small request.
+
+  This proves "responds like a daemon", not "is trustworthy": any server can return that
+  JSON. It is a guard against misconfiguration; TLS pinning is what guards against an
+  attacker.
+*/
+void MainWindow::loadVerifiedDaemonUi() {
+  QNetworkRequest handshakeRequest;
+  handshakeRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
+  handshakeRequest.setUrl(getEndpointUrl(ENDPOINT_HANDSHAKE.data()));
+  const auto reply = m_manager->get(handshakeRequest);
+  applyTlsPolicy(reply);
+  connect(reply, &QNetworkReply::finished, [reply, this]() {
+    const auto status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const auto shook =
+        status == 200 &&
+        QJsonDocument::fromJson(reply->readAll()).object().value("shake").toBool(false);
+    reply->deleteLater();
+    if (shook) {
+      m_uiLoadRetryCount = 0;
+      m_view->load(getDaemonUrl());
+      return;
+    }
+    // A daemon that is merely slow to start looks identical to a wrong address here, so
+    // reuse the same retry budget the page load itself uses before bothering the user.
+    if (m_uiLoadRetryCount < MAX_UI_LOAD_RETRIES) {
+      m_uiLoadRetryCount++;
+      qDebug() << "Daemon handshake failed (status" << status << "), retrying" << m_uiLoadRetryCount
+               << "/" << MAX_UI_LOAD_RETRIES;
+      QTimer::singleShot(1500, this, [this]() { loadVerifiedDaemonUi(); });
+      return;
+    }
+    m_uiLoadRetryCount = 0;
+    m_uiLoadingStopped = true;
+    qWarning() << "Not loading" << getDaemonUrl().toDisplayString()
+               << ": it did not respond as a CoolerControl daemon.";
+    displayAddressWizard();
+    notifyDaemonConnectionError();
   });
 }
 
