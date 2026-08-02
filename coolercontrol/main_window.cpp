@@ -47,6 +47,7 @@
 #include <QWebEngineView>
 #include <QWizardPage>
 #include <algorithm>
+#include <initializer_list>
 #include <memory>
 
 #include "constants.h"
@@ -55,6 +56,25 @@
 #include "sse_parser.h"
 #include "tls_trust.h"
 #include "translations.h"
+
+/*
+  Icon themes disagree on what exists: Breeze carries the plain names, modern Adwaita
+  only the symbolic ones, and neither covers everything. Take the first name the current
+  theme actually has, and no icon at all when it has none. A wrong icon reads worse than
+  none, so nothing here substitutes an approximation.
+*/
+QIcon themeIcon(const std::initializer_list<const char*> names) {
+  for (const auto* name : names) {
+    if (const auto candidate = QLatin1String(name); QIcon::hasThemeIcon(candidate)) {
+      return QIcon::fromTheme(candidate);
+    }
+  }
+  return {};
+}
+
+QIcon showIcon() { return themeIcon({"view-restore", "view-restore-symbolic"}); }
+
+QIcon hideIcon() { return themeIcon({"window-minimize", "window-minimize-symbolic"}); }
 
 /*
   Qt has no API for the settings file's mode, and QSettings creates it 0644. It does
@@ -275,8 +295,8 @@ void MainWindow::initSystemTray() {
       tr("CoolerControl"), m_sysTrayIcon);
   ccHeader->setDisabled(true);
   m_showAction = m_ipc->getStartInTray()
-                     ? new QAction(uiString("tray.show", tr("&Show")), m_sysTrayIcon)
-                     : new QAction(uiString("tray.hide", tr("&Hide")), m_sysTrayIcon);
+                     ? new QAction(showIcon(), uiString("tray.show", tr("&Show")), m_sysTrayIcon)
+                     : new QAction(hideIcon(), uiString("tray.hide", tr("&Hide")), m_sysTrayIcon);
   connect(
       m_showAction, &QAction::triggered, this,
       [this]() {
@@ -291,10 +311,11 @@ void MainWindow::initSystemTray() {
       Qt::QueuedConnection);
 
   m_addressAction =
-      new QAction(uiString("tray.daemonConnection", tr("&Daemon Connection\u2026")), m_sysTrayIcon);
+      new QAction(themeIcon({"network-server", "network-server-symbolic"}),
+                  uiString("tray.daemonConnection", tr("&Daemon Connection\u2026")), m_sysTrayIcon);
   connect(m_addressAction, &QAction::triggered, [this]() { displayAddressWizard(); });
 
-  m_quitAction = new QAction(QIcon::fromTheme("application-exit", QIcon()),
+  m_quitAction = new QAction(themeIcon({"application-exit", "application-exit-symbolic"}),
                              uiString("tray.quit", tr("&Quit")), m_sysTrayIcon);
   connect(m_quitAction, &QAction::triggered, this, &MainWindow::forceQuit, Qt::QueuedConnection);
   m_trayIconMenu = new QMenu(this);
@@ -304,10 +325,15 @@ void MainWindow::initSystemTray() {
   // Pinned-sensor rows go above Modes, either inline or inside this submenu once there
   // are enough of them to crowd the main menu.
   m_sensorsTrayMenu = new QMenu(this);
+  m_sensorsTrayMenu->setIcon(
+      themeIcon({"utilities-system-monitor", "speedometer-symbolic", "temperature-normal-symbolic",
+                 "power-profile-performance-symbolic"}));
   m_sensorsTrayMenu->setTitle(uiString("tray.sensors", tr("Sensors")));
   m_trayIconMenu->addMenu(m_sensorsTrayMenu);
   m_sensorsTrayMenu->menuAction()->setVisible(false);
   m_modesTrayMenu = new QMenu(this);
+  m_modesTrayMenu->setIcon(
+      themeIcon({"format-list-unordered", "view-list-symbolic", "view-list-bullet-symbolic"}));
   m_modesTrayMenu->setTitle(uiString("tray.modes", tr("Modes")));
   m_modesTrayMenu->setEnabled(false);
   m_trayIconMenu->addMenu(m_modesTrayMenu);
@@ -1031,10 +1057,12 @@ void MainWindow::delay(const int millisecondsWait) {
 }
 
 void MainWindow::setTrayActionToShow() const {
+  m_showAction->setIcon(showIcon());
   m_showAction->setText(uiString("tray.show", tr("&Show")));
 }
 
 void MainWindow::setTrayActionToHide() const {
+  m_showAction->setIcon(hideIcon());
   m_showAction->setText(uiString("tray.hide", tr("&Hide")));
 }
 
