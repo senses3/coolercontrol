@@ -184,6 +184,25 @@ export default {
                 forkForFan: 'Fork for this fan',
                 notControllable:
                     'This channel reports its speed but cannot be controlled by CoolerControl.',
+                verdictFirmwareOverride:
+                    'CoolerControl set this channel to manual control, but the firmware changed it back.',
+                verdictFamilyMayNeedOutOfTree:
+                    'No writable fan control was found for this channel. On this chip family, a different kernel driver sometimes provides it.',
+                verdictNoPwm:
+                    'The loaded driver exposes no fan control for this channel, only its speed.',
+                verdictPwmReadOnly:
+                    'The loaded driver exposes a fan control for this channel but marks it read-only.',
+                verdictIgnoresDuty:
+                    'This channel accepted duty changes, but its measured speed never responded.',
+                verdictUnverifiable:
+                    'This channel has no usable tachometer, so its response to duty changes cannot be verified.',
+                verdictEvidenceLabel: 'Measured on this machine:',
+                evidenceNoPwmFile: 'no fan control exposed',
+                evidencePwmNotWritable: 'fan control is read-only',
+                evidenceHasTachometer: 'speed reading available',
+                evidenceNoTachometer: 'no speed reading',
+                verdictLearnMore: 'What can I do about this?',
+                verdictFoundSomethingThatWorks: 'Found something that works? Tell us',
                 activeMode: 'Active',
                 previousMode: 'Previous',
                 activate: 'Activate',
