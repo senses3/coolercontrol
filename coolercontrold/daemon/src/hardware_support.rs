@@ -28,11 +28,14 @@
 //! verdict: there is nothing to attach it to.
 
 use crate::cc_fs;
+use crate::device::{ChannelName, DeviceUID};
 use log::{info, warn};
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::ops::Not;
 use std::path::Path;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Where bound drivers are resolved from. Every hwmon device appears here as a
@@ -51,7 +54,7 @@ const OUT_OF_TREE_CANDIDATE_PREFIXES: [&str; 2] = ["nct6", "it8"];
 ///
 /// `IgnoresDuty` and `Unverifiable` are reserved for the duty-response probe
 /// and are never produced by passive observation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelVerdict {
     /// `pwmN` is present and writable and nothing has reclaimed it.
@@ -75,13 +78,38 @@ impl ChannelVerdict {
     pub fn is_controllable(self) -> bool {
         matches!(self, Self::Controllable)
     }
+
+    /// Whether this is a fact about the hardware that cannot change while the
+    /// machine is running, as opposed to a condition that can clear.
+    ///
+    /// `FirmwareOverride` is deliberately *not* permanent: it is only
+    /// observable after control was attempted, and it stops being true if the
+    /// firmware stops reclaiming the channel. Grouping it with the permanent
+    /// capabilities would misrepresent both.
+    pub fn is_permanent_capability(self) -> bool {
+        matches!(
+            self,
+            Self::Controllable
+                | Self::FamilyMayNeedOutOfTree
+                | Self::NoPwm
+                | Self::PwmReadOnly
+                | Self::IgnoresDuty
+                | Self::Unverifiable
+        )
+    }
 }
 
 /// The raw facts a `ChannelVerdict` was computed from.
 ///
 /// Carried alongside the verdict so every surface can show what was measured
 /// rather than asking the user to trust a label.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// The bools are four genuinely independent sysfs observations, not a state
+/// machine that wants an enum: any combination of them can occur on real
+/// hardware, and collapsing them would discard the evidence this type exists
+/// to carry.
+#[allow(clippy::struct_excessive_bools)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelEvidence {
     pub has_pwm: bool,
     pub pwm_writable: bool,
@@ -94,10 +122,25 @@ pub struct ChannelEvidence {
 }
 
 /// One channel's diagnosis: the verdict and the evidence behind it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelDiagnosis {
     pub verdict: ChannelVerdict,
     pub evidence: ChannelEvidence,
+}
+
+/// A diagnosis bound to the channel it describes, for the health snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ChannelVerdictRef {
+    pub device_uid: DeviceUID,
+    pub channel_name: ChannelName,
+    pub verdict: ChannelVerdict,
+    pub evidence: ChannelEvidence,
+}
+
+/// Stable ordering so a client rendering the snapshot does not see rows
+/// shuffle between polls of an unordered map.
+fn sort_key(reference: &ChannelVerdictRef) -> (&str, &str) {
+    (&reference.device_uid, &reference.channel_name)
 }
 
 /// Computes the passive verdict for one fan channel.
@@ -154,7 +197,7 @@ pub fn is_out_of_tree_candidate_family(hwmon_name: &str) -> bool {
 }
 
 /// Why the Super-I/O probe could not run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EnvironmentBlocker {
     SecureBoot,
@@ -163,7 +206,7 @@ pub enum EnvironmentBlocker {
 }
 
 /// A fact about the machine rather than about one channel.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SystemFinding {
     /// A chip was detected but no loaded driver serves its family.
@@ -175,7 +218,7 @@ pub enum SystemFinding {
     Blacklisted { driver: String },
     /// The probe could not run at all.
     BlockedByEnvironment { reason: EnvironmentBlocker },
-    /// Not an x86_64 target, so no probe was ever attempted. Distinct from
+    /// Not an `x86_64` target, so no probe was ever attempted. Distinct from
     /// `BlockedByEnvironment` because the stub reports `has_dev_port: false`
     /// on platforms where `/dev/port` is simply irrelevant, and reporting that
     /// as a blocker would be a claim we cannot back with an observation.
@@ -313,7 +356,7 @@ pub fn resolve_bound_drivers(hwmon_class_path: &Path) -> HashSet<String> {
 /// Already read at startup for the log banner and previously discarded.
 /// Deliberately excludes serials and UUIDs: this is destined for a report the
 /// user pastes into a support channel.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct SystemInfo {
     pub board_vendor: String,
     pub board_name: String,
@@ -343,6 +386,10 @@ pub struct HardwareSupportController {
     pub system_info: SystemInfo,
     pub detection: Option<cc_detect::DetectionResults>,
     pub system_findings: Vec<SystemFinding>,
+    /// Keyed by `(device_uid, channel_name)`. Seeded when a repository
+    /// initializes its channels and updated when a runtime observation, such
+    /// as a firmware reclaim, changes a verdict.
+    channel_diagnoses: RefCell<HashMap<(DeviceUID, ChannelName), ChannelDiagnosis>>,
 }
 
 impl HardwareSupportController {
@@ -353,7 +400,53 @@ impl HardwareSupportController {
             system_info,
             detection,
             system_findings,
+            channel_diagnoses: RefCell::new(HashMap::new()),
         }
+    }
+
+    /// Records or replaces one channel's diagnosis.
+    pub fn record_channel_diagnosis(
+        &self,
+        device_uid: &str,
+        channel_name: &str,
+        diagnosis: ChannelDiagnosis,
+    ) {
+        self.channel_diagnoses.borrow_mut().insert(
+            (device_uid.to_string(), channel_name.to_string()),
+            diagnosis,
+        );
+    }
+
+    /// Splits the recorded diagnoses into the permanent capabilities and the
+    /// conditions that can clear.
+    ///
+    /// Kept separate because a verdict is a fact about hardware while a
+    /// firmware reclaim is a current state, and presenting them together would
+    /// misrepresent both. Channels we can drive are omitted from both lists:
+    /// there is nothing to report about hardware that works.
+    pub fn partitioned_verdicts(&self) -> (Vec<ChannelVerdictRef>, Vec<ChannelVerdictRef>) {
+        let diagnoses = self.channel_diagnoses.borrow();
+        let mut permanent = Vec::with_capacity(diagnoses.len());
+        let mut current = Vec::new();
+        for ((device_uid, channel_name), diagnosis) in diagnoses.iter() {
+            if diagnosis.verdict.is_controllable() {
+                continue;
+            }
+            let reference = ChannelVerdictRef {
+                device_uid: device_uid.clone(),
+                channel_name: channel_name.clone(),
+                verdict: diagnosis.verdict,
+                evidence: diagnosis.evidence.clone(),
+            };
+            if diagnosis.verdict.is_permanent_capability() {
+                permanent.push(reference);
+            } else {
+                current.push(reference);
+            }
+        }
+        permanent.sort_by(|a, b| sort_key(a).cmp(&sort_key(b)));
+        current.sort_by(|a, b| sort_key(a).cmp(&sort_key(b)));
+        (permanent, current)
     }
 
     /// `None` detection means the probe was switched off by config or

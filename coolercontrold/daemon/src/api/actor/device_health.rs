@@ -102,12 +102,18 @@ impl DeviceHealthHandle {
                 failsafe: Vec::with_capacity(0),
                 missing: Vec::with_capacity(0),
                 stale_source: Vec::with_capacity(0),
+                firmware_overrides: Vec::with_capacity(0),
+                channel_capabilities: Vec::with_capacity(0),
+                system_findings: Vec::with_capacity(0),
             };
         }
         rx.await.unwrap_or(DeviceHealthDto {
             failsafe: Vec::with_capacity(0),
             missing: Vec::with_capacity(0),
             stale_source: Vec::with_capacity(0),
+            firmware_overrides: Vec::with_capacity(0),
+            channel_capabilities: Vec::with_capacity(0),
+            system_findings: Vec::with_capacity(0),
         })
     }
 

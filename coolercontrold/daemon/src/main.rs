@@ -340,6 +340,7 @@ fn main() -> Result<()> {
                 &cmd_args,
                 run_token.clone(),
                 Rc::clone(&overrides_controller),
+                Rc::clone(&hardware_support),
             )
             .await?;
         let all_devices = create_devices_map(&repos).await;
@@ -387,12 +388,15 @@ fn main() -> Result<()> {
                     )
                     .await?,
                 );
-                let device_health_controller = Rc::new(device_health::DeviceHealthController::new(
-                    Rc::clone(&all_devices),
-                    Rc::clone(&config),
-                    Rc::clone(&repos),
-                    Rc::clone(&overrides_controller),
-                ));
+                let device_health_controller = Rc::new(
+                    device_health::DeviceHealthController::new(
+                        Rc::clone(&all_devices),
+                        Rc::clone(&config),
+                        Rc::clone(&repos),
+                        Rc::clone(&overrides_controller),
+                    )
+                    .with_hardware_support(Rc::clone(&hardware_support)),
+                );
                 AlertController::watch_for_shutdown(
                     &alert_controller,
                     run_token.clone(),
@@ -775,6 +779,7 @@ async fn initialize_device_repos(
     cmd_args: &Args,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<(
     Repos,
     Rc<CustomSensorsRepo>,
@@ -816,7 +821,14 @@ async fn initialize_device_repos(
             }
         });
         init_scope.spawn(async {
-            match init_hwmon_repo(config.clone(), lc_locations, Rc::clone(&overrides)).await {
+            match init_hwmon_repo(
+                config.clone(),
+                lc_locations,
+                Rc::clone(&overrides),
+                Rc::clone(&hardware_support),
+            )
+            .await
+            {
                 Ok(repo) => repos.hwmon = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing HWMON Repo: {err}"),
             }
@@ -910,8 +922,10 @@ async fn init_hwmon_repo(
     config: Rc<Config>,
     lc_locations: Vec<String>,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<HwmonRepo> {
-    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides);
+    let mut hwmon_repo =
+        HwmonRepo::new(config, lc_locations, overrides).with_hardware_support(hardware_support);
     hwmon_repo.initialize_devices().await?;
     Ok(hwmon_repo)
 }

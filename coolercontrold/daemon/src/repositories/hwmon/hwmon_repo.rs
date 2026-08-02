@@ -78,6 +78,7 @@ use crate::device::{
     TempInfo, TempName, TempStatus, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
+use crate::hardware_support::HardwareSupportController;
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, MISSING_STATUS_THRESHOLD};
 use crate::repositories::hwmon::apple_mac_smc::AppleMacSMC;
@@ -397,6 +398,10 @@ pub struct HwmonRepo {
     /// Liquidctl `HWMon` paths used to dedupe.
     lc_hwmon_paths: Vec<PathBuf>,
 
+    /// Registry the channel verdicts are published to. `None` in tests, which
+    /// simply skips publishing.
+    hardware_support: Option<Rc<HardwareSupportController>>,
+
     device_delays: HashMap<DeviceUID, u16>,
 
     /// Permit timeouts and init threshold are derived from
@@ -439,11 +444,24 @@ impl HwmonRepo {
                 .filter_map(|loc| cc_fs::canonicalize(loc).ok())
                 .collect(),
             device_delays: HashMap::new(),
+            hardware_support: None,
             device_read_permit_timeout,
             device_write_permit_timeout,
             slow_device_init_threshold,
             drivetemp_ioctl_timeout,
         }
+    }
+
+    /// Attaches the registry that channel verdicts are published to.
+    /// Follows the `OverridesController::with_sensors_conf` pattern so the
+    /// constructor stays unchanged for the many test call sites.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
     }
 
     fn load_device_delays(&mut self) {
@@ -661,12 +679,31 @@ impl HwmonRepo {
             self.delay_logged.insert(type_index, Cell::new(0));
             self.preload_in_flight
                 .insert(type_index, Rc::new(Cell::new(false)));
+            self.publish_channel_verdicts(&device.uid, &driver);
             self.devices.insert(
                 device.uid.clone(),
                 (Rc::new(RefCell::new(device)), Rc::new(driver)),
             );
         }
         Ok(())
+    }
+
+    /// Publishes the passive verdict for every fan channel on a device.
+    ///
+    /// `firmware_override_observed` is false here by construction: at init
+    /// nothing has attempted control yet, so there has been nothing to
+    /// reclaim. The writer task republishes a channel if that changes.
+    fn publish_channel_verdicts(&self, device_uid: &UID, driver: &HwmonDriverInfo) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for channel in &driver.channels {
+            if channel.hwmon_type != HwmonChannelType::Fan {
+                continue;
+            }
+            let diagnosis = fans::diagnose_fan_channel(&driver.name, channel, false);
+            hardware_support.record_channel_diagnosis(device_uid, &channel.name, diagnosis);
+        }
     }
 
     /// Gets the info necessary to apply setting to the device channel
@@ -1132,6 +1169,8 @@ impl HwmonRepo {
                 shutdown: self.shutdown_token.clone(),
                 write_permit_timeout,
                 delay_millis: self.device_delay(device_uid),
+                device_uid: device_uid.clone(),
+                hardware_support: self.hardware_support.clone(),
             };
             rt::spawn(run_writer_task(task));
         }
@@ -1201,6 +1240,10 @@ struct WriterTask {
     shutdown: CancellationToken,
     write_permit_timeout: Duration,
     delay_millis: u16,
+    /// Needed to republish a verdict when firmware reclaims a channel.
+    device_uid: UID,
+    /// `None` in tests, which simply skips republishing.
+    hardware_support: Option<Rc<HardwareSupportController>>,
 }
 
 /// Drains the mailbox until shutdown. Each iteration swaps `pending`
@@ -1524,6 +1567,13 @@ async fn reassert_manual_if_reclaimed(task: &WriterTask, channel_name: &str) {
     );
     let current_mode = current_mode.unwrap_or(fans::PWM_ENABLE_MANUAL_VALUE);
     let diagnosis = fans::diagnose_fan_channel(&task.driver.name, channel_info, true);
+    if let Some(hardware_support) = task.hardware_support.as_ref() {
+        hardware_support.record_channel_diagnosis(
+            &task.device_uid,
+            channel_name,
+            diagnosis.clone(),
+        );
+    }
     warn!(
         "Firmware reclaimed fan control on {}:{channel_name} (pwm_enable is {current_mode}, \
          expected {}); verdict {:?}. Re-asserting manual control.",
@@ -3390,6 +3440,8 @@ mod coalescer_tests {
             shutdown: repo.shutdown_token.clone(),
             write_permit_timeout: repo.device_write_permit_timeout,
             delay_millis,
+            device_uid: uid.clone(),
+            hardware_support: None,
         };
         crate::rt::spawn(run_writer_task(task));
         uid
@@ -4217,6 +4269,8 @@ mod slow_device_tests {
             shutdown: repo.shutdown_token.clone(),
             write_permit_timeout: repo.device_write_permit_timeout,
             delay_millis: 0,
+            device_uid: uid.clone(),
+            hardware_support: None,
         };
         crate::rt::spawn(run_writer_task(task));
         uid
