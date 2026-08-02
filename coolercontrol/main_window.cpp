@@ -400,7 +400,31 @@ void MainWindow::initWebUI() {
   JSON. It is a guard against misconfiguration; TLS pinning is what guards against an
   attacker.
 */
+/*
+  Stops after a certificate is refused.
+
+  A page loaded earlier keeps its own connections, and the web engine remembers the
+  exception it was already granted, so leaving it on screen would let it carry on talking
+  to a daemon the user just declined. Only trust refusals do this: a daemon that is merely
+  unreachable should keep its page and reconnect, as it always has.
+*/
+void MainWindow::refuseDaemonCertificate() {
+  m_uiLoadRetryCount = 0;
+  m_uiLoadingStopped = true;
+  m_view->load(QUrl(QStringLiteral("about:blank")));
+  displayAddressWizard();
+}
+
 void MainWindow::loadVerifiedDaemonUi() {
+  /*
+    Force a fresh handshake. Qt pools connections, and a pooled one is reused without
+    renegotiating, so QNetworkReply::sslErrors never fires again for the life of that
+    connection. Measured: request 1 ignoring errors succeeds, request 2 refusing them
+    still succeeds because the policy is never asked, and only after clearing the cache
+    does it get consulted. Without this, turning certificate validation on has no effect
+    until the app is restarted.
+  */
+  m_manager->clearConnectionCache();
   QNetworkRequest handshakeRequest;
   handshakeRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   handshakeRequest.setUrl(getEndpointUrl(ENDPOINT_HANDSHAKE.data()));
@@ -450,10 +474,16 @@ void MainWindow::loadVerifiedDaemonUi() {
           loadVerifiedDaemonUi();  // pinned now, so this pass gets through
           return;
         }
-        m_uiLoadRetryCount = 0;
-        m_uiLoadingStopped = true;
         qWarning() << "Not loading" << host << ": its certificate was not trusted.";
-        displayAddressWizard();
+        refuseDaemonCertificate();
+        return;
+      }
+      if (decision == tls_trust::Decision::Reject) {
+        // Strict validation turned this down. Retrying cannot change the answer, so go
+        // straight to the dialog instead of burning the retry budget first.
+        qWarning() << "Refusing" << host << ": its certificate does not validate and"
+                   << "certificate validation is enabled.";
+        refuseDaemonCertificate();
         return;
       }
     }

@@ -201,6 +201,9 @@ class MainWindow final : public QMainWindow {
   // applying a new address from the wizard.
   void loadVerifiedDaemonUi();
 
+  // Clears the screen and opens the address dialog after a refused certificate.
+  void refuseDaemonCertificate();
+
   // Decides whether to trust a daemon certificate, prompting when trust on first use
   // requires it. `silent` suppresses the prompt for background requests, which must not
   // pop dialogs; those simply fail until a page load establishes the pin.
