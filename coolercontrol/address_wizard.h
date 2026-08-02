@@ -30,8 +30,13 @@ class IntroPage final : public QWizardPage {
  public:
   explicit IntroPage(QWidget* parent = nullptr);
 
+  /// The concrete reason the last attempt failed. Empty hides the line again.
+  void setError(const QString& detail) const;
+
  private:
+  QLabel* m_leadLabel;
   QLabel* m_label;
+  QLabel* m_errorLabel;
 };
 
 class AddressPage final : public QWizardPage {
@@ -42,10 +47,22 @@ class AddressPage final : public QWizardPage {
 
   void resetAddressInputValues() const;
 
+  // Lists what is currently trusted and, on confirmation, drops every pin.
+  void forgetTrustedCertificates() const;
+
+  void refreshForgetCertsButton() const;
+
+  /// Same as IntroPage's: the wizard reopens on whichever page was last shown, so the
+  /// reason has to be on both or it is invisible exactly when it matters.
+  void setError(const QString& detail) const;
+
  private:
+  QLabel* m_errorLabel;
   QLineEdit* m_addressLineEdit;
   QLineEdit* m_portLineEdit;
   QCheckBox* m_sslCheckbox;
+  QCheckBox* m_strictTlsCheckbox;
   QPushButton* m_defaultButton;
+  QPushButton* m_forgetCertsButton;
 };
 #endif  // ADDRESSWIZARD_H

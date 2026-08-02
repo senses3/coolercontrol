@@ -1223,6 +1223,81 @@ export default {
             hasErrors: 'لديه أخطاء',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'الإغلاق إلى شريط المهام؟',
+            body: 'تستمر خدمة CoolerControl بالعمل في الخلفية في كلتا الحالتين، لذا تبقى إعدادات التبريد فعّالة. أبقِ الواجهة في شريط المهام للوصول السريع وتلقي إشعارات سطح المكتب، أو أغلقها تمامًا.',
+            keepInTray: 'الإبقاء في شريط المهام',
+            quit: 'خروج',
+            remember: 'تذكر اختياري',
+        },
+        tray: {
+            show: 'إظهار',
+            hide: 'إخفاء',
+            daemonConnection: 'اتصال الخدمة…',
+            quit: 'خروج',
+            modes: 'الأوضاع',
+            sensors: 'المستشعرات',
+        },
+        cert: {
+            title: 'شهادة خدمة غير موثّقة',
+            changedTitle: 'تغيّرت الشهادة',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: 'يستخدم %1 شهادة موقّعة ذاتيًا لا يمكن التحقق منها تلقائيًا. تابع فقط إذا كنت تعرف هذه الخدمة.',
+            changedBody:
+                'شهادة %1 ليست الشهادة الموثوقة سابقًا. قد يعني ذلك إعادة تثبيت الخدمة أو أن الاتصال يجري اعتراضه.',
+            fingerprint: 'البصمة (SHA-256):',
+            trust: 'الوثوق بهذه الشهادة',
+            cancel: 'إلغاء',
+        },
+        wizard: {
+            windowTitle: 'خطأ في الاتصال بالخدمة',
+            windowTitleOk: 'اتصال الخدمة',
+            apply: 'تطبيق',
+            retry: 'إعادة المحاولة',
+            quitApp: 'إنهاء التطبيق',
+            introPurpose:
+                'تتحكم هذه الإعدادات في كيفية اتصال تطبيق سطح المكتب بخادم CoolerControl.',
+            introFailed: 'تعذر إنشاء اتصال بخدمة CoolerControl.',
+            introCheckService: 'يرجى التأكد من أن خدمة systemd قيد التشغيل ومتاحة.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'راجع %1 للاطلاع على تعليمات التثبيت.',
+            introDocsLink: 'موقع التوثيق',
+            introCommands: 'بعض الأوامر المفيدة لتفعيل حالة الخدمة والتحقق منها:',
+            introCustomAddress:
+                'إذا قمت بضبط عنوان غير قياسي للاتصال بالخدمة، يمكنك تعيينه في الخطوات التالية:',
+            lastError: 'آخر خطأ:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: 'استجاب العنوان، لكن ليس بصفته خادم CoolerControl‏ (HTTP %1).',
+            errorCertUntrusted: 'لم يتم الوثوق بشهادة الخادم.',
+            errorCertInvalid: 'شهادة الخادم غير صالحة، والتحقق من الشهادات مُفعَّل.',
+            addressTitle: 'عنوان الخدمة - تطبيق سطح المكتب',
+            addressSubtitle: 'عدّل حقول العنوان حسب الحاجة.',
+            hostLabel: 'عنوان المضيف:',
+            hostTooltip: 'عنوان IPv4 أو IPv6 أو اسم المضيف المستخدم للتواصل مع الخدمة.',
+            portLabel: 'المنفذ:',
+            portTooltip: 'رقم المنفذ المستخدم للتواصل مع الخدمة.',
+            sslTooltip: 'تفعيل أو تعطيل SSL/TLS (HTTPS)',
+            strictTls: 'التحقق من الشهادة',
+            strictTlsTooltip:
+                'طلب شهادة يمكن التحقق منها بشكل طبيعي. اتركه معطلًا لاستخدام شهادة الخدمة الموقّعة ذاتيًا، والتي يوثق بها عند أول اتصال بالخدمات البعيدة.',
+            defaults: 'الإعدادات الافتراضية',
+            defaultsTooltip: 'إعادة تعيين عنوان الخدمة إلى القيم الافتراضية',
+            forgetCerts: 'نسيان الشهادات الموثوقة',
+            forgetCertsTooltip: 'يزيل شهادات الخدمات البعيدة التي طُلب من هذا التطبيق الوثوق بها.',
+            forgetCertsBody:
+                'يوثق حاليًا بشهادات الخدمات هذه. نسيانها يعني أنه سيُطلب منك التأكيد في المرة القادمة التي تتصل فيها.',
+        },
+        versionMismatch: {
+            title: 'عدم تطابق الإصدار',
+            text: 'إصدار تطبيق سطح المكتب (%1) لا يطابق إصدار الخدمة (%2).',
+            informative: 'يرجى إعادة تشغيل تطبيق سطح المكتب لتحميل إصدار الواجهة الصحيح.',
+            quitApp: 'إنهاء التطبيق',
+            continueAnyway: 'المتابعة على أي حال',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'انتهت الجلسة',

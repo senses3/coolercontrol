@@ -1230,6 +1230,87 @@ export default {
             hasErrors: 'Has Errors',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Close to System Tray?',
+            body: 'The CoolerControl daemon keeps running in the background either way, so your cooling settings stay active. Keep the UI in the system tray for quick access and desktop notifications, or quit it entirely.',
+            keepInTray: 'Keep in Tray',
+            quit: 'Quit',
+            remember: 'Remember my choice',
+        },
+        tray: {
+            show: '&Show',
+            hide: '&Hide',
+            daemonConnection: '&Daemon Connection…',
+            quit: '&Quit',
+            modes: 'Modes',
+            sensors: 'Sensors',
+        },
+        // Shown when the daemon cannot be reached, so the UI itself may never have
+        // loaded. Qt falls back to English until a successful run caches these.
+        cert: {
+            title: 'Unverified Daemon Certificate',
+            changedTitle: 'Certificate Changed',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 uses a self-signed certificate, which cannot be verified automatically. Continue only if you recognise this daemon.',
+            changedBody:
+                'The certificate for %1 is not the one previously trusted. This can mean the daemon was reinstalled, or that something is intercepting the connection.',
+            fingerprint: 'Fingerprint (SHA-256):',
+            trust: 'Trust This Certificate',
+            cancel: 'Cancel',
+        },
+        wizard: {
+            windowTitle: 'Daemon Connection Error',
+            windowTitleOk: 'Daemon Connection',
+            apply: '&Apply',
+            retry: '&Retry',
+            quitApp: '&Quit App',
+            introPurpose:
+                'These settings control how the desktop app connects to the CoolerControl daemon.',
+            introFailed: 'A connection to the CoolerControl Daemon could not be established.',
+            introCheckService:
+                'Please make sure that the systemd service is running and available.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Check the %1 for installation instructions.',
+            introDocsLink: 'docs website',
+            introCommands: 'Some helpful commands to enable and verify the daemon status:',
+            introCustomAddress:
+                'If you have configured a non-standard address to connect to the daemon, you can set it in the following steps:',
+            lastError: 'Last error:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: 'The address answered, but not as a CoolerControl daemon (HTTP %1).',
+            errorCertUntrusted: "The daemon's certificate was not trusted.",
+            errorCertInvalid:
+                "The daemon's certificate does not validate, and certificate validation is enabled.",
+            addressTitle: 'Daemon Address - Desktop Application',
+            addressSubtitle: 'Adjust the address fields as necessary.',
+            hostLabel: 'Host address:',
+            hostTooltip:
+                'The IPv4, IPv6 address or hostname to use to communicate with the daemon.',
+            portLabel: 'Port:',
+            portTooltip: 'The port number to use to communicate with the daemon.',
+            sslTooltip: 'Enable or disable SSL/TLS (HTTPS)',
+            strictTls: 'Validate certificate',
+            strictTlsTooltip:
+                "Require a certificate that validates normally. Leave off to use the daemon's self-signed certificate, which is trusted on first use for remote daemons.",
+            defaults: 'Defaults',
+            defaultsTooltip: 'Reset the daemon address to default values',
+            forgetCerts: 'Forget Trusted Certificates',
+            forgetCertsTooltip:
+                'Remove the remote daemon certificates this app has been told to trust.',
+            forgetCertsBody:
+                'These daemon certificates are currently trusted. Forgetting them means you will be asked to confirm the next time you connect.',
+        },
+        versionMismatch: {
+            title: 'Version Mismatch',
+            text: 'The desktop app version (%1) does not match the daemon version (%2).',
+            informative: 'Please restart the desktop app to load the correct interface version.',
+            quitApp: '&Quit App',
+            continueAnyway: 'Continue Anyway',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Session expired',

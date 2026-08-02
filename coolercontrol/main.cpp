@@ -18,8 +18,11 @@
 #include <QCommandLineParser>
 #include <QDBusInterface>
 #include <QDir>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QLoggingCategory>
 #include <QStandardPaths>
+#include <QTranslator>
 #include <optional>
 
 #include "constants.h"
@@ -75,6 +78,10 @@ void handleCmdOptions(const bool debug, const bool fullDebug, const bool disable
   setLogFilters(debug, fullDebug);
 }
 
+// Set by --no-discard. Keeps the renderer alive while the window sits in the tray,
+// as an escape hatch if tearing it down misbehaves on some desktop.
+bool g_discardEnabled = true;
+
 // Returns an exit code if the app should exit immediately, or std::nullopt to continue launching.
 std::optional<int> parseCLIOptions(const QApplication& a) {
   QCommandLineParser parser;
@@ -99,7 +106,13 @@ std::optional<int> parseCLIOptions(const QApplication& a) {
   const QCommandLineOption clearCacheOption("clear-cache",
                                             "Clear the browser HTTP cache and exit.");
   parser.addOption(clearCacheOption);
+  const QCommandLineOption noDiscardOption(
+      "no-discard",
+      "Keep the web renderer running while the window is closed to the system tray. "
+      "Uses considerably more memory.");
+  parser.addOption(noDiscardOption);
   parser.process(a);
+  g_discardEnabled = !parser.isSet(noDiscardOption);
   if (parser.isSet(clearCacheOption)) {
     const QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) +
                               "/QtWebEngine/" + WEBENGINE_PROFILE_NAME.c_str();
@@ -131,6 +144,16 @@ int main(int argc, char* argv[]) {
   // https://doc.qt.io/qt-6/qstandardpaths.html
   // settings: ~/.config/{app_id}/{app_id}.conf
   const QApplication a(argc, argv);
+
+  // Qt supplies its own strings for standard dialog buttons (Cancel, Back, Next, OK).
+  // Without this catalogue they stay English next to our translated text. It follows the
+  // system locale rather than the UI's chosen language, which is the best available
+  // signal this early: the UI has not loaded yet, and Qt only reads this at startup.
+  QTranslator qtTranslator;
+  if (qtTranslator.load(QLocale(), "qtbase", "_",
+                        QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+    QCoreApplication::installTranslator(&qtTranslator);
+  }
 
   QApplication::setWindowIcon(QIcon::fromTheme(
       APP_ID.data(), QIcon(":/icons/org.coolercontrol.CoolerControl-symbolic.svg")));
@@ -164,6 +187,7 @@ int main(int argc, char* argv[]) {
   }
 
   MainWindow w;
+  w.setDiscardEnabled(g_discardEnabled);
   w.setWindowTitle("CoolerControl");
   w.setMinimumSize(400, 400);
   w.resize(1600, 900);

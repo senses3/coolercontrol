@@ -1,0 +1,143 @@
+/*
+ * CoolerControl - monitor and control your cooling and other devices
+ * Copyright (c) 2021-2025  Guy Boldon and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+// The Qt app renders some UI of its own (dialogs, tray) but has no translation
+// pipeline, so those strings would be English-only while the SPA ships 12 locales.
+// Rather than run a second Linguist pipeline that translators would have to keep in
+// sync, the SPA pushes the strings Qt needs and Qt caches them. The cache is required
+// anyway: once the renderer is discarded to the tray there is nobody left to ask.
+//
+// Keys are written out one per line on purpose. An unused-key sweep only sees literal
+// translate calls, so building these from a template literal would get them pruned.
+
+/** Keys Qt looks up. Kept in sync with the C++ side by qtStrings.spec.ts. */
+export const QT_STRING_KEYS = [
+    'closePrompt.title',
+    'closePrompt.body',
+    'closePrompt.keepInTray',
+    'closePrompt.quit',
+    'closePrompt.remember',
+    'tray.show',
+    'tray.hide',
+    'tray.daemonConnection',
+    'tray.quit',
+    'tray.modes',
+    'tray.sensors',
+    'cert.title',
+    'cert.changedTitle',
+    'cert.body',
+    'cert.changedBody',
+    'cert.fingerprint',
+    'cert.trust',
+    'cert.cancel',
+    'wizard.windowTitle',
+    'wizard.windowTitleOk',
+    'wizard.apply',
+    'wizard.retry',
+    'wizard.quitApp',
+    'wizard.introPurpose',
+    'wizard.introFailed',
+    'wizard.introCheckService',
+    'wizard.introDocs',
+    'wizard.introDocsLink',
+    'wizard.introCommands',
+    'wizard.introCustomAddress',
+    'wizard.lastError',
+    'wizard.errorNotDaemon',
+    'wizard.errorCertUntrusted',
+    'wizard.errorCertInvalid',
+    'wizard.addressTitle',
+    'wizard.addressSubtitle',
+    'wizard.hostLabel',
+    'wizard.hostTooltip',
+    'wizard.portLabel',
+    'wizard.portTooltip',
+    'wizard.sslTooltip',
+    'wizard.strictTls',
+    'wizard.strictTlsTooltip',
+    'wizard.defaults',
+    'wizard.defaultsTooltip',
+    'wizard.forgetCerts',
+    'wizard.forgetCertsTooltip',
+    'wizard.forgetCertsBody',
+    'versionMismatch.title',
+    'versionMismatch.text',
+    'versionMismatch.informative',
+    'versionMismatch.quitApp',
+    'versionMismatch.continueAnyway',
+] as const
+
+type Translate = (key: string) => string
+
+export function buildQtStrings(t: Translate): Record<string, string> {
+    return {
+        'closePrompt.title': t('desktop.closePrompt.title'),
+        'closePrompt.body': t('desktop.closePrompt.body'),
+        'closePrompt.keepInTray': t('desktop.closePrompt.keepInTray'),
+        'closePrompt.quit': t('desktop.closePrompt.quit'),
+        'closePrompt.remember': t('desktop.closePrompt.remember'),
+        'tray.show': t('desktop.tray.show'),
+        'tray.hide': t('desktop.tray.hide'),
+        'tray.daemonConnection': t('desktop.tray.daemonConnection'),
+        'tray.quit': t('desktop.tray.quit'),
+        'tray.modes': t('desktop.tray.modes'),
+        'tray.sensors': t('desktop.tray.sensors'),
+        'cert.title': t('desktop.cert.title'),
+        'cert.changedTitle': t('desktop.cert.changedTitle'),
+        'cert.body': t('desktop.cert.body'),
+        'cert.changedBody': t('desktop.cert.changedBody'),
+        'cert.fingerprint': t('desktop.cert.fingerprint'),
+        'cert.trust': t('desktop.cert.trust'),
+        'cert.cancel': t('desktop.cert.cancel'),
+        'wizard.windowTitle': t('desktop.wizard.windowTitle'),
+        'wizard.windowTitleOk': t('desktop.wizard.windowTitleOk'),
+        'wizard.apply': t('desktop.wizard.apply'),
+        'wizard.retry': t('desktop.wizard.retry'),
+        'wizard.quitApp': t('desktop.wizard.quitApp'),
+        'wizard.introPurpose': t('desktop.wizard.introPurpose'),
+        'wizard.introFailed': t('desktop.wizard.introFailed'),
+        'wizard.introCheckService': t('desktop.wizard.introCheckService'),
+        'wizard.introDocs': t('desktop.wizard.introDocs'),
+        'wizard.introDocsLink': t('desktop.wizard.introDocsLink'),
+        'wizard.introCommands': t('desktop.wizard.introCommands'),
+        'wizard.introCustomAddress': t('desktop.wizard.introCustomAddress'),
+        'wizard.lastError': t('desktop.wizard.lastError'),
+        'wizard.errorNotDaemon': t('desktop.wizard.errorNotDaemon'),
+        'wizard.errorCertUntrusted': t('desktop.wizard.errorCertUntrusted'),
+        'wizard.errorCertInvalid': t('desktop.wizard.errorCertInvalid'),
+        'wizard.addressTitle': t('desktop.wizard.addressTitle'),
+        'wizard.addressSubtitle': t('desktop.wizard.addressSubtitle'),
+        'wizard.hostLabel': t('desktop.wizard.hostLabel'),
+        'wizard.hostTooltip': t('desktop.wizard.hostTooltip'),
+        'wizard.portLabel': t('desktop.wizard.portLabel'),
+        'wizard.portTooltip': t('desktop.wizard.portTooltip'),
+        'wizard.sslTooltip': t('desktop.wizard.sslTooltip'),
+        'wizard.strictTls': t('desktop.wizard.strictTls'),
+        'wizard.strictTlsTooltip': t('desktop.wizard.strictTlsTooltip'),
+        'wizard.defaults': t('desktop.wizard.defaults'),
+        'wizard.defaultsTooltip': t('desktop.wizard.defaultsTooltip'),
+        'wizard.forgetCerts': t('desktop.wizard.forgetCerts'),
+        'wizard.forgetCertsTooltip': t('desktop.wizard.forgetCertsTooltip'),
+        'wizard.forgetCertsBody': t('desktop.wizard.forgetCertsBody'),
+        'versionMismatch.title': t('desktop.versionMismatch.title'),
+        'versionMismatch.text': t('desktop.versionMismatch.text'),
+        'versionMismatch.informative': t('desktop.versionMismatch.informative'),
+        'versionMismatch.quitApp': t('desktop.versionMismatch.quitApp'),
+        'versionMismatch.continueAnyway': t('desktop.versionMismatch.continueAnyway'),
+    }
+}

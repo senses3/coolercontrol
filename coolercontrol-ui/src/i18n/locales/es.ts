@@ -1250,6 +1250,88 @@ export default {
             hasErrors: 'Tiene Errores',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '¿Cerrar a la bandeja del sistema?',
+            body: 'El demonio de CoolerControl sigue funcionando en segundo plano en cualquier caso, por lo que su configuración de refrigeración permanece activa. Mantenga la interfaz en la bandeja del sistema para un acceso rápido y notificaciones de escritorio, o ciérrela por completo.',
+            keepInTray: 'Mantener en la bandeja',
+            quit: 'Salir',
+            remember: 'Recordar mi elección',
+        },
+        tray: {
+            show: '&Mostrar',
+            hide: '&Ocultar',
+            daemonConnection: 'Conexión del &demonio…',
+            quit: '&Salir',
+            modes: 'Modos',
+            sensors: 'Sensores',
+        },
+        cert: {
+            title: 'Certificado del demonio no verificado',
+            changedTitle: 'El certificado ha cambiado',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 usa un certificado autofirmado que no se puede verificar automáticamente. Continúe solo si reconoce este demonio.',
+            changedBody:
+                'El certificado de %1 no es el que se aprobó anteriormente. Puede significar que el demonio se reinstaló o que algo está interceptando la conexión.',
+            fingerprint: 'Huella digital (SHA-256):',
+            trust: 'Confiar en este certificado',
+            cancel: 'Cancelar',
+        },
+        wizard: {
+            windowTitle: 'Error de conexión con el demonio',
+            windowTitleOk: 'Conexión del demonio',
+            apply: '&Aplicar',
+            retry: '&Reintentar',
+            quitApp: '&Salir',
+            introPurpose:
+                'Esta configuración controla cómo la aplicación de escritorio se conecta al demonio de CoolerControl.',
+            introFailed: 'No se pudo establecer una conexión con el demonio de CoolerControl.',
+            introCheckService:
+                'Asegúrese de que el servicio de systemd esté en ejecución y disponible.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Consulte el %1 para ver las instrucciones de instalación.',
+            introDocsLink: 'sitio de documentación',
+            introCommands:
+                'Algunos comandos útiles para activar y verificar el estado del demonio:',
+            introCustomAddress:
+                'Si ha configurado una dirección no estándar para conectarse al demonio, puede establecerla en los siguientes pasos:',
+            lastError: 'Último error:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'La dirección respondió, pero no como un demonio de CoolerControl (HTTP %1).',
+            errorCertUntrusted: 'No se confió en el certificado del demonio.',
+            errorCertInvalid:
+                'El certificado del demonio no es válido y la validación de certificados está activada.',
+            addressTitle: 'Dirección del demonio - Aplicación de escritorio',
+            addressSubtitle: 'Ajuste los campos de dirección según sea necesario.',
+            hostLabel: 'Dirección del host:',
+            hostTooltip:
+                'La dirección IPv4, IPv6 o el nombre de host que se usará para comunicarse con el demonio.',
+            portLabel: 'Puerto:',
+            portTooltip: 'El número de puerto que se usará para comunicarse con el demonio.',
+            sslTooltip: 'Activar o desactivar SSL/TLS (HTTPS)',
+            strictTls: 'Validar certificado',
+            strictTlsTooltip:
+                'Exigir un certificado que se valide normalmente. Déjelo desactivado para usar el certificado autofirmado del demonio, que se aprueba en el primer uso para demonios remotos.',
+            defaults: 'Valores predeterminados',
+            defaultsTooltip: 'Restablecer la dirección del demonio a los valores predeterminados',
+            forgetCerts: 'Olvidar certificados de confianza',
+            forgetCertsTooltip:
+                'Elimina los certificados de demonios remotos en los que esta aplicación confía.',
+            forgetCertsBody:
+                'Actualmente se confía en estos certificados de demonio. Olvidarlos significa que se le pedirá confirmación la próxima vez que se conecte.',
+        },
+        versionMismatch: {
+            title: 'Versiones incompatibles',
+            text: 'La versión de la aplicación de escritorio (%1) no coincide con la versión del demonio (%2).',
+            informative:
+                'Reinicie la aplicación de escritorio para cargar la versión correcta de la interfaz.',
+            quitApp: '&Salir',
+            continueAnyway: 'Continuar de todos modos',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sesión expirada',

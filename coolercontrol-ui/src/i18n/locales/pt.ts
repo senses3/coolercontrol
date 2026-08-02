@@ -1249,6 +1249,86 @@ export default {
             hasErrors: 'Tem Erros',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Fechar para a bandeja do sistema?',
+            body: 'O daemon do CoolerControl continua a funcionar em segundo plano de qualquer forma, pelo que as suas definições de refrigeração permanecem ativas. Mantenha a interface na bandeja do sistema para acesso rápido e notificações no ambiente de trabalho, ou encerre-a por completo.',
+            keepInTray: 'Manter na bandeja',
+            quit: 'Sair',
+            remember: 'Memorizar a minha escolha',
+        },
+        tray: {
+            show: '&Mostrar',
+            hide: '&Ocultar',
+            daemonConnection: 'Conexão do &daemon…',
+            quit: '&Sair',
+            modes: 'Modos',
+            sensors: 'Sensores',
+        },
+        cert: {
+            title: 'Certificado do daemon não verificado',
+            changedTitle: 'Certificado alterado',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: 'O %1 usa um certificado autoassinado que não pode ser verificado automaticamente. Continue apenas se reconhecer este daemon.',
+            changedBody:
+                'O certificado de %1 não é o anteriormente aprovado. Pode significar que o daemon foi reinstalado ou que algo está a intercetar a ligação.',
+            fingerprint: 'Impressão digital (SHA-256):',
+            trust: 'Confiar neste certificado',
+            cancel: 'Cancelar',
+        },
+        wizard: {
+            windowTitle: 'Erro de ligação ao daemon',
+            windowTitleOk: 'Conexão do daemon',
+            apply: '&Aplicar',
+            retry: '&Tentar novamente',
+            quitApp: '&Sair',
+            introPurpose:
+                'Estas configurações controlam como o aplicativo de desktop se conecta ao daemon do CoolerControl.',
+            introFailed: 'Não foi possível estabelecer uma ligação ao daemon do CoolerControl.',
+            introCheckService:
+                'Certifique-se de que o serviço systemd está em execução e disponível.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Consulte o %1 para obter instruções de instalação.',
+            introDocsLink: 'site de documentação',
+            introCommands: 'Alguns comandos úteis para ativar e verificar o estado do daemon:',
+            introCustomAddress:
+                'Se configurou um endereço não predefinido para ligar ao daemon, pode defini-lo nos passos seguintes:',
+            lastError: 'Último erro:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'O endereço respondeu, mas não como um daemon do CoolerControl (HTTP %1).',
+            errorCertUntrusted: 'O certificado do daemon não foi considerado confiável.',
+            errorCertInvalid:
+                'O certificado do daemon não é válido e a validação de certificados está ativada.',
+            addressTitle: 'Endereço do daemon - Aplicação de ambiente de trabalho',
+            addressSubtitle: 'Ajuste os campos de endereço conforme necessário.',
+            hostLabel: 'Endereço do anfitrião:',
+            hostTooltip:
+                'O endereço IPv4, IPv6 ou o nome de anfitrião a utilizar para comunicar com o daemon.',
+            portLabel: 'Porta:',
+            portTooltip: 'O número de porta a utilizar para comunicar com o daemon.',
+            sslTooltip: 'Ativar ou desativar SSL/TLS (HTTPS)',
+            strictTls: 'Validar certificado',
+            strictTlsTooltip:
+                'Exigir um certificado que valide normalmente. Deixe desativado para usar o certificado autoassinado do daemon, aprovado na primeira utilização para daemons remotos.',
+            defaults: 'Predefinições',
+            defaultsTooltip: 'Repor o endereço do daemon para os valores predefinidos',
+            forgetCerts: 'Esquecer certificados fiáveis',
+            forgetCertsTooltip:
+                'Remove os certificados de daemons remotos em que esta aplicação confia.',
+            forgetCertsBody:
+                'Estes certificados de daemon são atualmente fiáveis. Ao esquecê-los, ser-lhe-á pedida confirmação na próxima ligação.',
+        },
+        versionMismatch: {
+            title: 'Versões incompatíveis',
+            text: 'A versão da aplicação (%1) não corresponde à versão do daemon (%2).',
+            informative: 'Reinicie a aplicação para carregar a versão correta da interface.',
+            quitApp: '&Sair',
+            continueAnyway: 'Continuar mesmo assim',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sessão expirada',
