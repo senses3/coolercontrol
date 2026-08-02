@@ -33,7 +33,7 @@ use log::{info, warn};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Not;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -224,6 +224,40 @@ pub fn is_out_of_tree_candidate_family(hwmon_name: &str) -> bool {
     OUT_OF_TREE_CANDIDATE_PREFIXES
         .iter()
         .any(|prefix| name_lower.starts_with(prefix))
+}
+
+/// Why the daemon left an hwmon device out of its device list.
+///
+/// The report enumerates hwmon itself, so it sees devices the daemon dropped.
+/// Without this, a chip that is deliberately hidden and a chip that failed to
+/// come up look identical in a pasted report, and the obvious reading of "it is
+/// in the report but not in the app" is that something is broken.
+///
+/// Not on the wire: this shapes a line of the text report, nothing more.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HwmonExclusion {
+    /// A liquidctl device already covers this chip and duplicates are hidden.
+    /// The liquidctl entry offers more features, so it wins.
+    DuplicateOfLiquidctl,
+    /// The user disabled the device in settings.
+    UserDisabled,
+    /// Excluded by name: never useful as a cooling device.
+    NotACoolingDevice,
+    /// The lm-sensors configuration ignores every channel it has.
+    AllChannelsIgnored,
+}
+
+impl HwmonExclusion {
+    /// Phrased for a report a user pastes into a support channel, so it says
+    /// what happened rather than naming the internal rule.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::DuplicateOfLiquidctl => "hidden: covered by a liquidctl device",
+            Self::UserDisabled => "hidden: disabled in settings",
+            Self::NotACoolingDevice => "hidden: not a cooling device",
+            Self::AllChannelsIgnored => "hidden: every channel ignored by sensors.conf",
+        }
+    }
 }
 
 /// Why the Super-I/O probe could not run.
@@ -424,6 +458,10 @@ pub struct HardwareSupportController {
     /// disabled. Retained here so the report never has to re-enumerate USB
     /// devices just to be generated.
     liquidctl_devices: RefCell<Vec<crate::hardware_report::LiquidctlSummary>>,
+    /// hwmon devices the daemon deliberately dropped, keyed by canonical path.
+    /// Recorded where the decision is actually made rather than re-derived, so
+    /// the report cannot disagree with what the daemon did.
+    excluded_hwmon: RefCell<HashMap<PathBuf, HwmonExclusion>>,
 }
 
 impl HardwareSupportController {
@@ -436,7 +474,25 @@ impl HardwareSupportController {
             system_findings,
             channel_diagnoses: RefCell::new(HashMap::new()),
             liquidctl_devices: RefCell::new(Vec::new()),
+            excluded_hwmon: RefCell::new(HashMap::new()),
         }
+    }
+
+    /// Records that an hwmon device was left out, and why.
+    ///
+    /// Canonicalized on the way in because the report enumerates
+    /// `/sys/class/hwmon`, whose entries are symlinks into the bus tree, while
+    /// the repository walks its own paths. Both resolve to the same real path.
+    pub fn record_excluded_hwmon(&self, path: &Path, reason: HwmonExclusion) {
+        let Ok(canonical) = cc_fs::canonicalize(path) else {
+            return;
+        };
+        self.excluded_hwmon.borrow_mut().insert(canonical, reason);
+    }
+
+    /// The exclusions, for the report.
+    pub fn hwmon_exclusions(&self) -> HashMap<PathBuf, HwmonExclusion> {
+        self.excluded_hwmon.borrow().clone()
     }
 
     /// Records the drivability of a channel whose repository has no

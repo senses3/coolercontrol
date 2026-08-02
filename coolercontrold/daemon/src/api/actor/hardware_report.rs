@@ -85,7 +85,13 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 // Retained at startup, so this never re-enumerates USB devices
                 // and still includes devices the user has disabled.
                 let liquidctl = self.hardware_support.liquidctl_devices();
-                let report = hardware_report::generate(full, is_root, Some(&liquidctl)).await;
+                // Recorded by the repositories as they dropped each device, so
+                // the report says why a chip is missing from the app instead of
+                // leaving it looking broken.
+                let excluded = self.hardware_support.hwmon_exclusions();
+                let report =
+                    hardware_report::generate(full, is_root, Some(&liquidctl), Some(&excluded))
+                        .await;
                 let _ = respond_to.send(report);
             }
         }

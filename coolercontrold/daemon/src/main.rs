@@ -605,7 +605,7 @@ async fn handle_non_root_commands(args: &Args) -> Result<()> {
         // decides whether the Super-I/O probe is attempted.
         print!(
             "{}",
-            hardware_report::generate(*full, Uid::effective().is_root(), None).await
+            hardware_report::generate(*full, Uid::effective().is_root(), None, None).await
         );
         exit_successfully();
     }

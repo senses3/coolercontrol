@@ -28,11 +28,13 @@
 //! are limited to board and BIOS, which is what actually narrows a diagnosis.
 
 use crate::hardware_support::{
-    self, ChannelVerdict, DetectedChipRef, ProbeEnvironment, SystemFinding, SystemInfo,
+    self, ChannelVerdict, DetectedChipRef, HwmonExclusion, ProbeEnvironment, SystemFinding,
+    SystemInfo,
 };
 use crate::repositories::hwmon::fans;
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
 use crate::{cc_fs, VERSION};
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
@@ -56,17 +58,26 @@ struct ReportDevice {
     /// link, such as USB and HID devices.
     driver: Option<String>,
     fans: Vec<HwmonChannelInfo>,
+    /// Set when the running daemon deliberately left this device out. `None`
+    /// from the standalone CLI, which has no daemon to ask and therefore says
+    /// nothing rather than guessing.
+    excluded: Option<HwmonExclusion>,
 }
 
 /// Builds the report. `full` adds the whole hwmon tree with per-channel state.
-pub async fn generate(full: bool, is_root: bool, liquidctl: Option<&[LiquidctlSummary]>) -> String {
+pub async fn generate(
+    full: bool,
+    is_root: bool,
+    liquidctl: Option<&[LiquidctlSummary]>,
+    excluded_hwmon: Option<&HashMap<PathBuf, HwmonExclusion>>,
+) -> String {
     let system_info = SystemInfo::read().await;
-    let devices = scan_hwmon().await;
+    let devices = scan_hwmon(excluded_hwmon).await;
     let detection = run_probe(is_root);
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection.as_ref(), is_root, full);
-    write_fan_summary(&mut report, &devices).await;
+    write_fan_summary(&mut report, &devices, excluded_hwmon.is_some()).await;
     write_liquidctl_section(&mut report, liquidctl);
     write_findings(&mut report, detection.as_ref(), is_root);
     if full {
@@ -163,8 +174,17 @@ fn write_probe_summary(
 /// the compact report past the paste budget on an ordinary desktop. Restricted
 /// this way it costs nothing on a healthy machine and a couple of lines on a
 /// broken one, which removes a round trip for the common support case.
-async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
+async fn write_fan_summary(report: &mut String, devices: &[ReportDevice], exclusions_known: bool) {
     let _ = writeln!(report, "\nFan channels");
+    if exclusions_known.not() {
+        // Same honesty as the liquidctl section: only the running daemon knows
+        // which devices it chose to drop, so say that rather than let an
+        // unmarked list read as "nothing is hidden".
+        let _ = writeln!(
+            report,
+            "  (run from the app to see which devices are hidden and why)"
+        );
+    }
     let mut any = false;
     for device in devices {
         if device.fans.is_empty() {
@@ -178,10 +198,11 @@ async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
             .count();
         let _ = writeln!(
             report,
-            "  {} [{}]  {} fan(s), {controllable} controllable",
+            "  {} [{}]  {} fan(s), {controllable} controllable{}",
             device.name,
             device.driver.as_deref().unwrap_or("no driver link"),
-            device.fans.len()
+            device.fans.len(),
+            exclusion_suffix(device)
         );
         for fan in &device.fans {
             let verdict = verdict_for(device, fan);
@@ -332,10 +353,11 @@ async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
     for device in devices {
         let _ = writeln!(
             report,
-            "  {} [{}] at {}",
+            "  {} [{}] at {}{}",
             device.name,
             device.driver.as_deref().unwrap_or("no driver link"),
-            device.path.display()
+            device.path.display(),
+            exclusion_suffix(device)
         );
         for fan in &device.fans {
             let verdict = verdict_for(device, fan);
@@ -374,13 +396,25 @@ async fn read_attribute(base_path: &Path, file_name: &str) -> String {
         .map_or_else(|_| "-".to_string(), |value| value.trim().to_string())
 }
 
+/// The trailing "hidden: ..." note, or nothing for a device the app shows.
+///
+/// Silent when the daemon kept the device, which is the common case: a marker
+/// on every line would bury the few that matter.
+fn exclusion_suffix(device: &ReportDevice) -> String {
+    device
+        .excluded
+        .map_or_else(String::new, |reason| format!(", {}", reason.label()))
+}
+
 fn verdict_for(device: &ReportDevice, fan: &HwmonChannelInfo) -> ChannelVerdict {
     fans::diagnose_fan_channel(&device.name, fan, false).verdict
 }
 
 /// Enumerates hwmon and builds each device's fan channels with the exact same
 /// `init_fans` the daemon uses.
-async fn scan_hwmon() -> Vec<ReportDevice> {
+async fn scan_hwmon(
+    excluded_hwmon: Option<&HashMap<PathBuf, HwmonExclusion>>,
+) -> Vec<ReportDevice> {
     let mut devices = Vec::new();
     let Ok(entries) = cc_fs::read_dir(Path::new(HWMON_CLASS_PATH)) else {
         return devices;
@@ -407,11 +441,17 @@ async fn scan_hwmon() -> Vec<ReportDevice> {
             .into_iter()
             .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
             .collect();
+        // Matched on the canonical path: the entries here are symlinks into
+        // the bus tree, while the daemon recorded its own walk of it.
+        let excluded = cc_fs::canonicalize(&path).ok().and_then(|canonical| {
+            excluded_hwmon.and_then(|excluded| excluded.get(&canonical).copied())
+        });
         devices.push(ReportDevice {
             path,
             name,
             driver,
             fans,
+            excluded,
         });
     }
     devices
@@ -560,6 +600,50 @@ mod tests {
             ChannelVerdict::Unverifiable,
         ] {
             assert!(verdict_label(verdict).is_empty().not());
+        }
+    }
+
+    fn report_device(name: &str, excluded: Option<HwmonExclusion>) -> ReportDevice {
+        ReportDevice {
+            path: PathBuf::from(format!("/sys/class/hwmon/{name}")),
+            name: name.to_string(),
+            driver: Some(name.to_string()),
+            fans: Vec::new(),
+            excluded,
+        }
+    }
+
+    /// Goal: an hwmon device the daemon hid must say so. Without it, a chip
+    /// that is deliberately covered by its liquidctl entry reads as a device
+    /// the app failed to pick up, which is the opposite of what happened.
+    #[test]
+    fn hidden_hwmon_devices_say_why() {
+        let hidden = report_device("corsairpsu", Some(HwmonExclusion::DuplicateOfLiquidctl));
+        assert_eq!(
+            exclusion_suffix(&hidden),
+            ", hidden: covered by a liquidctl device"
+        );
+    }
+
+    /// Goal: the marker stays off the devices the app actually shows. One on
+    /// every line would bury the few that matter.
+    #[test]
+    fn shown_hwmon_devices_carry_no_marker() {
+        assert_eq!(exclusion_suffix(&report_device("nct6687", None)), "");
+    }
+
+    /// Goal: every exclusion reason can explain itself, including the ones a
+    /// maintainer sees rarely. A blank suffix in a pasted report is worse than
+    /// no suffix, because it looks like a bug in the reporter.
+    #[test]
+    fn every_exclusion_has_a_label() {
+        for reason in [
+            HwmonExclusion::DuplicateOfLiquidctl,
+            HwmonExclusion::UserDisabled,
+            HwmonExclusion::NotACoolingDevice,
+            HwmonExclusion::AllChannelsIgnored,
+        ] {
+            assert!(reason.label().is_empty().not(), "{reason:?} has no label");
         }
     }
 

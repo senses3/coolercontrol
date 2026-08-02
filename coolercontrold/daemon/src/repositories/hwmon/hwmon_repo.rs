@@ -78,7 +78,7 @@ use crate::device::{
     TempInfo, TempName, TempStatus, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
-use crate::hardware_support::HardwareSupportController;
+use crate::hardware_support::{HardwareSupportController, HwmonExclusion};
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, MISSING_STATUS_THRESHOLD};
 use crate::repositories::hwmon::apple_mac_smc::AppleMacSMC;
@@ -681,6 +681,15 @@ impl HwmonRepo {
             );
         }
         Ok(())
+    }
+
+    /// Notes an hwmon device the daemon is dropping, so the report can say why
+    /// it is absent from the app rather than leaving the user to guess.
+    fn record_exclusion(&self, path: &Path, reason: HwmonExclusion) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_excluded_hwmon(path, reason);
     }
 
     /// Publishes the passive verdict for every fan channel on a device.
@@ -1600,6 +1609,7 @@ impl Repository for HwmonRepo {
             let device_name = devices::get_device_name(&path).await;
             debug!("Detected Device Name: {device_name}");
             if HWMON_DEVICE_NAME_BLACKLIST.contains(&device_name.trim()) {
+                self.record_exclusion(&path, HwmonExclusion::NotACoolingDevice);
                 continue;
             }
             if settings.hide_duplicate_devices && self.path_matches_liquidctl_device(&path) {
@@ -1607,6 +1617,7 @@ impl Repository for HwmonRepo {
                     "Skipping HWMon detected device: {device_name} due to an existing \
                     duplicate liquidctl device"
                 );
+                self.record_exclusion(&path, HwmonExclusion::DuplicateOfLiquidctl);
                 continue;
             }
             let raw_id = devices::get_device_unique_id(&path, &device_name).await;
@@ -1628,6 +1639,7 @@ impl Repository for HwmonRepo {
                 .flatten();
             if cc_device_setting.as_ref().is_some_and(|s| s.disable) {
                 info!("Skipping disabled device: {device_name} with UID: {device_uid}");
+                self.record_exclusion(&path, HwmonExclusion::UserDisabled);
                 continue;
             }
             let disabled_channels = cc_device_setting
@@ -1675,6 +1687,7 @@ impl Repository for HwmonRepo {
                         "Skipping {device_name}: the lm-sensors configuration ignores every one \
                          of its {ignored_count} channel(s)"
                     );
+                    self.record_exclusion(&path, HwmonExclusion::AllChannelsIgnored);
                 } else {
                     debug!(
                         "No fans, temps, or power detected under {}, skipping.",
