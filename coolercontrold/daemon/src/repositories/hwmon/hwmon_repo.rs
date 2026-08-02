@@ -5731,3 +5731,46 @@ mod sensors_conf_tests {
         assert_eq!(channels.len(), 1);
     }
 }
+
+#[cfg(test)]
+mod verdict_publish_tests {
+    use super::*;
+    use crate::hardware_support::{ChannelVerdict, HardwareSupportController};
+    use serial_test::serial;
+
+    /// Goal: prove the init-time publish path actually reaches the registry
+    /// the API serves from, for a fan channel that reports speed but exposes
+    /// no pwm. Method: attach a controller, publish one driver, read back the
+    /// partitioned verdicts the health snapshot is built from.
+    #[test]
+    #[serial]
+    fn publishes_a_verdict_for_a_pwmless_fan_channel() {
+        cc_fs::test_runtime(async {
+            let hardware_support = Rc::new(HardwareSupportController::init(None).await);
+            let repo = HwmonRepo::new(
+                Rc::new(Config::init_default_config().unwrap()),
+                vec![],
+                Rc::new(crate::overrides::OverridesController::empty()),
+            )
+            .with_hardware_support(Rc::clone(&hardware_support));
+            let driver = HwmonDriverInfo {
+                name: "aquacomputer_d5next".to_string(),
+                channels: vec![HwmonChannelInfo {
+                    hwmon_type: HwmonChannelType::Fan,
+                    number: 9,
+                    name: "fan9".to_string(),
+                    caps: HwmonChannelCapabilities::RPM,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            repo.publish_channel_verdicts(&"dev-uid".to_string(), &driver);
+            let (permanent, current) = hardware_support.partitioned_verdicts();
+            assert!(current.is_empty(), "unexpected current-state verdicts");
+            assert_eq!(permanent.len(), 1, "expected one published verdict");
+            assert_eq!(permanent[0].verdict, ChannelVerdict::NoPwm);
+            assert_eq!(permanent[0].channel_name, "fan9");
+            assert_eq!(permanent[0].device_uid, "dev-uid");
+        });
+    }
+}
