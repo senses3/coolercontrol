@@ -105,7 +105,12 @@ describe('duty-response probe', () => {
 
     it('has a string for every outcome the daemon can complete with', () => {
         const page = (en as any).layout.shell.coolingPage
-        for (const key of ['probeResponded', 'probeNoResponse', 'probeFirmwareOverride']) {
+        for (const key of [
+            'probeResponded',
+            'probeNoResponse',
+            'probeFirmwareOverride',
+            'probeDidNotStart',
+        ]) {
             expect(typeof page[key], `missing string for ${key}`).toBe('string')
         }
     })

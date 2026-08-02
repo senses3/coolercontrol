@@ -17,19 +17,18 @@
   -->
 
 <script setup lang="ts">
-// The one control in the app that moves hardware to answer a question, so it
-// is per channel and only ever runs when pressed. It lives on the controllable
-// path deliberately: a channel with no writable fan control is already
-// explained by its verdict, and the probe would only refuse.
+// The duty-response probe is the one action in the app that moves hardware to
+// answer a question, so it is triggered by hand from the setup menu, next to
+// the other action that moves a fan. This renders only its result: nothing at
+// all until a test has been asked for, so there is no control sitting on the
+// page waiting for a question nobody asked.
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { mdiFan, mdiLoading } from '@mdi/js'
 import { UID } from '@/models/Device.ts'
 import { ChannelVerdict, ProbeOutcomeDTO, ProbeRefusal } from '@/models/DeviceHealth.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import UiButton from '@/shell/ui/UiButton.vue'
 
 const props = defineProps<{ deviceUID: UID; channelName: string }>()
 const { t } = useI18n()
@@ -37,11 +36,16 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
 const running = ref(false)
-const result = ref<string>('')
-/** Set only for outcomes that mean the fan is not actually being driven. */
+const result = ref('')
+/**
+ * Set only where the probe established that the fan is not being driven.
+ * A declined test and an inconclusive one are not failures, and colouring them
+ * as such would report a problem the daemon did not find.
+ */
 const resultIsAdverse = ref(false)
 
-async function runProbe(): Promise<void> {
+async function run(): Promise<void> {
+    if (running.value) return
     running.value = true
     result.value = ''
     try {
@@ -58,13 +62,17 @@ async function runProbe(): Promise<void> {
     }
 }
 
+defineExpose({ run })
+
 function applyOutcome(outcome: ProbeOutcomeDTO | ErrorResponse): void {
     if (outcome instanceof ErrorResponse) {
         resultIsAdverse.value = true
         result.value = t('layout.shell.coolingPage.probeFailed', { error: outcome.error })
         return
     }
-    resultIsAdverse.value = outcome.verdict !== ChannelVerdict.Controllable
+    resultIsAdverse.value =
+        outcome.verdict === ChannelVerdict.IgnoresDuty ||
+        outcome.verdict === ChannelVerdict.FirmwareOverride
     result.value =
         outcome.outcome === 'completed' ? completedMessage(outcome) : declinedMessage(outcome)
 }
@@ -80,6 +88,10 @@ function completedMessage(outcome: ProbeOutcomeDTO): string {
             return t('layout.shell.coolingPage.probeResponded', values)
         case ChannelVerdict.FirmwareOverride:
             return t('layout.shell.coolingPage.probeFirmwareOverride')
+        // The fan was stopped to begin with and never started. A stopped fan
+        // and an empty header look identical from here, so say both.
+        case ChannelVerdict.Unverifiable:
+            return t('layout.shell.coolingPage.probeDidNotStart', values)
         default:
             return t('layout.shell.coolingPage.probeNoResponse', values)
     }
@@ -109,27 +121,11 @@ const message = computed(() =>
 </script>
 
 <template>
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <UiButton
-            v-tooltip.top="t('layout.shell.coolingPage.probeTooltip')"
-            variant="outline"
-            :disabled="running"
-            @click="runProbe"
-        >
-            <svg-icon
-                type="mdi"
-                :path="running ? mdiLoading : mdiFan"
-                :size="16"
-                :class="running ? 'animate-spin' : ''"
-            />
-            {{ t('layout.shell.coolingPage.probeButton') }}
-        </UiButton>
-        <span
-            v-if="message"
-            class="text-sm"
-            :class="resultIsAdverse && !running ? 'text-error' : 'text-text-color-secondary'"
-        >
-            {{ message }}
-        </span>
-    </div>
+    <p
+        v-if="message"
+        class="text-sm"
+        :class="resultIsAdverse && !running ? 'text-error' : 'text-text-color-secondary'"
+    >
+        {{ message }}
+    </p>
 </template>

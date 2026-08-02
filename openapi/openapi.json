@@ -9652,7 +9652,7 @@
             "const": "no_tachometer"
           },
           {
-            "description": "A tachometer that reads zero is an empty header or a stopped fan, not a\n baseline. Probing it would manufacture an `IgnoresDuty` verdict for a\n connector with nothing on it.",
+            "description": "The channel is being driven and still reports no speed, which means an\n empty header. Probing it would manufacture an `IgnoresDuty` verdict for\n a connector with nothing on it.\n\n A channel at zero duty reporting zero speed is *not* this: that fan is\n merely stopped, and starting it is exactly what the probe is for.",
             "type": "string",
             "const": "no_baseline_rpm"
           },

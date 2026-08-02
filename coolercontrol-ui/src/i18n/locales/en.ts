@@ -166,6 +166,7 @@ export default {
                     autoCreateThisFan: 'Auto-Create for This Fan',
                     createProfile: 'Create a New Profile',
                     calibrateThisFan: 'Calibrate This Fan',
+                    testFanResponse: 'Test Fan Response',
                     autoCreateAllFans: 'Auto-Create All Fans',
                     calibrateAllFans: 'Calibrate All Fans',
                 },
@@ -213,6 +214,8 @@ export default {
                     'The fan responded: {baseline} rpm to {observed} rpm at {duty}% duty.',
                 probeNoResponse:
                     'The fan accepted {duty}% duty but its speed did not change ({baseline} rpm to {observed} rpm). CoolerControl is not driving this fan.',
+                probeDidNotStart:
+                    'The fan did not start at {duty}% duty. It may be a stopped fan that cannot start, or the header may be empty.',
                 probeFirmwareOverride:
                     'The firmware took this channel back during the test, so CoolerControl could not hold manual control.',
                 probeDeclinedNotControllable:
@@ -220,7 +223,7 @@ export default {
                 probeDeclinedNoTachometer:
                     'This channel reports no speed, so a response could not be observed.',
                 probeDeclinedNoBaselineRpm:
-                    'This channel reads 0 rpm, so there is nothing to compare against. That usually means an empty fan header.',
+                    'This channel is being driven but reports 0 rpm, so there is nothing to compare against. That usually means an empty fan header.',
                 probeDeclinedAlertActive:
                     'An alert is active on this channel. The test was skipped so it does not interfere.',
                 probeDeclinedTooWarmToLower:

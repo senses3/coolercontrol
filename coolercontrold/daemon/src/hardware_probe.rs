@@ -88,9 +88,12 @@ pub enum ProbeRefusal {
     NotControllable,
     /// No tachometer at all: the response can never be observed.
     NoTachometer,
-    /// A tachometer that reads zero is an empty header or a stopped fan, not a
-    /// baseline. Probing it would manufacture an `IgnoresDuty` verdict for a
-    /// connector with nothing on it.
+    /// The channel is being driven and still reports no speed, which means an
+    /// empty header. Probing it would manufacture an `IgnoresDuty` verdict for
+    /// a connector with nothing on it.
+    ///
+    /// A channel at zero duty reporting zero speed is *not* this: that fan is
+    /// merely stopped, and starting it is exactly what the probe is for.
     NoBaselineRpm,
     /// An alert is active on this channel; moving its fan would confuse the
     /// user's own investigation and could trip further alerts.
@@ -135,7 +138,11 @@ pub fn plan_probe(conditions: ProbeConditions) -> Result<ProbePlan, ProbeRefusal
     if conditions.has_tachometer.not() {
         return Err(ProbeRefusal::NoTachometer);
     }
-    if conditions.baseline_rpm == 0 {
+    // Zero speed only means an empty header when something is actually
+    // driving the channel. At zero duty the fan is simply stopped, and
+    // refusing there declines to test the one case a user is most likely to
+    // be asking about.
+    if conditions.baseline_rpm == 0 && conditions.current_duty > 0 {
         return Err(ProbeRefusal::NoBaselineRpm);
     }
     if conditions.alert_active {
@@ -194,6 +201,12 @@ pub fn interpret_probe(
     }
     if rpm_responded(baseline_rpm, observed_rpm) {
         return ChannelVerdict::Controllable;
+    }
+    if baseline_rpm == 0 {
+        // A fan that never started and an empty header are the same
+        // observation from out here. `IgnoresDuty` would claim we know which,
+        // and it is the claim that sends a user to the wrong documentation.
+        return ChannelVerdict::Unverifiable;
     }
     ChannelVerdict::IgnoresDuty
 }
@@ -405,13 +418,14 @@ mod tests {
         assert!(plan.lowers.not());
     }
 
-    /// Goal: a tachometer reading zero is an empty header, not a baseline.
-    /// Six headers on the validation machine are in exactly that state, and
-    /// probing them would invent an IgnoresDuty verdict for each.
+    /// Goal: a driven channel reading zero is an empty header, not a
+    /// baseline. Six headers on the validation machine sit at ~40% duty and
+    /// 0 rpm, and probing them would invent an IgnoresDuty verdict for each.
     #[test]
-    fn zero_rpm_is_not_a_baseline() {
+    fn zero_rpm_while_driven_is_not_a_baseline() {
         let conditions = ProbeConditions {
             baseline_rpm: 0,
+            current_duty: 40,
             ..healthy()
         };
         assert_eq!(plan_probe(conditions), Err(ProbeRefusal::NoBaselineRpm));
@@ -419,6 +433,32 @@ mod tests {
             refusal_verdict(ProbeRefusal::NoBaselineRpm),
             Some(ChannelVerdict::Unverifiable)
         );
+    }
+
+    /// Goal: a stopped fan is not an empty header. At zero duty, zero speed is
+    /// the expected reading, and starting the fan is precisely the question the
+    /// user is asking. Refusing here declined to test the most interesting case.
+    #[test]
+    fn zero_rpm_at_zero_duty_is_probed() {
+        let conditions = ProbeConditions {
+            baseline_rpm: 0,
+            current_duty: 0,
+            ..healthy()
+        };
+        let plan = plan_probe(conditions).unwrap();
+        assert_eq!(plan.original_duty, 0);
+        assert_eq!(plan.target_duty, 25);
+    }
+
+    /// Goal: a fan that never started must not be called IgnoresDuty. From
+    /// outside, a stopped fan and an empty header are the same observation, and
+    /// naming one of them asserts knowledge the probe does not have.
+    #[test]
+    fn a_fan_that_never_starts_is_unverifiable() {
+        assert_eq!(interpret_probe(true, 0, 0), ChannelVerdict::Unverifiable);
+        assert_eq!(interpret_probe(true, 0, 40), ChannelVerdict::Unverifiable);
+        // One that does start is simply controllable.
+        assert_eq!(interpret_probe(true, 0, 800), ChannelVerdict::Controllable);
     }
 
     /// Goal: with no tachometer the question cannot be settled either way, so
@@ -706,6 +746,7 @@ mod tests {
         let host = MockHost {
             conditions: Some(ProbeConditions {
                 baseline_rpm: 0,
+                current_duty: 40,
                 ..healthy()
             }),
             ..MockHost::responsive()
