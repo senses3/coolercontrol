@@ -5506,6 +5506,69 @@
         ]
       }
     },
+    "/hardware-report": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Hardware Support Report",
+        "description": "Returns a paste-ready hardware support report as plain text. Same content as the `coolercontrold report` subcommand, plus liquidctl devices, which only the running daemon can enumerate without touching hardware.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "full",
+            "description": "Include the whole hwmon tree instead of the compact summary.",
+            "schema": {
+              "description": "Include the whole hwmon tree instead of the compact summary.",
+              "type": "boolean",
+              "default": false
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/stress-test/cpu": {
       "post": {
         "tags": [
@@ -9637,6 +9700,28 @@
         },
         "required": [
           "profiles"
+        ]
+      },
+      "ReportQuery": {
+        "type": "object",
+        "properties": {
+          "full": {
+            "description": "Include the whole hwmon tree instead of the compact summary.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ReportResponse": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "description": "The report as plain text, ready to paste.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "report"
         ]
       },
       "SetPasswdRequest": {

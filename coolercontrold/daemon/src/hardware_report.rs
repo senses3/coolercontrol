@@ -59,7 +59,7 @@ struct ReportDevice {
 }
 
 /// Builds the report. `full` adds the whole hwmon tree with per-channel state.
-pub async fn generate(full: bool, is_root: bool) -> String {
+pub async fn generate(full: bool, is_root: bool, liquidctl: Option<&[LiquidctlSummary]>) -> String {
     let system_info = SystemInfo::read().await;
     let devices = scan_hwmon().await;
     let detection = run_probe(is_root);
@@ -67,7 +67,7 @@ pub async fn generate(full: bool, is_root: bool) -> String {
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection.as_ref(), is_root, full);
     write_fan_summary(&mut report, &devices);
-    write_liquidctl_note(&mut report);
+    write_liquidctl_section(&mut report, liquidctl);
     write_findings(&mut report, detection.as_ref(), is_root);
     if full {
         write_full_tree(&mut report, &devices).await;
@@ -190,25 +190,67 @@ fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
     }
 }
 
-/// Liquidctl devices are deliberately not enumerated here.
+/// One liquidctl device, reduced to what a maintainer needs.
 ///
-/// The only listing call is liqctld's `GET /devices`, and it is conditionally
-/// destructive: it returns the cached list when liqctld has already found
-/// devices, but when the cache is empty it runs `find_liquidctl_devices()` and
-/// `_connect_device()` on every device it finds. A report cannot tell which
-/// case it is in before calling, so a "read-only" report could end up claiming
-/// USB devices. Its socket is also root-only, and its payload carries device
-/// serial numbers, which must never reach a pasted report.
+/// Built by the caller from the daemon's live device list. Deliberately has no
+/// field for a serial number or a device id: this ends up in a pasted report,
+/// and liqctld's own payload carries a serial that must not travel with it.
+pub struct LiquidctlSummary {
+    pub name: String,
+    /// The liquidctl driver class.
+    pub driver_class: Option<String>,
+    /// The liquidctl version in use, not the device firmware.
+    pub liquidctl_version: Option<String>,
+    pub firmware_version: Option<String>,
+    /// True when the device is also exposed through a kernel hwmon driver, in
+    /// which case it appears under Fan channels as well.
+    pub hwmon_backed: bool,
+}
+
+/// Writes the liquidctl section, or explains its absence.
 ///
-/// Devices that have a kernel driver already appear under Fan channels, which
-/// covers most of what a maintainer needs from the hwmon side.
-fn write_liquidctl_note(report: &mut String) {
+/// `None` means the caller could not enumerate them. The standalone CLI cannot:
+/// liqctld's only listing call, `GET /devices`, returns its cache when
+/// populated but otherwise runs `find_liquidctl_devices()` and
+/// `_connect_device()` on everything it finds, so a read-only report cannot
+/// call it safely. Its socket is root-only besides. The daemon already holds
+/// the device list in memory and passes `Some`.
+fn write_liquidctl_section(report: &mut String, devices: Option<&[LiquidctlSummary]>) {
     let _ = writeln!(report, "\nLiquidctl");
-    let _ = writeln!(
-        report,
-        "  not enumerated by this report; devices with a kernel driver are \
-         listed above"
-    );
+    let Some(devices) = devices else {
+        let _ = writeln!(
+            report,
+            "  not enumerated by this report; devices with a kernel driver are \
+             listed above"
+        );
+        return;
+    };
+    if devices.is_empty() {
+        let _ = writeln!(report, "  no devices");
+        return;
+    }
+    for device in devices {
+        let _ = writeln!(
+            report,
+            "  {} [{}]{}",
+            device.name,
+            device.driver_class.as_deref().unwrap_or("unknown driver"),
+            if device.hwmon_backed {
+                ", hwmon-backed"
+            } else {
+                ""
+            }
+        );
+        if let Some(firmware) = device.firmware_version.as_deref() {
+            let _ = writeln!(report, "    firmware {firmware}");
+        }
+    }
+    if let Some(version) = devices
+        .iter()
+        .find_map(|device| device.liquidctl_version.as_deref())
+    {
+        let _ = writeln!(report, "  liquidctl {version}");
+    }
 }
 
 fn write_findings(

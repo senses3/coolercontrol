@@ -17,9 +17,9 @@
  */
 
 use crate::api::{
-    alerts, auth, base, calibration, custom_sensors, detect, device_health, functions, metrics,
-    modes, plugins, profile_generation, profiles, settings, sse, stats, status, stress_test,
-    tokens,
+    alerts, auth, base, calibration, custom_sensors, detect, device_health, functions,
+    hardware_report, metrics, modes, plugins, profile_generation, profiles, settings, sse, stats,
+    status, stress_test, tokens,
 };
 use crate::api::{devices, AppState};
 #[cfg(debug_assertions)]
@@ -65,6 +65,7 @@ pub fn documented_routes() -> ApiRouter<AppState> {
         .merge(calibration_routes())
         .merge(calibration_batch_routes())
         .merge(detect_routes())
+        .merge(hardware_report_routes())
         .merge(stress_test_routes())
         .merge(metrics_routes())
         .merge(sse_routes())
@@ -1333,6 +1334,24 @@ fn detect_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
         )
+}
+
+fn hardware_report_routes() -> ApiRouter<AppState> {
+    ApiRouter::new().api_route(
+        "/hardware-report",
+        get_with(hardware_report::get_hardware_report, |o| {
+            o.summary("Hardware Support Report")
+                .description(
+                    "Returns a paste-ready hardware support report as plain text. Same content \
+                     as the `coolercontrold report` subcommand, plus liquidctl devices, which \
+                     only the running daemon can enumerate without touching hardware.",
+                )
+                .tag("devices")
+                .security_requirement("CookieAuth")
+                .security_requirement("BearerAuth")
+        })
+        .layer(axum::middleware::from_fn(auth::auth_middleware)),
+    )
 }
 
 #[allow(clippy::too_many_lines)] // Declarative route registration; splitting hurts readability.
