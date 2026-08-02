@@ -574,19 +574,18 @@ const shortcutClasses =
                  are hidden when there is nothing to say, but the report stays
                  reachable because it is what the mods will ask for. -->
             <div :class="cardClasses">
-                <span class="flex items-center gap-2" :class="cardTitleClasses">
-                    {{ t('views.appInfo.hardwareSupport') }}
-                    <UiButton class="ml-auto" @click="reportOpen = true">
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3">
+                    <span class="text-lg font-medium text-text-color">
+                        {{ t('views.appInfo.hardwareSupport') }}
+                    </span>
+                    <UiButton size="sm" variant="outline" @click="reportOpen = true">
                         {{ t('views.appInfo.hardwareReportButton') }}
                     </UiButton>
-                </span>
-                <div
-                    v-if="supportRows.length === 0"
-                    class="pt-3 text-base text-text-color-secondary"
-                >
+                </div>
+                <div v-if="supportRows.length === 0" class="text-base text-text-color-secondary">
                     {{ t('views.appInfo.hardwareSupportOk') }}
                 </div>
-                <div v-else class="flex flex-col gap-1 pt-3">
+                <div v-else class="flex flex-col gap-1">
                     <RouterLink
                         v-for="row in supportRows.filter((r) => r.to)"
                         :key="row.key"
