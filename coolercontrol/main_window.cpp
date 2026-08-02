@@ -224,6 +224,8 @@ MainWindow::MainWindow(QWidget* parent)
     // This is used so the UI Window will show when password input is required
     setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
     showNormal();
+    raise();
+    activateWindow();
     qInfo() << "Force UI Window to show.";
   });
 
@@ -1386,7 +1388,10 @@ void MainWindow::setTrayMenuModes(const QString& modesJson) const {
             setModeReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status == 401) {
           clearAccessToken();
-          m_view->showNormal();  // show window if we have login credentials error
+          // Goes through the window-show path rather than m_view->showNormal(): calling
+          // it on the child view never brought the window up, so a credentials error
+          // raised from the tray left the user with nothing to log in to.
+          emit m_ipc->forceWindowShow();
           qWarning() << "Authentication no longer valid when trying to apply Mode. Please login.";
         }
         if (status >= 300) {
