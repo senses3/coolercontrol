@@ -1220,6 +1220,7 @@ export default {
             apply: '套用(&A)',
             retry: '重試(&R)',
             quitApp: '結束應用程式(&Q)',
+            introPurpose: '這些設定控制桌面應用程式如何連線到 CoolerControl 守護行程。',
             introFailed: '無法與 CoolerControl 守護行程建立連線。',
             introCheckService: '請確認 systemd 服務正在執行且可用。',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.

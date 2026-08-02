@@ -1285,6 +1285,8 @@ export default {
             apply: '&Aplicar',
             retry: '&Reintentar',
             quitApp: '&Salir',
+            introPurpose:
+                'Esta configuración controla cómo la aplicación de escritorio se conecta al demonio de CoolerControl.',
             introFailed: 'No se pudo establecer una conexión con el demonio de CoolerControl.',
             introCheckService:
                 'Asegúrese de que el servicio de systemd esté en ejecución y disponible.',

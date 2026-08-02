@@ -1258,6 +1258,8 @@ export default {
             apply: '적용(&A)',
             retry: '재시도(&R)',
             quitApp: '앱 종료(&Q)',
+            introPurpose:
+                '이 설정은 데스크톱 앱이 CoolerControl 데몬에 연결하는 방식을 제어합니다.',
             introFailed: 'CoolerControl 데몬에 연결할 수 없습니다.',
             introCheckService: 'systemd 서비스가 실행 중이며 사용 가능한지 확인하십시오.',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.

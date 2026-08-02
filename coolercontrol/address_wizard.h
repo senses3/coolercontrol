@@ -34,6 +34,7 @@ class IntroPage final : public QWizardPage {
   void setError(const QString& detail) const;
 
  private:
+  QLabel* m_leadLabel;
   QLabel* m_label;
   QLabel* m_errorLabel;
 };

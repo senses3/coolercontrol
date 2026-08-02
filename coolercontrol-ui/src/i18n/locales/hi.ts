@@ -1267,6 +1267,8 @@ export default {
             apply: 'लागू करें',
             retry: 'पुनः प्रयास',
             quitApp: 'ऐप बंद करें',
+            introPurpose:
+                'ये सेटिंग्स नियंत्रित करती हैं कि डेस्कटॉप ऐप CoolerControl डेमॉन से कैसे कनेक्ट होता है।',
             introFailed: 'CoolerControl डीमन से कनेक्शन स्थापित नहीं हो सका।',
             introCheckService: 'कृपया सुनिश्चित करें कि systemd सेवा चल रही है और उपलब्ध है।',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.

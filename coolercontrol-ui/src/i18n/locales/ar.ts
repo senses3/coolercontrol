@@ -1258,6 +1258,8 @@ export default {
             apply: 'تطبيق',
             retry: 'إعادة المحاولة',
             quitApp: 'إنهاء التطبيق',
+            introPurpose:
+                'تتحكم هذه الإعدادات في كيفية اتصال تطبيق سطح المكتب بخادم CoolerControl.',
             introFailed: 'تعذر إنشاء اتصال بخدمة CoolerControl.',
             introCheckService: 'يرجى التأكد من أن خدمة systemd قيد التشغيل ومتاحة.',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.

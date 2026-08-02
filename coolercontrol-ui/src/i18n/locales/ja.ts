@@ -1271,6 +1271,8 @@ export default {
             apply: '適用(&A)',
             retry: '再試行(&R)',
             quitApp: 'アプリを終了(&Q)',
+            introPurpose:
+                'これらの設定は、デスクトップアプリが CoolerControl デーモンに接続する方法を制御します。',
             introFailed: 'CoolerControl デーモンに接続できませんでした。',
             introCheckService: 'systemd サービスが実行中で利用可能であることを確認してください。',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.

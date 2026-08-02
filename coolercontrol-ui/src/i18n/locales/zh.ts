@@ -1219,6 +1219,7 @@ export default {
             apply: '应用(&A)',
             retry: '重试(&R)',
             quitApp: '退出应用(&Q)',
+            introPurpose: '这些设置控制桌面应用如何连接到 CoolerControl 守护进程。',
             introFailed: '无法与 CoolerControl 守护进程建立连接。',
             introCheckService: '请确认 systemd 服务正在运行且可用。',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.

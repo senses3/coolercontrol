@@ -1284,6 +1284,8 @@ export default {
             apply: '&Aplicar',
             retry: '&Tentar novamente',
             quitApp: '&Sair',
+            introPurpose:
+                'Estas configurações controlam como o aplicativo de desktop se conecta ao daemon do CoolerControl.',
             introFailed: 'Não foi possível estabelecer uma ligação ao daemon do CoolerControl.',
             introCheckService:
                 'Certifique-se de que o serviço systemd está em execução e disponível.',

@@ -63,14 +63,14 @@ IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
                             "<a href=\"https://docs.coolercontrol.org\" "
                             "target=\"_blank\">%1</a>")
                             .arg(uiString("wizard.introDocsLink", tr("docs website")));
+  // Swapped by setError: opening this from the tray is not a failure, and saying a
+  // connection could not be established when one is up reads as a bug.
+  m_leadLabel = new QLabel;
+  m_leadLabel->setWordWrap(true);
+  m_leadLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+
   m_label = new QLabel(
       "<p>" %
-      uiString("wizard.introFailed",
-               tr("A connection to the CoolerControl Daemon could not be established.")) %
-      "<br/>" %
-      uiString("wizard.introCheckService",
-               tr("Please make sure that the systemd service is running and available.")) %
-      "</p><p>" %
       uiString("wizard.introDocs", tr("Check the %1 for installation instructions."))
           .arg(docsLink) %
       "</p><p>" %
@@ -96,11 +96,30 @@ IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
 
   auto* layout = new QVBoxLayout;
   layout->addWidget(m_errorLabel);
+  layout->addWidget(m_leadLabel);
   layout->addWidget(m_label);
   setLayout(layout);
 }
 
-void IntroPage::setError(const QString& detail) const { applyErrorLabel(m_errorLabel, detail); }
+void IntroPage::setError(const QString& detail) const {
+  applyErrorLabel(m_errorLabel, detail);
+  if (detail.isEmpty()) {
+    m_leadLabel->setText("<p>" %
+                         uiString("wizard.introPurpose",
+                                  tr("These settings control how the desktop app connects to the "
+                                     "CoolerControl daemon.")) %
+                         "</p>");
+    return;
+  }
+  m_leadLabel->setText(
+      "<p>" %
+      uiString("wizard.introFailed",
+               tr("A connection to the CoolerControl Daemon could not be established.")) %
+      "<br/>" %
+      uiString("wizard.introCheckService",
+               tr("Please make sure that the systemd service is running and available.")) %
+      "</p>");
+}
 
 AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   setTitle(uiString("wizard.addressTitle", tr("Daemon Address - Desktop Application")));

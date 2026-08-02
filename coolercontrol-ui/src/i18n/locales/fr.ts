@@ -1297,6 +1297,8 @@ export default {
             apply: '&Appliquer',
             retry: '&Réessayer',
             quitApp: '&Quitter',
+            introPurpose:
+                "Ces paramètres déterminent comment l'application de bureau se connecte au démon CoolerControl.",
             introFailed: "La connexion au démon CoolerControl n'a pas pu être établie.",
             introCheckService:
                 'Veuillez vérifier que le service systemd est démarré et disponible.',

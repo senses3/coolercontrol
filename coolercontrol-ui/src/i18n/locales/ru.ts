@@ -1287,6 +1287,8 @@ export default {
             apply: '&Применить',
             retry: '&Повторить',
             quitApp: '&Выйти',
+            introPurpose:
+                'Эти параметры определяют, как настольное приложение подключается к службе CoolerControl.',
             introFailed: 'Не удалось установить соединение со службой CoolerControl.',
             introCheckService: 'Убедитесь, что служба systemd запущена и доступна.',
             // %1 is substituted by Qt via QString::arg, not by vue-i18n.
