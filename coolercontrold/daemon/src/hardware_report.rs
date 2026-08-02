@@ -67,6 +67,7 @@ pub async fn generate(full: bool, is_root: bool) -> String {
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection.as_ref(), is_root, full);
     write_fan_summary(&mut report, &devices);
+    write_liquidctl_note(&mut report);
     write_findings(&mut report, detection.as_ref(), is_root);
     if full {
         write_full_tree(&mut report, &devices).await;
@@ -187,6 +188,27 @@ fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
     if any.not() {
         let _ = writeln!(report, "  none found");
     }
+}
+
+/// Liquidctl devices are deliberately not enumerated here.
+///
+/// The only listing call is liqctld's `GET /devices`, and it is conditionally
+/// destructive: it returns the cached list when liqctld has already found
+/// devices, but when the cache is empty it runs `find_liquidctl_devices()` and
+/// `_connect_device()` on every device it finds. A report cannot tell which
+/// case it is in before calling, so a "read-only" report could end up claiming
+/// USB devices. Its socket is also root-only, and its payload carries device
+/// serial numbers, which must never reach a pasted report.
+///
+/// Devices that have a kernel driver already appear under Fan channels, which
+/// covers most of what a maintainer needs from the hwmon side.
+fn write_liquidctl_note(report: &mut String) {
+    let _ = writeln!(report, "\nLiquidctl");
+    let _ = writeln!(
+        report,
+        "  not enumerated by this report; devices with a kernel driver are \
+         listed above"
+    );
 }
 
 fn write_findings(
