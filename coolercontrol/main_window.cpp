@@ -1056,7 +1056,7 @@ void MainWindow::rebuildDaemonsTrayMenu() {
   daemon's page has loaded there is nothing for the tray to show. Connecting without
   showing would leave it half empty with no way to tell why.
 */
-void MainWindow::applyDaemonConnection(const connections::Connection& connection) {
+void MainWindow::applyDaemonConnection(const connections::Connection connection) {
   connections::upsert(connection);  // the live daemon is always a saved one
   if (connections::sameConnection(connection, connections::current())) {
     rebuildDaemonsTrayMenu();  // re-selection changes nothing, a rename does

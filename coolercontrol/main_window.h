@@ -213,7 +213,9 @@ class MainWindow final : public QMainWindow {
 
   // Saves the connection and, when it addresses a different daemon than the live one,
   // switches to it. Shared by the wizard's Apply and the tray's daemon entries.
-  void applyDaemonConnection(const connections::Connection& connection);
+  // By value, not by reference: the tray rows call this and it tears them down, so a
+  // reference would point into the very action being destroyed.
+  void applyDaemonConnection(connections::Connection connection);
 
   // Drops everything the previous daemon told us. Anything left behind here shows up as
   // the old machine's modes, sensors or badges under the new connection.
