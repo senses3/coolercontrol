@@ -543,6 +543,11 @@ export default {
             downloadCurrentLog: 'Download Current Log',
             deviceHealth: 'Device Health',
             deviceHealthOk: 'All sensors and channels are healthy.',
+            findingNoDriverBound: 'A chip was detected, but no loaded driver is serving it.',
+            findingBlacklisted: 'This driver is blacklisted and was not loaded.',
+            findingBlockedByEnvironment: 'Hardware detection could not run in this environment.',
+            findingDetectionUnsupported:
+                'Hardware detection is not supported on this architecture.',
             failsafeActive: 'Failsafe values in use',
             missingTempSource: 'Missing temp source',
             staleTempSource: 'Temp source using failsafe values',

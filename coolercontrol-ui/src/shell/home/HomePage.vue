@@ -39,9 +39,13 @@ import type { RouteLocationRaw } from 'vue-router'
 import { $enum } from 'ts-enum-util'
 import { DeviceType } from '@/models/Device.ts'
 import {
+    ChannelVerdict,
     type FailsafeRef,
+    HARDWARE_SUPPORT_DOCS,
     HealthEntityType,
     type SourceRef,
+    type SystemFinding,
+    SystemFindingKind,
     failsafeKey,
     sourceKey,
     sourceTempDisplayName,
@@ -227,6 +231,75 @@ const healthRows = computed((): Array<HealthRow> => {
     return rows
 })
 
+// Permanent hardware facts, kept in their own card. These are not faults and
+// must not sit in the health list: a capability shown among failures implies
+// the user should wait for it to clear, which it never will.
+interface SupportRow {
+    key: string
+    label: string
+    detail: string
+    to?: RouteLocationRaw
+    href?: string
+}
+
+const capabilityDetail = (verdict: ChannelVerdict): string => {
+    switch (verdict) {
+        case ChannelVerdict.FirmwareOverride:
+            return t('layout.shell.coolingPage.verdictFirmwareOverride')
+        case ChannelVerdict.FamilyMayNeedOutOfTree:
+            return t('layout.shell.coolingPage.verdictFamilyMayNeedOutOfTree')
+        case ChannelVerdict.NotSupportedByDriver:
+            return t('layout.shell.coolingPage.verdictNotSupportedByDriver')
+        case ChannelVerdict.NoPwm:
+            return t('layout.shell.coolingPage.verdictNoPwm')
+        case ChannelVerdict.PwmReadOnly:
+            return t('layout.shell.coolingPage.verdictPwmReadOnly')
+        case ChannelVerdict.IgnoresDuty:
+            return t('layout.shell.coolingPage.verdictIgnoresDuty')
+        default:
+            return t('layout.shell.coolingPage.notControllable')
+    }
+}
+
+const findingDetail = (finding: SystemFinding): string => {
+    switch (finding.kind) {
+        case SystemFindingKind.NoDriverBound:
+            return t('views.appInfo.findingNoDriverBound')
+        case SystemFindingKind.Blacklisted:
+            return t('views.appInfo.findingBlacklisted')
+        case SystemFindingKind.BlockedByEnvironment:
+            return t('views.appInfo.findingBlockedByEnvironment')
+        default:
+            return t('views.appInfo.findingDetectionUnsupported')
+    }
+}
+
+const supportRows = computed((): Array<SupportRow> => {
+    const rows: Array<SupportRow> = []
+    for (const finding of settingsStore.healthSystemFindings) {
+        // Machine-scope, so there is no channel to route to. The docs page is
+        // the only useful destination.
+        rows.push({
+            key: `finding/${finding.kind}/${finding.chip_name ?? finding.driver ?? ''}`,
+            label: finding.chip_name ?? finding.driver ?? t('views.appInfo.hardwareSupport'),
+            detail: findingDetail(finding),
+            href: HARDWARE_SUPPORT_DOCS,
+        })
+    }
+    for (const ref of settingsStore.healthChannelCapabilities) {
+        const deviceSettings = settingsStore.allUIDeviceSettings.get(ref.device_uid)
+        const channelName =
+            deviceSettings?.sensorsAndChannels.get(ref.channel_name)?.name ?? ref.channel_name
+        rows.push({
+            key: `capability/${ref.device_uid}/${ref.channel_name}`,
+            label: `${deviceSettings?.name ?? ref.device_uid} | ${channelName}`,
+            detail: capabilityDetail(ref.verdict),
+            to: channelRoute(deviceStore.allDevices(), ref.device_uid, ref.channel_name),
+        })
+    }
+    return rows
+})
+
 const activeMode = computed(() =>
     settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent),
 )
@@ -319,6 +392,41 @@ const shortcutClasses =
                         <span class="text-text-color-secondary">{{ label }}</span>
                         <span class="text-text-color">{{ value }}</span>
                     </template>
+                </div>
+            </div>
+
+            <!-- Hardware support: permanent facts, deliberately its own card so a
+                 capability is never read as a fault waiting to clear. Hidden
+                 entirely when there is nothing to say. -->
+            <div v-if="supportRows.length > 0" :class="cardClasses">
+                <span class="flex items-center gap-2" :class="cardTitleClasses">
+                    {{ t('views.appInfo.hardwareSupport') }}
+                </span>
+                <div class="flex flex-col gap-1 pt-3">
+                    <RouterLink
+                        v-for="row in supportRows.filter((r) => r.to)"
+                        :key="row.key"
+                        :to="row.to!"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="text-base text-text-color">{{ row.label }}</span>
+                        <span class="block text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </RouterLink>
+                    <a
+                        v-for="row in supportRows.filter((r) => r.href)"
+                        :key="row.key"
+                        :href="row.href"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="text-base text-text-color">{{ row.label }}</span>
+                        <span class="block text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </a>
                 </div>
             </div>
 

@@ -191,6 +191,9 @@ export function verdictDocsLink(verdict: ChannelVerdict): string | undefined {
     }
 }
 
+/** The hardware support page itself, for machine-scope findings. */
+export const HARDWARE_SUPPORT_DOCS = DOCS_BASE
+
 /** Where a user with working-but-uncovered hardware should go. */
 export const FOUND_SOMETHING_THAT_WORKS = `${DOCS_BASE}#found-something-that-works`
 
