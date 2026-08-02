@@ -1254,6 +1254,7 @@ export default {
         },
         wizard: {
             windowTitle: 'خطأ في الاتصال بالخدمة',
+            windowTitleOk: 'اتصال الخدمة',
             apply: 'تطبيق',
             retry: 'إعادة المحاولة',
             quitApp: 'إنهاء التطبيق',

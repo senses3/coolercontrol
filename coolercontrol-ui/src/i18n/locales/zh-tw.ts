@@ -1216,6 +1216,7 @@ export default {
         },
         wizard: {
             windowTitle: '守護行程連線錯誤',
+            windowTitleOk: '守護行程連線',
             apply: '套用(&A)',
             retry: '重試(&R)',
             quitApp: '結束應用程式(&Q)',

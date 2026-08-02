@@ -1263,6 +1263,7 @@ export default {
         },
         wizard: {
             windowTitle: 'डीमन कनेक्शन त्रुटि',
+            windowTitleOk: 'डीमन कनेक्शन',
             apply: 'लागू करें',
             retry: 'पुनः प्रयास',
             quitApp: 'ऐप बंद करें',

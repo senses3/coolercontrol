@@ -1283,6 +1283,7 @@ export default {
         },
         wizard: {
             windowTitle: 'Ошибка подключения к службе',
+            windowTitleOk: 'Подключение к службе',
             apply: '&Применить',
             retry: '&Повторить',
             quitApp: '&Выйти',

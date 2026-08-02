@@ -1254,6 +1254,7 @@ export default {
         },
         wizard: {
             windowTitle: '데몬 연결 오류',
+            windowTitleOk: '데몬 연결',
             apply: '적용(&A)',
             retry: '재시도(&R)',
             quitApp: '앱 종료(&Q)',

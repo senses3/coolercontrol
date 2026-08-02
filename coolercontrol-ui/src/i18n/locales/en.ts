@@ -1263,6 +1263,7 @@ export default {
         },
         wizard: {
             windowTitle: 'Daemon Connection Error',
+            windowTitleOk: 'Daemon Connection',
             apply: '&Apply',
             retry: '&Retry',
             quitApp: '&Quit App',

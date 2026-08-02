@@ -975,6 +975,10 @@ void MainWindow::displayAddressWizard() const {
     return;
   }
   m_introPage->setError(m_lastConnectionError);
+  // Opened from the tray with nothing wrong, "Error" is simply untrue.
+  m_wizard->setWindowTitle(m_lastConnectionError.isEmpty()
+                               ? uiString("wizard.windowTitleOk", tr("Daemon Connection"))
+                               : uiString("wizard.windowTitle", tr("Daemon Connection Error")));
   m_wizard->open();
 }
 

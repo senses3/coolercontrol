@@ -1267,6 +1267,7 @@ export default {
         },
         wizard: {
             windowTitle: 'デーモン接続エラー',
+            windowTitleOk: 'デーモン接続',
             apply: '適用(&A)',
             retry: '再試行(&R)',
             quitApp: 'アプリを終了(&Q)',

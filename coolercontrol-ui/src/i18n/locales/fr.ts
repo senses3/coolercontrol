@@ -1293,6 +1293,7 @@ export default {
         },
         wizard: {
             windowTitle: 'Erreur de connexion au démon',
+            windowTitleOk: 'Connexion au démon',
             apply: '&Appliquer',
             retry: '&Réessayer',
             quitApp: '&Quitter',

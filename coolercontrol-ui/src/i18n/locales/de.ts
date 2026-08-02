@@ -1290,6 +1290,7 @@ export default {
         },
         wizard: {
             windowTitle: 'Daemon-Verbindungsfehler',
+            windowTitleOk: 'Daemon-Verbindung',
             apply: '&Anwenden',
             retry: '&Wiederholen',
             quitApp: '&App beenden',

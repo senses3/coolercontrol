@@ -1280,6 +1280,7 @@ export default {
         },
         wizard: {
             windowTitle: 'Erro de ligação ao daemon',
+            windowTitleOk: 'Conexão do daemon',
             apply: '&Aplicar',
             retry: '&Tentar novamente',
             quitApp: '&Sair',

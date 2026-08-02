@@ -1281,6 +1281,7 @@ export default {
         },
         wizard: {
             windowTitle: 'Error de conexión con el demonio',
+            windowTitleOk: 'Conexión del demonio',
             apply: '&Aplicar',
             retry: '&Reintentar',
             quitApp: '&Salir',

@@ -1215,6 +1215,7 @@ export default {
         },
         wizard: {
             windowTitle: '守护进程连接错误',
+            windowTitleOk: '守护进程连接',
             apply: '应用(&A)',
             retry: '重试(&R)',
             quitApp: '退出应用(&Q)',
