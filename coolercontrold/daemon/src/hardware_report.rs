@@ -1,0 +1,506 @@
+/*
+ * CoolerControl - monitor and control your cooling and other devices
+ * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+//! Paste-ready hardware report.
+//!
+//! Runs standalone so it still works over SSH when the UI will not come up,
+//! and reuses `fans::init_fans` and `hardware_support::diagnose_channel` rather
+//! than re-deriving anything, so the report and the running daemon can never
+//! disagree about a verdict.
+//!
+//! Nothing here reads a serial number, a UUID, or a hostname. The output is
+//! meant to be pasted into a public support channel, so the identifying fields
+//! are limited to board and BIOS, which is what actually narrows a diagnosis.
+
+use crate::hardware_support::{
+    self, ChannelVerdict, DetectedChipRef, ProbeEnvironment, SystemFinding, SystemInfo,
+};
+use crate::repositories::hwmon::fans;
+use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
+use crate::{cc_fs, VERSION};
+use std::fmt::Write;
+use std::ops::Not;
+use std::path::{Path, PathBuf};
+
+const HWMON_CLASS_PATH: &str = "/sys/class/hwmon";
+
+/// Appended when the compact report is trimmed, so the dropped detail is still
+/// reachable rather than silently gone.
+const TRIM_NOTICE: &str = "\n[trimmed, run `coolercontrold report --full` for the rest]\n";
+
+/// Discord's message limit. The compact report is meant to be pasted whole, so
+/// it is trimmed with a pointer to `--full` rather than being allowed to run
+/// past this and get truncated by the client.
+pub const COMPACT_CHARACTER_BUDGET: usize = 2000;
+
+/// One hwmon device as the report sees it.
+struct ReportDevice {
+    path: PathBuf,
+    name: String,
+    /// Resolved from `device/driver`. `None` for hwmon entries with no such
+    /// link, such as USB and HID devices.
+    driver: Option<String>,
+    fans: Vec<HwmonChannelInfo>,
+}
+
+/// Builds the report. `full` adds the whole hwmon tree with per-channel state.
+pub async fn generate(full: bool, is_root: bool) -> String {
+    let system_info = SystemInfo::read().await;
+    let devices = scan_hwmon().await;
+    let detection = run_probe(is_root);
+    let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
+    write_header(&mut report, &system_info);
+    write_probe_summary(&mut report, detection.as_ref(), is_root);
+    write_fan_summary(&mut report, &devices);
+    write_findings(&mut report, detection.as_ref(), is_root);
+    if full {
+        write_full_tree(&mut report, &devices).await;
+        return report;
+    }
+    trim_to_budget(report)
+}
+
+/// The probe needs `/dev/port`, so without root it would report a blocked
+/// environment that is really just a permissions problem. Returning `None`
+/// keeps the report from asserting something it did not observe.
+fn run_probe(is_root: bool) -> Option<cc_detect::DetectionResults> {
+    if is_root.not() {
+        return None;
+    }
+    // `false`: a report must never load modules as a side effect of being read.
+    Some(cc_detect::run_detection(false, None))
+}
+
+fn write_header(report: &mut String, system_info: &SystemInfo) {
+    let _ = writeln!(report, "CoolerControl {VERSION} hardware report");
+    let _ = writeln!(
+        report,
+        "Board    {} {}",
+        blank_as_unknown(&system_info.board_vendor),
+        blank_as_unknown(&system_info.board_name)
+    );
+    let _ = writeln!(
+        report,
+        "BIOS     {} {}",
+        blank_as_unknown(&system_info.bios_vendor),
+        blank_as_unknown(&system_info.bios_release)
+    );
+    let _ = writeln!(
+        report,
+        "Kernel   {} ({})",
+        sysinfo::System::kernel_version().unwrap_or_else(|| "unknown".to_string()),
+        sysinfo::System::cpu_arch()
+    );
+}
+
+fn write_probe_summary(
+    report: &mut String,
+    detection: Option<&cc_detect::DetectionResults>,
+    is_root: bool,
+) {
+    if cc_detect::DETECTION_SUPPORTED.not() {
+        let _ = writeln!(report, "Probe    not supported on this architecture");
+        return;
+    }
+    let Some(detection) = detection else {
+        let _ = writeln!(
+            report,
+            "Probe    skipped ({})",
+            if is_root {
+                "detection disabled"
+            } else {
+                "needs root, re-run with sudo for chip detection"
+            }
+        );
+        return;
+    };
+    let environment = &detection.environment;
+    let _ = writeln!(
+        report,
+        "Probe    {} chip(s), Secure Boot {}, container {}, /dev/port {}",
+        detection.detected_chips.len(),
+        on_off(environment.is_secure_boot),
+        yes_no(environment.is_container),
+        available_or_not(environment.has_dev_port)
+    );
+    for chip in &detection.detected_chips {
+        let _ = writeln!(
+            report,
+            "         {} -> {} ({})",
+            chip.name, chip.driver, chip.module_status
+        );
+    }
+}
+
+/// Controllable channels are collapsed to a count. Anything we cannot drive is
+/// listed individually with its verdict, because that is the whole reason
+/// someone is pasting this into a support channel.
+fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
+    let _ = writeln!(report, "\nFan channels");
+    let mut any = false;
+    for device in devices {
+        if device.fans.is_empty() {
+            continue;
+        }
+        any = true;
+        let controllable = device
+            .fans
+            .iter()
+            .filter(|fan| verdict_for(device, fan).is_controllable())
+            .count();
+        let _ = writeln!(
+            report,
+            "  {} [{}]  {} fan(s), {controllable} controllable",
+            device.name,
+            device.driver.as_deref().unwrap_or("no driver link"),
+            device.fans.len()
+        );
+        for fan in &device.fans {
+            let verdict = verdict_for(device, fan);
+            if verdict.is_controllable() {
+                continue;
+            }
+            let _ = writeln!(report, "    {}: {}", fan.name, verdict_label(verdict));
+        }
+    }
+    if any.not() {
+        let _ = writeln!(report, "  none found");
+    }
+}
+
+fn write_findings(
+    report: &mut String,
+    detection: Option<&cc_detect::DetectionResults>,
+    is_root: bool,
+) {
+    let _ = writeln!(report, "\nSystem findings");
+    if cc_detect::DETECTION_SUPPORTED.not() {
+        let _ = writeln!(report, "  detection unsupported on this architecture");
+        return;
+    }
+    let Some(detection) = detection else {
+        let _ = writeln!(
+            report,
+            "  not determined ({})",
+            if is_root {
+                "detection disabled"
+            } else {
+                "needs root"
+            }
+        );
+        return;
+    };
+    let findings = derive_findings(detection);
+    if findings.is_empty() {
+        let _ = writeln!(report, "  none");
+        return;
+    }
+    for finding in &findings {
+        let _ = writeln!(report, "  {}", finding_label(finding));
+    }
+}
+
+fn derive_findings(detection: &cc_detect::DetectionResults) -> Vec<SystemFinding> {
+    let bound_drivers = hardware_support::resolve_bound_drivers(Path::new(HWMON_CLASS_PATH));
+    let chips = detection
+        .detected_chips
+        .iter()
+        .map(|chip| DetectedChipRef {
+            name: &chip.name,
+            driver: &chip.driver,
+        })
+        .collect::<Vec<_>>();
+    let environment = ProbeEnvironment {
+        is_container: detection.environment.is_container,
+        is_secure_boot: detection.environment.is_secure_boot,
+        has_dev_port: detection.environment.has_dev_port,
+    };
+    hardware_support::derive_system_findings(
+        cc_detect::DETECTION_SUPPORTED,
+        &chips,
+        &detection.blacklisted,
+        &environment,
+        &bound_drivers,
+    )
+}
+
+async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
+    let _ = writeln!(report, "\nFull hwmon tree");
+    for device in devices {
+        let _ = writeln!(
+            report,
+            "  {} [{}] at {}",
+            device.name,
+            device.driver.as_deref().unwrap_or("no driver link"),
+            device.path.display()
+        );
+        for fan in &device.fans {
+            let verdict = verdict_for(device, fan);
+            let pwm = read_attribute(&device.path, &format!("pwm{}", fan.number)).await;
+            let pwm_enable =
+                read_attribute(&device.path, &format!("pwm{}_enable", fan.number)).await;
+            let rpm = read_attribute(&device.path, &format!("fan{}_input", fan.number)).await;
+            let _ = writeln!(
+                report,
+                "    {}: verdict={} pwm={pwm} pwm_enable={pwm_enable} rpm={rpm} \
+                 writable={} label={}",
+                fan.name,
+                verdict_label(verdict),
+                fan.caps.is_fan_controllable(),
+                fan.label.as_deref().unwrap_or("-")
+            );
+        }
+    }
+}
+
+/// Reads one sysfs attribute for the full dump. A missing or unreadable file
+/// is reported as absent rather than failing the report.
+async fn read_attribute(base_path: &Path, file_name: &str) -> String {
+    cc_fs::read_sysfs(base_path.join(file_name))
+        .await
+        .map_or_else(|_| "-".to_string(), |value| value.trim().to_string())
+}
+
+fn verdict_for(device: &ReportDevice, fan: &HwmonChannelInfo) -> ChannelVerdict {
+    fans::diagnose_fan_channel(&device.name, fan, false).verdict
+}
+
+/// Enumerates hwmon and builds each device's fan channels with the exact same
+/// `init_fans` the daemon uses.
+async fn scan_hwmon() -> Vec<ReportDevice> {
+    let mut devices = Vec::new();
+    let Ok(entries) = cc_fs::read_dir(Path::new(HWMON_CLASS_PATH)) else {
+        return devices;
+    };
+    let mut paths = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
+    // Numeric, not lexicographic: plain sorting puts hwmon10 before hwmon2,
+    // which reads as a mistake in a report a human is scanning.
+    paths.sort_by_key(|path| (hwmon_index(path), path.clone()));
+    for path in paths {
+        let Ok(name) = cc_fs::read_txt(path.join("name")).await else {
+            continue;
+        };
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let driver = resolve_driver(&path);
+        let fans = fans::init_fans(&path, &name)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
+            .collect();
+        devices.push(ReportDevice {
+            path,
+            name,
+            driver,
+            fans,
+        });
+    }
+    devices
+}
+
+/// The trailing number of a `hwmonN` directory. Entries that do not match sort
+/// last rather than being dropped, since a report should show what is there.
+fn hwmon_index(path: &Path) -> u32 {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_prefix("hwmon"))
+        .and_then(|digits| digits.parse().ok())
+        .unwrap_or(u32::MAX)
+}
+
+fn resolve_driver(hwmon_path: &Path) -> Option<String> {
+    let target = cc_fs::read_link(hwmon_path.join("device").join("driver")).ok()?;
+    let driver = target.file_name()?.to_str()?;
+    if driver.is_empty() {
+        return None;
+    }
+    Some(driver.to_string())
+}
+
+/// Keeps the compact report pasteable. Trimming on a line boundary avoids
+/// cutting a verdict in half, and the pointer to `--full` means the dropped
+/// detail is still reachable.
+fn trim_to_budget(report: String) -> String {
+    if report.chars().count() <= COMPACT_CHARACTER_BUDGET {
+        return report;
+    }
+    let keep = COMPACT_CHARACTER_BUDGET.saturating_sub(TRIM_NOTICE.chars().count());
+    let mut trimmed = String::with_capacity(COMPACT_CHARACTER_BUDGET);
+    for line in report.lines() {
+        if trimmed.chars().count() + line.chars().count() + 1 > keep {
+            break;
+        }
+        trimmed.push_str(line);
+        trimmed.push('\n');
+    }
+    trimmed.push_str(TRIM_NOTICE);
+    trimmed
+}
+
+fn verdict_label(verdict: ChannelVerdict) -> &'static str {
+    match verdict {
+        ChannelVerdict::Controllable => "controllable",
+        ChannelVerdict::FirmwareOverride => "firmware override",
+        ChannelVerdict::FamilyMayNeedOutOfTree => "no control, family may need out-of-tree driver",
+        ChannelVerdict::NoPwm => "no pwm control exposed",
+        ChannelVerdict::PwmReadOnly => "pwm is read-only",
+        ChannelVerdict::IgnoresDuty => "accepts duty writes but does not respond",
+        ChannelVerdict::Unverifiable => "no usable tachometer",
+    }
+}
+
+fn finding_label(finding: &SystemFinding) -> String {
+    match finding {
+        SystemFinding::NoDriverBound {
+            chip_name,
+            expected_driver,
+        } => format!(
+            "{chip_name}: detected, but no loaded driver serves it (expected {expected_driver})"
+        ),
+        SystemFinding::Blacklisted { driver } => format!("{driver}: blacklisted, not loaded"),
+        SystemFinding::BlockedByEnvironment { reason } => {
+            format!("Super-I/O probe blocked: {reason:?}")
+        }
+        SystemFinding::DetectionUnsupported => {
+            "Super-I/O detection unsupported on this architecture".to_string()
+        }
+    }
+}
+
+fn blank_as_unknown(value: &str) -> &str {
+    if value.is_empty() {
+        "unknown"
+    } else {
+        value
+    }
+}
+
+fn on_off(value: bool) -> &'static str {
+    if value {
+        "on"
+    } else {
+        "off"
+    }
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
+}
+
+fn available_or_not(value: bool) -> &'static str {
+    if value {
+        "available"
+    } else {
+        "unavailable"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Goal: the compact report stays pasteable into Discord. Method: feed the
+    /// trimmer a report far over the limit and check the result fits and still
+    /// says where the rest went.
+    #[test]
+    fn compact_report_is_trimmed_to_the_paste_budget() {
+        let oversized = "a line of hwmon detail\n".repeat(400);
+        let trimmed = trim_to_budget(oversized);
+        assert!(
+            trimmed.chars().count() <= COMPACT_CHARACTER_BUDGET,
+            "trimmed report was {} chars",
+            trimmed.chars().count()
+        );
+        assert!(trimmed.contains("--full"));
+    }
+
+    /// Goal: a report already within budget must be returned untouched, so the
+    /// common case carries no trim notice.
+    #[test]
+    fn short_report_is_left_alone() {
+        let report = "CoolerControl hardware report\nBoard    ACME X\n".to_string();
+        assert_eq!(trim_to_budget(report.clone()), report);
+    }
+
+    /// Goal: every verdict has a human label. A missing arm would otherwise
+    /// only surface when a user pastes a report with a blank reason in it.
+    #[test]
+    fn every_verdict_has_a_label() {
+        for verdict in [
+            ChannelVerdict::Controllable,
+            ChannelVerdict::FirmwareOverride,
+            ChannelVerdict::FamilyMayNeedOutOfTree,
+            ChannelVerdict::NoPwm,
+            ChannelVerdict::PwmReadOnly,
+            ChannelVerdict::IgnoresDuty,
+            ChannelVerdict::Unverifiable,
+        ] {
+            assert!(verdict_label(verdict).is_empty().not());
+        }
+    }
+
+    /// Goal: hwmon devices sort numerically. Lexicographic order puts hwmon10
+    /// ahead of hwmon2, which reads as a bug in a report a human is scanning.
+    #[test]
+    fn hwmon_devices_sort_numerically() {
+        let mut paths = [
+            PathBuf::from("/sys/class/hwmon/hwmon10"),
+            PathBuf::from("/sys/class/hwmon/hwmon2"),
+            PathBuf::from("/sys/class/hwmon/hwmon1"),
+        ];
+        paths.sort_by_key(|path| (hwmon_index(path), path.clone()));
+        let order = paths
+            .iter()
+            .map(|path| hwmon_index(path))
+            .collect::<Vec<_>>();
+        assert_eq!(order, vec![1, 2, 10]);
+    }
+
+    /// Goal: an unexpected directory name must not panic or vanish, it sorts
+    /// last so the report still shows it.
+    #[test]
+    fn unparseable_hwmon_name_sorts_last() {
+        assert_eq!(hwmon_index(Path::new("/sys/class/hwmon/oddball")), u32::MAX);
+    }
+
+    /// Goal: without root the report must not claim the environment blocked the
+    /// probe. `/dev/port` is unreadable for a non-root user regardless of how
+    /// the machine is configured, so reporting NoDevPort there would be a claim
+    /// we cannot back with an observation.
+    #[test]
+    fn non_root_does_not_run_or_assert_a_probe() {
+        assert!(run_probe(false).is_none());
+        let mut report = String::new();
+        write_probe_summary(&mut report, None, false);
+        assert!(report.contains("needs root"));
+        let mut findings = String::new();
+        write_findings(&mut findings, None, false);
+        assert!(findings.contains("not determined"));
+        assert!(findings.contains("Secure Boot").not());
+    }
+}

@@ -60,6 +60,7 @@ mod device_listener;
 mod device_uid;
 mod engine;
 mod grpc_api;
+mod hardware_report;
 mod hardware_support;
 mod hashutil;
 mod logger;
@@ -306,7 +307,7 @@ fn main() -> Result<()> {
         // Publish the sidecar handle process-wide so reactor-bound work (process spawning, the
         // auth/token/liqctld/service-plugin transports) can reach it without threading a handle.
         sidecar::install_global(sidecar.handle());
-        handle_non_root_commands(&cmd_args)?;
+        handle_non_root_commands(&cmd_args).await?;
         let log_buf_handle = logger::setup_logging(&cmd_args, run_token.clone()).await?;
         verify_is_root()?;
         handle_detect_command(&cmd_args);
@@ -546,6 +547,13 @@ enum SubCommands {
     List,
     /// Validate all configuration files
     Check,
+    /// Print a paste-ready hardware support report to stdout. Needs neither root nor a
+    /// running daemon, though chip detection is only possible as root.
+    Report {
+        /// Include the whole hwmon tree instead of the compact summary
+        #[arg(long)]
+        full: bool,
+    },
     /// Print the `OpenAPI` spec to stdout. Generated from the route table, so it needs
     /// neither root nor a running daemon. See `make openapi`.
     #[command(name = "openapi", hide = true)]
@@ -582,11 +590,21 @@ enum SubCommands {
 
 /// The stress subcommands run synchronously on plain threads, so this needs
 /// no runtime of its own.
-fn handle_non_root_commands(args: &Args) -> Result<()> {
+async fn handle_non_root_commands(args: &Args) -> Result<()> {
     if let Some(SubCommands::OpenApi) = &args.command {
         // Pretty-printed: the file is checked in, so a merge request diff has to be
         // readable. Whitespace compresses away to a couple of KB on the wire.
         println!("{}", serde_json::to_string_pretty(&api::openapi_spec())?);
+        exit_successfully();
+    }
+    if let Some(SubCommands::Report { full }) = &args.command {
+        // Runs before `verify_is_root`, so it still works over SSH for a user
+        // whose daemon will not start. `Uid::effective().is_root()` only
+        // decides whether the Super-I/O probe is attempted.
+        print!(
+            "{}",
+            hardware_report::generate(*full, Uid::effective().is_root()).await
+        );
         exit_successfully();
     }
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {
