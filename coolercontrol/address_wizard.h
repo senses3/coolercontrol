@@ -51,7 +51,12 @@ class AddressPage final : public QWizardPage {
 
   void refreshForgetCertsButton() const;
 
+  /// Same as IntroPage's: the wizard reopens on whichever page was last shown, so the
+  /// reason has to be on both or it is invisible exactly when it matters.
+  void setError(const QString& detail) const;
+
  private:
+  QLabel* m_errorLabel;
   QLineEdit* m_addressLineEdit;
   QLineEdit* m_portLineEdit;
   QCheckBox* m_sslCheckbox;

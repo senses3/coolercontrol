@@ -30,6 +30,32 @@
 #include "tls_trust.h"
 #include "translations.h"
 
+namespace {
+
+/// Hidden until there is something to say, and selectable so a user can paste it into
+/// a bug report.
+QLabel* newErrorLabel() {
+  auto* label = new QLabel;
+  label->setWordWrap(true);
+  label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  label->hide();
+  return label;
+}
+
+void applyErrorLabel(QLabel* label, const QString& detail) {
+  if (detail.isEmpty()) {
+    label->clear();
+    label->hide();
+    return;
+  }
+  label->setText("<p><b>" %
+                 uiString("wizard.lastError", QObject::tr("Last error:")).toHtmlEscaped() %
+                 "</b> " % detail.toHtmlEscaped() % "</p>");
+  label->show();
+}
+
+}  // namespace
+
 IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
   // Assembled from parts so the shell commands stay out of translation, and so the
   // docs link can be placed wherever a language needs it.
@@ -66,10 +92,7 @@ IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
   // "Could not connect" on its own leaves the user guessing between a stopped
   // service, a wrong port, and a refused certificate. Those need different fixes, so
   // the transport's own reason is worth the one line it costs.
-  m_errorLabel = new QLabel;
-  m_errorLabel->setWordWrap(true);
-  m_errorLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-  m_errorLabel->hide();
+  m_errorLabel = newErrorLabel();
 
   auto* layout = new QVBoxLayout;
   layout->addWidget(m_errorLabel);
@@ -77,16 +100,7 @@ IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
   setLayout(layout);
 }
 
-void IntroPage::setError(const QString& detail) const {
-  if (detail.isEmpty()) {
-    m_errorLabel->clear();
-    m_errorLabel->hide();
-    return;
-  }
-  m_errorLabel->setText("<p><b>" % uiString("wizard.lastError", tr("Last error:")).toHtmlEscaped() %
-                        "</b> " % detail.toHtmlEscaped() % "</p>");
-  m_errorLabel->show();
-}
+void IntroPage::setError(const QString& detail) const { applyErrorLabel(m_errorLabel, detail); }
 
 AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   setTitle(uiString("wizard.addressTitle", tr("Daemon Address - Desktop Application")));
@@ -138,17 +152,20 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
                tr("Remove the remote daemon certificates this app has been told to trust.")));
   connect(m_forgetCertsButton, &QPushButton::clicked, [this]() { forgetTrustedCertificates(); });
 
+  m_errorLabel = newErrorLabel();
+
   auto* layout = new QGridLayout;
   auto* spacer = new QSpacerItem(1, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
-  layout->addWidget(addressLabel, 0, 0);
-  layout->addWidget(m_addressLineEdit, 0, 1);
-  layout->addWidget(portLabel, 1, 0);
-  layout->addWidget(m_portLineEdit, 1, 1);
-  layout->addWidget(m_sslCheckbox, 2, 0, 1, 2);
-  layout->addWidget(m_strictTlsCheckbox, 3, 0, 1, 2);
-  layout->addItem(spacer, 4, 0, 1, 2);
-  layout->addWidget(m_defaultButton, 5, 0, 1, 1);
-  layout->addWidget(m_forgetCertsButton, 5, 1, 1, 1);
+  layout->addWidget(m_errorLabel, 0, 0, 1, 2);
+  layout->addWidget(addressLabel, 1, 0);
+  layout->addWidget(m_addressLineEdit, 1, 1);
+  layout->addWidget(portLabel, 2, 0);
+  layout->addWidget(m_portLineEdit, 2, 1);
+  layout->addWidget(m_sslCheckbox, 3, 0, 1, 2);
+  layout->addWidget(m_strictTlsCheckbox, 4, 0, 1, 2);
+  layout->addItem(spacer, 5, 0, 1, 2);
+  layout->addWidget(m_defaultButton, 6, 0, 1, 1);
+  layout->addWidget(m_forgetCertsButton, 6, 1, 1, 1);
   setLayout(layout);
 
   const QSettings settings;
@@ -168,6 +185,8 @@ void AddressPage::resetAddressInputValues() const {
   m_sslCheckbox->setChecked(DEFAULT_DAEMON_SSL_ENABLED);
   m_strictTlsCheckbox->setChecked(false);
 }
+
+void AddressPage::setError(const QString& detail) const { applyErrorLabel(m_errorLabel, detail); }
 
 void AddressPage::refreshForgetCertsButton() const {
   const auto pins = tls_trust::allPins();

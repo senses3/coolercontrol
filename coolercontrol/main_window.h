@@ -135,6 +135,7 @@ class MainWindow final : public QMainWindow {
   QAction* m_showAction;
   QWizard* m_wizard;
   IntroPage* m_introPage;
+  AddressPage* m_addressPage;
   // Why the last attempt failed, shown by the wizard. Cleared on a good connection so
   // a hand-opened dialog never blames a problem that is already over.
   mutable QString m_lastConnectionError;

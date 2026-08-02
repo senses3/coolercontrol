@@ -145,6 +145,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_ipc(new IPC(this)),
       m_wizard(new QWizard(parent)),
       m_introPage(new IntroPage(m_wizard)),
+      m_addressPage(new AddressPage(m_wizard)),
       m_manager(new QNetworkAccessManager(parent)),
       m_originFilter(new OriginFilter(this)),
       m_retryTimer(new QTimer(parent)),
@@ -251,8 +252,7 @@ void MainWindow::initWizard() {
   m_wizard->setButtonText(QWizard::HelpButton, uiString("wizard.quitApp", tr("&Quit App")));
   m_wizard->setOption(QWizard::HaveHelpButton, true);
   m_wizard->addPage(m_introPage);
-  const auto addressPage = new AddressPage(m_wizard);
-  m_wizard->addPage(addressPage);
+  m_wizard->addPage(m_addressPage);
   m_wizard->setMinimumSize(640, 480);
   connect(m_wizard, &QWizard::helpRequested, this, &MainWindow::forceQuit, Qt::QueuedConnection);
   connect(m_wizard, &QWizard::customButtonClicked, [this](const int which) {
@@ -1018,7 +1018,10 @@ void MainWindow::displayAddressWizard() const {
   if (m_wizard->isVisible()) {
     return;
   }
+  // Both pages, because the wizard reopens on whichever one was last shown, and a
+  // failure that follows Apply lands the user back on the address page.
   m_introPage->setError(m_lastConnectionError);
+  m_addressPage->setError(m_lastConnectionError);
   // Opened from the tray with nothing wrong, "Error" is simply untrue.
   m_wizard->setWindowTitle(m_lastConnectionError.isEmpty()
                                ? uiString("wizard.windowTitleOk", tr("Daemon Connection"))
