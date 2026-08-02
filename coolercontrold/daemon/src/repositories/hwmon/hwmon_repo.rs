@@ -1620,7 +1620,7 @@ impl Repository for HwmonRepo {
             let device_name = devices::get_device_name(&path).await;
             debug!("Detected Device Name: {device_name}");
             if HWMON_DEVICE_NAME_BLACKLIST.contains(&device_name.trim()) {
-                self.record_exclusion(&path, HwmonExclusion::NotACoolingDevice);
+                self.record_exclusion(&path, HwmonExclusion::ServedByAnotherRepository);
                 continue;
             }
             if settings.hide_duplicate_devices && self.path_matches_liquidctl_device(&path) {

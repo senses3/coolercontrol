@@ -226,35 +226,45 @@ pub fn is_out_of_tree_candidate_family(hwmon_name: &str) -> bool {
         .any(|prefix| name_lower.starts_with(prefix))
 }
 
-/// Why the daemon left an hwmon device out of its device list.
+/// Why the hwmon repository left a device out.
 ///
-/// The report enumerates hwmon itself, so it sees devices the daemon dropped.
-/// Without this, a chip that is deliberately hidden and a chip that failed to
-/// come up look identical in a pasted report, and the obvious reading of "it is
-/// in the report but not in the app" is that something is broken.
+/// The report enumerates hwmon itself, so it sees devices the repository
+/// dropped. Without this, a device deliberately left out and one that failed to
+/// come up look identical in a pasted report.
+///
+/// Two different things live here, and the wording keeps them apart. Some of
+/// these devices are gone from the app entirely; others are very much present,
+/// just read through a repository that offers more than hwmon does. Calling the
+/// second kind "hidden" states something false about hardware the user can see
+/// on their own screen, which is exactly what this feature exists not to do.
 ///
 /// Not on the wire: this shapes a line of the text report, nothing more.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HwmonExclusion {
     /// A liquidctl device already covers this chip and duplicates are hidden.
-    /// The liquidctl entry offers more features, so it wins.
+    /// The liquidctl entry offers more features, so it wins. Still in the app.
     DuplicateOfLiquidctl,
-    /// The user disabled the device in settings.
+    /// Excluded by name because a dedicated repository serves it, currently
+    /// the GPU one. Still in the app, read through that repository.
+    ServedByAnotherRepository,
+    /// The user disabled the device in settings. Absent from the app.
     UserDisabled,
-    /// Excluded by name: never useful as a cooling device.
-    NotACoolingDevice,
-    /// The lm-sensors configuration ignores every channel it has.
+    /// The lm-sensors configuration ignores every channel it has. Absent from
+    /// the app.
     AllChannelsIgnored,
 }
 
 impl HwmonExclusion {
     /// Phrased for a report a user pastes into a support channel, so it says
     /// what happened rather than naming the internal rule.
+    ///
+    /// "not used" for a device the app still shows by another route, "hidden"
+    /// only where the device is genuinely absent.
     pub fn label(self) -> &'static str {
         match self {
-            Self::DuplicateOfLiquidctl => "hidden: covered by a liquidctl device",
+            Self::DuplicateOfLiquidctl => "not used: shown as a liquidctl device",
+            Self::ServedByAnotherRepository => "not used: shown by another repository",
             Self::UserDisabled => "hidden: disabled in settings",
-            Self::NotACoolingDevice => "hidden: not a cooling device",
             Self::AllChannelsIgnored => "hidden: every channel ignored by sensors.conf",
         }
     }
