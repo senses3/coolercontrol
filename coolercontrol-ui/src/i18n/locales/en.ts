@@ -543,6 +543,7 @@ export default {
             downloadCurrentLog: 'Download Current Log',
             deviceHealth: 'Device Health',
             deviceHealthOk: 'All sensors and channels are healthy.',
+            hardwareSupportOk: 'All detected hardware is supported and controllable.',
             hardwareReport: 'Hardware Report',
             hardwareReportDescription:
                 'A summary of what CoolerControl can see on this machine, ready to paste into a support channel. Serial numbers and identifiers are excluded.',

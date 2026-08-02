@@ -400,45 +400,6 @@ const shortcutClasses =
                 </div>
             </div>
 
-            <!-- Hardware support: permanent facts, deliberately its own card so a
-                 capability is never read as a fault waiting to clear. The rows
-                 are hidden when there is nothing to say, but the report stays
-                 reachable because it is what the mods will ask for. -->
-            <div :class="cardClasses">
-                <span class="flex items-center gap-2" :class="cardTitleClasses">
-                    {{ t('views.appInfo.hardwareSupport') }}
-                    <UiButton class="ml-auto" @click="reportOpen = true">
-                        {{ t('views.appInfo.hardwareReportButton') }}
-                    </UiButton>
-                </span>
-                <div class="flex flex-col gap-1 pt-3">
-                    <RouterLink
-                        v-for="row in supportRows.filter((r) => r.to)"
-                        :key="row.key"
-                        :to="row.to!"
-                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                        <span class="text-base text-text-color">{{ row.label }}</span>
-                        <span class="block text-sm text-text-color-secondary">
-                            {{ row.detail }}
-                        </span>
-                    </RouterLink>
-                    <a
-                        v-for="row in supportRows.filter((r) => r.href)"
-                        :key="row.key"
-                        :href="row.href"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                        <span class="text-base text-text-color">{{ row.label }}</span>
-                        <span class="block text-sm text-text-color-secondary">
-                            {{ row.detail }}
-                        </span>
-                    </a>
-                </div>
-            </div>
-
             <!-- Device health -->
             <div :class="cardClasses">
                 <span class="flex items-center gap-2" :class="cardTitleClasses">
@@ -605,6 +566,51 @@ const shortcutClasses =
                             Discord
                         </a>
                     </div>
+                </div>
+            </div>
+
+            <!-- Hardware support: permanent facts, deliberately its own card so a
+                 capability is never read as a fault waiting to clear. The rows
+                 are hidden when there is nothing to say, but the report stays
+                 reachable because it is what the mods will ask for. -->
+            <div :class="cardClasses">
+                <span class="flex items-center gap-2" :class="cardTitleClasses">
+                    {{ t('views.appInfo.hardwareSupport') }}
+                    <UiButton class="ml-auto" @click="reportOpen = true">
+                        {{ t('views.appInfo.hardwareReportButton') }}
+                    </UiButton>
+                </span>
+                <div
+                    v-if="supportRows.length === 0"
+                    class="pt-3 text-base text-text-color-secondary"
+                >
+                    {{ t('views.appInfo.hardwareSupportOk') }}
+                </div>
+                <div v-else class="flex flex-col gap-1 pt-3">
+                    <RouterLink
+                        v-for="row in supportRows.filter((r) => r.to)"
+                        :key="row.key"
+                        :to="row.to!"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="text-base text-text-color">{{ row.label }}</span>
+                        <span class="block text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </RouterLink>
+                    <a
+                        v-for="row in supportRows.filter((r) => r.href)"
+                        :key="row.key"
+                        :href="row.href"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="text-base text-text-color">{{ row.label }}</span>
+                        <span class="block text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </a>
                 </div>
             </div>
 
