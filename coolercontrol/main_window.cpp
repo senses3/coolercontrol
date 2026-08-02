@@ -46,6 +46,7 @@
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QWizardPage>
+#include <algorithm>
 #include <memory>
 
 #include "constants.h"
@@ -639,6 +640,12 @@ void MainWindow::refreshTraySensors() {
 
 void MainWindow::stopTraySensorPolling() const { m_sensorPollTimer->stop(); }
 
+void MainWindow::clearTraySensorReadings() const {
+  for (const auto& sensor : m_traySensors) {
+    sensor.action->setText(sensor.label);
+  }
+}
+
 QIcon MainWindow::sensorColorIcon(const QString& color) {
   const QColor swatch(color);
   if (!swatch.isValid()) {
@@ -1217,12 +1224,16 @@ void MainWindow::requestDaemonErrors() const {
   applyAuth(healthRequest);
   const auto healthReply = m_manager->get(healthRequest);
   applyTlsPolicy(healthReply);
-  connect(healthReply, &QNetworkReply::readyRead, [healthReply, this]() {
+  connect(healthReply, &QNetworkReply::finished, [healthReply, this]() {
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status == 401) {
       qDebug() << "Health endpoint returned 401 - not yet authenticated.";
       healthReply->deleteLater();
       return;
+    }
+    if (healthReply->error() != QNetworkReply::NoError) {
+      healthReply->deleteLater();
+      return;  // finished fires on failure too; there is no body to read
     }
     const QString replyText = healthReply->readAll();
     qDebug() << "Health Endpoint Response Status: " << status << "; Body: " << replyText;
@@ -1254,7 +1265,7 @@ void MainWindow::requestDaemonErrors() const {
                 healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             qWarning() << "Error occurred connecting to Daemon Health endpoint. Status: " << status
                        << " QtErrorCode: " << code;
-            healthReply->deleteLater();
+            // finished always follows, and it owns the cleanup.
           });
 }
 
@@ -1386,6 +1397,7 @@ void MainWindow::watchDaemonEvents() const {
   // One parser per connection, so a reconnect never resumes on a half-read frame.
   const auto parser = std::make_shared<SseParser>();
   connect(sseReply, &QNetworkReply::readyRead, [sseReply, parser, this]() {
+    m_sseRetryDelayMs = 0;  // data flowed, so any earlier backoff is spent
     parser->feed(sseReply->readAll(), [this](const QString& name, const QString& data) {
       if (name == "log") {
         handleLogEvent(data);
@@ -1405,13 +1417,41 @@ void MainWindow::watchDaemonEvents() const {
       sseReply->deleteLater();
       return;
     }
+    if (m_forceQuit || m_changeAddress) {
+      sseReply->deleteLater();
+      return;
+    }
+    if (status >= 400) {
+      /*
+        The daemon answered and turned this route down, so the connection is not lost and
+        reporting one would be wrong. Measured against a daemon whose /sse predates the
+        multiplexed endpoint: health kept returning 200, the stream kept returning 404,
+        and the two second retry became an endless stream of paired disconnect and
+        reconnect notifications. Back off quietly instead. Everything else still works;
+        only the tray's own live updates are degraded.
+      */
+      if (m_sseRetryDelayMs == 0) {
+        qWarning() << "Daemon event stream refused with status" << status
+                   << "- tray mode and notification updates will not be live.";
+        m_sseRetryDelayMs = SSE_RETRY_BASE_MS;
+      } else {
+        m_sseRetryDelayMs = std::min(m_sseRetryDelayMs * 2, SSE_RETRY_MAX_MS);
+      }
+      QTimer::singleShot(m_sseRetryDelayMs, this, [this]() { emit watchForSSE(); });
+      sseReply->deleteLater();
+      return;
+    }
     // on error or dropped connection will be re-connected once connection is re-established.
-    if (!m_forceQuit && !m_changeAddress) {
+    // Reconnection is unconditional: gating it could strand the app offline. Only the
+    // notification is gated, so a second stream closing cannot report the same loss twice.
+    if (!m_disconnectNotified) {
+      m_disconnectNotified = true;
+      clearTraySensorReadings();
       notifyDaemonDisconnected();
       applyTrayIconNotificationBadge(true);
-      emit daemonConnectionLost();
       qInfo() << "Connection to the Daemon Lost";
     }
+    emit daemonConnectionLost();
     sseReply->deleteLater();
   });
 }
@@ -1444,7 +1484,12 @@ void MainWindow::tryDaemonConnection() {
   const auto healthReply = m_manager->get(healthRequest);
   applyTlsPolicy(healthReply);
   qDebug() << "Attempting to establish connection to the daemon...";
-  connect(healthReply, &QNetworkReply::readyRead, [this, healthReply]() {
+  // finished, not readyRead: readyRead fires once per chunk, and a remote daemon's
+  // response often arrives in several. That re-ran this whole block, emitting
+  // watchForSSE repeatedly, which opened a stack of SSE streams whose closures each
+  // produced a disconnect notification. Locally the body arrives in one chunk, so it
+  // only ever showed up over the network.
+  connect(healthReply, &QNetworkReply::finished, [this, healthReply]() {
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status == 401) {
       // A stored token the daemon no longer accepts (revoked, or its config was
@@ -1460,6 +1505,15 @@ void MainWindow::tryDaemonConnection() {
       healthReply->deleteLater();
       return;
     }
+    if (healthReply->error() != QNetworkReply::NoError || status != 200) {
+      // Unlike readyRead, finished also fires when the request failed. Without this the
+      // retry timer would stop and a "reconnected" notification would go out over a
+      // connection that never came up.
+      m_lastConnectionError = describeReplyError(healthReply);
+      qDebug() << "Daemon connection attempt failed:" << m_lastConnectionError;
+      healthReply->deleteLater();
+      return;
+    }
     m_lastConnectionError.clear();
     m_retryTimer->stop();
     provisionAccessToken();  // no-op once we hold one
@@ -1472,7 +1526,13 @@ void MainWindow::tryDaemonConnection() {
       m_startup = false;
     } else {
       qInfo() << "Connection to the Daemon Reestablished";
-      notifyDaemonConnectionRestored();
+      // Also covers an address change, where the readings on screen came from the
+      // machine we just stopped talking to.
+      clearTraySensorReadings();
+      if (m_disconnectNotified) {
+        m_disconnectNotified = false;
+        notifyDaemonConnectionRestored();
+      }
       // reset states on reconnection
       m_daemonHasErrors = false;
       m_daemonHasWarnings = false;
@@ -1496,7 +1556,7 @@ void MainWindow::tryDaemonConnection() {
                 healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
             qDebug() << "Error occurred establishing connection to Daemon. Status: " << status
                      << " QtErrorCode: " << code;
-            healthReply->deleteLater();
+            // finished always follows, and it owns the cleanup.
           });
 }
 

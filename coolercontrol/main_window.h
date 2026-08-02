@@ -155,6 +155,11 @@ class MainWindow final : public QMainWindow {
   mutable bool m_webLoadFinished{false};
   mutable bool m_loginWindowShown{false};
   mutable bool m_uiLoadingStopped{false};
+  // Whether the user has been told the connection dropped. Reconnection never depends
+  // on this, only the notifications do, so they stay paired: no "restored" without a
+  // "disconnected" first, and no second "disconnected" before a recovery.
+  mutable bool m_disconnectNotified{false};
+  mutable int m_sseRetryDelayMs{0};
   mutable bool m_changeAddress{false};
   mutable bool m_daemonHasErrors{false};
   mutable bool m_daemonHasWarnings{false};
@@ -230,6 +235,11 @@ class MainWindow final : public QMainWindow {
 
   // One bulk status request, applied to every row.
   void pollTraySensors() const;
+
+  /// Drops the readings, keeping the rows. Values that cannot be refreshed must not
+  /// keep being shown: after an outage they are old, and after an address change they
+  /// belong to a different machine entirely.
+  void clearTraySensorReadings() const;
 
   // Shows the window on the channel's own page. The route is resolved by the UI, which
   // owns the rule that a controllable fan belongs on Cooling and a custom sensor on its

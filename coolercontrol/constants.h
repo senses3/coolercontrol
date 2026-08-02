@@ -54,6 +54,10 @@ constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;
 constexpr int DEFAULT_CONNECTION_TIMEOUT_MS = 8000;
 // 2s is good at startup, so as not to hit the daemon with lots of requests at once (+UI)
 constexpr int DEFAULT_CONNECTION_RETRY_INTERVAL_MS = 2000;
+// Backoff for an event stream the daemon answers but refuses. The daemon is reachable,
+// so retrying at the connection interval forever only produces noise.
+constexpr int SSE_RETRY_BASE_MS = 2000;
+constexpr int SSE_RETRY_MAX_MS = 60000;
 // How long the window stays hidden before the renderer is torn down. Above the UI's own
 // 7s stale-history threshold, so a restore that reloads and a discard never disagree.
 constexpr int DISCARD_DELAY_MS = 10000;
