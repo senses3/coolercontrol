@@ -275,14 +275,8 @@ void MainWindow::initWizard() {
       m_wizard->hide();
     }
   });
-  connect(m_wizard, &QDialog::accepted, [this]() {
-    connections::Connection connection;
-    connection.host = m_wizard->field("address").toString();
-    connection.port = m_wizard->field("port").toInt();
-    connection.sslEnabled = m_wizard->field("ssl").toBool();
-    connection.tlsStrict = m_wizard->field("strictTls").toBool();
-    applyDaemonConnection(connection);
-  });
+  connect(m_wizard, &QDialog::accepted,
+          [this]() { applyDaemonConnection(m_addressPage->commit()); });
 }
 
 void MainWindow::initDelay() const {
@@ -1111,6 +1105,9 @@ void MainWindow::displayAddressWizard() const {
   if (m_wizard->isVisible()) {
     return;
   }
+  // The page is built once with the window, so it would otherwise still show whatever
+  // was configured at startup.
+  m_addressPage->reload();
   // Both pages, because the wizard reopens on whichever one was last shown, and a
   // failure that follows Apply lands the user back on the address page.
   m_introPage->setError(m_lastConnectionError);

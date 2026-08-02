@@ -18,11 +18,15 @@
 #define ADDRESSWIZARD_H
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QList>
 #include <QPushButton>
 #include <QSettings>
 #include <QWizardPage>
+
+#include "connections.h"
 
 class IntroPage final : public QWizardPage {
   Q_OBJECT
@@ -45,6 +49,16 @@ class AddressPage final : public QWizardPage {
  public:
   explicit AddressPage(QWidget* parent = nullptr);
 
+  /// Re-reads the saved list and the live connection into every widget. The page is
+  /// built once with the window, so without this it shows whatever was configured at
+  /// startup rather than what is configured now.
+  void reload() const;
+
+  /// Folds the visible fields into the selected entry, saves the list, and returns the
+  /// connection that should now be live. Editing an entry's address edits that entry
+  /// rather than adding a second one.
+  [[nodiscard]] connections::Connection commit() const;
+
   void resetAddressInputValues() const;
 
   // Lists what is currently trusted and, on confirmation, drops every pin.
@@ -58,11 +72,28 @@ class AddressPage final : public QWizardPage {
 
  private:
   QLabel* m_errorLabel;
+  // Picks which saved connection the fields below are editing. Selecting one does not
+  // switch to it: Apply does, so the error-recovery flow keeps its single confirm step.
+  QComboBox* m_savedCombo;
+  QPushButton* m_addButton;
+  QPushButton* m_removeButton;
+  QLineEdit* m_nameLineEdit;
   QLineEdit* m_addressLineEdit;
   QLineEdit* m_portLineEdit;
   QCheckBox* m_sslCheckbox;
   QCheckBox* m_strictTlsCheckbox;
   QPushButton* m_defaultButton;
   QPushButton* m_forgetCertsButton;
+
+  // Guards the combo's own handler while reload() repopulates it.
+  mutable bool m_populating{false};
+
+  /// Writes the fields from a saved entry, or from the defaults for a new one.
+  void showConnection(const connections::Connection& connection) const;
+
+  /// The list as edited here, with the visible fields folded into the selected entry.
+  [[nodiscard]] QList<connections::Connection> editedList() const;
+
+  void refreshRemoveButton() const;
 };
 #endif  // ADDRESSWIZARD_H

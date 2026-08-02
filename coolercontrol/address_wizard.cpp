@@ -125,6 +125,67 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   setTitle(uiString("wizard.addressTitle", tr("Daemon Address - Desktop Application")));
   setSubTitle(uiString("wizard.addressSubtitle", tr("Adjust the address fields as necessary.")));
 
+  auto* savedLabel = new QLabel(uiString("wizard.savedLabel", tr("Saved connection:")));
+  m_savedCombo = new QComboBox;
+  savedLabel->setBuddy(m_savedCombo);
+  connect(m_savedCombo, &QComboBox::currentIndexChanged, [this](const int index) {
+    if (m_populating || index < 0) {
+      return;
+    }
+    const auto list = connections::all();
+    showConnection(index < list.size() ? list.at(index) : connections::Connection{});
+    refreshRemoveButton();
+  });
+
+  m_addButton = new QPushButton(uiString("wizard.addConnection", tr("Add")));
+  m_addButton->setToolTip(
+      uiString("wizard.addConnectionTooltip", tr("Add another daemon to connect to.")));
+  connect(m_addButton, &QPushButton::clicked, [this]() {
+    auto list = editedList();
+    list.append(connections::Connection{});
+    connections::saveAll(list);
+    reload();
+    // The blank row is last, and is what the fields should now be editing.
+    m_savedCombo->setCurrentIndex(m_savedCombo->count() - 1);
+    resetAddressInputValues();
+  });
+
+  m_removeButton = new QPushButton(uiString("wizard.removeConnection", tr("Remove")));
+  m_removeButton->setToolTip(
+      uiString("wizard.removeConnectionTooltip", tr("Forget the selected daemon.")));
+  connect(m_removeButton, &QPushButton::clicked, [this]() {
+    const auto index = m_savedCombo->currentIndex();
+    auto list = connections::all();
+    if (index < 0 || index >= list.size() || list.size() < 2) {
+      return;  // the last one cannot go: the app always needs somewhere to connect
+    }
+    QMessageBox dialog;
+    dialog.setIcon(QMessageBox::Question);
+    const auto title = uiString("wizard.removeConnection", tr("Remove"));
+    dialog.setWindowTitle(title);
+    dialog.setText(title);
+    dialog.setInformativeText(
+        uiString("wizard.removeConnectionBody", tr("Stop offering this daemon in the tray?")) %
+        "\n\n" % connections::displayName(list.at(index)));
+    const auto removeButton = dialog.addButton(title, QMessageBox::AcceptRole);
+    dialog.addButton(uiString("cert.cancel", tr("Cancel")), QMessageBox::RejectRole);
+    dialog.setDefaultButton(nullptr);
+    dialog.exec();
+    if (dialog.clickedButton() != removeButton) {
+      return;
+    }
+    list.removeAt(index);
+    connections::saveAll(list);
+    reload();
+  });
+
+  auto* nameLabel = new QLabel(uiString("wizard.nameLabel", tr("Name:")));
+  m_nameLineEdit = new QLineEdit;
+  nameLabel->setBuddy(m_nameLineEdit);
+  m_nameLineEdit->setToolTip(
+      uiString("wizard.nameTooltip", tr("Optional label for this daemon. Blank shows host:port.")));
+  registerField("name", m_nameLineEdit);
+
   auto* addressLabel = new QLabel(uiString("wizard.hostLabel", tr("Host address:")));
   m_addressLineEdit = new QLineEdit;
   addressLabel->setBuddy(m_addressLineEdit);
@@ -175,30 +236,90 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
 
   auto* layout = new QGridLayout;
   auto* spacer = new QSpacerItem(1, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+  auto* savedButtons = new QHBoxLayout;
+  savedButtons->addWidget(m_savedCombo, 1);
+  savedButtons->addWidget(m_addButton);
+  savedButtons->addWidget(m_removeButton);
   layout->addWidget(m_errorLabel, 0, 0, 1, 2);
-  layout->addWidget(addressLabel, 1, 0);
-  layout->addWidget(m_addressLineEdit, 1, 1);
-  layout->addWidget(portLabel, 2, 0);
-  layout->addWidget(m_portLineEdit, 2, 1);
-  layout->addWidget(m_sslCheckbox, 3, 0, 1, 2);
-  layout->addWidget(m_strictTlsCheckbox, 4, 0, 1, 2);
-  layout->addItem(spacer, 5, 0, 1, 2);
-  layout->addWidget(m_defaultButton, 6, 0, 1, 1);
-  layout->addWidget(m_forgetCertsButton, 6, 1, 1, 1);
+  layout->addWidget(savedLabel, 1, 0);
+  layout->addLayout(savedButtons, 1, 1);
+  layout->addWidget(nameLabel, 2, 0);
+  layout->addWidget(m_nameLineEdit, 2, 1);
+  layout->addWidget(addressLabel, 3, 0);
+  layout->addWidget(m_addressLineEdit, 3, 1);
+  layout->addWidget(portLabel, 4, 0);
+  layout->addWidget(m_portLineEdit, 4, 1);
+  layout->addWidget(m_sslCheckbox, 5, 0, 1, 2);
+  layout->addWidget(m_strictTlsCheckbox, 6, 0, 1, 2);
+  layout->addItem(spacer, 7, 0, 1, 2);
+  layout->addWidget(m_defaultButton, 8, 0, 1, 1);
+  layout->addWidget(m_forgetCertsButton, 8, 1, 1, 1);
   setLayout(layout);
 
-  const QSettings settings;
-  m_addressLineEdit->setText(
-      settings.value(SETTING_DAEMON_ADDRESS.data(), DEFAULT_DAEMON_ADDRESS.data()).toString());
-  m_portLineEdit->setText(
-      QString::number(settings.value(SETTING_DAEMON_PORT.data(), DEFAULT_DAEMON_PORT).toInt()));
-  m_sslCheckbox->setChecked(
-      settings.value(SETTING_DAEMON_SSL_ENABLED.data(), DEFAULT_DAEMON_SSL_ENABLED).toBool());
-  m_strictTlsCheckbox->setChecked(settings.value(SETTING_TLS_STRICT.data(), false).toBool());
+  reload();
+}
+
+void AddressPage::showConnection(const connections::Connection& connection) const {
+  m_nameLineEdit->setText(connection.name);
+  m_addressLineEdit->setText(connection.host);
+  m_portLineEdit->setText(QString::number(connection.port));
+  m_sslCheckbox->setChecked(connection.sslEnabled);
+  m_strictTlsCheckbox->setChecked(connection.tlsStrict);
+}
+
+QList<connections::Connection> AddressPage::editedList() const {
+  auto list = connections::all();
+  connections::Connection edited;
+  edited.name = m_nameLineEdit->text();
+  edited.host = m_addressLineEdit->text();
+  edited.port = m_portLineEdit->text().toInt();
+  edited.sslEnabled = m_sslCheckbox->isChecked();
+  edited.tlsStrict = m_strictTlsCheckbox->isChecked();
+  if (const auto index = m_savedCombo->currentIndex(); index >= 0 && index < list.size()) {
+    list[index] = edited;
+  }
+  return list;
+}
+
+connections::Connection AddressPage::commit() const {
+  const auto list = editedList();
+  connections::saveAll(list);
+  const auto index = m_savedCombo->currentIndex();
+  if (index >= 0 && index < list.size()) {
+    return list.at(index);
+  }
+  return list.isEmpty() ? connections::current() : list.first();
+}
+
+void AddressPage::refreshRemoveButton() const {
+  // The app always needs somewhere to connect, so the last entry stays.
+  m_removeButton->setEnabled(m_savedCombo->count() > 1);
+}
+
+void AddressPage::reload() const {
+  const auto list = connections::all();
+  const auto live = connections::currentIndex();
+  m_populating = true;
+  m_savedCombo->clear();
+  for (const auto& connection : list) {
+    m_savedCombo->addItem(connections::displayName(connection));
+  }
+  // Falls back to the first row when the live daemon is not saved, which only happens
+  // if the file was hand-edited.
+  const auto selected = live >= 0 ? live : 0;
+  m_savedCombo->setCurrentIndex(selected);
+  m_populating = false;
+  if (selected < list.size()) {
+    showConnection(list.at(selected));
+  } else {
+    showConnection(connections::current());
+  }
+  refreshRemoveButton();
   refreshForgetCertsButton();
 }
 
 void AddressPage::resetAddressInputValues() const {
+  // The name is left alone: it is the user's label for this row, not an address field.
   m_addressLineEdit->setText(DEFAULT_DAEMON_ADDRESS.data());
   m_portLineEdit->setText(QString::number(DEFAULT_DAEMON_PORT));
   m_sslCheckbox->setChecked(DEFAULT_DAEMON_SSL_ENABLED);
