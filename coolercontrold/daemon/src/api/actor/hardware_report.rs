@@ -29,12 +29,21 @@ use tokio_util::sync::CancellationToken;
 
 use crate::api::actor::{run_api_actor, ApiActor};
 use crate::hardware_report::{self, LiquidctlSummary};
+use crate::hardware_support::HardwareSupportController;
+use std::rc::Rc;
 
 struct HardwareReportActor {
     receiver: mpsc::Receiver<HardwareReportMessage>,
+    hardware_support: Rc<HardwareSupportController>,
 }
 
 enum HardwareReportMessage {
+    /// What the startup probe found, rather than a fresh probe. Startup is
+    /// when module loading actually happens, so it is the only run that can
+    /// answer "why is my chip not bound".
+    RetainedDetection {
+        respond_to: oneshot::Sender<Option<cc_detect::DetectionResults>>,
+    },
     Generate {
         full: bool,
         is_root: bool,
@@ -44,8 +53,14 @@ enum HardwareReportMessage {
 }
 
 impl HardwareReportActor {
-    pub fn new(receiver: mpsc::Receiver<HardwareReportMessage>) -> Self {
-        Self { receiver }
+    pub fn new(
+        receiver: mpsc::Receiver<HardwareReportMessage>,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        Self {
+            receiver,
+            hardware_support,
+        }
     }
 }
 
@@ -60,6 +75,9 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
 
     async fn handle_message(&mut self, msg: HardwareReportMessage) {
         match msg {
+            HardwareReportMessage::RetainedDetection { respond_to } => {
+                let _ = respond_to.send(self.hardware_support.detection.clone());
+            }
             HardwareReportMessage::Generate {
                 full,
                 is_root,
@@ -85,13 +103,23 @@ pub struct HardwareReportHandle {
 
 impl HardwareReportHandle {
     pub fn new<'s>(
+        hardware_support: Rc<HardwareSupportController>,
         cancel_token: CancellationToken,
         main_scope: &'s Scope<'s, 's, Result<()>>,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(1);
-        let actor = HardwareReportActor::new(receiver);
+        let actor = HardwareReportActor::new(receiver, hardware_support);
         main_scope.spawn(run_api_actor(actor, cancel_token));
         Self { sender }
+    }
+
+    /// `None` means no probe was made (disabled by config or environment),
+    /// which is not the same as a probe that found nothing.
+    pub async fn retained_detection(&self) -> Result<Option<cc_detect::DetectionResults>> {
+        let (tx, rx) = oneshot::channel();
+        let msg = HardwareReportMessage::RetainedDetection { respond_to: tx };
+        let _ = self.sender.send(msg).await;
+        Ok(rx.await?)
     }
 
     pub async fn generate(

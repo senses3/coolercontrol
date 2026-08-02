@@ -7879,12 +7879,17 @@
           },
           "environment": {
             "$ref": "#/components/schemas/EnvironmentDto"
+          },
+          "probed": {
+            "description": "False when no probe was made at all, so an empty `detected_chips` means\n \"not looked for\" rather than \"none present\". Detection can be switched\n off by config or environment, and is unsupported off `x86_64`.",
+            "type": "boolean"
           }
         },
         "required": [
           "detected_chips",
           "blacklisted",
-          "environment"
+          "environment",
+          "probed"
         ]
       },
       "DetectedChipDto": {

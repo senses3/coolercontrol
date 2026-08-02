@@ -433,6 +433,7 @@ fn main() -> Result<()> {
                     Rc::clone(&mode_controller),
                     Rc::clone(&alert_controller),
                     Rc::clone(&device_health_controller),
+                    Rc::clone(&hardware_support),
                     Rc::clone(&overrides_controller),
                     plugin_controller,
                     log_buf_handle,

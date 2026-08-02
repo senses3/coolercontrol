@@ -36,6 +36,10 @@ pub struct DetectResponse {
     pub detected_chips: Vec<DetectedChipDto>,
     pub blacklisted: Vec<String>,
     pub environment: EnvironmentDto,
+    /// False when no probe was made at all, so an empty `detected_chips` means
+    /// "not looked for" rather than "none present". Detection can be switched
+    /// off by config or environment, and is unsupported off `x86_64`.
+    pub probed: bool,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -76,20 +80,49 @@ impl From<cc_detect::DetectionResults> for DetectResponse {
                 is_secure_boot: results.environment.is_secure_boot,
                 has_dev_port: results.environment.has_dev_port,
             },
+            probed: true,
         }
     }
 }
 
-/// GET /detect — Run detection and return results (no module loading).
+impl DetectResponse {
+    /// No probe was made. Everything empty, and `probed` false so a client
+    /// cannot mistake that for a clean scan.
+    fn not_probed() -> Self {
+        Self {
+            detected_chips: Vec::new(),
+            blacklisted: Vec::new(),
+            environment: EnvironmentDto {
+                is_container: false,
+                is_secure_boot: false,
+                has_dev_port: false,
+            },
+            probed: false,
+        }
+    }
+}
+
+/// GET /detect - Return what the startup probe found.
+///
+/// Deliberately does not re-probe. Startup is when module loading actually
+/// happens, so a fresh scan would answer a different question than the one
+/// being asked, and probing Super-I/O config registers on demand is real
+/// hardware access for what reads like a page load. `POST /detect` remains the
+/// explicit, user-initiated re-scan.
 pub async fn get_detect(
-    State(AppState { detect_handle, .. }): State<AppState>,
+    State(AppState {
+        hardware_report_handle,
+        ..
+    }): State<AppState>,
 ) -> Result<Json<DetectResponse>, CCError> {
-    detect_handle
-        .run(false)
+    hardware_report_handle
+        .retained_detection()
         .await
-        .map(|r| Json(DetectResponse::from(r)))
+        .map(|retained| {
+            Json(retained.map_or_else(DetectResponse::not_probed, DetectResponse::from))
+        })
         .map_err(|e| CCError::InternalError {
-            msg: format!("Detection failed: {e}"),
+            msg: format!("Could not read retained detection results: {e}"),
         })
 }
 

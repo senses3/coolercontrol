@@ -132,6 +132,7 @@ pub async fn start_server<'s>(
     modes_controller: Rc<ModeController>,
     alert_controller: Rc<AlertController>,
     device_health_controller: Rc<DeviceHealthController>,
+    hardware_support: Rc<crate::hardware_support::HardwareSupportController>,
     overrides_controller: Rc<OverridesController>,
     plugin_controller: Rc<PluginController>,
     log_buf_handle: LogBufHandle,
@@ -167,6 +168,7 @@ pub async fn start_server<'s>(
         &modes_controller,
         &alert_controller,
         &device_health_controller,
+        hardware_support,
         overrides_controller,
         plugin_controller,
         log_buf_handle,
@@ -653,6 +655,7 @@ async fn create_app_state<'s>(
     modes_controller: &Rc<ModeController>,
     alert_controller: &Rc<AlertController>,
     device_health_controller: &Rc<DeviceHealthController>,
+    hardware_support: Rc<crate::hardware_support::HardwareSupportController>,
     overrides_controller: Rc<OverridesController>,
     plugin_controller: Rc<PluginController>,
     log_buf_handle: LogBufHandle,
@@ -667,7 +670,8 @@ async fn create_app_state<'s>(
         cancel_token.clone(),
         main_scope,
     );
-    let hardware_report_handle = HardwareReportHandle::new(cancel_token.clone(), main_scope);
+    let hardware_report_handle =
+        HardwareReportHandle::new(hardware_support, cancel_token.clone(), main_scope);
     let auth_handle = AuthHandle::new(cancel_token.clone());
     let token_handle = TokenHandle::new(cancel_token.clone()).await;
     let device_handle = DeviceHandle::new(
