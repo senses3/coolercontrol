@@ -275,20 +275,12 @@ void MainWindow::initWizard() {
     }
   });
   connect(m_wizard, &QDialog::accepted, [this]() {
-    QSettings settings;
-    settings.setValue(SETTING_DAEMON_ADDRESS.data(), m_wizard->field("address").toString());
-    settings.setValue(SETTING_DAEMON_PORT.data(), m_wizard->field("port").toInt());
-    settings.setValue(SETTING_DAEMON_SSL_ENABLED.data(), m_wizard->field("ssl").toBool());
-    settings.setValue(SETTING_TLS_STRICT.data(), m_wizard->field("strictTls").toBool());
-    settings.sync();  // the reload below reads these back immediately
-    m_changeAddress = true;
-    emit dropConnections();
-    delay(300);  // give signals a moment to process.
-    m_startup = true;
-    m_changeAddress = false;
-    m_uiLoadingStopped = false;
-    m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
-    loadVerifiedDaemonUi();
+    connections::Connection connection;
+    connection.host = m_wizard->field("address").toString();
+    connection.port = m_wizard->field("port").toInt();
+    connection.sslEnabled = m_wizard->field("ssl").toBool();
+    connection.tlsStrict = m_wizard->field("strictTls").toBool();
+    applyDaemonConnection(connection);
   });
 }
 
@@ -1020,6 +1012,64 @@ QUrl MainWindow::getEndpointUrl(const QString& endpoint, const bool forceHttp) {
   // for testing with npm dev server:
   // url.setPort(DEFAULT_DAEMON_PORT);
   return url;
+}
+
+/*
+  Points the app at a saved daemon.
+
+  The window is brought up rather than left in the tray on purpose. The tray's modes,
+  pinned sensors and alert badge are all pushed by the UI over IPC, so until the new
+  daemon's page has loaded there is nothing for the tray to show. Connecting without
+  showing would leave it half empty with no way to tell why.
+*/
+void MainWindow::applyDaemonConnection(const connections::Connection& connection) {
+  connections::upsert(connection);  // the live daemon is always a saved one
+  if (connections::sameConnection(connection, connections::current())) {
+    return;  // re-selecting the live daemon, or Apply with nothing changed
+  }
+  qInfo() << "Switching to daemon" << connections::displayName(connection);
+  connections::setCurrent(connection);
+  m_changeAddress = true;
+  emit dropConnections();
+  delay(300);  // give signals a moment to process.
+  m_changeAddress = false;
+  resetPerDaemonState();
+  setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
+  // Reactivating a discarded page reloads it at its old address, so it is blanked before
+  // the new origin is installed. Otherwise the old daemon gets one request that the
+  // origin filter then refuses, leaving an error page on screen.
+  restorePage();
+  m_view->load(QUrl(QStringLiteral("about:blank")));
+  showNormal();
+  raise();
+  activateWindow();
+  // showEvent skips its own work while m_startup is set, so the tray label is set here.
+  setTrayActionToHide();
+  m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
+  loadVerifiedDaemonUi();
+}
+
+void MainWindow::resetPerDaemonState() {
+  m_accessToken.clear();
+  loadAccessToken();  // the new daemon's own, under its own key
+  m_activeModeUID.clear();
+  m_modesTrayMenu->clear();
+  m_modesTrayMenu->setEnabled(false);
+  stopTraySensorPolling();
+  m_sensorPollTicks = 0;
+  clearTraySensorReadings();
+  m_daemonHasErrors = false;
+  m_daemonHasWarnings = false;
+  m_uiAlertsActive = false;
+  applyTrayIconNotificationBadge();
+  m_disconnectNotified = false;
+  m_sseRetryDelayMs = 0;
+  m_loginWindowShown = false;
+  m_uiLoadRetryCount = 0;
+  m_lastConnectionError.clear();
+  m_uiLoadingStopped = false;
+  m_reloadOnShow = false;
+  m_startup = true;
 }
 
 void MainWindow::displayAddressWizard() const {

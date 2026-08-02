@@ -95,6 +95,23 @@ void saveAll(const QList<Connection>& list) {
   settings.sync();
 }
 
+void upsert(const Connection& connection) {
+  if (connection.host.isEmpty()) {
+    return;
+  }
+  auto list = all();
+  const auto key = endpoint(connection);
+  for (auto i = 0; i < list.size(); ++i) {
+    if (endpoint(list.at(i)) == key) {
+      list[i] = connection;
+      saveAll(list);
+      return;
+    }
+  }
+  list.append(connection);
+  saveAll(list);
+}
+
 Connection current() {
   const QSettings settings;
   Connection connection;

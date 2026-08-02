@@ -55,6 +55,10 @@ QList<Connection> all();
 /// Replaces the whole list. Drops entries with no host and any duplicate host:port.
 void saveAll(const QList<Connection>& list);
 
+/// Appends, or replaces the entry addressing the same host:port. Keeps the invariant
+/// that the live daemon is always one of the saved ones.
+void upsert(const Connection& connection);
+
 /// The connection currently live.
 Connection current();
 

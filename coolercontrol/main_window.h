@@ -31,6 +31,7 @@
 #include <QWebEngineView>
 
 #include "address_wizard.h"
+#include "connections.h"
 #include "ipc.h"
 #include "origin_filter.h"
 
@@ -203,6 +204,14 @@ class MainWindow final : public QMainWindow {
   // Removes a token this app previously owned but no longer holds. Session-only route,
   // so it runs from the provision path where the cookie is known good.
   void deleteAccessToken(const QString& tokenId) const;
+
+  // Saves the connection and, when it addresses a different daemon than the live one,
+  // switches to it. Shared by the wizard's Apply and the tray's daemon entries.
+  void applyDaemonConnection(const connections::Connection& connection);
+
+  // Drops everything the previous daemon told us. Anything left behind here shows up as
+  // the old machine's modes, sensors or badges under the new connection.
+  void resetPerDaemonState();
 
   void displayAddressWizard() const;
 
