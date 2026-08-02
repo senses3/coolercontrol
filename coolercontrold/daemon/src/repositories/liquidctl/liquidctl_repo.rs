@@ -103,6 +103,35 @@ pub struct LiquidctlRepo {
 }
 
 impl LiquidctlRepo {
+    /// Retains one detected device for the report, enabled or not. Reads only
+    /// what is already in memory, so generating a report never re-enumerates
+    /// USB devices.
+    fn record_detected_device(&self, device: &Device, enabled: bool) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_liquidctl_device(crate::hardware_report::LiquidctlSummary {
+            name: device.name.clone(),
+            enabled,
+            driver_class: device
+                .lc_info
+                .as_ref()
+                .map(|lc| lc.driver_type.to_string())
+                .or_else(|| device.info.driver_info.name.clone()),
+            liquidctl_version: device.info.driver_info.version.clone(),
+            firmware_version: device
+                .lc_info
+                .as_ref()
+                .and_then(|lc| lc.firmware_version.clone()),
+            hwmon_backed: device
+                .info
+                .driver_info
+                .locations
+                .iter()
+                .any(|location| location.contains("hwmon")),
+        });
+    }
+
     /// Publishes whether each channel can be driven. This repository has no
     /// sysfs-level evidence, so the verdict carries none: an unexplained
     /// "not controllable" is honest, invented measurements are not.
@@ -317,7 +346,11 @@ impl LiquidctlRepo {
                 poll_rate,
             );
             let cc_device_setting = self.config.get_cc_settings_for_device(&device.uid)?;
-            if cc_device_setting.as_ref().is_some_and(|s| s.disable) {
+            let disabled = cc_device_setting.as_ref().is_some_and(|s| s.disable);
+            // Recorded before the skip: a disabled device must still appear in
+            // the report, or "not detected" and "turned off" look identical.
+            self.record_detected_device(&device, disabled.not());
+            if disabled {
                 info!(
                     "Skipping disabled device: {} with UID: {}",
                     device.name, device.uid

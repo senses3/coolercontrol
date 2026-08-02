@@ -195,8 +195,13 @@ fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
 /// Built by the caller from the daemon's live device list. Deliberately has no
 /// field for a serial number or a device id: this ends up in a pasted report,
 /// and liqctld's own payload carries a serial that must not travel with it.
+#[derive(Clone)]
 pub struct LiquidctlSummary {
     pub name: String,
+    /// False when the user has disabled the device. Disabled devices are
+    /// deliberately still listed: "the app cannot see my cooler" and "I turned
+    /// that cooler off" look identical in a support thread otherwise.
+    pub enabled: bool,
     /// The liquidctl driver class.
     pub driver_class: Option<String>,
     /// The liquidctl version in use, not the device firmware.
@@ -232,14 +237,15 @@ fn write_liquidctl_section(report: &mut String, devices: Option<&[LiquidctlSumma
     for device in devices {
         let _ = writeln!(
             report,
-            "  {} [{}]{}",
+            "  {} [{}]{}{}",
             device.name,
             device.driver_class.as_deref().unwrap_or("unknown driver"),
             if device.hwmon_backed {
                 ", hwmon-backed"
             } else {
                 ""
-            }
+            },
+            if device.enabled { "" } else { ", disabled" }
         );
         if let Some(firmware) = device.firmware_version.as_deref() {
             let _ = writeln!(report, "    firmware {firmware}");
@@ -533,6 +539,46 @@ mod tests {
         ] {
             assert!(verdict_label(verdict).is_empty().not());
         }
+    }
+
+    fn liquidctl(name: &str, enabled: bool) -> LiquidctlSummary {
+        LiquidctlSummary {
+            name: name.to_string(),
+            enabled,
+            driver_class: Some("kraken2".to_string()),
+            liquidctl_version: Some("1.15.0".to_string()),
+            firmware_version: Some("1.2.3".to_string()),
+            hwmon_backed: false,
+        }
+    }
+
+    /// Goal: a disabled device still appears, marked as disabled. Without it,
+    /// "CoolerControl cannot see my cooler" and "I turned that cooler off"
+    /// produce identical reports, which sends a support thread the wrong way.
+    #[test]
+    fn disabled_liquidctl_devices_are_listed_and_marked() {
+        let mut report = String::new();
+        write_liquidctl_section(
+            &mut report,
+            Some(&[liquidctl("NZXT Kraken", true), liquidctl("Old Pump", false)]),
+        );
+        assert!(report.contains("NZXT Kraken"), "{report}");
+        assert!(report.contains("Old Pump"), "{report}");
+        assert!(report.contains("Old Pump [kraken2], disabled"), "{report}");
+        // The enabled device must not pick up the marker.
+        assert!(report.contains("NZXT Kraken [kraken2]\n"), "{report}");
+    }
+
+    /// Goal: when the caller cannot enumerate them at all, say so rather than
+    /// implying the machine has none. The standalone CLI is in this case.
+    #[test]
+    fn absent_liquidctl_list_is_distinguished_from_empty() {
+        let mut unknown = String::new();
+        write_liquidctl_section(&mut unknown, None);
+        assert!(unknown.contains("not enumerated"), "{unknown}");
+        let mut empty = String::new();
+        write_liquidctl_section(&mut empty, Some(&[]));
+        assert!(empty.contains("no devices"), "{empty}");
     }
 
     /// Goal: a chip line carries the address and device id, matching the

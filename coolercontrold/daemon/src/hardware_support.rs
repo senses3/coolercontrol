@@ -420,6 +420,10 @@ pub struct HardwareSupportController {
     /// initializes its channels and updated when a runtime observation, such
     /// as a firmware reclaim, changes a verdict.
     channel_diagnoses: RefCell<HashMap<(DeviceUID, ChannelName), ChannelDiagnosis>>,
+    /// Every liquidctl device found at startup, including ones the user has
+    /// disabled. Retained here so the report never has to re-enumerate USB
+    /// devices just to be generated.
+    liquidctl_devices: RefCell<Vec<crate::hardware_report::LiquidctlSummary>>,
 }
 
 impl HardwareSupportController {
@@ -431,6 +435,7 @@ impl HardwareSupportController {
             detection,
             system_findings,
             channel_diagnoses: RefCell::new(HashMap::new()),
+            liquidctl_devices: RefCell::new(Vec::new()),
         }
     }
 
@@ -456,6 +461,16 @@ impl HardwareSupportController {
             };
             self.record_driver_channel(device_uid, channel_name, speed_options.fixed_enabled);
         }
+    }
+
+    /// Records a liquidctl device found at startup, enabled or not.
+    pub fn record_liquidctl_device(&self, device: crate::hardware_report::LiquidctlSummary) {
+        self.liquidctl_devices.borrow_mut().push(device);
+    }
+
+    /// The retained liquidctl devices, for the report.
+    pub fn liquidctl_devices(&self) -> Vec<crate::hardware_report::LiquidctlSummary> {
+        self.liquidctl_devices.borrow().clone()
     }
 
     /// Records or replaces one channel's diagnosis.

@@ -28,7 +28,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::api::actor::{run_api_actor, ApiActor};
-use crate::hardware_report::{self, LiquidctlSummary};
+use crate::hardware_report;
 use crate::hardware_support::HardwareSupportController;
 use std::rc::Rc;
 
@@ -47,7 +47,6 @@ enum HardwareReportMessage {
     Generate {
         full: bool,
         is_root: bool,
-        liquidctl: Vec<LiquidctlSummary>,
         respond_to: oneshot::Sender<String>,
     },
 }
@@ -81,9 +80,11 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
             HardwareReportMessage::Generate {
                 full,
                 is_root,
-                liquidctl,
                 respond_to,
             } => {
+                // Retained at startup, so this never re-enumerates USB devices
+                // and still includes devices the user has disabled.
+                let liquidctl = self.hardware_support.liquidctl_devices();
                 let report = hardware_report::generate(full, is_root, Some(&liquidctl)).await;
                 let _ = respond_to.send(report);
             }
@@ -122,17 +123,11 @@ impl HardwareReportHandle {
         Ok(rx.await?)
     }
 
-    pub async fn generate(
-        &self,
-        full: bool,
-        is_root: bool,
-        liquidctl: Vec<LiquidctlSummary>,
-    ) -> Result<String> {
+    pub async fn generate(&self, full: bool, is_root: bool) -> Result<String> {
         let (tx, rx) = oneshot::channel();
         let msg = HardwareReportMessage::Generate {
             full,
             is_root,
-            liquidctl,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;

@@ -29,8 +29,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::api::{AppState, CCError};
-use crate::device::DriverType;
-use crate::hardware_report::LiquidctlSummary;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ReportQuery {
@@ -49,130 +47,19 @@ pub struct ReportResponse {
 pub async fn get_hardware_report(
     Query(query): Query<ReportQuery>,
     State(AppState {
-        device_handle,
         hardware_report_handle,
         ..
     }): State<AppState>,
 ) -> Result<Json<ReportResponse>, CCError> {
-    let devices = device_handle
-        .devices_get()
-        .await
-        .map_err(|err| CCError::InternalError {
-            msg: format!("Could not read the device list: {err}"),
-        })?;
-    let liquidctl = collect_liquidctl(&devices);
     // Generation runs on the main runtime: it reads sysfs through `cc_fs`,
     // whose futures are not `Send` and so cannot be awaited in a handler.
+    // Liquidctl devices come from what the daemon retained at startup, so no
+    // USB enumeration happens here and disabled devices are still listed.
     let report = hardware_report_handle
-        .generate(query.full, Uid::effective().is_root(), liquidctl)
+        .generate(query.full, Uid::effective().is_root())
         .await
         .map_err(|err| CCError::InternalError {
             msg: format!("Could not generate the hardware report: {err}"),
         })?;
     Ok(Json(ReportResponse { report }))
-}
-
-/// Reduces the live device list to the liquidctl entries.
-///
-/// Only the fields a maintainer needs are carried across. The device uid and
-/// `device_id` are dropped on purpose: `device_id` can be a serial number, and
-/// this text is meant to be pasted into a public support channel.
-fn collect_liquidctl(devices: &[crate::api::devices::DeviceDto]) -> Vec<LiquidctlSummary> {
-    devices
-        .iter()
-        .filter(|device| device.info.driver_info.drv_type == DriverType::Liquidctl)
-        .map(|device| LiquidctlSummary {
-            name: device.name.clone(),
-            driver_class: device
-                .lc_info
-                .as_ref()
-                .map(|lc| lc.driver_type.to_string())
-                .or_else(|| device.info.driver_info.name.clone()),
-            liquidctl_version: device.info.driver_info.version.clone(),
-            firmware_version: device
-                .lc_info
-                .as_ref()
-                .and_then(|lc| lc.firmware_version.clone()),
-            hwmon_backed: device
-                .info
-                .driver_info
-                .locations
-                .iter()
-                .any(|location| location.contains("hwmon")),
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::api::devices::DeviceDto;
-    use crate::device::{DeviceInfo, DeviceType, DriverInfo, LcInfo};
-    use std::ops::Not;
-
-    fn device(drv_type: DriverType, locations: Vec<String>) -> DeviceDto {
-        DeviceDto {
-            name: "NZXT Kraken".to_string(),
-            d_type: DeviceType::Liquidctl,
-            type_index: 1,
-            uid: "uid-1".to_string(),
-            lc_info: Some(LcInfo {
-                driver_type: crate::repositories::liquidctl::base_driver::BaseDriver::Kraken2,
-                firmware_version: Some("1.2.3".to_string()),
-                unknown_asetek: false,
-            }),
-            info: DeviceInfo {
-                driver_info: DriverInfo {
-                    drv_type,
-                    name: Some("kraken2".to_string()),
-                    version: Some("1.15.0".to_string()),
-                    locations,
-                },
-                ..Default::default()
-            },
-        }
-    }
-
-    /// Goal: only liquidctl devices reach the section, so a kernel-driven fan
-    /// controller is not double-reported under both Fan channels and Liquidctl.
-    #[test]
-    fn only_liquidctl_devices_are_collected() {
-        let devices = vec![
-            device(DriverType::Liquidctl, Vec::new()),
-            device(DriverType::Kernel, Vec::new()),
-        ];
-        assert_eq!(collect_liquidctl(&devices).len(), 1);
-    }
-
-    /// Goal: a device exposed through hwmon is marked as such, so a reader can
-    /// tell that its channels also appear in the Fan channels section rather
-    /// than thinking it is listed twice by mistake.
-    #[test]
-    fn hwmon_backed_devices_are_flagged() {
-        let backed = collect_liquidctl(&[device(
-            DriverType::Liquidctl,
-            vec!["/sys/class/hwmon/hwmon8".to_string()],
-        )]);
-        assert!(backed[0].hwmon_backed);
-        let usb_only = collect_liquidctl(&[device(
-            DriverType::Liquidctl,
-            vec!["/dev/hidraw3".to_string()],
-        )]);
-        assert!(usb_only[0].hwmon_backed.not());
-    }
-
-    /// Goal: the summary carries no identifying field. The uid is dropped and
-    /// there is no serial anywhere, because this text gets pasted in public.
-    #[test]
-    fn summary_carries_no_identifiers() {
-        let summaries = collect_liquidctl(&[device(DriverType::Liquidctl, Vec::new())]);
-        let rendered = format!(
-            "{} {:?} {:?} {:?}",
-            summaries[0].name,
-            summaries[0].driver_class,
-            summaries[0].liquidctl_version,
-            summaries[0].firmware_version
-        );
-        assert!(rendered.contains("uid-1").not(), "uid leaked: {rendered}");
-    }
 }
