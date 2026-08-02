@@ -33,6 +33,7 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
+import ChannelProbeButton from '@/shell/cooling/ChannelProbeButton.vue'
 import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
 import UncontrollableBadge from '@/shell/cooling/UncontrollableBadge.vue'
 import FirmwareCurveBadge from '@/shell/cooling/FirmwareCurveBadge.vue'
@@ -455,6 +456,11 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     }}
                 </UiButton>
             </div>
+
+            <!-- The fan is writable as far as the driver is concerned. Whether
+                 it actually moves is a separate question, and this is the only
+                 thing in the app that can answer it. -->
+            <ChannelProbeButton :device-u-i-d="deviceUID" :channel-name="channelName" />
 
             <!-- Manual -->
             <div

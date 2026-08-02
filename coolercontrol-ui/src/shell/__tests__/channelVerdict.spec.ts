@@ -21,7 +21,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
-import { ChannelVerdict, verdictDocsLink } from '@/models/DeviceHealth.ts'
+import { ChannelVerdict, ProbeRefusal, verdictDocsLink } from '@/models/DeviceHealth.ts'
 
 // The verdict labels are chosen in a switch inside the notice and badge
 // components rather than read from a table, so the static i18n sweep does see
@@ -38,6 +38,17 @@ const VERDICT_KEYS: Record<ChannelVerdict, string | undefined> = {
     [ChannelVerdict.PwmReadOnly]: 'verdictPwmReadOnly',
     [ChannelVerdict.IgnoresDuty]: 'verdictIgnoresDuty',
     [ChannelVerdict.Unverifiable]: 'verdictUnverifiable',
+}
+
+// Same guard for the probe: every refusal the daemon can return has to have
+// something to say, and the mapping is a switch rather than a table for the
+// same reason as above.
+const REFUSAL_KEYS: Record<ProbeRefusal, string> = {
+    [ProbeRefusal.NotControllable]: 'probeDeclinedNotControllable',
+    [ProbeRefusal.NoTachometer]: 'probeDeclinedNoTachometer',
+    [ProbeRefusal.NoBaselineRpm]: 'probeDeclinedNoBaselineRpm',
+    [ProbeRefusal.AlertActive]: 'probeDeclinedAlertActive',
+    [ProbeRefusal.TooWarmToLower]: 'probeDeclinedTooWarmToLower',
 }
 
 describe('channel verdicts', () => {
@@ -72,12 +83,30 @@ describe('channel verdicts', () => {
         // baked into the binary goes stale and can contradict the maintainers.
         const page = (en as any).layout.shell.coolingPage
         const forbidden = ['nct6', 'it87', 'modprobe', 'lm-sensors', 'lm_sensors']
-        for (const key of Object.values(VERDICT_KEYS)) {
+        for (const key of [...Object.values(VERDICT_KEYS), ...Object.values(REFUSAL_KEYS)]) {
             if (key == null) continue
             const text = String(page[key]).toLowerCase()
             for (const term of forbidden) {
                 expect(text.includes(term), `${key} names "${term}"`).toBe(false)
             }
+        }
+    })
+})
+
+describe('duty-response probe', () => {
+    it('has an english string for every refusal', () => {
+        // The probe is the one thing that moves a fan, so a refusal it cannot
+        // explain would leave the user watching a button do nothing.
+        const page = (en as any).layout.shell.coolingPage
+        for (const [reason, key] of Object.entries(REFUSAL_KEYS)) {
+            expect(typeof page[key], `missing string for ${reason}`).toBe('string')
+        }
+    })
+
+    it('has a string for every outcome the daemon can complete with', () => {
+        const page = (en as any).layout.shell.coolingPage
+        for (const key of ['probeResponded', 'probeNoResponse', 'probeFirmwareOverride']) {
+            expect(typeof page[key], `missing string for ${key}`).toBe('string')
         }
     })
 })

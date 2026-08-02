@@ -205,6 +205,27 @@ export default {
                 evidenceNoTachometer: 'no speed reading',
                 verdictLearnMore: 'What can I do about this?',
                 verdictFoundSomethingThatWorks: 'Found something that works? Tell us',
+                probeButton: 'Test fan response',
+                probeTooltip:
+                    'Briefly changes the fan speed and checks whether it actually responded, then puts your setting back.',
+                probeRunning: 'Testing, the fan will change speed briefly...',
+                probeResponded:
+                    'The fan responded: {baseline} rpm to {observed} rpm at {duty}% duty.',
+                probeNoResponse:
+                    'The fan accepted {duty}% duty but its speed did not change ({baseline} rpm to {observed} rpm). CoolerControl is not driving this fan.',
+                probeFirmwareOverride:
+                    'The firmware took this channel back during the test, so CoolerControl could not hold manual control.',
+                probeDeclinedNotControllable:
+                    'This channel has no writable fan control, so there is nothing to test.',
+                probeDeclinedNoTachometer:
+                    'This channel reports no speed, so a response could not be observed.',
+                probeDeclinedNoBaselineRpm:
+                    'This channel reads 0 rpm, so there is nothing to compare against. That usually means an empty fan header.',
+                probeDeclinedAlertActive:
+                    'An alert is active on this channel. The test was skipped so it does not interfere.',
+                probeDeclinedTooWarmToLower:
+                    'This fan is already near maximum and the machine is too warm to slow it down for a test.',
+                probeFailed: 'The test could not be completed: {error}',
                 activeMode: 'Active',
                 previousMode: 'Previous',
                 activate: 'Activate',
