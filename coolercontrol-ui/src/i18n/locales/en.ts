@@ -212,7 +212,7 @@ export default {
                 probeTooltip:
                     'Briefly changes the fan speed and checks whether it actually responded, then puts your setting back.',
                 probeRunning:
-                    'Testing, the fan will change speed briefly. A stopped fan is tried at several speeds, so this can take a moment...',
+                    'Testing, the fan will change speed briefly. A stopped fan is tried at several speeds and boards that ramp slowly are waited out, so this can take up to a minute...',
                 probeResponded:
                     'The fan responded: {baseline} rpm to {observed} rpm at {duty}% duty.',
                 probeNoResponse:

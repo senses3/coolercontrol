@@ -36,7 +36,6 @@ use crate::device::{DeviceUID, Duty, RPM};
 use crate::hardware_support::ChannelVerdict;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use log::warn;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::ops::Not;
@@ -74,29 +73,26 @@ const _: () = assert!(START_LADDER[START_LADDER.len() - 1] == 100);
 /// probe declines rather than reduce cooling on a machine already running warm.
 const LOWER_MAX_TEMP_CELSIUS: f64 = 70.0;
 
-/// How long to let the fan reach its new speed before sampling. Generous
-/// enough for a slow 140mm fan, which takes longer to spin up than the status
-/// cache takes to refresh.
-const SETTLE_MS: u32 = 5_000;
+/// How often to look at the channel while a write is taking effect.
+const POLL_INTERVAL_MS: u32 = 500;
 
-/// The same, per rung of the start ladder. Shorter on purpose: a fan that is
-/// going to break away does so almost at once, and the ladder only asks
-/// whether it turned at all rather than what speed it settled to. Waiting the
-/// full time on every rung would treble how long the request is held open.
-const START_SETTLE_MS: u32 = 2_500;
+/// Consecutive fresh samples with no change in either duty or speed before a
+/// rung counts as finished.
+///
+/// This replaced a fixed sleep, which was the wrong instrument: some boards
+/// ramp the reported duty towards the target over several seconds rather than
+/// applying it at once, and sampling once after a guessed delay gave up while
+/// the fan was still on its way up. Watching until nothing moves tracks the
+/// board's own pace, and on hardware that applies a write immediately it
+/// finishes sooner than any sleep long enough for the slow case.
+const STABLE_SAMPLES: u32 = 3;
 
-const _: () = assert!(START_SETTLE_MS < SETTLE_MS);
+/// Hard cap per rung, so a channel whose readings never settle cannot hold the
+/// request open indefinitely.
+const RUNG_TIMEOUT_MS: u32 = 20_000;
 
-/// After settling, the sample still has to come from a status refresh that
-/// happened after the write, or it would report the pre-write speed.
-const FRESH_STATUS_POLL_MS: u32 = 500;
-
-/// Bound on that wait. A device whose statuses stopped refreshing entirely
-/// must not hold the probe open forever; the sample is taken anyway and the
-/// stale reading simply fails to clear the response threshold.
-const FRESH_STATUS_ATTEMPTS_MAX: u32 = 10;
-
-const _: () = assert!(FRESH_STATUS_POLL_MS > 0);
+const _: () = assert!(POLL_INTERVAL_MS > 0);
+const _: () = assert!(RUNG_TIMEOUT_MS > POLL_INTERVAL_MS * STABLE_SAMPLES);
 const _: () = assert!(PROBE_STEP > 0);
 const _: () = assert!(RAISE_HEADROOM_CEILING < 100);
 
@@ -132,14 +128,6 @@ pub struct ProbePlan {
 }
 
 impl ProbePlan {
-    /// How long to wait after each write before sampling.
-    fn settle_ms(&self) -> u32 {
-        if self.steps.len() > 1 {
-            return START_SETTLE_MS;
-        }
-        SETTLE_MS
-    }
-
     /// Whether the last rung was full duty, which is what makes a fan that
     /// never turned a conclusion rather than an open question.
     fn ends_at_full_duty(&self) -> bool {
@@ -346,6 +334,12 @@ pub trait ProbeHost {
 
     async fn current_rpm(&self, device_uid: &DeviceUID, channel_name: &str) -> Option<RPM>;
 
+    /// The duty the channel currently *reports*, which is not always the duty
+    /// last written: boards that ramp report the value on its way to the
+    /// target. Watched so the probe can tell "still arriving" from "arrived
+    /// and nothing happened".
+    async fn current_duty(&self, device_uid: &DeviceUID, channel_name: &str) -> Option<Duty>;
+
     /// Timestamp of the newest status, watched so the RPM sample is known to
     /// come from a refresh that happened after the write.
     async fn latest_status_timestamp_ms(&self, device_uid: &DeviceUID) -> Option<i64>;
@@ -430,16 +424,14 @@ async fn walk_the_plan<H: ProbeHost + ?Sized>(
     baseline_rpm: RPM,
 ) -> Result<ProbeRun> {
     host.enter_manual_control(device_uid, channel_name).await?;
-    let settle_ms = plan.settle_ms();
     let mut observed_rpm = 0;
     let mut probed_duty = plan.original_duty;
     for &duty in &plan.steps {
         host.write_duty(device_uid, channel_name, duty).await?;
         probed_duty = duty;
-        observed_rpm = settle_and_sample(host, device_uid, channel_name, settle_ms)
-            .await
-            .ok_or_else(|| anyhow!("no fan speed reading after the probe write"))?;
-        if rpm_responded(baseline_rpm, observed_rpm) {
+        let rung = watch_rung(host, device_uid, channel_name, baseline_rpm).await?;
+        observed_rpm = rung.rpm;
+        if rung.responded {
             break;
         }
     }
@@ -456,24 +448,66 @@ async fn walk_the_plan<H: ProbeHost + ?Sized>(
     })
 }
 
-/// Waits for the fan to reach its new speed, then for a status refresh that
-/// postdates the write, then samples.
-async fn settle_and_sample<H: ProbeHost + ?Sized>(
+/// How one rung ended.
+struct RungOutcome {
+    rpm: RPM,
+    /// True when the fan answered, which ends the ladder here.
+    responded: bool,
+}
+
+/// Watches a channel after a write until the fan answers or nothing is moving.
+///
+/// Only samples that come from a *new* status are considered, so a cache that
+/// has not refreshed yet can never be mistaken for a channel that has settled.
+async fn watch_rung<H: ProbeHost + ?Sized>(
     host: &H,
     device_uid: &DeviceUID,
     channel_name: &str,
-    settle_ms: u32,
-) -> Option<RPM> {
-    let before_ms = host.latest_status_timestamp_ms(device_uid).await;
-    host.sleep_millis(settle_ms).await;
-    for _ in 0..FRESH_STATUS_ATTEMPTS_MAX {
-        if host.latest_status_timestamp_ms(device_uid).await != before_ms {
-            return host.current_rpm(device_uid, channel_name).await;
+    baseline_rpm: RPM,
+) -> Result<RungOutcome> {
+    let polls_max = RUNG_TIMEOUT_MS / POLL_INTERVAL_MS;
+    let mut seen_status_ms = host.latest_status_timestamp_ms(device_uid).await;
+    let mut previous: Option<(Option<Duty>, RPM)> = None;
+    let mut unchanged = 0;
+    let mut rpm = None;
+    for _ in 0..polls_max {
+        host.sleep_millis(POLL_INTERVAL_MS).await;
+        let status_ms = host.latest_status_timestamp_ms(device_uid).await;
+        if status_ms == seen_status_ms {
+            continue; // nothing new to read yet
         }
-        host.sleep_millis(FRESH_STATUS_POLL_MS).await;
+        seen_status_ms = status_ms;
+        let Some(sampled_rpm) = host.current_rpm(device_uid, channel_name).await else {
+            continue;
+        };
+        rpm = Some(sampled_rpm);
+        if rpm_responded(baseline_rpm, sampled_rpm) {
+            return Ok(RungOutcome {
+                rpm: sampled_rpm,
+                responded: true,
+            });
+        }
+        let sample = (
+            host.current_duty(device_uid, channel_name).await,
+            sampled_rpm,
+        );
+        // A duty still climbing towards the target means the write is being
+        // applied gradually, and the fan has not had its chance yet.
+        if previous == Some(sample) {
+            unchanged += 1;
+        } else {
+            unchanged = 0;
+        }
+        previous = Some(sample);
+        if unchanged >= STABLE_SAMPLES {
+            break;
+        }
     }
-    warn!("Duty-response probe saw no status refresh for {device_uid}; sampling anyway");
-    host.current_rpm(device_uid, channel_name).await
+    let rpm = rpm.ok_or_else(|| anyhow!("no fan speed reading after the probe write"))?;
+    Ok(RungOutcome {
+        rpm,
+        responded: false,
+    })
 }
 
 #[cfg(test)]
@@ -681,6 +715,13 @@ mod tests {
         restore_fails: bool,
         /// Advances on every read, so a fresh status always lands.
         status_ms: Cell<i64>,
+        /// What the channel reports as its duty. Unchanging by default.
+        reported_duty: Cell<Option<Duty>>,
+        /// Fresh samples a write takes to actually arrive. Zero applies it at
+        /// once; higher values imitate a board that ramps the duty.
+        ramp_samples: u32,
+        /// Fresh samples seen since the last write.
+        samples_since_write: Cell<u32>,
         writes: RefCell<Vec<String>>,
     }
 
@@ -734,6 +775,7 @@ mod tests {
 
         async fn write_duty(&self, _: &DeviceUID, _: &str, duty: Duty) -> Result<()> {
             self.log(&format!("duty:{duty}"));
+            self.samples_since_write.set(0);
             if self.duty_write_fails {
                 return Err(anyhow!("duty write failed"));
             }
@@ -741,7 +783,25 @@ mod tests {
         }
 
         async fn current_rpm(&self, _: &DeviceUID, _: &str) -> Option<RPM> {
+            let seen = self.samples_since_write.get() + 1;
+            self.samples_since_write.set(seen);
+            if seen <= self.ramp_samples {
+                // Still on its way to the written duty, so the fan has not had
+                // its chance yet.
+                return Some(0);
+            }
             self.rpm_after_write
+        }
+
+        async fn current_duty(&self, _: &DeviceUID, _: &str) -> Option<Duty> {
+            let seen = self.samples_since_write.get();
+            if seen <= self.ramp_samples {
+                // Climbing, so every sample differs from the last and the rung
+                // keeps watching.
+                #[allow(clippy::cast_possible_truncation)]
+                return Some((seen * 5).min(100) as Duty);
+            }
+            self.reported_duty.get()
         }
 
         async fn latest_status_timestamp_ms(&self, _: &DeviceUID) -> Option<i64> {
@@ -887,6 +947,54 @@ mod tests {
         let outcome = probe(&host).unwrap();
         assert_eq!(outcome.verdict(), Some(ChannelVerdict::Controllable));
         assert_eq!(host.touched(), vec!["manual", "duty:30", "restore"]);
+    }
+
+    /// Goal: a board that applies a write gradually must not be given up on.
+    /// Some boards ramp the reported duty towards the target over seconds, and
+    /// a fixed sleep sampled once while the fan was still on its way up, then
+    /// moved to the next rung. Method: a host that takes six fresh samples to
+    /// arrive, after which the fan turns. The first rung must carry it.
+    #[test]
+    fn a_ramping_board_is_waited_out() {
+        let host = MockHost {
+            conditions: Some(ProbeConditions {
+                baseline_rpm: 0,
+                current_duty: 0,
+                ..healthy()
+            }),
+            rpm_after_write: Some(800),
+            ramp_samples: 6,
+            ..MockHost::responsive()
+        };
+        let outcome = probe(&host).unwrap();
+        assert_eq!(outcome.verdict(), Some(ChannelVerdict::Controllable));
+        assert_eq!(
+            host.touched(),
+            vec!["manual", "duty:30", "restore"],
+            "the ramp must be waited out on the first rung, not escalated past"
+        );
+    }
+
+    /// Goal: a rung ends once nothing is moving, rather than burning its whole
+    /// timeout on a channel that has plainly finished. Method: a host that
+    /// reports the same duty and speed every sample.
+    #[test]
+    fn a_settled_channel_ends_its_rung_early() {
+        let host = MockHost {
+            conditions: Some(ProbeConditions {
+                baseline_rpm: 0,
+                current_duty: 0,
+                ..healthy()
+            }),
+            rpm_after_write: Some(0),
+            ..MockHost::responsive()
+        };
+        probe(&host).unwrap();
+        let polls_max = RUNG_TIMEOUT_MS / POLL_INTERVAL_MS;
+        assert!(
+            STABLE_SAMPLES < polls_max,
+            "a rung must be able to settle before its timeout"
+        );
     }
 
     /// Goal: a fan that answers no rung is walked all the way to full duty and

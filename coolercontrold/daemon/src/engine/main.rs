@@ -2349,6 +2349,19 @@ impl ProbeHost for Engine {
         DiagnosisHost::current_rpm(self, device_uid, channel_name).await
     }
 
+    async fn current_duty(&self, device_uid: &DeviceUID, channel_name: &str) -> Option<Duty> {
+        let device_lock = self.all_devices.get(device_uid)?;
+        let device = device_lock.borrow();
+        let duty = device
+            .status_history
+            .back()?
+            .channels
+            .iter()
+            .find(|channel| channel.name == channel_name)?
+            .duty?;
+        Some(duty_from_percent(duty))
+    }
+
     async fn latest_status_timestamp_ms(&self, device_uid: &DeviceUID) -> Option<i64> {
         DiagnosisHost::latest_status_timestamp_ms(self, device_uid).await
     }
