@@ -100,7 +100,7 @@ function completedMessage(outcome: ProbeOutcomeDTO): string {
         // Anything else is a verdict this build has never heard of, so say
         // that rather than pick one of the above and state it confidently.
         default:
-            return t('layout.shell.coolingPage.probeUnrecognized')
+            return unrecognized(outcome)
     }
 }
 
@@ -122,8 +122,21 @@ function declinedMessage(outcome: ProbeOutcomeDTO): string {
         // a reason this build did not know. Never assert a cause we were not
         // given.
         default:
-            return t('layout.shell.coolingPage.probeUnrecognized')
+            return unrecognized(outcome)
     }
+}
+
+/**
+ * The honest answer when the daemon sent something this build cannot name,
+ * plus the payload in the console.
+ *
+ * Without the log this is undiagnosable: the daemon's own log prints its
+ * internal enum name, not the JSON, so a mismatch between the two sides is
+ * invisible from either end alone.
+ */
+function unrecognized(outcome: ProbeOutcomeDTO): string {
+    console.error('Unrecognized probe outcome from the daemon:', JSON.stringify(outcome))
+    return t('layout.shell.coolingPage.probeUnrecognized')
 }
 
 const message = computed(() =>

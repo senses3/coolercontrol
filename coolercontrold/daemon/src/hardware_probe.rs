@@ -1070,6 +1070,24 @@ mod tests {
         );
     }
 
+    /// Goal: pin the exact JSON the UI has to decode. The wire shape is the
+    /// contract between the daemon and the app, and a mismatch there is
+    /// invisible to both sides' own tests.
+    #[test]
+    fn the_wire_shape_is_what_the_app_expects() {
+        let outcome = ProbeOutcome::Completed {
+            verdict: ChannelVerdict::FanDoesNotSpin,
+            baseline_rpm: 0,
+            observed_rpm: 0,
+            original_duty: 0,
+            probed_duty: 100,
+        };
+        let json = serde_json::to_string(&outcome).unwrap();
+        println!("WIRE: {json}");
+        assert!(json.contains("\"outcome\":\"completed\""), "{json}");
+        assert!(json.contains("\"verdict\":\"fan_does_not_spin\""), "{json}");
+    }
+
     /// Goal: a fan that answers no rung is walked all the way to full duty and
     /// then condemned. Stopping short would leave the user with an open
     /// question about a header that is demonstrably dead.
