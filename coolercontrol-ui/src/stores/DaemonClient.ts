@@ -51,7 +51,7 @@ import {
 } from '@/models/Mode'
 import defaultHealthCheck, { HealthCheck } from '@/models/HealthCheck.ts'
 import { Alert, AlertsDTO } from '@/models/Alert.ts'
-import { DeviceHealthDTO } from '@/models/DeviceHealth.ts'
+import { DetectionDTO, DeviceHealthDTO } from '@/models/DeviceHealth.ts'
 import type {
     Calibration,
     CalibrationBatchStatus,
@@ -1308,6 +1308,22 @@ export default class DaemonClient {
      * matches the `coolercontrold report` subcommand, with liquidctl devices
      * added, which only the running daemon can enumerate safely.
      */
+    /**
+     * What the startup Super-I/O probe found. Deliberately does not trigger a
+     * fresh probe: startup is when module loading happens, so it is the run
+     * that explains an unbound chip.
+     */
+    async loadDetection(): Promise<DetectionDTO> {
+        try {
+            const response = await this.getClient().get('/detect')
+            this.logDaemonResponse(response, 'Load Detection')
+            return plainToInstance(DetectionDTO, response.data as object)
+        } catch (err) {
+            this.logError(err)
+            return new DetectionDTO()
+        }
+    }
+
     async loadHardwareReport(full: boolean): Promise<string> {
         try {
             const response = await this.getClient().get('/hardware-report', {

@@ -61,6 +61,7 @@ import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import HardwareReportModal from '@/shell/home/HardwareReportModal.vue'
+import DetectionModal from '@/shell/home/DetectionModal.vue'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
 const deviceStore = useDeviceStore()
@@ -278,6 +279,7 @@ const findingDetail = (finding: SystemFinding): string => {
 // The report is useful even when nothing is wrong, so its button is not gated
 // on there being findings.
 const reportOpen = ref(false)
+const detectionOpen = ref(false)
 
 const supportRows = computed((): Array<SupportRow> => {
     const rows: Array<SupportRow> = []
@@ -578,9 +580,14 @@ const shortcutClasses =
                     <span class="text-lg font-medium text-text-color">
                         {{ t('views.appInfo.hardwareSupport') }}
                     </span>
-                    <UiButton size="sm" variant="outline" @click="reportOpen = true">
-                        {{ t('views.appInfo.hardwareReportButton') }}
-                    </UiButton>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <UiButton size="sm" variant="outline" @click="detectionOpen = true">
+                            {{ t('views.appInfo.detectionButton') }}
+                        </UiButton>
+                        <UiButton size="sm" variant="outline" @click="reportOpen = true">
+                            {{ t('views.appInfo.hardwareReportButton') }}
+                        </UiButton>
+                    </div>
                 </div>
                 <div v-if="supportRows.length === 0" class="text-base text-text-color-secondary">
                     {{ t('views.appInfo.hardwareSupportOk') }}
@@ -620,4 +627,5 @@ const shortcutClasses =
     </div>
 
     <HardwareReportModal v-model:open="reportOpen" />
+    <DetectionModal v-model:open="detectionOpen" />
 </template>

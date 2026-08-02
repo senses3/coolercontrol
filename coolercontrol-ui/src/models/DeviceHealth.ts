@@ -191,6 +191,37 @@ export function verdictDocsLink(verdict: ChannelVerdict): string | undefined {
     }
 }
 
+/** One Super-I/O chip the startup probe found. */
+export class DetectedChip {
+    name: string = ''
+    driver: string = ''
+    address: string = ''
+    base_address: string = ''
+    device_id: string = ''
+    features: Array<string> = []
+    /** Free-form from the daemon: loaded, already_loaded, blacklisted, failed. */
+    module_status: string = ''
+}
+
+export class DetectEnvironment {
+    is_container: boolean = false
+    is_secure_boot: boolean = false
+    has_dev_port: boolean = false
+}
+
+/**
+ * What the startup probe found. `probed` false means no probe was made at all,
+ * so an empty chip list is "not looked for" rather than "none present".
+ */
+export class DetectionDTO {
+    @Type(() => DetectedChip)
+    detected_chips: Array<DetectedChip> = []
+    blacklisted: Array<string> = []
+    @Type(() => DetectEnvironment)
+    environment: DetectEnvironment = new DetectEnvironment()
+    probed: boolean = false
+}
+
 /** The hardware support page itself, for machine-scope findings. */
 export const HARDWARE_SUPPORT_DOCS = DOCS_BASE
 

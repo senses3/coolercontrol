@@ -543,6 +543,18 @@ export default {
             downloadCurrentLog: 'Download Current Log',
             deviceHealth: 'Device Health',
             deviceHealthOk: 'All sensors and channels are healthy.',
+            detection: 'Hardware Detection',
+            detectionDescription:
+                'What the Super-I/O probe found when the daemon started. Module loading happens at startup, so this is the run that explains an unbound chip.',
+            detectionButton: 'Detection',
+            detectionNotRun:
+                'No detection was run, so nothing is known about Super-I/O chips on this machine.',
+            detectionSecureBoot: 'Secure Boot',
+            detectionContainer: 'Container',
+            detectionDevPort: '/dev/port available',
+            detectionChips: 'Detected chips',
+            detectionNoChips: 'No Super-I/O chips were detected.',
+            detectionBlacklisted: 'Blacklisted drivers',
             hardwareSupportOk: 'All detected hardware is supported and controllable.',
             hardwareReport: 'Hardware Report',
             hardwareReportDescription:
