@@ -1276,6 +1276,7 @@ export default {
             quit: '&Beenden',
             modes: 'Modi',
             sensors: 'Sensoren',
+            daemons: 'Daemons',
         },
         cert: {
             title: 'Nicht verifiziertes Daemon-Zertifikat',

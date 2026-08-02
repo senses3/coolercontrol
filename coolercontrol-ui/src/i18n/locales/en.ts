@@ -1247,6 +1247,7 @@ export default {
             quit: '&Quit',
             modes: 'Modes',
             sensors: 'Sensors',
+            daemons: 'Daemons',
         },
         // Shown when the daemon cannot be reached, so the UI itself may never have
         // loaded. Qt falls back to English until a successful run caches these.

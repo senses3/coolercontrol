@@ -1267,6 +1267,7 @@ export default {
             quit: '&Salir',
             modes: 'Modos',
             sensors: 'Sensores',
+            daemons: 'Demonios',
         },
         cert: {
             title: 'Certificado del demonio no verificado',

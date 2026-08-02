@@ -1253,6 +1253,7 @@ export default {
             quit: '終了(&Q)',
             modes: 'モード',
             sensors: 'センサー',
+            daemons: 'デーモン',
         },
         cert: {
             title: '検証されていないデーモン証明書',

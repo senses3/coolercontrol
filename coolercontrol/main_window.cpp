@@ -17,6 +17,7 @@
 #include "main_window.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QDebug>
@@ -341,6 +342,13 @@ void MainWindow::initSystemTray() {
   m_modesTrayMenu->setEnabled(false);
   m_trayIconMenu->addMenu(m_modesTrayMenu);
   m_trayIconMenu->addAction(m_showAction);
+  // Next to the entry that manages connections, and below Show/Hide so that stays where
+  // muscle memory expects it.
+  m_daemonsTrayMenu = new QMenu(this);
+  m_daemonsTrayMenu->setIcon(themeIcon({"network-server", "network-server-symbolic"}));
+  m_daemonsTrayMenu->setTitle(uiString("tray.daemons", tr("Daemons")));
+  m_trayIconMenu->addMenu(m_daemonsTrayMenu);
+  rebuildDaemonsTrayMenu();
   m_trayIconMenu->addAction(m_addressAction);
   m_trayIconMenu->addSeparator();
   m_trayIconMenu->addAction(m_quitAction);
@@ -1015,6 +1023,31 @@ QUrl MainWindow::getEndpointUrl(const QString& endpoint, const bool forceHttp) {
 }
 
 /*
+  Rebuilt outright on every change, the way the Modes submenu already is. Only the
+  submenu's own visibility touches the top-level menu, so hosts that cache the tray
+  layout over DBusMenu see a stable one.
+*/
+void MainWindow::rebuildDaemonsTrayMenu() {
+  const auto list = connections::all();
+  m_daemonsTrayMenu->menuAction()->setVisible(list.size() > 1);
+  m_daemonsTrayMenu->clear();
+  // The rows are parented to the group, so this is what frees the previous ones.
+  delete m_daemonsActionGroup;
+  m_daemonsActionGroup = new QActionGroup(m_daemonsTrayMenu);
+  m_daemonsActionGroup->setExclusive(true);
+  const auto liveIndex = connections::currentIndex();
+  for (auto i = 0; i < list.size(); ++i) {
+    const auto connection = list.at(i);
+    const auto action = new QAction(connections::displayName(connection), m_daemonsActionGroup);
+    action->setCheckable(true);
+    action->setChecked(i == liveIndex);
+    connect(action, &QAction::triggered, this,
+            [this, connection]() { applyDaemonConnection(connection); });
+    m_daemonsTrayMenu->addAction(action);
+  }
+}
+
+/*
   Points the app at a saved daemon.
 
   The window is brought up rather than left in the tray on purpose. The tray's modes,
@@ -1025,7 +1058,8 @@ QUrl MainWindow::getEndpointUrl(const QString& endpoint, const bool forceHttp) {
 void MainWindow::applyDaemonConnection(const connections::Connection& connection) {
   connections::upsert(connection);  // the live daemon is always a saved one
   if (connections::sameConnection(connection, connections::current())) {
-    return;  // re-selecting the live daemon, or Apply with nothing changed
+    rebuildDaemonsTrayMenu();  // re-selection changes nothing, a rename does
+    return;
   }
   qInfo() << "Switching to daemon" << connections::displayName(connection);
   connections::setCurrent(connection);
@@ -1047,6 +1081,7 @@ void MainWindow::applyDaemonConnection(const connections::Connection& connection
   setTrayActionToHide();
   m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
   loadVerifiedDaemonUi();
+  rebuildDaemonsTrayMenu();  // moves the checked row
 }
 
 void MainWindow::resetPerDaemonState() {

@@ -1279,6 +1279,7 @@ export default {
             quit: '&Quitter',
             modes: 'Modes',
             sensors: 'Capteurs',
+            daemons: 'Démons',
         },
         cert: {
             title: 'Certificat du démon non vérifié',

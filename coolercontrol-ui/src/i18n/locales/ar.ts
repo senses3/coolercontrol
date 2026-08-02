@@ -1240,6 +1240,7 @@ export default {
             quit: 'خروج',
             modes: 'الأوضاع',
             sensors: 'المستشعرات',
+            daemons: 'الخدمات',
         },
         cert: {
             title: 'شهادة خدمة غير موثّقة',

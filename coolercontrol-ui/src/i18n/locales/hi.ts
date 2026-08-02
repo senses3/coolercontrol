@@ -1249,6 +1249,7 @@ export default {
             quit: 'बंद करें',
             modes: 'मोड',
             sensors: 'सेंसर',
+            daemons: 'डीमन',
         },
         cert: {
             title: 'असत्यापित डीमन प्रमाणपत्र',

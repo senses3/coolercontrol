@@ -1240,6 +1240,7 @@ export default {
             quit: '종료(&Q)',
             modes: '모드',
             sensors: '센서',
+            daemons: '데몬',
         },
         cert: {
             title: '확인되지 않은 데몬 인증서',

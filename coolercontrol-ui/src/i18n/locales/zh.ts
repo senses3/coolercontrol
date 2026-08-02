@@ -1201,6 +1201,7 @@ export default {
             quit: '退出(&Q)',
             modes: '模式',
             sensors: '传感器',
+            daemons: '守护进程',
         },
         cert: {
             title: '未验证的守护进程证书',

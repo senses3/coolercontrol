@@ -117,6 +117,9 @@ class MainWindow final : public QMainWindow {
   QSystemTrayIcon* m_sysTrayIcon;
   QMenu* m_trayIconMenu;
   QMenu* m_modesTrayMenu;
+  // Hidden while only one daemon is saved, which is nearly every install.
+  QMenu* m_daemonsTrayMenu;
+  QActionGroup* m_daemonsActionGroup{nullptr};
   // One disabled row per pinned sensor. Rebuilt only when the pinned set changes, so
   // the menu layout stays stable for hosts that cache it over DBusMenu.
   struct TraySensor {
@@ -204,6 +207,9 @@ class MainWindow final : public QMainWindow {
   // Removes a token this app previously owned but no longer holds. Session-only route,
   // so it runs from the provision path where the cookie is known good.
   void deleteAccessToken(const QString& tokenId) const;
+
+  // One checkable row per saved daemon, the live one checked.
+  void rebuildDaemonsTrayMenu();
 
   // Saves the connection and, when it addresses a different daemon than the live one,
   // switches to it. Shared by the wizard's Apply and the tray's daemon entries.

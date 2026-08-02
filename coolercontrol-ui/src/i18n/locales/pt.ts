@@ -1266,6 +1266,7 @@ export default {
             quit: '&Sair',
             modes: 'Modos',
             sensors: 'Sensores',
+            daemons: 'Daemons',
         },
         cert: {
             title: 'Certificado do daemon não verificado',

@@ -1202,6 +1202,7 @@ export default {
             quit: '結束(&Q)',
             modes: '模式',
             sensors: '感測器',
+            daemons: '守護行程',
         },
         cert: {
             title: '未驗證的守護行程憑證',

@@ -1269,6 +1269,7 @@ export default {
             quit: '&Выход',
             modes: 'Режимы',
             sensors: 'Датчики',
+            daemons: 'Службы',
         },
         cert: {
             title: 'Непроверенный сертификат службы',
