@@ -46,6 +46,8 @@ const reason = computed<string>(() => {
             return t('layout.shell.coolingPage.verdictFirmwareOverride')
         case ChannelVerdict.FamilyMayNeedOutOfTree:
             return t('layout.shell.coolingPage.verdictFamilyMayNeedOutOfTree')
+        case ChannelVerdict.NotSupportedByDriver:
+            return t('layout.shell.coolingPage.verdictNotSupportedByDriver')
         case ChannelVerdict.NoPwm:
             return t('layout.shell.coolingPage.verdictNoPwm')
         case ChannelVerdict.PwmReadOnly:

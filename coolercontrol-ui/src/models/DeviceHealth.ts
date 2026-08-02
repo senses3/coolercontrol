@@ -47,6 +47,7 @@ export enum ChannelVerdict {
     Controllable = 'controllable',
     FirmwareOverride = 'firmware_override',
     FamilyMayNeedOutOfTree = 'family_may_need_out_of_tree',
+    NotSupportedByDriver = 'not_supported_by_driver',
     NoPwm = 'no_pwm',
     PwmReadOnly = 'pwm_read_only',
     IgnoresDuty = 'ignores_duty',
@@ -70,8 +71,13 @@ export class ChannelVerdictRef {
     device_uid: UID = ''
     channel_name: string = ''
     verdict: ChannelVerdict = ChannelVerdict.Controllable
+    /**
+     * Absent when the reporting repository has no sysfs-level facts. Only the
+     * hwmon repository can measure these; the others report a cause with no
+     * evidence rather than sending zeroed fields that read as measurements.
+     */
     @Type(() => ChannelEvidence)
-    evidence: ChannelEvidence = new ChannelEvidence()
+    evidence?: ChannelEvidence
 }
 
 /** Machine-scope findings, for hardware that produced no channel at all. */
@@ -174,6 +180,8 @@ export function verdictDocsLink(verdict: ChannelVerdict): string | undefined {
         case ChannelVerdict.FirmwareOverride:
         case ChannelVerdict.IgnoresDuty:
             return `${DOCS_BASE}#motherboard-fans`
+        case ChannelVerdict.NotSupportedByDriver:
+            return DOCS_BASE
         case ChannelVerdict.NoPwm:
         case ChannelVerdict.PwmReadOnly:
             return `${DOCS_BASE}#laptops`

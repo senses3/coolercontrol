@@ -33,6 +33,7 @@ const VERDICT_KEYS: Record<ChannelVerdict, string | undefined> = {
     [ChannelVerdict.Controllable]: undefined,
     [ChannelVerdict.FirmwareOverride]: 'verdictFirmwareOverride',
     [ChannelVerdict.FamilyMayNeedOutOfTree]: 'verdictFamilyMayNeedOutOfTree',
+    [ChannelVerdict.NotSupportedByDriver]: 'verdictNotSupportedByDriver',
     [ChannelVerdict.NoPwm]: 'verdictNoPwm',
     [ChannelVerdict.PwmReadOnly]: 'verdictPwmReadOnly',
     [ChannelVerdict.IgnoresDuty]: 'verdictIgnoresDuty',
@@ -56,13 +57,13 @@ describe('channel verdicts', () => {
         for (const verdict of [
             ChannelVerdict.FirmwareOverride,
             ChannelVerdict.FamilyMayNeedOutOfTree,
+            ChannelVerdict.NotSupportedByDriver,
             ChannelVerdict.NoPwm,
             ChannelVerdict.PwmReadOnly,
             ChannelVerdict.IgnoresDuty,
         ]) {
             const link = verdictDocsLink(verdict)
-            expect(link, `no docs anchor for ${verdict}`).toBeDefined()
-            expect(link).toContain('#')
+            expect(link, `no docs page for ${verdict}`).toBeDefined()
         }
     })
 

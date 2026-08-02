@@ -188,6 +188,8 @@ export default {
                     'CoolerControl set this channel to manual control, but the firmware changed it back.',
                 verdictFamilyMayNeedOutOfTree:
                     'No writable fan control was found for this channel. On this chip family, a different kernel driver sometimes provides it.',
+                verdictNotSupportedByDriver:
+                    'The driver in use does not expose fan control for this channel.',
                 verdictNoPwm:
                     'The loaded driver exposes no fan control for this channel, only its speed.',
                 verdictPwmReadOnly:
