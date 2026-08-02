@@ -46,6 +46,7 @@
 #include <QWebEngineSettings>
 #include <QWebEngineView>
 #include <QWizardPage>
+#include <memory>
 
 #include "constants.h"
 #include "notifier.h"
@@ -246,6 +247,7 @@ void MainWindow::initWizard() {
     settings.setValue(SETTING_DAEMON_PORT.data(), m_wizard->field("port").toInt());
     settings.setValue(SETTING_DAEMON_SSL_ENABLED.data(), m_wizard->field("ssl").toBool());
     settings.setValue(SETTING_TLS_STRICT.data(), m_wizard->field("strictTls").toBool());
+    settings.sync();  // the reload below reads these back immediately
     m_changeAddress = true;
     emit dropConnections();
     delay(300);  // give signals a moment to process.
@@ -403,8 +405,23 @@ void MainWindow::loadVerifiedDaemonUi() {
   handshakeRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   handshakeRequest.setUrl(getEndpointUrl(ENDPOINT_HANDSHAKE.data()));
   const auto reply = m_manager->get(handshakeRequest);
-  applyTlsPolicy(reply);
-  connect(reply, &QNetworkReply::finished, [reply, this]() {
+  // Captured here so `finished` can tell "could not connect" apart from "this
+  // certificate has never been confirmed", which look identical from the outside.
+  const auto pendingLeaf = std::make_shared<QSslCertificate>();
+  connect(reply, &QNetworkReply::sslErrors, reply,
+          [reply, pendingLeaf, this](const QList<QSslError>&) {
+            const auto chain = reply->sslConfiguration().peerCertificateChain();
+            if (!chain.isEmpty()) {
+              *pendingLeaf = chain.first();
+            }
+            const auto url = reply->url();
+            // Silent: a dialog must not run inside the TLS callback. If this needs a
+            // decision, `finished` asks once the request has unwound.
+            if (confirmCertificate(url.host(), url.port(DEFAULT_DAEMON_PORT), *pendingLeaf, true)) {
+              reply->ignoreSslErrors();
+            }
+          });
+  connect(reply, &QNetworkReply::finished, [reply, pendingLeaf, this]() {
     const auto status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const auto shook =
         status == 200 &&
@@ -414,6 +431,31 @@ void MainWindow::loadVerifiedDaemonUi() {
       m_uiLoadRetryCount = 0;
       m_view->load(getDaemonUrl());
       return;
+    }
+    /*
+      The probe may have failed only because this certificate has never been confirmed.
+      Asking has to happen here: the page load is the other place that can prompt, and it
+      never runs until this succeeds. Doing it any earlier would mean a modal dialog
+      inside a TLS callback.
+    */
+    if (!pendingLeaf->isNull()) {
+      const auto url = getDaemonUrl();
+      const auto host = url.host();
+      const auto port = url.port(DEFAULT_DAEMON_PORT);
+      const auto decision = tls_trust::decide(host, port, *pendingLeaf, false);
+      if (decision == tls_trust::Decision::AskFirstUse ||
+          decision == tls_trust::Decision::AskChanged) {
+        if (confirmCertificate(host, port, *pendingLeaf, false)) {
+          m_uiLoadRetryCount = 0;
+          loadVerifiedDaemonUi();  // pinned now, so this pass gets through
+          return;
+        }
+        m_uiLoadRetryCount = 0;
+        m_uiLoadingStopped = true;
+        qWarning() << "Not loading" << host << ": its certificate was not trusted.";
+        displayAddressWizard();
+        return;
+      }
     }
     // A daemon that is merely slow to start looks identical to a wrong address here, so
     // reuse the same retry budget the page load itself uses before bothering the user.
