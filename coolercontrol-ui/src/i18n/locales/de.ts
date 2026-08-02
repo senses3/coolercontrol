@@ -1303,6 +1303,13 @@ export default {
                 'Einige nützliche Befehle, um den Daemon-Status zu aktivieren und zu prüfen:',
             introCustomAddress:
                 'Wenn Sie eine abweichende Adresse für die Verbindung zum Daemon konfiguriert haben, können Sie diese in den folgenden Schritten festlegen:',
+            lastError: 'Letzter Fehler:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'Die Adresse hat geantwortet, aber nicht als CoolerControl Daemon (HTTP %1).',
+            errorCertUntrusted: 'Dem Zertifikat des Daemons wurde nicht vertraut.',
+            errorCertInvalid:
+                'Das Zertifikat des Daemons ist ungültig und die Zertifikatsprüfung ist aktiviert.',
             addressTitle: 'Daemon-Adresse - Desktop-Anwendung',
             addressSubtitle: 'Passen Sie die Adressfelder nach Bedarf an.',
             hostLabel: 'Host-Adresse:',

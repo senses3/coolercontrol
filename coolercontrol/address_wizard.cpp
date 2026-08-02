@@ -63,9 +63,29 @@ IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
   m_label->setOpenExternalLinks(true);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse | Qt::LinksAccessibleByMouse);
 
+  // "Could not connect" on its own leaves the user guessing between a stopped
+  // service, a wrong port, and a refused certificate. Those need different fixes, so
+  // the transport's own reason is worth the one line it costs.
+  m_errorLabel = new QLabel;
+  m_errorLabel->setWordWrap(true);
+  m_errorLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  m_errorLabel->hide();
+
   auto* layout = new QVBoxLayout;
+  layout->addWidget(m_errorLabel);
   layout->addWidget(m_label);
   setLayout(layout);
+}
+
+void IntroPage::setError(const QString& detail) const {
+  if (detail.isEmpty()) {
+    m_errorLabel->clear();
+    m_errorLabel->hide();
+    return;
+  }
+  m_errorLabel->setText("<p><b>" % uiString("wizard.lastError", tr("Last error:")).toHtmlEscaped() %
+                        "</b> " % detail.toHtmlEscaped() % "</p>");
+  m_errorLabel->show();
 }
 
 AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {

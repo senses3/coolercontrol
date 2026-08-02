@@ -1274,6 +1274,13 @@ export default {
             introCommands: 'डीमन की स्थिति सक्षम करने और जाँचने के लिए कुछ उपयोगी कमांड:',
             introCustomAddress:
                 'यदि आपने डीमन से कनेक्ट करने के लिए गैर-मानक पता कॉन्फ़िगर किया है, तो आप इसे निम्न चरणों में सेट कर सकते हैं:',
+            lastError: 'अंतिम त्रुटि:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'पते ने उत्तर दिया, लेकिन CoolerControl डेमॉन के रूप में नहीं (HTTP %1)।',
+            errorCertUntrusted: 'डेमॉन के प्रमाणपत्र पर भरोसा नहीं किया गया।',
+            errorCertInvalid:
+                'डेमॉन का प्रमाणपत्र सत्यापित नहीं होता, और प्रमाणपत्र सत्यापन सक्षम है।',
             addressTitle: 'डीमन पता - डेस्कटॉप अनुप्रयोग',
             addressSubtitle: 'आवश्यकतानुसार पता फ़ील्ड समायोजित करें।',
             hostLabel: 'होस्ट पता:',

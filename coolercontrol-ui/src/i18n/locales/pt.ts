@@ -1292,6 +1292,13 @@ export default {
             introCommands: 'Alguns comandos úteis para ativar e verificar o estado do daemon:',
             introCustomAddress:
                 'Se configurou um endereço não predefinido para ligar ao daemon, pode defini-lo nos passos seguintes:',
+            lastError: 'Último erro:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'O endereço respondeu, mas não como um daemon do CoolerControl (HTTP %1).',
+            errorCertUntrusted: 'O certificado do daemon não foi considerado confiável.',
+            errorCertInvalid:
+                'O certificado do daemon não é válido e a validação de certificados está ativada.',
             addressTitle: 'Endereço do daemon - Aplicação de ambiente de trabalho',
             addressSubtitle: 'Ajuste os campos de endereço conforme necessário.',
             hostLabel: 'Endereço do anfitrião:',

@@ -1294,6 +1294,13 @@ export default {
                 'Algunos comandos útiles para activar y verificar el estado del demonio:',
             introCustomAddress:
                 'Si ha configurado una dirección no estándar para conectarse al demonio, puede establecerla en los siguientes pasos:',
+            lastError: 'Último error:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'La dirección respondió, pero no como un demonio de CoolerControl (HTTP %1).',
+            errorCertUntrusted: 'No se confió en el certificado del demonio.',
+            errorCertInvalid:
+                'El certificado del demonio no es válido y la validación de certificados está activada.',
             addressTitle: 'Dirección del demonio - Aplicación de escritorio',
             addressSubtitle: 'Ajuste los campos de dirección según sea necesario.',
             hostLabel: 'Dirección del host:',

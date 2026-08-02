@@ -123,6 +123,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_channel(new QWebChannel(m_page)),
       m_ipc(new IPC(this)),
       m_wizard(new QWizard(parent)),
+      m_introPage(new IntroPage(m_wizard)),
       m_manager(new QNetworkAccessManager(parent)),
       m_originFilter(new OriginFilter(this)),
       m_retryTimer(new QTimer(parent)),
@@ -228,7 +229,7 @@ void MainWindow::initWizard() {
   m_wizard->setOption(QWizard::HaveCustomButton1, true);
   m_wizard->setButtonText(QWizard::HelpButton, uiString("wizard.quitApp", tr("&Quit App")));
   m_wizard->setOption(QWizard::HaveHelpButton, true);
-  m_wizard->addPage(new IntroPage(m_wizard));
+  m_wizard->addPage(m_introPage);
   const auto addressPage = new AddressPage(m_wizard);
   m_wizard->addPage(addressPage);
   m_wizard->setMinimumSize(640, 480);
@@ -408,7 +409,8 @@ void MainWindow::initWebUI() {
   to a daemon the user just declined. Only trust refusals do this: a daemon that is merely
   unreachable should keep its page and reconnect, as it always has.
 */
-void MainWindow::refuseDaemonCertificate() {
+void MainWindow::refuseDaemonCertificate(const QString& reason) {
+  m_lastConnectionError = reason;
   m_uiLoadRetryCount = 0;
   m_uiLoadingStopped = true;
   m_view->load(QUrl(QStringLiteral("about:blank")));
@@ -453,9 +455,11 @@ void MainWindow::loadVerifiedDaemonUi() {
     reply->deleteLater();
     if (shook) {
       m_uiLoadRetryCount = 0;
+      m_lastConnectionError.clear();
       m_view->load(getDaemonUrl());
       return;
     }
+    const auto failure = describeReplyError(reply);
     /*
       The probe may have failed only because this certificate has never been confirmed.
       Asking has to happen here: the page load is the other place that can prompt, and it
@@ -475,7 +479,8 @@ void MainWindow::loadVerifiedDaemonUi() {
           return;
         }
         qWarning() << "Not loading" << host << ": its certificate was not trusted.";
-        refuseDaemonCertificate();
+        refuseDaemonCertificate(
+            uiString("wizard.errorCertUntrusted", tr("The daemon's certificate was not trusted.")));
         return;
       }
       if (decision == tls_trust::Decision::Reject) {
@@ -483,7 +488,10 @@ void MainWindow::loadVerifiedDaemonUi() {
         // straight to the dialog instead of burning the retry budget first.
         qWarning() << "Refusing" << host << ": its certificate does not validate and"
                    << "certificate validation is enabled.";
-        refuseDaemonCertificate();
+        refuseDaemonCertificate(
+            uiString("wizard.errorCertInvalid",
+                     tr("The daemon's certificate does not validate, and certificate "
+                        "validation is enabled.")));
         return;
       }
     }
@@ -498,8 +506,9 @@ void MainWindow::loadVerifiedDaemonUi() {
     }
     m_uiLoadRetryCount = 0;
     m_uiLoadingStopped = true;
+    m_lastConnectionError = failure;
     qWarning() << "Not loading" << getDaemonUrl().toDisplayString()
-               << ": it did not respond as a CoolerControl daemon.";
+               << ": it did not respond as a CoolerControl daemon." << failure;
     displayAddressWizard();
     notifyDaemonConnectionError();
   });
@@ -958,7 +967,18 @@ void MainWindow::displayAddressWizard() const {
   if (m_wizard->isVisible()) {
     return;
   }
+  m_introPage->setError(m_lastConnectionError);
   m_wizard->open();
+}
+
+QString MainWindow::describeReplyError(const QNetworkReply* reply) {
+  if (reply->error() != QNetworkReply::NoError) {
+    return reply->errorString();  // "Connection refused", "Host not found", and so on
+  }
+  const auto status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+  return uiString("wizard.errorNotDaemon",
+                  tr("The address answered, but not as a CoolerControl daemon (HTTP %1)."))
+      .arg(status);
 }
 
 void MainWindow::handleStartInTray() {
@@ -1440,6 +1460,7 @@ void MainWindow::tryDaemonConnection() {
       healthReply->deleteLater();
       return;
     }
+    m_lastConnectionError.clear();
     m_retryTimer->stop();
     provisionAccessToken();  // no-op once we hold one
     if (m_startup) {

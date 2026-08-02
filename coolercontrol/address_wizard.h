@@ -30,8 +30,12 @@ class IntroPage final : public QWizardPage {
  public:
   explicit IntroPage(QWidget* parent = nullptr);
 
+  /// The concrete reason the last attempt failed. Empty hides the line again.
+  void setError(const QString& detail) const;
+
  private:
   QLabel* m_label;
+  QLabel* m_errorLabel;
 };
 
 class AddressPage final : public QWizardPage {

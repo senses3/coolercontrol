@@ -1275,6 +1275,12 @@ export default {
             introCommands: 'Some helpful commands to enable and verify the daemon status:',
             introCustomAddress:
                 'If you have configured a non-standard address to connect to the daemon, you can set it in the following steps:',
+            lastError: 'Last error:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: 'The address answered, but not as a CoolerControl daemon (HTTP %1).',
+            errorCertUntrusted: "The daemon's certificate was not trusted.",
+            errorCertInvalid:
+                "The daemon's certificate does not validate, and certificate validation is enabled.",
             addressTitle: 'Daemon Address - Desktop Application',
             addressSubtitle: 'Adjust the address fields as necessary.',
             hostLabel: 'Host address:',

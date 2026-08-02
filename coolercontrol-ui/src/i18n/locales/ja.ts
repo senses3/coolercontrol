@@ -1278,6 +1278,12 @@ export default {
             introCommands: 'デーモンの有効化と状態確認に役立つコマンド:',
             introCustomAddress:
                 'デーモンへの接続に標準以外のアドレスを設定している場合は、次の手順で指定できます:',
+            lastError: '前回のエラー:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'アドレスは応答しましたが、CoolerControl デーモンではありませんでした (HTTP %1)。',
+            errorCertUntrusted: 'デーモンの証明書は信頼されませんでした。',
+            errorCertInvalid: 'デーモンの証明書が検証できず、証明書の検証が有効になっています。',
             addressTitle: 'デーモンアドレス - デスクトップアプリケーション',
             addressSubtitle: '必要に応じてアドレス項目を調整してください。',
             hostLabel: 'ホストアドレス:',

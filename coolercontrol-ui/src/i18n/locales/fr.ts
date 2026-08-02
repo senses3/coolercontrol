@@ -1305,6 +1305,13 @@ export default {
             introCommands: "Quelques commandes utiles pour activer et vérifier l'état du démon :",
             introCustomAddress:
                 'Si vous avez configuré une adresse non standard pour vous connecter au démon, vous pouvez la définir aux étapes suivantes :',
+            lastError: 'Dernière erreur :',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                "L'adresse a répondu, mais pas en tant que démon CoolerControl (HTTP %1).",
+            errorCertUntrusted: "Le certificat du démon n'a pas été approuvé.",
+            errorCertInvalid:
+                "Le certificat du démon n'est pas valide et la validation des certificats est activée.",
             addressTitle: 'Adresse du démon - Application de bureau',
             addressSubtitle: "Ajustez les champs d'adresse si nécessaire.",
             hostLabel: "Adresse de l'hôte :",

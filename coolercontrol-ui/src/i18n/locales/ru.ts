@@ -1294,6 +1294,12 @@ export default {
             introCommands: 'Полезные команды для включения и проверки состояния службы:',
             introCustomAddress:
                 'Если вы настроили нестандартный адрес для подключения к службе, его можно указать на следующих шагах:',
+            lastError: 'Последняя ошибка:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: 'Адрес ответил, но не как демон CoolerControl (HTTP %1).',
+            errorCertUntrusted: 'Сертификат демона не был подтверждён как доверенный.',
+            errorCertInvalid:
+                'Сертификат демона не проходит проверку, а проверка сертификатов включена.',
             addressTitle: 'Адрес службы - Настольное приложение',
             addressSubtitle: 'При необходимости измените поля адреса.',
             hostLabel: 'Адрес узла:',

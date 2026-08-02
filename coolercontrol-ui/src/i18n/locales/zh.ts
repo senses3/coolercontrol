@@ -1225,6 +1225,11 @@ export default {
             introDocsLink: '文档网站',
             introCommands: '以下命令有助于启用和检查守护进程状态:',
             introCustomAddress: '如果您为连接守护进程配置了非默认地址，可在以下步骤中设置:',
+            lastError: '上次错误:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: '该地址有响应，但不是 CoolerControl 守护进程 (HTTP %1)。',
+            errorCertUntrusted: '未信任守护进程的证书。',
+            errorCertInvalid: '守护进程的证书未通过验证，且证书验证已启用。',
             addressTitle: '守护进程地址 - 桌面应用程序',
             addressSubtitle: '请根据需要调整地址字段。',
             hostLabel: '主机地址:',

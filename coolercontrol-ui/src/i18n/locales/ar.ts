@@ -1265,6 +1265,11 @@ export default {
             introCommands: 'بعض الأوامر المفيدة لتفعيل حالة الخدمة والتحقق منها:',
             introCustomAddress:
                 'إذا قمت بضبط عنوان غير قياسي للاتصال بالخدمة، يمكنك تعيينه في الخطوات التالية:',
+            lastError: 'آخر خطأ:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: 'استجاب العنوان، لكن ليس بصفته خادم CoolerControl‏ (HTTP %1).',
+            errorCertUntrusted: 'لم يتم الوثوق بشهادة الخادم.',
+            errorCertInvalid: 'شهادة الخادم غير صالحة، والتحقق من الشهادات مُفعَّل.',
             addressTitle: 'عنوان الخدمة - تطبيق سطح المكتب',
             addressSubtitle: 'عدّل حقول العنوان حسب الحاجة.',
             hostLabel: 'عنوان المضيف:',

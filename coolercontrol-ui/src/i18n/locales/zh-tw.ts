@@ -1226,6 +1226,11 @@ export default {
             introDocsLink: '文件網站',
             introCommands: '以下指令有助於啟用與檢查守護行程狀態:',
             introCustomAddress: '如果您為連線守護行程設定了非預設位址，可在以下步驟中設定:',
+            lastError: '上次錯誤:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: '該位址有回應，但不是 CoolerControl 守護行程 (HTTP %1)。',
+            errorCertUntrusted: '未信任守護行程的憑證。',
+            errorCertInvalid: '守護行程的憑證未通過驗證，且憑證驗證已啟用。',
             addressTitle: '守護行程位址 - 桌面應用程式',
             addressSubtitle: '請依需要調整位址欄位。',
             hostLabel: '主機位址:',

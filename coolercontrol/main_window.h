@@ -134,6 +134,10 @@ class MainWindow final : public QMainWindow {
   QAction* m_addressAction;
   QAction* m_showAction;
   QWizard* m_wizard;
+  IntroPage* m_introPage;
+  // Why the last attempt failed, shown by the wizard. Cleared on a good connection so
+  // a hand-opened dialog never blames a problem that is already over.
+  mutable QString m_lastConnectionError;
   QNetworkAccessManager* m_manager;
   OriginFilter* m_originFilter;
   QTimer* m_retryTimer;
@@ -202,7 +206,10 @@ class MainWindow final : public QMainWindow {
   void loadVerifiedDaemonUi();
 
   // Clears the screen and opens the address dialog after a refused certificate.
-  void refuseDaemonCertificate();
+  void refuseDaemonCertificate(const QString& reason);
+
+  /// The transport's own account of a failure, for the connection dialog.
+  static QString describeReplyError(const QNetworkReply* reply);
 
   // Decides whether to trust a daemon certificate, prompting when trust on first use
   // requires it. `silent` suppresses the prompt for background requests, which must not

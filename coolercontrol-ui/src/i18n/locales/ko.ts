@@ -1265,6 +1265,11 @@ export default {
             introCommands: '데몬을 활성화하고 상태를 확인하는 데 유용한 명령:',
             introCustomAddress:
                 '데몬 연결에 기본이 아닌 주소를 설정한 경우 다음 단계에서 지정할 수 있습니다:',
+            lastError: '마지막 오류:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: '주소가 응답했지만 CoolerControl 데몬이 아닙니다 (HTTP %1).',
+            errorCertUntrusted: '데몬의 인증서를 신뢰하지 않았습니다.',
+            errorCertInvalid: '데몬의 인증서를 검증할 수 없으며 인증서 검증이 활성화되어 있습니다.',
             addressTitle: '데몬 주소 - 데스크톱 애플리케이션',
             addressSubtitle: '필요에 따라 주소 항목을 조정하십시오.',
             hostLabel: '호스트 주소:',
