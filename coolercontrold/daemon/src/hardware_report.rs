@@ -65,7 +65,7 @@ pub async fn generate(full: bool, is_root: bool) -> String {
     let detection = run_probe(is_root);
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
-    write_probe_summary(&mut report, detection.as_ref(), is_root);
+    write_probe_summary(&mut report, detection.as_ref(), is_root, full);
     write_fan_summary(&mut report, &devices);
     write_findings(&mut report, detection.as_ref(), is_root);
     if full {
@@ -112,6 +112,7 @@ fn write_probe_summary(
     report: &mut String,
     detection: Option<&cc_detect::DetectionResults>,
     is_root: bool,
+    full: bool,
 ) {
     if cc_detect::DETECTION_SUPPORTED.not() {
         let _ = writeln!(report, "Probe    not supported on this architecture");
@@ -139,11 +140,16 @@ fn write_probe_summary(
         available_or_not(environment.has_dev_port)
     );
     for chip in &detection.detected_chips {
+        // Address and device id mirror the startup detection log, so a chip
+        // line in a pasted report can be matched against a pasted log.
         let _ = writeln!(
             report,
-            "         {} -> {} ({})",
-            chip.name, chip.driver, chip.module_status
+            "         {} at {} id:{} -> {} ({})",
+            chip.name, chip.address, chip.device_id, chip.driver, chip.module_status
         );
+        if full {
+            let _ = writeln!(report, "           base address {}", chip.base_address);
+        }
     }
 }
 
@@ -464,6 +470,42 @@ mod tests {
         }
     }
 
+    /// Goal: a chip line carries the address and device id, matching the
+    /// startup detection log, so a pasted report and a pasted log can be lined
+    /// up against each other. Base address is detail for `--full` only, to keep
+    /// the compact form inside the paste budget.
+    #[test]
+    fn chip_lines_carry_address_and_device_id() {
+        let detection = cc_detect::DetectionResults {
+            detected_chips: vec![cc_detect::DetectedChipInfo {
+                name: "Nuvoton NCT6687D-R eSIO".to_string(),
+                driver: "nct6687".to_string(),
+                address: "0x4E".to_string(),
+                base_address: "0x0A20".to_string(),
+                device_id: "0xD592".to_string(),
+                features: vec!["fan".to_string()],
+                module_status: "already_loaded".to_string(),
+            }],
+            blacklisted: Vec::new(),
+            environment: cc_detect::EnvironmentInfo {
+                is_container: false,
+                is_secure_boot: false,
+                has_dev_port: true,
+            },
+        };
+        let mut compact = String::new();
+        write_probe_summary(&mut compact, Some(&detection), true, false);
+        assert!(
+            compact.contains("Nuvoton NCT6687D-R eSIO at 0x4E id:0xD592 -> nct6687"),
+            "unexpected chip line:\n{compact}"
+        );
+        assert!(compact.contains("base address").not());
+
+        let mut full = String::new();
+        write_probe_summary(&mut full, Some(&detection), true, true);
+        assert!(full.contains("base address 0x0A20"), "{full}");
+    }
+
     /// Goal: hwmon devices sort numerically. Lexicographic order puts hwmon10
     /// ahead of hwmon2, which reads as a bug in a report a human is scanning.
     #[test]
@@ -496,7 +538,7 @@ mod tests {
     fn non_root_does_not_run_or_assert_a_probe() {
         assert!(run_probe(false).is_none());
         let mut report = String::new();
-        write_probe_summary(&mut report, None, false);
+        write_probe_summary(&mut report, None, false, false);
         assert!(report.contains("needs root"));
         let mut findings = String::new();
         write_findings(&mut findings, None, false);
