@@ -1237,6 +1237,9 @@ export default {
                 '要求可正常验证的证书。保持关闭则使用守护进程的自签名证书，远程守护进程在首次连接时受信任。',
             defaults: '默认值',
             defaultsTooltip: '将守护进程地址重置为默认值',
+            forgetCerts: '清除已信任的证书',
+            forgetCertsTooltip: '移除此应用已被设置为信任的远程守护进程证书。',
+            forgetCertsBody: '这些守护进程证书当前受信任。清除后，下次连接时将再次要求确认。',
         },
         versionMismatch: {
             title: '版本不匹配',

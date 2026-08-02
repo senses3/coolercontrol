@@ -1305,6 +1305,11 @@ export default {
                 'Exigir um certificado que valide normalmente. Deixe desativado para usar o certificado autoassinado do daemon, aprovado na primeira utilização para daemons remotos.',
             defaults: 'Predefinições',
             defaultsTooltip: 'Repor o endereço do daemon para os valores predefinidos',
+            forgetCerts: 'Esquecer certificados fiáveis',
+            forgetCertsTooltip:
+                'Remove os certificados de daemons remotos em que esta aplicação confia.',
+            forgetCertsBody:
+                'Estes certificados de daemon são atualmente fiáveis. Ao esquecê-los, ser-lhe-á pedida confirmação na próxima ligação.',
         },
         versionMismatch: {
             title: 'Versões incompatíveis',

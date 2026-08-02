@@ -1238,6 +1238,9 @@ export default {
                 '要求可正常驗證的憑證。保持關閉則使用守護行程的自簽憑證，遠端守護行程在首次連線時受信任。',
             defaults: '預設值',
             defaultsTooltip: '將守護行程位址重設為預設值',
+            forgetCerts: '清除已信任的憑證',
+            forgetCertsTooltip: '移除此應用程式已被設定為信任的遠端守護行程憑證。',
+            forgetCertsBody: '這些守護行程憑證目前受信任。清除後，下次連線時將再次要求確認。',
         },
         versionMismatch: {
             title: '版本不符',

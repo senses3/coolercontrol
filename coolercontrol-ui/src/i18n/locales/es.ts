@@ -1307,6 +1307,11 @@ export default {
                 'Exigir un certificado que se valide normalmente. Déjelo desactivado para usar el certificado autofirmado del demonio, que se aprueba en el primer uso para demonios remotos.',
             defaults: 'Valores predeterminados',
             defaultsTooltip: 'Restablecer la dirección del demonio a los valores predeterminados',
+            forgetCerts: 'Olvidar certificados de confianza',
+            forgetCertsTooltip:
+                'Elimina los certificados de demonios remotos en los que esta aplicación confía.',
+            forgetCertsBody:
+                'Actualmente se confía en estos certificados de demonio. Olvidarlos significa que se le pedirá confirmación la próxima vez que se conecte.',
         },
         versionMismatch: {
             title: 'Versiones incompatibles',

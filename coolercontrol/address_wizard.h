@@ -42,11 +42,17 @@ class AddressPage final : public QWizardPage {
 
   void resetAddressInputValues() const;
 
+  // Lists what is currently trusted and, on confirmation, drops every pin.
+  void forgetTrustedCertificates() const;
+
+  void refreshForgetCertsButton() const;
+
  private:
   QLineEdit* m_addressLineEdit;
   QLineEdit* m_portLineEdit;
   QCheckBox* m_sslCheckbox;
   QCheckBox* m_strictTlsCheckbox;
   QPushButton* m_defaultButton;
+  QPushButton* m_forgetCertsButton;
 };
 #endif  // ADDRESSWIZARD_H

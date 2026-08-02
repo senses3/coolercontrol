@@ -16,6 +16,7 @@
 
 #include "tls_trust.h"
 
+#include <QAbstractSocket>
 #include <QCryptographicHash>
 #include <QHostAddress>
 #include <QSettings>
@@ -29,9 +30,19 @@ namespace {
 
 /// Pins are keyed by host and port, so moving the daemon to another machine is a new
 /// decision rather than a silently reused one.
+QString hostPort(const QString& host, const int port) {
+  const auto lowered = host.toLower();
+  // An IPv6 literal is full of colons, so bracket it as every other tool does. Without
+  // this, "::1:11987" gives a reader no idea where the address ends.
+  const QHostAddress address(lowered);
+  const auto formatted = (!address.isNull() && address.protocol() == QAbstractSocket::IPv6Protocol)
+                             ? "[" % lowered % "]"
+                             : lowered;
+  return formatted % ":" % QString::number(port);
+}
+
 QString pinKey(const QString& host, const int port) {
-  return QString(SETTING_GROUP_TLS_PINS.data()) % "/" % host.toLower() % ":" %
-         QString::number(port);
+  return QString(SETTING_GROUP_TLS_PINS.data()) % "/" % hostPort(host, port);
 }
 
 }  // namespace
@@ -75,6 +86,25 @@ QString storedPin(const QString& host, const int port) {
 void storePin(const QString& host, const int port, const QString& fingerprint) {
   QSettings settings;
   settings.setValue(pinKey(host, port), fingerprint);
+  settings.sync();
+}
+
+QList<QPair<QString, QString>> allPins() {
+  QSettings settings;
+  settings.beginGroup(SETTING_GROUP_TLS_PINS.data());
+  QList<QPair<QString, QString>> pins;
+  for (const auto& key : settings.allKeys()) {
+    pins.append({key, settings.value(key).toString()});
+  }
+  settings.endGroup();
+  return pins;
+}
+
+void forgetAllPins() {
+  QSettings settings;
+  settings.beginGroup(SETTING_GROUP_TLS_PINS.data());
+  settings.remove(QString());  // the whole group
+  settings.endGroup();
   settings.sync();
 }
 

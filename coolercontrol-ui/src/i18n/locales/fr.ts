@@ -1318,6 +1318,11 @@ export default {
                 'Exiger un certificat vérifiable normalement. Laissez désactivé pour utiliser le certificat auto-signé du démon, approuvé à la première connexion pour les démons distants.',
             defaults: 'Valeurs par défaut',
             defaultsTooltip: "Réinitialiser l'adresse du démon aux valeurs par défaut",
+            forgetCerts: 'Oublier les certificats approuvés',
+            forgetCertsTooltip:
+                'Supprime les certificats des démons distants auxquels cette application fait confiance.',
+            forgetCertsBody:
+                "Ces certificats de démon sont actuellement approuvés. Les oublier signifie qu'une confirmation vous sera demandée à la prochaine connexion.",
         },
         versionMismatch: {
             title: 'Version incompatible',

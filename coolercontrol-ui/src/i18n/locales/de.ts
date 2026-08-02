@@ -1316,6 +1316,11 @@ export default {
                 'Ein normal überprüfbares Zertifikat verlangen. Ausgeschaltet lassen, um das selbstsignierte Zertifikat des Daemons zu verwenden, dem bei entfernten Daemons beim ersten Verbinden vertraut wird.',
             defaults: 'Standardwerte',
             defaultsTooltip: 'Die Daemon-Adresse auf die Standardwerte zurücksetzen',
+            forgetCerts: 'Vertraute Zertifikate vergessen',
+            forgetCertsTooltip:
+                'Entfernt die Zertifikate entfernter Daemons, denen diese App vertrauen soll.',
+            forgetCertsBody:
+                'Diesen Daemon-Zertifikaten wird derzeit vertraut. Wenn Sie sie vergessen, werden Sie bei der nächsten Verbindung erneut um Bestätigung gebeten.',
         },
         versionMismatch: {
             title: 'Versionskonflikt',

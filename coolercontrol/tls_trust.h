@@ -17,6 +17,8 @@
 #ifndef TLS_TRUST_H
 #define TLS_TRUST_H
 
+#include <QList>
+#include <QPair>
 #include <QSslCertificate>
 #include <QString>
 
@@ -58,6 +60,11 @@ QString fingerprint(const QSslCertificate& certificate);
 QString storedPin(const QString& host, int port);
 
 void storePin(const QString& host, int port, const QString& fingerprint);
+
+/// Every pin, as ("host:port", fingerprint), so the user can see what they trusted.
+QList<QPair<QString, QString>> allPins();
+
+void forgetAllPins();
 
 /// `chainIsValid` is what the transport already concluded, so a properly signed
 /// certificate short-circuits everything below it.

@@ -1288,6 +1288,11 @@ export default {
                 "Require a certificate that validates normally. Leave off to use the daemon's self-signed certificate, which is trusted on first use for remote daemons.",
             defaults: 'Defaults',
             defaultsTooltip: 'Reset the daemon address to default values',
+            forgetCerts: 'Forget Trusted Certificates',
+            forgetCertsTooltip:
+                'Remove the remote daemon certificates this app has been told to trust.',
+            forgetCertsBody:
+                'These daemon certificates are currently trusted. Forgetting them means you will be asked to confirm the next time you connect.',
         },
         versionMismatch: {
             title: 'Version Mismatch',

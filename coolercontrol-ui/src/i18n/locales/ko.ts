@@ -1277,6 +1277,10 @@ export default {
                 '정상적으로 검증되는 인증서를 요구합니다. 꺼두면 데몬의 자체 서명 인증서를 사용하며, 원격 데몬은 첫 연결 시 신뢰합니다.',
             defaults: '기본값',
             defaultsTooltip: '데몬 주소를 기본값으로 되돌립니다',
+            forgetCerts: '신뢰한 인증서 지우기',
+            forgetCertsTooltip: '이 앱이 신뢰하도록 설정된 원격 데몬 인증서를 제거합니다.',
+            forgetCertsBody:
+                '이 데몬 인증서들은 현재 신뢰되고 있습니다. 지우면 다음 연결 시 다시 확인을 요청합니다.',
         },
         versionMismatch: {
             title: '버전 불일치',

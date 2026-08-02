@@ -17,14 +17,17 @@
 #include "address_wizard.h"
 
 #include <QCheckBox>
+#include <QDebug>
 #include <QIntValidator>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QStringBuilder>
 #include <QVBoxLayout>
 
 #include "constants.h"
+#include "tls_trust.h"
 #include "translations.h"
 
 IntroPage::IntroPage(QWidget* parent) : QWizardPage(parent) {
@@ -106,6 +109,15 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
       uiString("wizard.defaultsTooltip", tr("Reset the daemon address to default values")));
   connect(m_defaultButton, &QPushButton::clicked, [this]() { resetAddressInputValues(); });
 
+  // Certificates for remote daemons are trusted on first use and then remembered. This
+  // is the only way to take that back without hand-editing the config file.
+  m_forgetCertsButton =
+      new QPushButton(uiString("wizard.forgetCerts", tr("Forget Trusted Certificates")));
+  m_forgetCertsButton->setToolTip(
+      uiString("wizard.forgetCertsTooltip",
+               tr("Remove the remote daemon certificates this app has been told to trust.")));
+  connect(m_forgetCertsButton, &QPushButton::clicked, [this]() { forgetTrustedCertificates(); });
+
   auto* layout = new QGridLayout;
   auto* spacer = new QSpacerItem(1, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
   layout->addWidget(addressLabel, 0, 0);
@@ -116,6 +128,7 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   layout->addWidget(m_strictTlsCheckbox, 3, 0, 1, 2);
   layout->addItem(spacer, 4, 0, 1, 2);
   layout->addWidget(m_defaultButton, 5, 0, 1, 1);
+  layout->addWidget(m_forgetCertsButton, 5, 1, 1, 1);
   setLayout(layout);
 
   const QSettings settings;
@@ -126,6 +139,7 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   m_sslCheckbox->setChecked(
       settings.value(SETTING_DAEMON_SSL_ENABLED.data(), DEFAULT_DAEMON_SSL_ENABLED).toBool());
   m_strictTlsCheckbox->setChecked(settings.value(SETTING_TLS_STRICT.data(), false).toBool());
+  refreshForgetCertsButton();
 }
 
 void AddressPage::resetAddressInputValues() const {
@@ -133,4 +147,42 @@ void AddressPage::resetAddressInputValues() const {
   m_portLineEdit->setText(QString::number(DEFAULT_DAEMON_PORT));
   m_sslCheckbox->setChecked(DEFAULT_DAEMON_SSL_ENABLED);
   m_strictTlsCheckbox->setChecked(false);
+}
+
+void AddressPage::refreshForgetCertsButton() const {
+  const auto pins = tls_trust::allPins();
+  // Nothing to forget on a purely local setup, which is most installs.
+  m_forgetCertsButton->setEnabled(!pins.isEmpty());
+}
+
+void AddressPage::forgetTrustedCertificates() const {
+  const auto pins = tls_trust::allPins();
+  if (pins.isEmpty()) {
+    return;
+  }
+  QStringList lines;
+  lines.reserve(pins.size());
+  for (const auto& [hostPort, fingerprint] : pins) {
+    lines << hostPort % "\n    " % fingerprint;
+  }
+  QMessageBox dialog;
+  dialog.setIcon(QMessageBox::Question);
+  const auto title = uiString("wizard.forgetCerts", tr("Forget Trusted Certificates"));
+  dialog.setWindowTitle(title);
+  dialog.setText(title);
+  dialog.setInformativeText(
+      uiString("wizard.forgetCertsBody",
+               tr("These daemon certificates are currently trusted. Forgetting them means "
+                  "you will be asked to confirm the next time you connect.")) %
+      "\n\n" % lines.join(QStringLiteral("\n")));
+  const auto forgetButton = dialog.addButton(title, QMessageBox::AcceptRole);
+  dialog.addButton(uiString("cert.cancel", tr("Cancel")), QMessageBox::RejectRole);
+  dialog.setDefaultButton(nullptr);
+  dialog.exec();
+  if (dialog.clickedButton() != forgetButton) {
+    return;
+  }
+  tls_trust::forgetAllPins();
+  refreshForgetCertsButton();
+  qInfo() << "Forgot" << pins.size() << "trusted daemon certificate(s).";
 }
