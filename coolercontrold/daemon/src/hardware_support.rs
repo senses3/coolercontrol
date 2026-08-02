@@ -486,6 +486,24 @@ impl HardwareSupportController {
         );
     }
 
+    /// Replaces a channel's verdict with one the duty-response probe
+    /// established, keeping the evidence already recorded for it.
+    ///
+    /// The probe answers a question the passive evidence could not; it does
+    /// not re-measure the sysfs facts, so overwriting them with nothing would
+    /// discard observations that are still true.
+    pub fn record_probe_verdict(
+        &self,
+        device_uid: &str,
+        channel_name: &str,
+        verdict: ChannelVerdict,
+    ) {
+        let key = (device_uid.to_string(), channel_name.to_string());
+        let mut diagnoses = self.channel_diagnoses.borrow_mut();
+        let evidence = diagnoses.get(&key).and_then(|prior| prior.evidence.clone());
+        diagnoses.insert(key, ChannelDiagnosis { verdict, evidence });
+    }
+
     /// Splits the recorded diagnoses into the permanent capabilities and the
     /// conditions that can clear.
     ///

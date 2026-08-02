@@ -178,8 +178,8 @@ async fn caps_to_hwmon_fans(
 ) -> Result<Vec<HwmonChannelInfo>> {
     let mut fans = vec![];
     for (channel_number, fan_cap) in fan_caps {
-        let current_pwm_enable = get_current_pwm_enable(base_path, &channel_number).await;
-        let pwm_enable_default = adjusted_pwm_default(current_pwm_enable, device_name);
+        let pwm_enable_at_init = current_pwm_enable(base_path, channel_number).await;
+        let pwm_enable_default = adjusted_pwm_default(pwm_enable_at_init, device_name);
         let channel_name = get_fan_channel_name(channel_number);
         let label = get_fan_channel_label(base_path, &channel_number).await;
         // deprecated setting:
@@ -418,7 +418,7 @@ async fn get_pwm_duty(
                 io_err.raw_os_error().is_some() && io_err.kind() != ErrorKind::NotFound
             });
             if is_kernel_refusal {
-                if let Some(pwm_enable) = get_current_pwm_enable(base_path, channel_number).await {
+                if let Some(pwm_enable) = current_pwm_enable(base_path, *channel_number).await {
                     if pwm_enable >= PWM_ENABLE_AUTO_VALUE {
                         debug!(
                             "pwmX read refused by kernel driver in auto mode \
@@ -475,7 +475,9 @@ pub async fn get_fan_rpm(
 ///  - 3 : "Fan Speed Cruise" mode (?)
 ///  - 4 : "Smart Fan III" mode (NCT6775F only)
 ///  - 5 : "Smart Fan IV" mode (modern `MoBo`'s with build-in smart fan control probably use this)
-async fn get_current_pwm_enable(base_path: &Path, channel_number: &u8) -> Option<u8> {
+/// Reads `pwmN_enable`. `None` when the driver exposes no such file, which
+/// means there is no auto mode to hand control back to.
+pub async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> {
     let pwm_enable_path = base_path.join(format_pwm_enable!(channel_number));
     let current_pwm_enable = cc_fs::read_sysfs(&pwm_enable_path)
         .await
@@ -620,7 +622,7 @@ pub async fn set_pwm_enable_to_default_or_auto(
 
 /// This sets `pwm_enable` to the desired value. Unlike other operations,
 /// it will not check if it's already set to the desired value.
-/// See also `get_current_pwm_enable`.
+/// See also `current_pwm_enable`.
 pub async fn set_pwm_enable(
     pwm_enable_value: u8,
     base_path: &Path,
@@ -640,7 +642,7 @@ pub async fn set_pwm_enable(
 }
 
 /// This sets `pwm_enable` to the desired value if it's not already set to the desired value.
-/// See also `get_current_pwm_enable`.
+/// See also `current_pwm_enable`.
 pub async fn set_pwm_enable_if_not_already(
     pwm_enable_value: u8,
     base_path: &Path,

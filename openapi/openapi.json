@@ -5506,6 +5506,76 @@
         ]
       }
     },
+    "/hardware-support/{device_uid}/channels/{channel_name}/probe": {
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Probe a fan channel's duty response",
+        "description": "Briefly changes the channel's duty and reports whether the fan responded, then restores the previous setting. The only endpoint that moves hardware to answer a question, so it is per channel and never automatic. Always 200 when the request was understood: a probe that declined to touch the fan returns the reason it declined.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "in": "path",
+            "name": "device_uid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What one probe request produced.\n\n `Declined` is a result, not an error: \"we will not move this fan, and here\n is why\" is exactly the kind of observation this feature exists to state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/hardware-report": {
       "get": {
         "tags": [
@@ -9490,6 +9560,112 @@
         "required": [
           "kind",
           "preset"
+        ]
+      },
+      "ProbeOutcome": {
+        "description": "What one probe request produced.\n\n `Declined` is a result, not an error: \"we will not move this fan, and here\n is why\" is exactly the kind of observation this feature exists to state.",
+        "oneOf": [
+          {
+            "description": "The fan was moved and the response observed.",
+            "type": "object",
+            "properties": {
+              "baseline_rpm": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0
+              },
+              "observed_rpm": {
+                "type": "integer",
+                "format": "uint32",
+                "minimum": 0
+              },
+              "original_duty": {
+                "type": "integer",
+                "format": "uint8",
+                "maximum": 255,
+                "minimum": 0
+              },
+              "outcome": {
+                "type": "string",
+                "const": "completed"
+              },
+              "probed_duty": {
+                "type": "integer",
+                "format": "uint8",
+                "maximum": 255,
+                "minimum": 0
+              },
+              "verdict": {
+                "$ref": "#/components/schemas/ChannelVerdict"
+              }
+            },
+            "required": [
+              "outcome",
+              "verdict",
+              "baseline_rpm",
+              "observed_rpm",
+              "original_duty",
+              "probed_duty"
+            ]
+          },
+          {
+            "description": "Nothing was written to hardware.",
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "const": "declined"
+              },
+              "reason": {
+                "$ref": "#/components/schemas/ProbeRefusal"
+              },
+              "verdict": {
+                "description": "The verdict the refusal itself establishes, when it establishes\n one. Absent means the channel's existing verdict already explains\n it and must not be overwritten.",
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ChannelVerdict"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "outcome",
+              "reason"
+            ]
+          }
+        ]
+      },
+      "ProbeRefusal": {
+        "description": "Why a probe may not run. Every variant is a refusal to touch hardware.",
+        "oneOf": [
+          {
+            "description": "No writable control, so there is nothing to test.",
+            "type": "string",
+            "const": "not_controllable"
+          },
+          {
+            "description": "No tachometer at all: the response can never be observed.",
+            "type": "string",
+            "const": "no_tachometer"
+          },
+          {
+            "description": "A tachometer that reads zero is an empty header or a stopped fan, not a\n baseline. Probing it would manufacture an `IgnoresDuty` verdict for a\n connector with nothing on it.",
+            "type": "string",
+            "const": "no_baseline_rpm"
+          },
+          {
+            "description": "An alert is active on this channel; moving its fan would confuse the\n user's own investigation and could trip further alerts.",
+            "type": "string",
+            "const": "alert_active"
+          },
+          {
+            "description": "Near maximum duty, so the probe would have to lower, and the machine is\n too warm to reduce cooling.",
+            "type": "string",
+            "const": "too_warm_to_lower"
+          }
         ]
       },
       "Profile": {

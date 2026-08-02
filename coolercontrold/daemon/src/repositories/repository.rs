@@ -130,6 +130,17 @@ pub trait Repository {
     fn duty_floor(&self, _device_uid: &UID, _channel_name: &str) -> Duty {
         0
     }
+
+    /// Whether the channel is still in the manual mode this repository set,
+    /// for the user-triggered duty-response probe.
+    ///
+    /// Default `None`, which is the honest answer everywhere but hwmon: no
+    /// other repository exposes a mode that firmware could reclaim, so there
+    /// is nothing to have been reclaimed. Deliberately not called from the
+    /// write path; the read belongs to setting application and the probe only.
+    async fn manual_control_held(&self, _device_uid: &UID, _channel_name: &str) -> Option<bool> {
+        None
+    }
 }
 
 #[derive(Default)]

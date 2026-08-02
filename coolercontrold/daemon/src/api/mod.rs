@@ -27,6 +27,7 @@ mod device_health;
 pub mod devices;
 mod dual_protocol;
 mod functions;
+mod hardware_probe;
 mod hardware_report;
 mod metrics;
 pub mod modes;
@@ -46,9 +47,9 @@ mod tokens;
 use crate::alerts::AlertController;
 use crate::api::actor::{
     AlertHandle, AuthHandle, CalibrationHandle, CustomSensorHandle, DetectHandle, DeviceHandle,
-    DeviceHealthHandle, FunctionHandle, HardwareReportHandle, HealthHandle, ModeHandle,
-    PluginHandle, ProfileHandle, SettingHandle, StatsHandle, StatusHandle, StressTestHandle,
-    TokenHandle,
+    DeviceHealthHandle, FunctionHandle, HardwareProbeHandle, HardwareReportHandle, HealthHandle,
+    ModeHandle, PluginHandle, ProfileHandle, SettingHandle, StatsHandle, StatusHandle,
+    StressTestHandle, TokenHandle,
 };
 use crate::api::dual_protocol::Protocol;
 use crate::api::session_store::{FileSessionStore, MemorySessionStore};
@@ -670,8 +671,17 @@ async fn create_app_state<'s>(
         cancel_token.clone(),
         main_scope,
     );
-    let hardware_report_handle =
-        HardwareReportHandle::new(hardware_support, cancel_token.clone(), main_scope);
+    let hardware_report_handle = HardwareReportHandle::new(
+        Rc::clone(&hardware_support),
+        cancel_token.clone(),
+        main_scope,
+    );
+    let hardware_probe_handle = HardwareProbeHandle::new(
+        engine.clone(),
+        hardware_support,
+        cancel_token.clone(),
+        main_scope,
+    );
     let auth_handle = AuthHandle::new(cancel_token.clone());
     let token_handle = TokenHandle::new(cancel_token.clone()).await;
     let device_handle = DeviceHandle::new(
@@ -727,6 +737,7 @@ async fn create_app_state<'s>(
     AppState {
         health,
         detect_handle,
+        hardware_probe_handle,
         hardware_report_handle,
         auth_handle,
         token_handle,
@@ -1317,6 +1328,7 @@ impl OperationOutput for CCError {
 pub struct AppState {
     pub health: HealthHandle,
     pub detect_handle: DetectHandle,
+    pub hardware_probe_handle: HardwareProbeHandle,
     pub hardware_report_handle: HardwareReportHandle,
     pub auth_handle: AuthHandle,
     pub token_handle: TokenHandle,

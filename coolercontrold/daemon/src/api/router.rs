@@ -18,8 +18,8 @@
 
 use crate::api::{
     alerts, auth, base, calibration, custom_sensors, detect, device_health, functions,
-    hardware_report, metrics, modes, plugins, profile_generation, profiles, settings, sse, stats,
-    status, stress_test, tokens,
+    hardware_probe, hardware_report, metrics, modes, plugins, profile_generation, profiles,
+    settings, sse, stats, status, stress_test, tokens,
 };
 use crate::api::{devices, AppState};
 #[cfg(debug_assertions)]
@@ -65,6 +65,7 @@ pub fn documented_routes() -> ApiRouter<AppState> {
         .merge(calibration_routes())
         .merge(calibration_batch_routes())
         .merge(detect_routes())
+        .merge(hardware_probe_routes())
         .merge(hardware_report_routes())
         .merge(stress_test_routes())
         .merge(metrics_routes())
@@ -1334,6 +1335,26 @@ fn detect_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
         )
+}
+
+fn hardware_probe_routes() -> ApiRouter<AppState> {
+    ApiRouter::new().api_route(
+        "/hardware-support/{device_uid}/channels/{channel_name}/probe",
+        post_with(hardware_probe::probe_channel, |o| {
+            o.summary("Probe a fan channel's duty response")
+                .description(
+                    "Briefly changes the channel's duty and reports whether the fan responded, \
+                     then restores the previous setting. The only endpoint that moves hardware \
+                     to answer a question, so it is per channel and never automatic. Always 200 \
+                     when the request was understood: a probe that declined to touch the fan \
+                     returns the reason it declined.",
+                )
+                .tag("devices")
+                .security_requirement("CookieAuth")
+                .security_requirement("BearerAuth")
+        })
+        .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
+    )
 }
 
 fn hardware_report_routes() -> ApiRouter<AppState> {
