@@ -260,6 +260,38 @@ impl HwmonExclusion {
     }
 }
 
+/// Why one channel is absent from the app while sysfs still exposes it.
+///
+/// Separate from `HwmonExclusion` because the device is present either way:
+/// the user sees most of a chip and wonders where the rest of it went, which
+/// reads as a detection failure rather than as their own configuration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChannelExclusion {
+    /// The user disabled this channel in settings.
+    UserDisabled,
+    /// The lm-sensors configuration ignores it.
+    IgnoredBySensorsConf,
+}
+
+impl ChannelExclusion {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::UserDisabled => "hidden: disabled in settings",
+            Self::IgnoredBySensorsConf => "hidden: ignored by sensors.conf",
+        }
+    }
+}
+
+/// Everything the daemon left out, for the report to explain.
+///
+/// Absent from the standalone CLI, which has no daemon to ask and therefore
+/// says nothing rather than implying nothing is hidden.
+#[derive(Debug, Clone, Default)]
+pub struct HiddenHardware {
+    pub devices: HashMap<PathBuf, HwmonExclusion>,
+    pub channels: HashMap<(PathBuf, ChannelName), ChannelExclusion>,
+}
+
 /// Why the Super-I/O probe could not run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -458,10 +490,10 @@ pub struct HardwareSupportController {
     /// disabled. Retained here so the report never has to re-enumerate USB
     /// devices just to be generated.
     liquidctl_devices: RefCell<Vec<crate::hardware_report::LiquidctlSummary>>,
-    /// hwmon devices the daemon deliberately dropped, keyed by canonical path.
-    /// Recorded where the decision is actually made rather than re-derived, so
-    /// the report cannot disagree with what the daemon did.
-    excluded_hwmon: RefCell<HashMap<PathBuf, HwmonExclusion>>,
+    /// hwmon devices and channels the daemon deliberately dropped, keyed by
+    /// canonical path. Recorded where each decision is actually made rather
+    /// than re-derived, so the report cannot disagree with what the daemon did.
+    hidden_hardware: RefCell<HiddenHardware>,
 }
 
 impl HardwareSupportController {
@@ -474,7 +506,7 @@ impl HardwareSupportController {
             system_findings,
             channel_diagnoses: RefCell::new(HashMap::new()),
             liquidctl_devices: RefCell::new(Vec::new()),
-            excluded_hwmon: RefCell::new(HashMap::new()),
+            hidden_hardware: RefCell::new(HiddenHardware::default()),
         }
     }
 
@@ -487,12 +519,31 @@ impl HardwareSupportController {
         let Ok(canonical) = cc_fs::canonicalize(path) else {
             return;
         };
-        self.excluded_hwmon.borrow_mut().insert(canonical, reason);
+        self.hidden_hardware
+            .borrow_mut()
+            .devices
+            .insert(canonical, reason);
     }
 
-    /// The exclusions, for the report.
-    pub fn hwmon_exclusions(&self) -> HashMap<PathBuf, HwmonExclusion> {
-        self.excluded_hwmon.borrow().clone()
+    /// Records that one channel of an otherwise-present device was left out.
+    pub fn record_excluded_channel(
+        &self,
+        path: &Path,
+        channel_name: &str,
+        reason: ChannelExclusion,
+    ) {
+        let Ok(canonical) = cc_fs::canonicalize(path) else {
+            return;
+        };
+        self.hidden_hardware
+            .borrow_mut()
+            .channels
+            .insert((canonical, channel_name.to_string()), reason);
+    }
+
+    /// What was left out, for the report.
+    pub fn hidden_hardware(&self) -> HiddenHardware {
+        self.hidden_hardware.borrow().clone()
     }
 
     /// Records the drivability of a channel whose repository has no

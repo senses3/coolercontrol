@@ -88,10 +88,9 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 // Recorded by the repositories as they dropped each device, so
                 // the report says why a chip is missing from the app instead of
                 // leaving it looking broken.
-                let excluded = self.hardware_support.hwmon_exclusions();
+                let hidden = self.hardware_support.hidden_hardware();
                 let report =
-                    hardware_report::generate(full, is_root, Some(&liquidctl), Some(&excluded))
-                        .await;
+                    hardware_report::generate(full, is_root, Some(&liquidctl), Some(&hidden)).await;
                 let _ = respond_to.send(report);
             }
         }

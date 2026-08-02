@@ -78,7 +78,7 @@ use crate::device::{
     TempInfo, TempName, TempStatus, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
-use crate::hardware_support::{HardwareSupportController, HwmonExclusion};
+use crate::hardware_support::{ChannelExclusion, HardwareSupportController, HwmonExclusion};
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, MISSING_STATUS_THRESHOLD};
 use crate::repositories::hwmon::apple_mac_smc::AppleMacSMC;
@@ -692,6 +692,14 @@ impl HwmonRepo {
         hardware_support.record_excluded_hwmon(path, reason);
     }
 
+    /// The same, for a single channel of a device that is otherwise present.
+    fn record_excluded_channel(&self, path: &Path, channel_name: &str, reason: ChannelExclusion) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_excluded_channel(path, channel_name, reason);
+    }
+
     /// Publishes the passive verdict for every fan channel on a device.
     ///
     /// `firmware_override_observed` is false here by construction: at init
@@ -1290,12 +1298,14 @@ fn order_entries_by_starvation(
 /// An `ignore` statement is final: it is the user's own file saying to hide the sensor, so we
 /// respect it rather than offering a way around it. Each dropped channel is logged with the chip
 /// and the file that hid it, which is the file to edit to get it back.
+/// Returns the names of the channels it dropped, so the caller can both log a
+/// count and record which ones vanished for the hardware report.
 fn drop_ignored_channels(
     overrides: &OverridesController,
     chip: Option<&ChipName>,
     channels: &mut Vec<HwmonChannelInfo>,
-) -> usize {
-    let count_before = channels.len();
+) -> Vec<ChannelName> {
+    let mut dropped = Vec::new();
     channels.retain(|channel| {
         let Some(source) = overrides.sensors_conf_ignore_source(chip, &channel.name) else {
             return true;
@@ -1307,9 +1317,10 @@ fn drop_ignored_channels(
             channel.name,
             source.display()
         );
+        dropped.push(channel.name.clone());
         false
     });
-    count_before - channels.len()
+    dropped
 }
 
 /// The temp label to show: a label the user wrote in their lm-sensors configuration is used
@@ -1653,11 +1664,22 @@ impl Repository for HwmonRepo {
                 AppleMacSMC::init_fans(&path, &mut channels, &disabled_channels).await;
             } else {
                 match fans::init_fans(&path, &device_name).await {
-                    Ok(fans) => channels.extend(
-                        fans.into_iter()
-                            .filter(|fan| disabled_channels.contains(&fan.name).not())
-                            .collect::<Vec<HwmonChannelInfo>>(),
-                    ),
+                    Ok(fans) => {
+                        for fan in &fans {
+                            if disabled_channels.contains(&fan.name) {
+                                self.record_excluded_channel(
+                                    &path,
+                                    &fan.name,
+                                    ChannelExclusion::UserDisabled,
+                                );
+                            }
+                        }
+                        channels.extend(
+                            fans.into_iter()
+                                .filter(|fan| disabled_channels.contains(&fan.name).not())
+                                .collect::<Vec<HwmonChannelInfo>>(),
+                        );
+                    }
                     Err(err) => error!("Error initializing Hwmon Fans: {err}"),
                 }
             }
@@ -1679,8 +1701,16 @@ impl Repository for HwmonRepo {
                 ),
                 Err(err) => error!("Error initializing Hwmon Power: {err}"),
             }
-            let ignored_count =
+            let ignored_channels =
                 drop_ignored_channels(&self.overrides, chip.as_ref(), &mut channels);
+            let ignored_count = ignored_channels.len();
+            for channel_name in &ignored_channels {
+                self.record_excluded_channel(
+                    &path,
+                    channel_name,
+                    ChannelExclusion::IgnoredBySensorsConf,
+                );
+            }
             if channels.is_empty() {
                 if ignored_count > 0 {
                     info!(
@@ -5731,7 +5761,8 @@ mod sensors_conf_tests {
 
         let dropped = drop_ignored_channels(&overrides, Some(&nct6687()), &mut channels);
 
-        assert_eq!(dropped, 2);
+        // Names, not just a count: the report says which channels went and why.
+        assert_eq!(dropped, vec!["fan2".to_string(), "temp5".to_string()]);
         let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
         assert_eq!(names, vec!["fan1"]);
     }
@@ -5742,16 +5773,13 @@ mod sensors_conf_tests {
     fn nothing_is_dropped_without_a_match() {
         let mut channels = vec![fan_channel("fan2")];
         let empty = overrides_with(SensorsConf::default());
-        assert_eq!(
-            drop_ignored_channels(&empty, Some(&nct6687()), &mut channels),
-            0
-        );
+        assert!(drop_ignored_channels(&empty, Some(&nct6687()), &mut channels).is_empty());
 
         let ignoring = overrides_with(SensorsConf::from_config_text(
             "chip \"nct6687-*\"\n ignore fan2\n",
         ));
         // An unidentified chip matches no statement, so the channel survives.
-        assert_eq!(drop_ignored_channels(&ignoring, None, &mut channels), 0);
+        assert!(drop_ignored_channels(&ignoring, None, &mut channels).is_empty());
         assert_eq!(channels.len(), 1);
 
         // So does one whose chip the statement does not name.
@@ -5759,10 +5787,7 @@ mod sensors_conf_tests {
             prefix: "it8686".to_owned(),
             bus: Bus::Isa { addr: 0x0a40 },
         };
-        assert_eq!(
-            drop_ignored_channels(&ignoring, Some(&other_chip), &mut channels),
-            0
-        );
+        assert!(drop_ignored_channels(&ignoring, Some(&other_chip), &mut channels).is_empty());
         assert_eq!(channels.len(), 1);
     }
 }

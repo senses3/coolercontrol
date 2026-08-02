@@ -27,9 +27,10 @@
 //! meant to be pasted into a public support channel, so the identifying fields
 //! are limited to board and BIOS, which is what actually narrows a diagnosis.
 
+use crate::device::ChannelName;
 use crate::hardware_support::{
-    self, ChannelVerdict, DetectedChipRef, HwmonExclusion, ProbeEnvironment, SystemFinding,
-    SystemInfo,
+    self, ChannelExclusion, ChannelVerdict, DetectedChipRef, HiddenHardware, HwmonExclusion,
+    ProbeEnvironment, SystemFinding, SystemInfo,
 };
 use crate::repositories::hwmon::fans;
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
@@ -62,6 +63,9 @@ struct ReportDevice {
     /// from the standalone CLI, which has no daemon to ask and therefore says
     /// nothing rather than guessing.
     excluded: Option<HwmonExclusion>,
+    /// Channels of this device the daemon dropped individually, by name. Empty
+    /// for a device that was dropped whole: its channels were never reached.
+    excluded_channels: HashMap<ChannelName, ChannelExclusion>,
 }
 
 /// Builds the report. `full` adds the whole hwmon tree with per-channel state.
@@ -69,15 +73,15 @@ pub async fn generate(
     full: bool,
     is_root: bool,
     liquidctl: Option<&[LiquidctlSummary]>,
-    excluded_hwmon: Option<&HashMap<PathBuf, HwmonExclusion>>,
+    hidden: Option<&HiddenHardware>,
 ) -> String {
     let system_info = SystemInfo::read().await;
-    let devices = scan_hwmon(excluded_hwmon).await;
+    let devices = scan_hwmon(hidden).await;
     let detection = run_probe(is_root);
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection.as_ref(), is_root, full);
-    write_fan_summary(&mut report, &devices, excluded_hwmon.is_some()).await;
+    write_fan_summary(&mut report, &devices, hidden.is_some()).await;
     write_liquidctl_section(&mut report, liquidctl);
     write_findings(&mut report, detection.as_ref(), is_root);
     if full {
@@ -196,25 +200,33 @@ async fn write_fan_summary(report: &mut String, devices: &[ReportDevice], exclus
             .iter()
             .filter(|fan| verdict_for(device, fan).is_controllable())
             .count();
+        let hidden_fans = device
+            .fans
+            .iter()
+            .filter(|fan| device.excluded_channels.contains_key(&fan.name))
+            .count();
         let _ = writeln!(
             report,
-            "  {} [{}]  {} fan(s), {controllable} controllable{}",
+            "  {} [{}]  {} fan(s), {controllable} controllable{}{}",
             device.name,
             device.driver.as_deref().unwrap_or("no driver link"),
             device.fans.len(),
+            hidden_channel_suffix(hidden_fans),
             exclusion_suffix(device)
         );
         for fan in &device.fans {
             let verdict = verdict_for(device, fan);
-            if verdict.is_controllable() {
+            let hidden = device.excluded_channels.get(&fan.name).copied();
+            // A hidden channel earns a line even when it is perfectly
+            // drivable: that it is missing from the app is the whole point.
+            if verdict.is_controllable() && hidden.is_none() {
                 continue;
             }
             let _ = writeln!(
                 report,
-                "    {}: {} ({})",
-                fan.name,
-                verdict_label(verdict),
-                raw_state(&device.path, fan.number).await
+                "    {}: {}",
+                channel_title(fan),
+                channel_notes(device, fan, verdict, hidden).await
             );
         }
     }
@@ -365,10 +377,14 @@ async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
             let pwm_enable =
                 read_attribute(&device.path, &format!("pwm{}_enable", fan.number)).await;
             let rpm = read_attribute(&device.path, &format!("fan{}_input", fan.number)).await;
+            let hidden = device
+                .excluded_channels
+                .get(&fan.name)
+                .map_or_else(String::new, |reason| format!(" {}", reason.label()));
             let _ = writeln!(
                 report,
                 "    {}: verdict={} pwm={pwm} pwm_enable={pwm_enable} rpm={rpm} \
-                 writable={} label={}",
+                 writable={} label={}{hidden}",
                 fan.name,
                 verdict_label(verdict),
                 fan.caps.is_fan_controllable(),
@@ -396,6 +412,67 @@ async fn read_attribute(base_path: &Path, file_name: &str) -> String {
         .map_or_else(|_| "-".to_string(), |value| value.trim().to_string())
 }
 
+/// The channel name with its driver label when it has one.
+///
+/// Eight headers all called `fanN` are indistinguishable in a pasted report,
+/// and the label is what tells the user which one is the front intake.
+fn channel_title(fan: &HwmonChannelInfo) -> String {
+    match fan.label.as_deref() {
+        Some(label) if label.trim().is_empty().not() => {
+            format!("{} \"{}\"", fan.name, label.trim())
+        }
+        _ => fan.name.clone(),
+    }
+}
+
+/// Why this channel earned a line: that it is hidden, that it cannot be
+/// driven, or both. A hidden channel that is also uncontrollable says both,
+/// because fixing the second does not bring it back.
+async fn channel_notes(
+    device: &ReportDevice,
+    fan: &HwmonChannelInfo,
+    verdict: ChannelVerdict,
+    hidden: Option<ChannelExclusion>,
+) -> String {
+    let mut notes = Vec::with_capacity(2);
+    if let Some(reason) = hidden {
+        notes.push(reason.label().to_string());
+    }
+    if verdict.is_controllable().not() {
+        notes.push(format!(
+            "{} ({})",
+            verdict_label(verdict),
+            raw_state(&device.path, fan.number).await
+        ));
+    }
+    notes.join(", ")
+}
+
+/// The channels this device lost individually, keyed by name.
+fn hidden_channels(
+    hidden: Option<&HiddenHardware>,
+    canonical: &Path,
+) -> HashMap<ChannelName, ChannelExclusion> {
+    let Some(hidden) = hidden else {
+        return HashMap::new();
+    };
+    hidden
+        .channels
+        .iter()
+        .filter(|((path, _), _)| path == canonical)
+        .map(|((_, channel_name), reason)| (channel_name.clone(), *reason))
+        .collect()
+}
+
+/// Reports how many of a device's fans the app is not showing. Silent at zero,
+/// which is every ordinary machine.
+fn hidden_channel_suffix(count: usize) -> String {
+    if count == 0 {
+        return String::new();
+    }
+    format!(", {count} hidden")
+}
+
 /// The trailing "hidden: ..." note, or nothing for a device the app shows.
 ///
 /// Silent when the daemon kept the device, which is the common case: a marker
@@ -412,9 +489,7 @@ fn verdict_for(device: &ReportDevice, fan: &HwmonChannelInfo) -> ChannelVerdict 
 
 /// Enumerates hwmon and builds each device's fan channels with the exact same
 /// `init_fans` the daemon uses.
-async fn scan_hwmon(
-    excluded_hwmon: Option<&HashMap<PathBuf, HwmonExclusion>>,
-) -> Vec<ReportDevice> {
+async fn scan_hwmon(hidden: Option<&HiddenHardware>) -> Vec<ReportDevice> {
     let mut devices = Vec::new();
     let Ok(entries) = cc_fs::read_dir(Path::new(HWMON_CLASS_PATH)) else {
         return devices;
@@ -443,15 +518,21 @@ async fn scan_hwmon(
             .collect();
         // Matched on the canonical path: the entries here are symlinks into
         // the bus tree, while the daemon recorded its own walk of it.
-        let excluded = cc_fs::canonicalize(&path).ok().and_then(|canonical| {
-            excluded_hwmon.and_then(|excluded| excluded.get(&canonical).copied())
-        });
+        let canonical = cc_fs::canonicalize(&path).ok();
+        let excluded = canonical
+            .as_ref()
+            .zip(hidden)
+            .and_then(|(canonical, hidden)| hidden.devices.get(canonical).copied());
+        let excluded_channels = canonical
+            .as_ref()
+            .map_or_else(HashMap::new, |canonical| hidden_channels(hidden, canonical));
         devices.push(ReportDevice {
             path,
             name,
             driver,
             fans,
             excluded,
+            excluded_channels,
         });
     }
     devices
@@ -610,7 +691,48 @@ mod tests {
             driver: Some(name.to_string()),
             fans: Vec::new(),
             excluded,
+            excluded_channels: HashMap::new(),
         }
+    }
+
+    fn fan(name: &str, label: Option<&str>) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            name: name.to_string(),
+            label: label.map(ToString::to_string),
+            ..HwmonChannelInfo::default()
+        }
+    }
+
+    /// Goal: a report full of `fanN` lines cannot tell the user which header
+    /// is which. The driver's label is the only thing that can, so it rides
+    /// along whenever the driver publishes one.
+    #[test]
+    fn channel_titles_carry_the_driver_label() {
+        assert_eq!(
+            channel_title(&fan("fan1", Some("PSU Fan"))),
+            "fan1 \"PSU Fan\""
+        );
+        assert_eq!(channel_title(&fan("fan1", None)), "fan1");
+        // A label of pure whitespace is no label; quoting it would add noise
+        // that reads like a missing value.
+        assert_eq!(channel_title(&fan("fan2", Some("  "))), "fan2");
+    }
+
+    /// Goal: a channel the user disabled must say so on its own line, and the
+    /// device line must account for it. Otherwise the counts disagree with the
+    /// app and nothing explains the difference.
+    #[test]
+    fn hidden_channels_are_counted_and_explained() {
+        assert_eq!(hidden_channel_suffix(2), ", 2 hidden");
+        assert_eq!(hidden_channel_suffix(0), "");
+        assert_eq!(
+            ChannelExclusion::UserDisabled.label(),
+            "hidden: disabled in settings"
+        );
+        assert_eq!(
+            ChannelExclusion::IgnoredBySensorsConf.label(),
+            "hidden: ignored by sensors.conf"
+        );
     }
 
     /// Goal: an hwmon device the daemon hid must say so. Without it, a chip
