@@ -386,7 +386,14 @@ pub async fn run_probe<H: ProbeHost + ?Sized>(
         conditions.baseline_rpm,
     )
     .await;
-    let restored = host.restore_setting(&snapshot).await;
+    let restored = restore_channel(
+        host,
+        device_uid,
+        channel_name,
+        plan.original_duty,
+        &snapshot,
+    )
+    .await;
     let run = run?;
     restored?;
     let observation = ProbeObservation {
@@ -446,6 +453,35 @@ async fn walk_the_plan<H: ProbeHost + ?Sized>(
         probed_duty,
         manual_mode_held,
     })
+}
+
+/// Puts the channel back exactly as it was found.
+///
+/// The stored setting alone is not enough. Restoring an *unmanaged* channel
+/// only hands control back to the firmware; it writes no duty at all, so the
+/// raw pwm keeps the last value the probe wrote. On a board whose driver is
+/// not managing that header, nothing then overwrites it and the fan sits at
+/// the probe duty indefinitely, which is the one thing this probe must never
+/// do. So the duty goes back first, while manual control is still held, and
+/// the setting after it. Where the setting does drive a duty of its own, that
+/// write simply supersedes this one.
+///
+/// Both halves are attempted before either failure is reported: a channel left
+/// half restored is worse than one that reports the first thing that went
+/// wrong.
+async fn restore_channel<H: ProbeHost + ?Sized>(
+    host: &H,
+    device_uid: &DeviceUID,
+    channel_name: &str,
+    original_duty: Duty,
+    snapshot: &SettingsSnapshot,
+) -> Result<()> {
+    let duty_restored = host
+        .write_duty(device_uid, channel_name, original_duty)
+        .await;
+    let setting_restored = host.restore_setting(snapshot).await;
+    duty_restored?;
+    setting_restored
 }
 
 /// How one rung ended.
@@ -837,7 +873,10 @@ mod tests {
                 probed_duty: 65,
             }
         );
-        assert_eq!(host.touched(), vec!["manual", "duty:65", "restore"]);
+        assert_eq!(
+            host.touched(),
+            vec!["manual", "duty:65", "duty:40", "restore"]
+        );
     }
 
     /// Goal: writes that all succeed while the fan never moves is the exact
@@ -879,7 +918,10 @@ mod tests {
             ..MockHost::responsive()
         };
         assert!(probe(&host).is_err());
-        assert_eq!(host.touched(), vec!["manual", "duty:65", "restore"]);
+        assert_eq!(
+            host.touched(),
+            vec!["manual", "duty:65", "duty:40", "restore"]
+        );
     }
 
     /// Goal: a restore that fails leaves the fan somewhere the user did not
@@ -946,7 +988,10 @@ mod tests {
         };
         let outcome = probe(&host).unwrap();
         assert_eq!(outcome.verdict(), Some(ChannelVerdict::Controllable));
-        assert_eq!(host.touched(), vec!["manual", "duty:30", "restore"]);
+        assert_eq!(
+            host.touched(),
+            vec!["manual", "duty:30", "duty:0", "restore"]
+        );
     }
 
     /// Goal: a board that applies a write gradually must not be given up on.
@@ -970,7 +1015,7 @@ mod tests {
         assert_eq!(outcome.verdict(), Some(ChannelVerdict::Controllable));
         assert_eq!(
             host.touched(),
-            vec!["manual", "duty:30", "restore"],
+            vec!["manual", "duty:30", "duty:0", "restore"],
             "the ramp must be waited out on the first rung, not escalated past"
         );
     }
@@ -997,6 +1042,34 @@ mod tests {
         );
     }
 
+    /// Goal: the duty the channel was found at is written back, not just the
+    /// stored setting. Restoring an unmanaged channel only hands control to the
+    /// firmware and writes no duty, so on a board whose driver is not managing
+    /// that header the raw pwm kept the probe's last value and the fan sat at
+    /// full duty afterwards. Observed on real hardware: a second probe reported
+    /// `original_duty: 100` on a channel the user had left at 0.
+    #[test]
+    fn the_duty_goes_back_not_just_the_setting() {
+        let host = MockHost {
+            conditions: Some(ProbeConditions {
+                baseline_rpm: 0,
+                current_duty: 0,
+                ..healthy()
+            }),
+            rpm_after_write: Some(0),
+            ..MockHost::responsive()
+        };
+        probe(&host).unwrap();
+        let touched = host.touched();
+        let restore_at = touched.iter().position(|entry| entry == "restore").unwrap();
+        assert_eq!(
+            touched[restore_at - 1],
+            "duty:0",
+            "the original duty must be written back while manual control is \
+             still held, before the setting is handed back: {touched:?}"
+        );
+    }
+
     /// Goal: a fan that answers no rung is walked all the way to full duty and
     /// then condemned. Stopping short would leave the user with an open
     /// question about a header that is demonstrably dead.
@@ -1015,7 +1088,7 @@ mod tests {
         assert_eq!(outcome.verdict(), Some(ChannelVerdict::FanDoesNotSpin));
         assert_eq!(
             host.touched(),
-            vec!["manual", "duty:30", "duty:60", "duty:100", "restore"]
+            vec!["manual", "duty:30", "duty:60", "duty:100", "duty:0", "restore"]
         );
     }
 

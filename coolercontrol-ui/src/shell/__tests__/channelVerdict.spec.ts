@@ -114,6 +114,7 @@ describe('duty-response probe', () => {
             'probeFirmwareOverride',
             'probeDidNotStart',
             'probeStoppedShort',
+            'probeUnrecognized',
         ]) {
             expect(typeof page[key], `missing string for ${key}`).toBe('string')
         }

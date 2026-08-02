@@ -95,8 +95,12 @@ function completedMessage(outcome: ProbeOutcomeDTO): string {
         // The ladder stopped short, so nothing is settled.
         case ChannelVerdict.Unverifiable:
             return t('layout.shell.coolingPage.probeStoppedShort', values)
-        default:
+        case ChannelVerdict.IgnoresDuty:
             return t('layout.shell.coolingPage.probeNoResponse', values)
+        // Anything else is a verdict this build has never heard of, so say
+        // that rather than pick one of the above and state it confidently.
+        default:
+            return t('layout.shell.coolingPage.probeUnrecognized')
     }
 }
 
@@ -111,8 +115,14 @@ function declinedMessage(outcome: ProbeOutcomeDTO): string {
             return t('layout.shell.coolingPage.probeDeclinedAlertActive')
         case ProbeRefusal.TooWarmToLower:
             return t('layout.shell.coolingPage.probeDeclinedTooWarmToLower')
-        default:
+        case ProbeRefusal.NotControllable:
             return t('layout.shell.coolingPage.probeDeclinedNotControllable')
+        // Falling back to "no writable fan control" here told a user with a
+        // perfectly writable channel exactly that, because the daemon had sent
+        // a reason this build did not know. Never assert a cause we were not
+        // given.
+        default:
+            return t('layout.shell.coolingPage.probeUnrecognized')
     }
 }
 
