@@ -66,7 +66,7 @@ pub async fn generate(full: bool, is_root: bool, liquidctl: Option<&[LiquidctlSu
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection.as_ref(), is_root, full);
-    write_fan_summary(&mut report, &devices);
+    write_fan_summary(&mut report, &devices).await;
     write_liquidctl_section(&mut report, liquidctl);
     write_findings(&mut report, detection.as_ref(), is_root);
     if full {
@@ -155,9 +155,15 @@ fn write_probe_summary(
 }
 
 /// Controllable channels are collapsed to a count. Anything we cannot drive is
-/// listed individually with its verdict, because that is the whole reason
-/// someone is pasting this into a support channel.
-fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
+/// listed individually with its verdict and its raw state, because that is the
+/// whole reason someone is pasting this into a support channel.
+///
+/// The raw state is deliberately limited to channels we cannot drive. Emitting
+/// it for every channel is what `--full` is for, and doing so here would push
+/// the compact report past the paste budget on an ordinary desktop. Restricted
+/// this way it costs nothing on a healthy machine and a couple of lines on a
+/// broken one, which removes a round trip for the common support case.
+async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
     let _ = writeln!(report, "\nFan channels");
     let mut any = false;
     for device in devices {
@@ -182,7 +188,13 @@ fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
             if verdict.is_controllable() {
                 continue;
             }
-            let _ = writeln!(report, "    {}: {}", fan.name, verdict_label(verdict));
+            let _ = writeln!(
+                report,
+                "    {}: {} ({})",
+                fan.name,
+                verdict_label(verdict),
+                raw_state(&device.path, fan.number).await
+            );
         }
     }
     if any.not() {
@@ -342,6 +354,16 @@ async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
             );
         }
     }
+}
+
+/// The raw pwm state behind a verdict. `pwm_enable` in particular is the field
+/// that distinguishes a driver-defined mode from a documented one, and it is
+/// what a maintainer asks for first.
+async fn raw_state(base_path: &Path, number: u8) -> String {
+    let pwm = read_attribute(base_path, &format!("pwm{number}")).await;
+    let pwm_enable = read_attribute(base_path, &format!("pwm{number}_enable")).await;
+    let rpm = read_attribute(base_path, &format!("fan{number}_input")).await;
+    format!("pwm={pwm} pwm_enable={pwm_enable} rpm={rpm}")
 }
 
 /// Reads one sysfs attribute for the full dump. A missing or unreadable file
