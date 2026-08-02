@@ -1025,8 +1025,12 @@ void MainWindow::rebuildDaemonsTrayMenu() {
   const auto list = connections::all();
   m_daemonsTrayMenu->menuAction()->setVisible(list.size() > 1);
   m_daemonsTrayMenu->clear();
-  // The rows are parented to the group, so this is what frees the previous ones.
-  delete m_daemonsActionGroup;
+  // The rows are parented to the group, so this is what frees the previous ones. It has
+  // to be deleteLater: this runs from one of those rows' own triggered handler, and
+  // deleting it outright would pull the object out from under the running signal.
+  if (m_daemonsActionGroup != nullptr) {
+    m_daemonsActionGroup->deleteLater();
+  }
   m_daemonsActionGroup = new QActionGroup(m_daemonsTrayMenu);
   m_daemonsActionGroup->setExclusive(true);
   const auto liveIndex = connections::currentIndex();

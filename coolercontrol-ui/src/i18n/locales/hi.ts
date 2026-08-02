@@ -1286,8 +1286,7 @@ export default {
             errorCertInvalid:
                 'डेमॉन का प्रमाणपत्र सत्यापित नहीं होता, और प्रमाणपत्र सत्यापन सक्षम है।',
             savedLabel: 'सहेजा गया कनेक्शन:',
-            addConnection: 'जोड़ें',
-            addConnectionTooltip: 'कनेक्ट करने के लिए एक और डीमन जोड़ें।',
+            newConnection: 'नया कनेक्शन…',
             removeConnection: 'हटाएँ',
             removeConnectionTooltip: 'चयनित डीमन को भूल जाएँ।',
             removeConnectionBody: 'क्या इस डीमन को ट्रे में दिखाना बंद करें?',

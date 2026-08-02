@@ -1305,8 +1305,7 @@ export default {
             errorCertInvalid:
                 'Сертификат демона не проходит проверку, а проверка сертификатов включена.',
             savedLabel: 'Сохранённое подключение:',
-            addConnection: 'Добавить',
-            addConnectionTooltip: 'Добавить ещё одну службу для подключения.',
+            newConnection: 'Новое подключение…',
             removeConnection: 'Удалить',
             removeConnectionTooltip: 'Забыть выбранную службу.',
             removeConnectionBody: 'Больше не предлагать эту службу в трее?',

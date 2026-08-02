@@ -1286,8 +1286,7 @@ export default {
             errorCertInvalid:
                 "The daemon's certificate does not validate, and certificate validation is enabled.",
             savedLabel: 'Saved connection:',
-            addConnection: 'Add',
-            addConnectionTooltip: 'Add another daemon to connect to.',
+            newConnection: 'New connection…',
             removeConnection: 'Remove',
             removeConnectionTooltip: 'Forget the selected daemon.',
             removeConnectionBody: 'Stop offering this daemon in the tray?',

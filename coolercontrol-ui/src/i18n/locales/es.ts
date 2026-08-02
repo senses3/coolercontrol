@@ -1306,8 +1306,7 @@ export default {
             errorCertInvalid:
                 'El certificado del demonio no es válido y la validación de certificados está activada.',
             savedLabel: 'Conexión guardada:',
-            addConnection: 'Añadir',
-            addConnectionTooltip: 'Añadir otro demonio al que conectarse.',
+            newConnection: 'Nueva conexión…',
             removeConnection: 'Eliminar',
             removeConnectionTooltip: 'Olvidar el demonio seleccionado.',
             removeConnectionBody: '¿Dejar de ofrecer este demonio en la bandeja?',

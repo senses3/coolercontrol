@@ -133,21 +133,14 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
       return;
     }
     const auto list = connections::all();
-    showConnection(index < list.size() ? list.at(index) : connections::Connection{});
+    if (index < list.size()) {
+      showConnection(list.at(index));
+    } else {
+      // The trailing "New connection" row. Nothing is saved until Apply.
+      m_nameLineEdit->clear();
+      resetAddressInputValues();
+    }
     refreshRemoveButton();
-  });
-
-  m_addButton = new QPushButton(uiString("wizard.addConnection", tr("Add")));
-  m_addButton->setToolTip(
-      uiString("wizard.addConnectionTooltip", tr("Add another daemon to connect to.")));
-  connect(m_addButton, &QPushButton::clicked, [this]() {
-    auto list = editedList();
-    list.append(connections::Connection{});
-    connections::saveAll(list);
-    reload();
-    // The blank row is last, and is what the fields should now be editing.
-    m_savedCombo->setCurrentIndex(m_savedCombo->count() - 1);
-    resetAddressInputValues();
   });
 
   m_removeButton = new QPushButton(uiString("wizard.removeConnection", tr("Remove")));
@@ -238,7 +231,6 @@ AddressPage::AddressPage(QWidget* parent) : QWizardPage(parent) {
   auto* spacer = new QSpacerItem(1, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
   auto* savedButtons = new QHBoxLayout;
   savedButtons->addWidget(m_savedCombo, 1);
-  savedButtons->addWidget(m_addButton);
   savedButtons->addWidget(m_removeButton);
   layout->addWidget(m_errorLabel, 0, 0, 1, 2);
   layout->addWidget(savedLabel, 1, 0);
@@ -267,33 +259,35 @@ void AddressPage::showConnection(const connections::Connection& connection) cons
   m_strictTlsCheckbox->setChecked(connection.tlsStrict);
 }
 
-QList<connections::Connection> AddressPage::editedList() const {
-  auto list = connections::all();
+connections::Connection AddressPage::editedConnection() const {
   connections::Connection edited;
   edited.name = m_nameLineEdit->text();
   edited.host = m_addressLineEdit->text();
   edited.port = m_portLineEdit->text().toInt();
   edited.sslEnabled = m_sslCheckbox->isChecked();
   edited.tlsStrict = m_strictTlsCheckbox->isChecked();
-  if (const auto index = m_savedCombo->currentIndex(); index >= 0 && index < list.size()) {
-    list[index] = edited;
-  }
-  return list;
+  return edited;
 }
 
 connections::Connection AddressPage::commit() const {
-  const auto list = editedList();
-  connections::saveAll(list);
-  const auto index = m_savedCombo->currentIndex();
-  if (index >= 0 && index < list.size()) {
-    return list.at(index);
+  auto list = connections::all();
+  const auto edited = editedConnection();
+  // Past the end of the saved rows means the "New connection" row was selected.
+  if (const auto index = m_savedCombo->currentIndex(); index >= 0 && index < list.size()) {
+    list[index] = edited;
+  } else {
+    list.append(edited);
   }
-  return list.isEmpty() ? connections::current() : list.first();
+  connections::saveAll(list);
+  return edited;
 }
 
 void AddressPage::refreshRemoveButton() const {
-  // The app always needs somewhere to connect, so the last entry stays.
-  m_removeButton->setEnabled(m_savedCombo->count() > 1);
+  // Only a saved row can be removed, and the app always needs somewhere to connect, so
+  // the last one stays.
+  const auto index = m_savedCombo->currentIndex();
+  const auto saved = connections::all().size();
+  m_removeButton->setEnabled(saved > 1 && index >= 0 && index < saved);
 }
 
 void AddressPage::reload() const {
@@ -304,6 +298,8 @@ void AddressPage::reload() const {
   for (const auto& connection : list) {
     m_savedCombo->addItem(connections::displayName(connection));
   }
+  // Selecting this blanks the fields; Apply is what actually saves it.
+  m_savedCombo->addItem(uiString("wizard.newConnection", tr("New connection…")));
   // Falls back to the first row when the live daemon is not saved, which only happens
   // if the file was hand-edited.
   const auto selected = live >= 0 ? live : 0;

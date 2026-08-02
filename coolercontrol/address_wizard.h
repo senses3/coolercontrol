@@ -75,7 +75,6 @@ class AddressPage final : public QWizardPage {
   // Picks which saved connection the fields below are editing. Selecting one does not
   // switch to it: Apply does, so the error-recovery flow keeps its single confirm step.
   QComboBox* m_savedCombo;
-  QPushButton* m_addButton;
   QPushButton* m_removeButton;
   QLineEdit* m_nameLineEdit;
   QLineEdit* m_addressLineEdit;
@@ -91,8 +90,8 @@ class AddressPage final : public QWizardPage {
   /// Writes the fields from a saved entry, or from the defaults for a new one.
   void showConnection(const connections::Connection& connection) const;
 
-  /// The list as edited here, with the visible fields folded into the selected entry.
-  [[nodiscard]] QList<connections::Connection> editedList() const;
+  /// The connection the visible fields currently describe.
+  [[nodiscard]] connections::Connection editedConnection() const;
 
   void refreshRemoveButton() const;
 };

@@ -1315,8 +1315,7 @@ export default {
             errorCertInvalid:
                 'Das Zertifikat des Daemons ist ungültig und die Zertifikatsprüfung ist aktiviert.',
             savedLabel: 'Gespeicherte Verbindung:',
-            addConnection: 'Hinzufügen',
-            addConnectionTooltip: 'Einen weiteren Daemon zum Verbinden hinzufügen.',
+            newConnection: 'Neue Verbindung…',
             removeConnection: 'Entfernen',
             removeConnectionTooltip: 'Den ausgewählten Daemon vergessen.',
             removeConnectionBody: 'Diesen Daemon nicht mehr im Systemabschnitt anbieten?',

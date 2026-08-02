@@ -1304,8 +1304,7 @@ export default {
             errorCertInvalid:
                 'O certificado do daemon não é válido e a validação de certificados está ativada.',
             savedLabel: 'Conexão salva:',
-            addConnection: 'Adicionar',
-            addConnectionTooltip: 'Adicionar outro daemon ao qual se conectar.',
+            newConnection: 'Nova conexão…',
             removeConnection: 'Remover',
             removeConnectionTooltip: 'Esquecer o daemon selecionado.',
             removeConnectionBody: 'Parar de oferecer este daemon na bandeja?',

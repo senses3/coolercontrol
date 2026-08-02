@@ -1317,8 +1317,7 @@ export default {
             errorCertInvalid:
                 "Le certificat du démon n'est pas valide et la validation des certificats est activée.",
             savedLabel: 'Connexion enregistrée :',
-            addConnection: 'Ajouter',
-            addConnectionTooltip: 'Ajouter un autre démon auquel se connecter.',
+            newConnection: 'Nouvelle connexion…',
             removeConnection: 'Supprimer',
             removeConnectionTooltip: 'Oublier le démon sélectionné.',
             removeConnectionBody: 'Ne plus proposer ce démon dans la zone de notification ?',
