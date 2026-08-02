@@ -32,7 +32,7 @@ import {
     mdiOpenInNew,
     mdiSpeedometer,
 } from '@mdi/js'
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Emitter, EventType } from 'mitt'
 import type { RouteLocationRaw } from 'vue-router'
@@ -60,6 +60,7 @@ import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
+import HardwareReportModal from '@/shell/home/HardwareReportModal.vue'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
 const deviceStore = useDeviceStore()
@@ -274,6 +275,10 @@ const findingDetail = (finding: SystemFinding): string => {
     }
 }
 
+// The report is useful even when nothing is wrong, so its button is not gated
+// on there being findings.
+const reportOpen = ref(false)
+
 const supportRows = computed((): Array<SupportRow> => {
     const rows: Array<SupportRow> = []
     for (const finding of settingsStore.healthSystemFindings) {
@@ -396,11 +401,15 @@ const shortcutClasses =
             </div>
 
             <!-- Hardware support: permanent facts, deliberately its own card so a
-                 capability is never read as a fault waiting to clear. Hidden
-                 entirely when there is nothing to say. -->
-            <div v-if="supportRows.length > 0" :class="cardClasses">
+                 capability is never read as a fault waiting to clear. The rows
+                 are hidden when there is nothing to say, but the report stays
+                 reachable because it is what the mods will ask for. -->
+            <div :class="cardClasses">
                 <span class="flex items-center gap-2" :class="cardTitleClasses">
                     {{ t('views.appInfo.hardwareSupport') }}
+                    <UiButton class="ml-auto" @click="reportOpen = true">
+                        {{ t('views.appInfo.hardwareReportButton') }}
+                    </UiButton>
                 </span>
                 <div class="flex flex-col gap-1 pt-3">
                     <RouterLink
@@ -604,4 +613,6 @@ const shortcutClasses =
         </div>
         <div class="pb-8" />
     </div>
+
+    <HardwareReportModal v-model:open="reportOpen" />
 </template>
