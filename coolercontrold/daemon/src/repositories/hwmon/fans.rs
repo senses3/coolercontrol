@@ -66,8 +66,9 @@ pub async fn init_fans(base_path: &Path, device_name: &str) -> Result<Vec<HwmonC
 
 /// Diagnoses why one fan channel is or is not controllable.
 ///
-/// `firmware_override_observed` comes from the `pwm_enable` read-back; at init
-/// there has been nothing to observe yet, so callers pass `false`.
+/// `firmware_override_observed` is reserved for the duty-response probe, which
+/// is the only thing that can establish it without adding reads to the write
+/// path. Passive callers pass `false`.
 pub fn diagnose_fan_channel(
     hwmon_name: &str,
     channel: &HwmonChannelInfo,
@@ -83,33 +84,6 @@ pub fn diagnose_fan_channel(
         has_pwm_enable: channel.pwm_enable_default.is_some(),
     };
     hardware_support::diagnose_channel(evidence, hwmon_name, firmware_override_observed)
-}
-
-/// Whether a `pwm_enable` reading means the firmware took a channel back.
-///
-/// Compares against manual specifically rather than against the documented
-/// auto values. `pwm_enable` vocabularies are driver-defined and range well
-/// outside the 0-5 set in the kernel docs: an `nct6687` board reports 99 for
-/// channels its driver is not managing, so testing for "2 or 5" would miss the
-/// reclaim on exactly the boards this is meant to catch.
-pub fn is_firmware_reclaim(
-    manual_asserted: bool,
-    has_pwm_enable: bool,
-    current_mode: Option<u8>,
-) -> bool {
-    if manual_asserted.not() {
-        return false;
-    }
-    // Absence of `pwm_enable` is evidence against a reclaim, never for one:
-    // there is no auto mode for the firmware to revert the channel into.
-    if has_pwm_enable.not() {
-        return false;
-    }
-    match current_mode {
-        Some(mode) => mode != PWM_ENABLE_MANUAL_VALUE,
-        // An unreadable mode is not an observation of a reclaim.
-        None => false,
-    }
 }
 
 /// Logs a reason for every channel we cannot drive, replacing the previous
@@ -500,7 +474,7 @@ pub async fn get_fan_rpm(
 ///  - 3 : "Fan Speed Cruise" mode (?)
 ///  - 4 : "Smart Fan III" mode (NCT6775F only)
 ///  - 5 : "Smart Fan IV" mode (modern `MoBo`'s with build-in smart fan control probably use this)
-pub async fn get_current_pwm_enable(base_path: &Path, channel_number: &u8) -> Option<u8> {
+async fn get_current_pwm_enable(base_path: &Path, channel_number: &u8) -> Option<u8> {
     let pwm_enable_path = base_path.join(format_pwm_enable!(channel_number));
     let current_pwm_enable = cc_fs::read_sysfs(&pwm_enable_path)
         .await
@@ -1184,44 +1158,6 @@ mod tests {
             assert!(result.is_ok());
             assert_eq!(format!("{current_duty:.1}"), "50.0");
         });
-    }
-
-    /// Goal: a reclaim is anything that is not manual, not just the auto
-    /// values the kernel docs list. Method: feed the pwm_enable value a real
-    /// nct6687 board reports for channels its driver does not manage, which is
-    /// outside the documented 0-5 range entirely.
-    #[test]
-    fn firmware_reclaim_detects_undocumented_modes() {
-        assert!(is_firmware_reclaim(true, true, Some(99)));
-        assert!(is_firmware_reclaim(true, true, Some(PWM_ENABLE_AUTO_VALUE)));
-        assert!(is_firmware_reclaim(
-            true,
-            true,
-            Some(PWM_ENABLE_NCT6775_SMART_FAN_IV_VALUE)
-        ));
-    }
-
-    /// Goal: manual mode is the one value that is not a reclaim.
-    #[test]
-    fn firmware_reclaim_ignores_manual_mode() {
-        assert!(is_firmware_reclaim(true, true, Some(PWM_ENABLE_MANUAL_VALUE)).not());
-    }
-
-    /// Goal: the two gates that must suppress the check. A channel we never
-    /// claimed is expected to sit in whatever mode the BIOS chose, and a
-    /// channel with no pwm_enable file has no auto mode to be reverted into,
-    /// so its absence is evidence against a reclaim rather than for one.
-    #[test]
-    fn firmware_reclaim_requires_claim_and_pwm_enable() {
-        assert!(is_firmware_reclaim(false, true, Some(99)).not());
-        assert!(is_firmware_reclaim(true, false, Some(99)).not());
-    }
-
-    /// Goal: an unreadable mode is not an observation, so it must not be
-    /// reported as a reclaim.
-    #[test]
-    fn firmware_reclaim_needs_a_reading() {
-        assert!(is_firmware_reclaim(true, true, None).not());
     }
 
     #[test]

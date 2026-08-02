@@ -332,10 +332,6 @@ struct WriterMailbox {
     pending: RefCell<HashMap<ChannelName, PendingWrite>>,
     notify: Notify,
     force_next_write: RefCell<HashSet<ChannelName>>,
-    /// Channels this daemon has put into manual control. Only these can
-    /// meaningfully be checked for a firmware reclaim: a channel we never
-    /// claimed is expected to be in whatever mode the BIOS left it.
-    manual_asserted: RefCell<HashSet<ChannelName>>,
 }
 
 /// Duty-cache entry for slow-device fan channels. `last_known` is
@@ -673,7 +669,6 @@ impl HwmonRepo {
                     force_next_write: RefCell::new(HashSet::with_capacity(
                         PENDING_INITIAL_CAPACITY,
                     )),
-                    manual_asserted: RefCell::new(HashSet::with_capacity(PENDING_INITIAL_CAPACITY)),
                 }),
             );
             self.delay_logged.insert(type_index, Cell::new(0));
@@ -1169,8 +1164,6 @@ impl HwmonRepo {
                 shutdown: self.shutdown_token.clone(),
                 write_permit_timeout,
                 delay_millis: self.device_delay(device_uid),
-                device_uid: device_uid.clone(),
-                hardware_support: self.hardware_support.clone(),
             };
             rt::spawn(run_writer_task(task));
         }
@@ -1189,23 +1182,6 @@ impl HwmonRepo {
         };
         mailbox
             .force_next_write
-            .borrow_mut()
-            .insert(channel_name.to_string());
-    }
-
-    /// Records that this daemon has put `(type_index, channel_name)` into
-    /// manual control, which is the precondition for treating a later
-    /// non-manual `pwm_enable` reading as a firmware reclaim.
-    fn mark_manual_asserted(&self, type_index: TypeIndex, channel_name: &str) {
-        let Some(mailbox) = self.writers.get(&type_index) else {
-            debug!(
-                "No writer mailbox for type_index {type_index} when marking manual control \
-                 for channel {channel_name}"
-            );
-            return;
-        };
-        mailbox
-            .manual_asserted
             .borrow_mut()
             .insert(channel_name.to_string());
     }
@@ -1240,10 +1216,6 @@ struct WriterTask {
     shutdown: CancellationToken,
     write_permit_timeout: Duration,
     delay_millis: u16,
-    /// Needed to republish a verdict when firmware reclaims a channel.
-    device_uid: UID,
-    /// `None` in tests, which simply skips republishing.
-    hardware_support: Option<Rc<HardwareSupportController>>,
 }
 
 /// Drains the mailbox until shutdown. Each iteration swaps `pending`
@@ -1486,7 +1458,6 @@ async fn run_one_pending_write(
         drop(permit);
         return;
     }
-    reassert_manual_if_reclaimed(task, &channel_name).await;
     debug!(
         "Applying HWMON device: {driver_name} channel: {channel_name}; \
          Fixed Speed: {}",
@@ -1517,82 +1488,6 @@ async fn run_one_pending_write(
         }
     }
     let _ = pending.waiter.send(result);
-}
-
-/// Detects a firmware or EC reclaim of a channel this daemon put into manual
-/// control, and re-asserts manual so the duty write that follows has a chance
-/// of sticking.
-///
-/// Runs with the device permit already held, immediately before the duty
-/// write, so the extra sysfs read costs no additional permit round trip and
-/// only happens on writes that were not skipped as redundant.
-///
-/// The comparison is against manual specifically, not against the documented
-/// auto values: `pwm_enable` vocabularies are driver-defined and go well
-/// outside the 0-5 range in the kernel docs. An `nct6687` board reports 99 for
-/// channels its driver is not managing, so checking for "2 or 5" would miss
-/// the reclaim entirely.
-async fn reassert_manual_if_reclaimed(task: &WriterTask, channel_name: &str) {
-    if task
-        .mailbox
-        .manual_asserted
-        .borrow()
-        .contains(channel_name)
-        .not()
-    {
-        return;
-    }
-    let Some(channel_info) = task.driver.channels.iter().find(|channel| {
-        channel.hwmon_type == HwmonChannelType::Fan && channel.name == channel_name
-    }) else {
-        return;
-    };
-    // No `pwmN_enable` means there is no auto mode to be reclaimed into. Its
-    // absence is evidence against an override, never for one.
-    if channel_info.pwm_enable_default.is_none() {
-        return;
-    }
-    let current_mode = fans::get_current_pwm_enable(&task.driver.path, &channel_info.number).await;
-    let reclaimed = fans::is_firmware_reclaim(
-        true, // gated above so the sysfs read only happens for claimed channels
-        channel_info.pwm_enable_default.is_some(),
-        current_mode,
-    );
-    if reclaimed.not() {
-        return;
-    }
-    debug_assert!(
-        current_mode.is_some(),
-        "is_firmware_reclaim only reports a reclaim for a readable mode"
-    );
-    let current_mode = current_mode.unwrap_or(fans::PWM_ENABLE_MANUAL_VALUE);
-    let diagnosis = fans::diagnose_fan_channel(&task.driver.name, channel_info, true);
-    if let Some(hardware_support) = task.hardware_support.as_ref() {
-        hardware_support.record_channel_diagnosis(
-            &task.device_uid,
-            channel_name,
-            diagnosis.clone(),
-        );
-    }
-    warn!(
-        "Firmware reclaimed fan control on {}:{channel_name} (pwm_enable is {current_mode}, \
-         expected {}); verdict {:?}. Re-asserting manual control.",
-        task.driver.name,
-        fans::PWM_ENABLE_MANUAL_VALUE,
-        diagnosis.verdict
-    );
-    if let Err(err) = fans::set_pwm_enable(
-        fans::PWM_ENABLE_MANUAL_VALUE,
-        &task.driver.path,
-        channel_info,
-    )
-    .await
-    {
-        warn!(
-            "Could not re-assert manual control on {}:{channel_name}: {err}",
-            task.driver.name
-        );
-    }
 }
 
 /// Removes and returns whether `channel_name` had the
@@ -2075,10 +1970,6 @@ impl Repository for HwmonRepo {
             })
         };
         apply_device_command_delay(self.device_delay(device_uid)).await;
-        // Apple SMC has no `pwm_enable`, so there is no mode to be reclaimed.
-        if result.is_ok() && hwmon_driver.apple_smc.detected.not() {
-            self.mark_manual_asserted(type_index, channel_name);
-        }
         result
     }
 
@@ -3415,7 +3306,6 @@ mod coalescer_tests {
                 pending: RefCell::new(HashMap::with_capacity(PENDING_INITIAL_CAPACITY)),
                 notify: Notify::new(),
                 force_next_write: RefCell::new(HashSet::with_capacity(PENDING_INITIAL_CAPACITY)),
-                manual_asserted: RefCell::new(HashSet::with_capacity(PENDING_INITIAL_CAPACITY)),
             }),
         );
         repo.delay_logged.insert(type_index, Cell::new(0));
@@ -3440,8 +3330,6 @@ mod coalescer_tests {
             shutdown: repo.shutdown_token.clone(),
             write_permit_timeout: repo.device_write_permit_timeout,
             delay_millis,
-            device_uid: uid.clone(),
-            hardware_support: None,
         };
         crate::rt::spawn(run_writer_task(task));
         uid
@@ -4232,7 +4120,6 @@ mod slow_device_tests {
                 pending: RefCell::new(HashMap::with_capacity(PENDING_INITIAL_CAPACITY)),
                 notify: Notify::new(),
                 force_next_write: RefCell::new(HashSet::with_capacity(PENDING_INITIAL_CAPACITY)),
-                manual_asserted: RefCell::new(HashSet::with_capacity(PENDING_INITIAL_CAPACITY)),
             }),
         );
         repo.delay_logged.insert(type_index, Cell::new(0));
@@ -4269,8 +4156,6 @@ mod slow_device_tests {
             shutdown: repo.shutdown_token.clone(),
             write_permit_timeout: repo.device_write_permit_timeout,
             delay_millis: 0,
-            device_uid: uid.clone(),
-            hardware_support: None,
         };
         crate::rt::spawn(run_writer_task(task));
         uid
