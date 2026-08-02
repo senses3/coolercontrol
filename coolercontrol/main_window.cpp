@@ -277,6 +277,9 @@ void MainWindow::initWizard() {
   });
   connect(m_wizard, &QDialog::accepted,
           [this]() { applyDaemonConnection(m_addressPage->commit()); });
+  // Removing an entry never reaches applyDaemonConnection, so the menu is refreshed on
+  // the way out whatever the user did in there.
+  connect(m_wizard, &QDialog::finished, this, [this]() { rebuildDaemonsTrayMenu(); });
 }
 
 void MainWindow::initDelay() const {

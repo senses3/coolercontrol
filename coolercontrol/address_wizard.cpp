@@ -283,11 +283,12 @@ connections::Connection AddressPage::commit() const {
 }
 
 void AddressPage::refreshRemoveButton() const {
-  // Only a saved row can be removed, and the app always needs somewhere to connect, so
-  // the last one stays.
+  // Only a saved row can go, never the last one, and never the daemon in use: removing
+  // that would leave the app connected to something no longer on the list.
   const auto index = m_savedCombo->currentIndex();
   const auto saved = connections::all().size();
-  m_removeButton->setEnabled(saved > 1 && index >= 0 && index < saved);
+  m_removeButton->setEnabled(saved > 1 && index >= 0 && index < saved &&
+                             index != connections::currentIndex());
 }
 
 void AddressPage::reload() const {
