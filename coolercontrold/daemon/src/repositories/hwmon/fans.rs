@@ -18,6 +18,7 @@
 
 use crate::cc_fs;
 use crate::device::ChannelStatus;
+use crate::hardware_support::{self, ChannelDiagnosis, ChannelEvidence};
 use crate::repositories::hwmon::hwmon_repo::{
     AutoCurveInfo, HwmonChannelCapabilities, HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo,
 };
@@ -55,11 +56,54 @@ pub async fn init_fans(base_path: &Path, device_name: &str) -> Result<Vec<HwmonC
     let mut fans = caps_to_hwmon_fans(base_path, device_name, fan_caps).await?;
     fans.sort_by_key(|c| c.number);
     auto_curve::init_auto_curve_fans(base_path, &mut fans, device_name).await?;
+    log_channel_verdicts(base_path, device_name, &fans);
     trace!(
         "Hwmon pwm fans detected: {fans:?} for {}",
         base_path.display()
     );
     Ok(fans)
+}
+
+/// Diagnoses why one fan channel is or is not controllable.
+///
+/// `firmware_override_observed` comes from the `pwm_enable` read-back; at init
+/// there has been nothing to observe yet, so callers pass `false`.
+pub fn diagnose_fan_channel(
+    hwmon_name: &str,
+    channel: &HwmonChannelInfo,
+    firmware_override_observed: bool,
+) -> ChannelDiagnosis {
+    debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
+    let evidence = ChannelEvidence {
+        has_pwm: channel.caps.has_pwm(),
+        pwm_writable: channel.caps.is_fan_controllable(),
+        has_rpm: channel.caps.has_rpm(),
+        // `pwm_enable_default` is `Some` exactly when the driver exposed a
+        // `pwmN_enable` file for this channel.
+        has_pwm_enable: channel.pwm_enable_default.is_some(),
+    };
+    hardware_support::diagnose_channel(evidence, hwmon_name, firmware_override_observed)
+}
+
+/// Logs a reason for every channel we cannot drive, replacing the previous
+/// bare "uncontrollable fan found" line. Controllable channels stay silent,
+/// consistent with making no noise for working hardware.
+fn log_channel_verdicts(base_path: &Path, device_name: &str, fans: &[HwmonChannelInfo]) {
+    for channel in fans {
+        let diagnosis = diagnose_fan_channel(device_name, channel, false);
+        if diagnosis.verdict.is_controllable() {
+            continue;
+        }
+        info!(
+            "Fan channel {} at {} is not controllable: {:?} (pwm: {}, writable: {}, rpm: {})",
+            channel.name,
+            base_path.display(),
+            diagnosis.verdict,
+            diagnosis.evidence.has_pwm,
+            diagnosis.evidence.pwm_writable,
+            diagnosis.evidence.has_rpm,
+        );
+    }
 }
 
 /// Detects if a fan has pwm capability and pwm-write capabilities.
@@ -138,12 +182,9 @@ async fn caps_to_hwmon_fans(
         let label = get_fan_channel_label(base_path, &channel_number).await;
         // deprecated setting:
         // determine_pwm_mode_support(base_path, &channel_number).await;
-        if fan_cap.is_non_controllable_rpm_fan() {
-            info!(
-                "Uncontrollable RPM-only fan found at {}/fan{channel_number}_input",
-                base_path.display()
-            );
-        }
+        // Uncontrollable channels are reported by `log_channel_verdicts` once
+        // the full channel is built, which can name a cause instead of a
+        // symptom.
         let pwm_path = if fan_cap.has_pwm() {
             Some(base_path.join(format_pwm!(channel_number)))
         } else {

@@ -60,6 +60,7 @@ mod device_listener;
 mod device_uid;
 mod engine;
 mod grpc_api;
+mod hardware_support;
 mod hashutil;
 mod logger;
 mod main_loop;
@@ -321,8 +322,11 @@ fn main() -> Result<()> {
         sidecar::handle().run(admin::load_passwd).await??;
 
         pause_before_startup(&config).await?;
-        run_sensors_detection(&config);
+        let detection_results = run_sensors_detection(&config);
         rt::log_active_backend();
+        let hardware_support =
+            Rc::new(hardware_support::HardwareSupportController::init(detection_results).await);
+        hardware_support.log_findings();
 
         let sensors_conf = Rc::new(load_sensors_conf(&config).await);
         let overrides_controller = Rc::new(
@@ -712,11 +716,14 @@ fn exit_successfully() -> ! {
 }
 
 /// Run Super-I/O hardware detection and load kernel modules if enabled.
+/// Returns the results so they can be retained for the lifetime of the daemon.
+/// `None` means no probe was made, which is not the same as a probe that found
+/// nothing and must not produce findings.
 #[cfg(target_arch = "x86_64")]
-fn run_sensors_detection(config: &Rc<Config>) {
+fn run_sensors_detection(config: &Rc<Config>) -> Option<cc_detect::DetectionResults> {
     if is_env_disabled(ENV_SENSORS_DETECT) {
         info!("Super-I/O hardware detection disabled by environment variable");
-        return;
+        return None;
     }
     match config.get_settings() {
         Ok(settings) if settings.sensors_auto_detect => {
@@ -731,19 +738,23 @@ fn run_sensors_detection(config: &Rc<Config>) {
             if results.detected_chips.is_empty() && !results.environment.is_container {
                 info!("No Super-I/O chips detected");
             }
+            Some(results)
         }
         Ok(_) => {
             info!("Super-I/O hardware detection disabled by configuration");
+            None
         }
         Err(err) => {
             warn!("Could not read settings for sensors detection: {err}");
+            None
         }
     }
 }
 
 #[cfg(not(target_arch = "x86_64"))]
-fn run_sensors_detection(_config: &Rc<Config>) {
+fn run_sensors_detection(_config: &Rc<Config>) -> Option<cc_detect::DetectionResults> {
     // Super-I/O detection is x86_64-only
+    None
 }
 
 /// Some hardware needs additional time to come up and be ready to communicate.

@@ -65,6 +65,15 @@ use module_loader::LoadResult;
 #[cfg(target_arch = "x86_64")]
 use superio::DetectedChip;
 
+/// Whether this build can actually probe for Super-I/O chips.
+///
+/// Callers must consult this before interpreting `EnvironmentInfo`: the
+/// non-x86_64 stub reports `has_dev_port: false` and `is_secure_boot: false`,
+/// and those are defaults, not observations. Treating them as observations
+/// would report a blocked environment on every machine that simply has no
+/// Super-I/O bus to probe.
+pub const DETECTION_SUPPORTED: bool = cfg!(target_arch = "x86_64");
+
 /// Complete detection results.
 #[derive(Debug, Clone, Serialize)]
 pub struct DetectionResults {

@@ -134,7 +134,7 @@ async fn log_system_info() {
     }
 }
 
-async fn get_dmi_system_info(name: &str) -> String {
+pub async fn get_dmi_system_info(name: &str) -> String {
     cc_fs::read_txt(format!("/sys/devices/virtual/dmi/id/{name}"))
         .await
         .unwrap_or_default()

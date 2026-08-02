@@ -1,0 +1,628 @@
+/*
+ * CoolerControl - monitor and control your cooling and other devices
+ * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+//! Hardware support diagnostics.
+//!
+//! The daemon asserts observations, the docs assert remedies. Nothing in this
+//! module names a kernel module, a module parameter, or a fix, so the guidance
+//! can never go stale against the docs site.
+//!
+//! Two scopes, deliberately separate. A `ChannelVerdict` explains one fan
+//! channel that hwmon already exposes. A `SystemFinding` explains a chip that
+//! produced no hwmon channel at all, which is why it cannot be a channel
+//! verdict: there is nothing to attach it to.
+
+use crate::cc_fs;
+use log::{info, warn};
+use std::collections::HashSet;
+use std::ops::Not;
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+/// Where bound drivers are resolved from. Every hwmon device appears here as a
+/// symlink regardless of which bus it lives on.
+const HWMON_CLASS_PATH: &str = "/sys/class/hwmon";
+
+/// Super-I/O families whose in-tree driver frequently lacks fan control that
+/// an out-of-tree variant provides.
+///
+/// Matched against the hwmon `name` attribute, which is the *chip*, not the
+/// module: the `it87` module presents as `it8728`, `it8686` and friends, so a
+/// literal `it87` match would miss most of the family.
+const OUT_OF_TREE_CANDIDATE_PREFIXES: [&str; 2] = ["nct6", "it8"];
+
+/// Why a fan channel can or cannot be driven, from local evidence only.
+///
+/// `IgnoresDuty` and `Unverifiable` are reserved for the duty-response probe
+/// and are never produced by passive observation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChannelVerdict {
+    /// `pwmN` is present and writable and nothing has reclaimed it.
+    Controllable,
+    /// Manual mode was set and later read back as something else.
+    FirmwareOverride,
+    /// No writable control, on a family where an out-of-tree driver may help.
+    FamilyMayNeedOutOfTree,
+    /// The driver exposes no `pwmN` for this channel.
+    NoPwm,
+    /// `pwmN` exists but the driver cleared its write bit.
+    PwmReadOnly,
+    /// Probe proved writes are accepted and the fan never responded.
+    IgnoresDuty,
+    /// No usable tachometer, so no probe can settle the question.
+    Unverifiable,
+}
+
+impl ChannelVerdict {
+    /// Whether this verdict means `CoolerControl` can currently drive the fan.
+    pub fn is_controllable(self) -> bool {
+        matches!(self, Self::Controllable)
+    }
+}
+
+/// The raw facts a `ChannelVerdict` was computed from.
+///
+/// Carried alongside the verdict so every surface can show what was measured
+/// rather than asking the user to trust a label.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChannelEvidence {
+    pub has_pwm: bool,
+    pub pwm_writable: bool,
+    pub has_rpm: bool,
+    /// A missing `pwmN_enable` is not a defect. Drivers implement different
+    /// feature sets; its absence usually means only that fan control cannot be
+    /// handed back to the BIOS. It is evidence *against* `FirmwareOverride`,
+    /// because there is no auto mode to revert to.
+    pub has_pwm_enable: bool,
+}
+
+/// One channel's diagnosis: the verdict and the evidence behind it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChannelDiagnosis {
+    pub verdict: ChannelVerdict,
+    pub evidence: ChannelEvidence,
+}
+
+/// Computes the passive verdict for one fan channel.
+///
+/// `firmware_override_observed` comes from the `pwm_enable` read-back and is
+/// ignored unless the channel actually has a `pwm_enable` file.
+pub fn diagnose_channel(
+    evidence: ChannelEvidence,
+    hwmon_name: &str,
+    firmware_override_observed: bool,
+) -> ChannelDiagnosis {
+    debug_assert!(
+        evidence.pwm_writable.not() || evidence.has_pwm,
+        "a channel cannot have a writable pwm without having a pwm"
+    );
+    debug_assert!(
+        evidence.has_pwm_enable.not() || evidence.has_pwm,
+        "a channel cannot have pwm_enable without having a pwm"
+    );
+    let verdict = if evidence.has_pwm.not() {
+        family_fallback(hwmon_name, ChannelVerdict::NoPwm)
+    } else if evidence.pwm_writable.not() {
+        family_fallback(hwmon_name, ChannelVerdict::PwmReadOnly)
+    } else if firmware_override_observed && evidence.has_pwm_enable {
+        ChannelVerdict::FirmwareOverride
+    } else {
+        ChannelVerdict::Controllable
+    };
+    ChannelDiagnosis { verdict, evidence }
+}
+
+/// Family guidance is evidence-gated, not identity-gated: it only ever
+/// replaces a verdict that already established there is no writable control.
+/// A board with eleven working fans and one locked header must not send the
+/// user module-hunting.
+fn family_fallback(hwmon_name: &str, otherwise: ChannelVerdict) -> ChannelVerdict {
+    debug_assert!(
+        otherwise.is_controllable().not(),
+        "family guidance must only replace a no-control verdict"
+    );
+    if is_out_of_tree_candidate_family(hwmon_name) {
+        ChannelVerdict::FamilyMayNeedOutOfTree
+    } else {
+        otherwise
+    }
+}
+
+/// Whether an hwmon `name` belongs to a family with a known out-of-tree driver.
+pub fn is_out_of_tree_candidate_family(hwmon_name: &str) -> bool {
+    let name_lower = hwmon_name.to_ascii_lowercase();
+    OUT_OF_TREE_CANDIDATE_PREFIXES
+        .iter()
+        .any(|prefix| name_lower.starts_with(prefix))
+}
+
+/// Why the Super-I/O probe could not run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvironmentBlocker {
+    SecureBoot,
+    Container,
+    NoDevPort,
+}
+
+/// A fact about the machine rather than about one channel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SystemFinding {
+    /// A chip was detected but no loaded driver serves its family.
+    NoDriverBound {
+        chip_name: String,
+        expected_driver: String,
+    },
+    /// modprobe refused because the driver is blacklisted.
+    Blacklisted { driver: String },
+    /// The probe could not run at all.
+    BlockedByEnvironment { reason: EnvironmentBlocker },
+    /// Not an x86_64 target, so no probe was ever attempted. Distinct from
+    /// `BlockedByEnvironment` because the stub reports `has_dev_port: false`
+    /// on platforms where `/dev/port` is simply irrelevant, and reporting that
+    /// as a blocker would be a claim we cannot back with an observation.
+    DetectionUnsupported,
+}
+
+/// Normalizes a driver or chip name to its family key.
+///
+/// In-tree and out-of-tree drivers for the same chip have different module
+/// names (`nct6683` in-tree versus `nct6687` out-of-tree), and the chip
+/// database records the *expected* in-tree driver. Comparing exact names would
+/// report a fully working board as having no driver bound.
+fn driver_family(name: &str) -> String {
+    let name_lower = name.to_ascii_lowercase();
+    for prefix in OUT_OF_TREE_CANDIDATE_PREFIXES {
+        if name_lower.starts_with(prefix) {
+            return prefix.to_string();
+        }
+    }
+    name_lower
+}
+
+/// Whether any loaded driver serves the same family as `expected_driver`.
+fn is_chip_served(expected_driver: &str, bound_drivers: &HashSet<String>) -> bool {
+    let expected_family = driver_family(expected_driver);
+    bound_drivers
+        .iter()
+        .any(|bound| driver_family(bound) == expected_family)
+}
+
+/// A chip detected by the Super-I/O probe, reduced to what the findings need.
+pub struct DetectedChipRef<'a> {
+    pub name: &'a str,
+    pub driver: &'a str,
+}
+
+/// The environment the probe ran in.
+pub struct ProbeEnvironment {
+    pub is_container: bool,
+    pub is_secure_boot: bool,
+    pub has_dev_port: bool,
+}
+
+/// Derives the machine-scope findings.
+///
+/// `bound_drivers` must come from resolving each hwmon device's `device/driver`
+/// symlink, not from the hwmon `name` attribute: `name` is the chip, and for
+/// several families it does not match any module name.
+pub fn derive_system_findings(
+    detection_supported: bool,
+    chips: &[DetectedChipRef<'_>],
+    blacklisted: &[String],
+    environment: &ProbeEnvironment,
+    bound_drivers: &HashSet<String>,
+) -> Vec<SystemFinding> {
+    if detection_supported.not() {
+        return vec![SystemFinding::DetectionUnsupported];
+    }
+    let mut findings = Vec::with_capacity(chips.len() + blacklisted.len() + 1);
+    if let Some(reason) = environment_blocker(environment) {
+        findings.push(SystemFinding::BlockedByEnvironment { reason });
+    }
+    for driver in blacklisted {
+        findings.push(SystemFinding::Blacklisted {
+            driver: driver.clone(),
+        });
+    }
+    for chip in chips {
+        if is_chip_served(chip.driver, bound_drivers) {
+            continue;
+        }
+        findings.push(SystemFinding::NoDriverBound {
+            chip_name: chip.name.to_string(),
+            expected_driver: chip.driver.to_string(),
+        });
+    }
+    findings
+}
+
+/// Secure Boot is checked first because it is the cause users are least likely
+/// to suspect and it silently defeats module loading.
+fn environment_blocker(environment: &ProbeEnvironment) -> Option<EnvironmentBlocker> {
+    if environment.is_secure_boot {
+        return Some(EnvironmentBlocker::SecureBoot);
+    }
+    if environment.is_container {
+        return Some(EnvironmentBlocker::Container);
+    }
+    if environment.has_dev_port.not() {
+        return Some(EnvironmentBlocker::NoDevPort);
+    }
+    None
+}
+
+/// Resolves the driver actually bound to each hwmon device.
+///
+/// Reads `<hwmon>/device/driver`, whose symlink target basename is the module
+/// serving the device. This is the authoritative answer and the reason we do
+/// not use the hwmon `name` attribute: `name` is the chip, and for several
+/// families it matches no module name at all.
+///
+/// Devices with no such link (USB and HID hwmon entries among them) simply
+/// contribute nothing, which is correct: they are not Super-I/O chips and
+/// cannot satisfy a detected-chip lookup.
+pub fn resolve_bound_drivers(hwmon_class_path: &Path) -> HashSet<String> {
+    let mut bound = HashSet::new();
+    let Ok(entries) = cc_fs::read_dir(hwmon_class_path) else {
+        warn!(
+            "Could not enumerate {} for bound driver resolution",
+            hwmon_class_path.display()
+        );
+        return bound;
+    };
+    for entry in entries {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let driver_link = entry.path().join("device").join("driver");
+        let Ok(target) = cc_fs::read_link(&driver_link) else {
+            continue;
+        };
+        let Some(driver_name) = target.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if driver_name.is_empty() {
+            continue;
+        }
+        bound.insert(driver_name.to_ascii_lowercase());
+    }
+    bound
+}
+
+/// Machine identity, used to pick the right docs anchor and for the report.
+///
+/// Already read at startup for the log banner and previously discarded.
+/// Deliberately excludes serials and UUIDs: this is destined for a report the
+/// user pastes into a support channel.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SystemInfo {
+    pub board_vendor: String,
+    pub board_name: String,
+    pub board_version: String,
+    pub bios_vendor: String,
+    pub bios_release: String,
+}
+
+impl SystemInfo {
+    pub async fn read() -> Self {
+        Self {
+            board_vendor: crate::logger::get_dmi_system_info("board_vendor").await,
+            board_name: crate::logger::get_dmi_system_info("board_name").await,
+            board_version: crate::logger::get_dmi_system_info("board_version").await,
+            bios_vendor: crate::logger::get_dmi_system_info("bios_vendor").await,
+            bios_release: crate::logger::get_dmi_system_info("bios_release").await,
+        }
+    }
+}
+
+/// Retains what startup detection learned so it can be served later.
+///
+/// Detection runs before the device repositories are initialized, and module
+/// loading only happens at that point, so re-probing on demand would answer a
+/// different question than the one the user is asking.
+pub struct HardwareSupportController {
+    pub system_info: SystemInfo,
+    pub detection: Option<cc_detect::DetectionResults>,
+    pub system_findings: Vec<SystemFinding>,
+}
+
+impl HardwareSupportController {
+    pub async fn init(detection: Option<cc_detect::DetectionResults>) -> Self {
+        let system_info = SystemInfo::read().await;
+        let system_findings = Self::compute_findings(detection.as_ref());
+        Self {
+            system_info,
+            detection,
+            system_findings,
+        }
+    }
+
+    /// `None` detection means the probe was switched off by config or
+    /// environment, which is not an observation and therefore yields no
+    /// findings.
+    fn compute_findings(detection: Option<&cc_detect::DetectionResults>) -> Vec<SystemFinding> {
+        if cc_detect::DETECTION_SUPPORTED.not() {
+            return vec![SystemFinding::DetectionUnsupported];
+        }
+        let Some(results) = detection else {
+            return Vec::new();
+        };
+        let bound_drivers = resolve_bound_drivers(Path::new(HWMON_CLASS_PATH));
+        let chips = results
+            .detected_chips
+            .iter()
+            .map(|chip| DetectedChipRef {
+                name: &chip.name,
+                driver: &chip.driver,
+            })
+            .collect::<Vec<_>>();
+        let environment = ProbeEnvironment {
+            is_container: results.environment.is_container,
+            is_secure_boot: results.environment.is_secure_boot,
+            has_dev_port: results.environment.has_dev_port,
+        };
+        derive_system_findings(
+            true,
+            &chips,
+            &results.blacklisted,
+            &environment,
+            &bound_drivers,
+        )
+    }
+
+    /// Secure Boot silently defeating module loading is invisible in the app
+    /// today, so the findings are worth a startup line even before any surface
+    /// consumes them.
+    pub fn log_findings(&self) {
+        if self.has_actionable_finding() {
+            self.log_machine_context();
+        }
+        for finding in &self.system_findings {
+            match finding {
+                SystemFinding::NoDriverBound {
+                    chip_name,
+                    expected_driver,
+                } => warn!(
+                    "Hardware support: {chip_name} was detected but no loaded driver serves it \
+                     (expected something like {expected_driver})"
+                ),
+                SystemFinding::Blacklisted { driver } => {
+                    warn!("Hardware support: driver {driver} is blacklisted and was not loaded");
+                }
+                SystemFinding::BlockedByEnvironment { reason } => warn!(
+                    "Hardware support: Super-I/O detection could not run ({reason:?}); \
+                     chips needing a Super-I/O probe will not be found"
+                ),
+                SystemFinding::DetectionUnsupported => {
+                    info!("Hardware support: Super-I/O detection is x86_64 only");
+                }
+            }
+        }
+    }
+
+    /// `DetectionUnsupported` is a statement about the build, not a problem
+    /// with the machine, so it does not warrant dumping board context.
+    fn has_actionable_finding(&self) -> bool {
+        self.system_findings
+            .iter()
+            .any(|finding| matches!(finding, SystemFinding::DetectionUnsupported).not())
+    }
+
+    /// The board and chip count are what a maintainer needs first when reading
+    /// a log alongside a support question.
+    fn log_machine_context(&self) {
+        let SystemInfo {
+            board_vendor,
+            board_name,
+            bios_vendor,
+            bios_release,
+            ..
+        } = &self.system_info;
+        info!(
+            "Hardware support: board {board_vendor} {board_name}, BIOS {bios_vendor} \
+             {bios_release}"
+        );
+        if let Some(detection) = &self.detection {
+            info!(
+                "Hardware support: {} Super-I/O chip(s) detected",
+                detection.detected_chips.len()
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn evidence(has_pwm: bool, pwm_writable: bool, has_pwm_enable: bool) -> ChannelEvidence {
+        ChannelEvidence {
+            has_pwm,
+            pwm_writable,
+            has_rpm: true,
+            has_pwm_enable,
+        }
+    }
+
+    /// A writable pwm with nothing reclaiming it is the ordinary healthy case.
+    #[test]
+    fn writable_pwm_is_controllable() {
+        let diagnosis = diagnose_channel(evidence(true, true, true), "nct6687", false);
+        assert_eq!(diagnosis.verdict, ChannelVerdict::Controllable);
+    }
+
+    /// A channel with no pwm_enable is still fully controllable. Its absence
+    /// only means control cannot be handed back to the BIOS.
+    #[test]
+    fn missing_pwm_enable_is_not_a_defect() {
+        let diagnosis = diagnose_channel(evidence(true, true, false), "some_driver", false);
+        assert_eq!(diagnosis.verdict, ChannelVerdict::Controllable);
+    }
+
+    /// The override read-back must be ignored when there is no pwm_enable file
+    /// to have read back, otherwise absence would be treated as evidence for.
+    #[test]
+    fn override_requires_pwm_enable_to_exist() {
+        let with_file = diagnose_channel(evidence(true, true, true), "some_driver", true);
+        assert_eq!(with_file.verdict, ChannelVerdict::FirmwareOverride);
+        let without_file = diagnose_channel(evidence(true, true, false), "some_driver", true);
+        assert_eq!(without_file.verdict, ChannelVerdict::Controllable);
+    }
+
+    /// No writable control on a plain driver reports the honest mechanical
+    /// reason rather than sending the user looking for a module.
+    #[test]
+    fn no_control_on_unknown_family_reports_mechanism() {
+        let no_pwm = diagnose_channel(evidence(false, false, false), "some_driver", false);
+        assert_eq!(no_pwm.verdict, ChannelVerdict::NoPwm);
+        let read_only = diagnose_channel(evidence(true, false, false), "some_driver", false);
+        assert_eq!(read_only.verdict, ChannelVerdict::PwmReadOnly);
+    }
+
+    /// Family guidance replaces a no-control verdict, and only that. A working
+    /// channel on the same chip must stay Controllable.
+    #[test]
+    fn family_guidance_is_evidence_gated() {
+        let locked = diagnose_channel(evidence(true, false, false), "nct6798", false);
+        assert_eq!(locked.verdict, ChannelVerdict::FamilyMayNeedOutOfTree);
+        let working = diagnose_channel(evidence(true, true, true), "nct6798", false);
+        assert_eq!(working.verdict, ChannelVerdict::Controllable);
+    }
+
+    /// The it87 module presents as it8xxx chip names, so the family predicate
+    /// has to match the chip prefix rather than the module name.
+    #[test]
+    fn it87_family_matches_chip_names() {
+        assert!(is_out_of_tree_candidate_family("it8728"));
+        assert!(is_out_of_tree_candidate_family("it8686"));
+        assert!(is_out_of_tree_candidate_family("nct6683"));
+        assert!(is_out_of_tree_candidate_family("NCT6687"));
+        assert!(is_out_of_tree_candidate_family("k10temp").not());
+        assert!(is_out_of_tree_candidate_family("amdgpu").not());
+    }
+
+    /// Regression guard for the worst false positive available to this
+    /// feature. The chip database maps NCT6687D to the in-tree nct6683, but a
+    /// working board may be served by the out-of-tree nct6687. Reporting
+    /// NoDriverBound there would tell a user with working fans to go load
+    /// kernel modules.
+    #[test]
+    fn out_of_tree_driver_counts_as_bound() {
+        let chips = [DetectedChipRef {
+            name: "Nuvoton NCT6687D eSIO",
+            driver: "nct6683",
+        }];
+        let bound = HashSet::from(["nct6687".to_string()]);
+        let findings = derive_system_findings(true, &chips, &[], &clear_environment(), &bound);
+        assert!(
+            findings.is_empty(),
+            "expected no findings, got {findings:?}"
+        );
+    }
+
+    /// A chip with genuinely nothing loaded for its family is the case the
+    /// finding exists for.
+    #[test]
+    fn unserved_chip_reports_no_driver_bound() {
+        let chips = [DetectedChipRef {
+            name: "ITE IT8728F Super IO Sensors",
+            driver: "it87",
+        }];
+        let bound = HashSet::from(["k10temp".to_string()]);
+        let findings = derive_system_findings(true, &chips, &[], &clear_environment(), &bound);
+        assert_eq!(
+            findings,
+            vec![SystemFinding::NoDriverBound {
+                chip_name: "ITE IT8728F Super IO Sensors".to_string(),
+                expected_driver: "it87".to_string(),
+            }]
+        );
+    }
+
+    /// On non-x86_64 the stub reports has_dev_port: false, which is not an
+    /// observation. Reporting it as a blocker would fire on every ARM board.
+    #[test]
+    fn unsupported_detection_never_reports_blockers() {
+        let environment = ProbeEnvironment {
+            is_container: false,
+            is_secure_boot: false,
+            has_dev_port: false,
+        };
+        let findings = derive_system_findings(false, &[], &[], &environment, &HashSet::new());
+        assert_eq!(findings, vec![SystemFinding::DetectionUnsupported]);
+    }
+
+    /// Secure Boot outranks the other blockers because it is the one users are
+    /// least likely to suspect.
+    #[test]
+    fn secure_boot_outranks_other_blockers() {
+        let environment = ProbeEnvironment {
+            is_container: true,
+            is_secure_boot: true,
+            has_dev_port: false,
+        };
+        let findings = derive_system_findings(true, &[], &[], &environment, &HashSet::new());
+        assert_eq!(
+            findings,
+            vec![SystemFinding::BlockedByEnvironment {
+                reason: EnvironmentBlocker::SecureBoot
+            }]
+        );
+    }
+
+    /// A blacklisted driver is strongly actionable and must survive alongside
+    /// the chip scan.
+    #[test]
+    fn blacklisted_drivers_are_reported() {
+        let blacklisted = vec!["it87".to_string()];
+        let findings = derive_system_findings(
+            true,
+            &[],
+            &blacklisted,
+            &clear_environment(),
+            &HashSet::new(),
+        );
+        assert_eq!(
+            findings,
+            vec![SystemFinding::Blacklisted {
+                driver: "it87".to_string()
+            }]
+        );
+    }
+
+    /// Only Controllable counts as drivable. FirmwareOverride in particular
+    /// must not, since the whole point is that the write does not stick.
+    #[test]
+    fn only_controllable_is_drivable() {
+        assert!(ChannelVerdict::Controllable.is_controllable());
+        assert!(ChannelVerdict::FirmwareOverride.is_controllable().not());
+        assert!(ChannelVerdict::NoPwm.is_controllable().not());
+    }
+
+    fn clear_environment() -> ProbeEnvironment {
+        ProbeEnvironment {
+            is_container: false,
+            is_secure_boot: false,
+            has_dev_port: true,
+        }
+    }
+}
