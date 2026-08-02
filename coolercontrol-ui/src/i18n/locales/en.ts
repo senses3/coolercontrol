@@ -543,10 +543,10 @@ export default {
             downloadCurrentLog: 'Download Current Log',
             deviceHealth: 'Device Health',
             deviceHealthOk: 'All sensors and channels are healthy.',
-            detection: 'Hardware Detection',
+            detection: 'Chip Detection',
             detectionDescription:
-                'What the Super-I/O probe found when the daemon started. Module loading happens at startup, so this is the run that explains an unbound chip.',
-            detectionButton: 'Detection',
+                'What the Super-I/O chip probe found when the daemon started. Module loading happens at startup, so this is the run that explains an unbound chip.',
+            detectionButton: 'Chip Detection',
             detectionNotRun:
                 'No detection was run, so nothing is known about Super-I/O chips on this machine.',
             detectionSecureBoot: 'Secure Boot',
