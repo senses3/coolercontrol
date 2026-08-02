@@ -1380,6 +1380,7 @@ void MainWindow::setTrayMenuModes(const QString& modesJson) const {
       setModeRequest.setUrl(url);
       applyAuth(setModeRequest);
       const auto setModeReply = m_manager->post(setModeRequest, QByteArray());
+      applyTlsPolicy(setModeReply);
       connect(setModeReply, &QNetworkReply::finished, [setModeReply, this]() {
         const auto status =
             setModeReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
