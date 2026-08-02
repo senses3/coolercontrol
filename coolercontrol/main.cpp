@@ -25,6 +25,7 @@
 #include <QTranslator>
 #include <optional>
 
+#include "connections.h"
 #include "constants.h"
 #include "dbus_listener.h"
 #include "main_window.h"
@@ -185,6 +186,10 @@ int main(int argc, char* argv[]) {
   } else {
     qWarning("Cannot connect to the D-Bus session bus.");
   }
+
+  // Before MainWindow: its member initialisers build the address wizard, which reads the
+  // saved list in its own constructor.
+  connections::ensureMigrated();
 
   MainWindow w;
   w.setDiscardEnabled(g_discardEnabled);

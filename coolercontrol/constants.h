@@ -52,6 +52,10 @@ const std::string SETTING_PINNED_SENSORS_LEGACY = "pinnedSensors";
 const std::string SETTING_TLS_STRICT = "tlsStrict";
 // SHA-256 pins accepted by the user for remote daemons, keyed by host:port.
 const std::string SETTING_GROUP_TLS_PINS = "tlsPins";
+// The saved daemon list, as a QSettings array. Which entry is live is not stored here:
+// that stays in the flat address keys above, so older builds keep working and there is
+// no index to repair when the list changes. See connections.h.
+const std::string SETTING_GROUP_CONNECTIONS = "daemonConnections";
 const std::string DEFAULT_DAEMON_ADDRESS = "localhost";
 constexpr int DEFAULT_DAEMON_PORT = 11987;
 constexpr bool DEFAULT_DAEMON_SSL_ENABLED = true;

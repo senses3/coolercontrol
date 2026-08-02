@@ -50,6 +50,7 @@
 #include <initializer_list>
 #include <memory>
 
+#include "connections.h"
 #include "constants.h"
 #include "notifier.h"
 #include "origin_filter.h"
@@ -994,17 +995,14 @@ void MainWindow::showEvent(QShowEvent* event) {
 }
 
 QUrl MainWindow::getDaemonUrl(const bool forceHttp) {
-  const QSettings settings;
-  const auto host =
-      settings.value(SETTING_DAEMON_ADDRESS.data(), DEFAULT_DAEMON_ADDRESS.data()).toString();
-  const auto port = settings.value(SETTING_DAEMON_PORT.data(), DEFAULT_DAEMON_PORT).toInt();
-  const auto sslEnabled =
-      settings.value(SETTING_DAEMON_SSL_ENABLED.data(), DEFAULT_DAEMON_SSL_ENABLED).toBool();
-  const auto schema = forceHttp ? tr("http") : sslEnabled ? tr("https") : tr("http");
+  const auto connection = connections::current();
+  // Not tr(): a translated URL scheme would break every request this app makes.
+  const auto scheme =
+      (forceHttp || !connection.sslEnabled) ? QStringLiteral("http") : QStringLiteral("https");
   QUrl url;
-  url.setScheme(schema);
-  url.setHost(host);
-  url.setPort(port);
+  url.setScheme(scheme);
+  url.setHost(connection.host);
+  url.setPort(connection.port);
   return url;
 }
 
