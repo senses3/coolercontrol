@@ -31,6 +31,11 @@ const open = defineModel<boolean>('open', { required: true })
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
 
+// Discord and every markdown editor collapse the column alignment unless the
+// text is a code block, so the copy wraps it. The daemon reserves room for
+// these in its paste budget, so a fenced compact report still fits the limit.
+const CODE_FENCE = '```'
+
 const report = ref('')
 const loading = ref(false)
 const full = ref(false)
@@ -44,7 +49,8 @@ async function load(): Promise<void> {
 }
 
 // Reload when opened and whenever the compact/full choice changes, so the
-// preview always matches what the copy button will put on the clipboard.
+// preview always shows the text the copy button will put on the clipboard. The
+// fences are the one difference, and they are formatting rather than content.
 watch(open, (isOpen) => {
     if (isOpen) void load()
 })
@@ -54,7 +60,11 @@ watch(full, () => {
 
 async function copy(): Promise<void> {
     try {
-        await navigator.clipboard.writeText(report.value)
+        // trimEnd first: the report ends in a newline, which would otherwise
+        // put a blank line inside the block.
+        await navigator.clipboard.writeText(
+            `${CODE_FENCE}\n${report.value.trimEnd()}\n${CODE_FENCE}`,
+        )
         copied.value = true
     } catch {
         // Clipboard access can be denied; the text is on screen and

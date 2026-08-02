@@ -51,6 +51,17 @@ const TRIM_NOTICE: &str = "\n[trimmed, run `coolercontrold report --full` for th
 /// past this and get truncated by the client.
 pub const COMPACT_CHARACTER_BUDGET: usize = 2000;
 
+/// Room held back for the ```` ``` ```` fences the UI wraps the text in when
+/// copying. Without a code block the column alignment collapses in Discord and
+/// in every markdown editor, and a report trimmed to exactly the limit would
+/// then overflow it by the length of the fences themselves.
+const CODE_FENCE_RESERVE: usize = "```\n\n```".len();
+
+/// What the compact report may actually occupy.
+const COMPACT_TRIM_TARGET: usize = COMPACT_CHARACTER_BUDGET - CODE_FENCE_RESERVE;
+
+const _: () = assert!(COMPACT_TRIM_TARGET < COMPACT_CHARACTER_BUDGET);
+
 /// One hwmon device as the report sees it.
 struct ReportDevice {
     path: PathBuf,
@@ -561,11 +572,11 @@ fn resolve_driver(hwmon_path: &Path) -> Option<String> {
 /// cutting a verdict in half, and the pointer to `--full` means the dropped
 /// detail is still reachable.
 fn trim_to_budget(report: String) -> String {
-    if report.chars().count() <= COMPACT_CHARACTER_BUDGET {
+    if report.chars().count() <= COMPACT_TRIM_TARGET {
         return report;
     }
-    let keep = COMPACT_CHARACTER_BUDGET.saturating_sub(TRIM_NOTICE.chars().count());
-    let mut trimmed = String::with_capacity(COMPACT_CHARACTER_BUDGET);
+    let keep = COMPACT_TRIM_TARGET.saturating_sub(TRIM_NOTICE.chars().count());
+    let mut trimmed = String::with_capacity(COMPACT_TRIM_TARGET);
     for line in report.lines() {
         if trimmed.chars().count() + line.chars().count() + 1 > keep {
             break;
@@ -644,17 +655,19 @@ fn available_or_not(value: bool) -> &'static str {
 mod tests {
     use super::*;
 
-    /// Goal: the compact report stays pasteable into Discord. Method: feed the
-    /// trimmer a report far over the limit and check the result fits and still
-    /// says where the rest went.
+    /// Goal: the compact report stays pasteable into Discord *after* the UI
+    /// wraps it in a code fence. Method: feed the trimmer a report far over the
+    /// limit and check that the fenced result still fits, since a report
+    /// trimmed to exactly the limit would overflow once fenced.
     #[test]
     fn compact_report_is_trimmed_to_the_paste_budget() {
         let oversized = "a line of hwmon detail\n".repeat(400);
         let trimmed = trim_to_budget(oversized);
+        let fenced = format!("```\n{}\n```", trimmed.trim_end());
         assert!(
-            trimmed.chars().count() <= COMPACT_CHARACTER_BUDGET,
-            "trimmed report was {} chars",
-            trimmed.chars().count()
+            fenced.chars().count() <= COMPACT_CHARACTER_BUDGET,
+            "fenced report was {} chars",
+            fenced.chars().count()
         );
         assert!(trimmed.contains("--full"));
     }
