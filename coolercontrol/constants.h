@@ -34,8 +34,14 @@ const std::string SETTING_STARTUP_DELAY = "startupDelay";
 const std::string SETTING_CLOSE_TO_TRAY = "closeToTray";
 const std::string SETTING_ZOOM_FACTOR = "zoomFactor";
 const std::string SETTING_WINDOW_GEOMETRY = "windowGeometry";
+// Pre-4.4 single-daemon keys. Read once on upgrade, then removed: see loadAccessToken.
 const std::string SETTING_ACCESS_TOKEN = "accessToken";
 const std::string SETTING_ACCESS_TOKEN_ID = "accessTokenId";
+// A token belongs to the daemon that minted it, so both are kept per host:port. Two
+// groups rather than one nested pair, so neither name is a prefix of the other and a
+// QSettings::remove of either cannot take the other's subtree with it.
+const std::string SETTING_GROUP_ACCESS_TOKENS = "daemonAccessTokens";
+const std::string SETTING_GROUP_ACCESS_TOKEN_IDS = "daemonAccessTokenIds";
 // Strings the UI pushes over IPC for Qt-rendered dialogs, cached so a discarded
 // renderer does not have to be asked.
 const std::string SETTING_GROUP_TRANSLATIONS = "translations";

@@ -85,6 +85,14 @@ QIcon hideIcon() { return themeIcon({"window-minimize", "window-minimize-symboli
   cookie and the daemon access token. The token is the more sensitive of the two, since
   it does not expire and carries write access.
 */
+QString accessTokenKey(const QString& daemonKey) {
+  return QString(SETTING_GROUP_ACCESS_TOKENS.data()) % "/" % daemonKey;
+}
+
+QString accessTokenIdKey(const QString& daemonKey) {
+  return QString(SETTING_GROUP_ACCESS_TOKEN_IDS.data()) % "/" % daemonKey;
+}
+
 void restrictSettingsFilePermissions(const QSettings& settings) {
   if (!QFile::setPermissions(settings.fileName(),
                              QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
@@ -1164,8 +1172,26 @@ void MainWindow::applyTrayIconNotificationBadge(const bool forceBadge) const {
 }
 
 void MainWindow::loadAccessToken() const {
-  const QSettings settings;
-  m_accessToken = settings.value(SETTING_ACCESS_TOKEN.data()).toByteArray();
+  const auto daemonKey = daemonSettingsKey();
+  QSettings settings;
+  m_accessToken = settings.value(accessTokenKey(daemonKey)).toByteArray();
+  if (m_accessToken.isEmpty()) {
+    // Pre-4.4 kept one token for whichever daemon was configured. Adopt it for that
+    // daemon and drop the old keys in the same breath: with them gone this cannot fire
+    // again later and hand one daemon's token to another.
+    if (const auto legacy = settings.value(SETTING_ACCESS_TOKEN.data()).toByteArray();
+        !legacy.isEmpty()) {
+      m_accessToken = legacy;
+      settings.setValue(accessTokenKey(daemonKey), legacy);
+      settings.setValue(accessTokenIdKey(daemonKey),
+                        settings.value(SETTING_ACCESS_TOKEN_ID.data()).toString());
+      settings.remove(SETTING_ACCESS_TOKEN.data());
+      settings.remove(SETTING_ACCESS_TOKEN_ID.data());
+      settings.sync();
+      restrictSettingsFilePermissions(settings);
+      qInfo() << "Adopted the stored access token for" << daemonKey;
+    }
+  }
   if (!m_accessToken.isEmpty()) {
     qInfo() << "Loaded stored daemon access token.";
   }
@@ -1185,7 +1211,7 @@ void MainWindow::clearAccessToken() const {
   qWarning() << "Daemon rejected the stored access token. Clearing it.";
   m_accessToken.clear();
   QSettings settings;
-  settings.remove(SETTING_ACCESS_TOKEN.data());
+  settings.remove(accessTokenKey(daemonSettingsKey()));
   // The id is deliberately kept so the next provision can delete the dead token
   // server-side. Deleting it here is not possible: /tokens is session-only, and a
   // rejected token usually means there is no valid session to delete it with either.
@@ -1227,9 +1253,12 @@ void MainWindow::provisionAccessToken() const {
   if (!m_accessToken.isEmpty()) {
     return;
   }
+  // Captured by value: a switch mid-flight must not file this token under whichever
+  // daemon happens to be live when the reply lands.
+  const auto daemonKey = daemonSettingsKey();
   // Left behind by a previous token this daemon rejected. Deleted once the replacement
   // exists, so a revoke-and-reconnect cycle cannot accumulate dead entries.
-  const auto supersededId = QSettings().value(SETTING_ACCESS_TOKEN_ID.data()).toString();
+  const auto supersededId = QSettings().value(accessTokenIdKey(daemonKey)).toString();
   QNetworkRequest tokenRequest;
   tokenRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   tokenRequest.setUrl(getEndpointUrl(ENDPOINT_TOKENS.data()));
@@ -1240,7 +1269,7 @@ void MainWindow::provisionAccessToken() const {
   const auto tokenReply =
       m_manager->post(tokenRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
   applyTlsPolicy(tokenReply);
-  connect(tokenReply, &QNetworkReply::finished, [tokenReply, supersededId, this]() {
+  connect(tokenReply, &QNetworkReply::finished, [tokenReply, supersededId, daemonKey, this]() {
     const auto status = tokenReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status >= 300) {
       // Not fatal: the session cookie still works while the renderer is alive, and
@@ -1258,8 +1287,8 @@ void MainWindow::provisionAccessToken() const {
     }
     m_accessToken = token.toUtf8();
     QSettings settings;
-    settings.setValue(SETTING_ACCESS_TOKEN.data(), m_accessToken);
-    settings.setValue(SETTING_ACCESS_TOKEN_ID.data(), rootObj.value("id").toString());
+    settings.setValue(accessTokenKey(daemonKey), m_accessToken);
+    settings.setValue(accessTokenIdKey(daemonKey), rootObj.value("id").toString());
     settings.sync();
     restrictSettingsFilePermissions(settings);
     qInfo() << "Created a desktop access token for daemon requests.";
