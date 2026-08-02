@@ -1197,7 +1197,7 @@ export default {
         tray: {
             show: '显示(&S)',
             hide: '隐藏(&H)',
-            daemonAddress: '守护进程地址(&D)',
+            daemonConnection: '守护进程连接(&D)…',
             quit: '退出(&Q)',
             modes: '模式',
             sensors: '传感器',

@@ -1236,7 +1236,7 @@ export default {
         tray: {
             show: 'إظهار',
             hide: 'إخفاء',
-            daemonAddress: 'عنوان الخدمة',
+            daemonConnection: 'اتصال الخدمة…',
             quit: 'خروج',
             modes: 'الأوضاع',
             sensors: 'المستشعرات',

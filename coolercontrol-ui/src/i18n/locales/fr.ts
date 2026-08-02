@@ -1275,7 +1275,7 @@ export default {
         tray: {
             show: '&Afficher',
             hide: '&Masquer',
-            daemonAddress: 'Adresse du &démon',
+            daemonConnection: 'Connexion au &démon…',
             quit: '&Quitter',
             modes: 'Modes',
             sensors: 'Capteurs',

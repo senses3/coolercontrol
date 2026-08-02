@@ -1265,7 +1265,7 @@ export default {
         tray: {
             show: '&Показать',
             hide: '&Скрыть',
-            daemonAddress: '&Адрес службы',
+            daemonConnection: '&Подключение к службе…',
             quit: '&Выход',
             modes: 'Режимы',
             sensors: 'Датчики',

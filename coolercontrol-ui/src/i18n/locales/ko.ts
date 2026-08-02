@@ -1236,7 +1236,7 @@ export default {
         tray: {
             show: '표시(&S)',
             hide: '숨기기(&H)',
-            daemonAddress: '데몬 주소(&D)',
+            daemonConnection: '데몬 연결(&D)…',
             quit: '종료(&Q)',
             modes: '모드',
             sensors: '센서',

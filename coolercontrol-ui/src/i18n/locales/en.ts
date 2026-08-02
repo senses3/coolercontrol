@@ -1243,7 +1243,7 @@ export default {
         tray: {
             show: '&Show',
             hide: '&Hide',
-            daemonAddress: '&Daemon Address',
+            daemonConnection: '&Daemon Connection…',
             quit: '&Quit',
             modes: 'Modes',
             sensors: 'Sensors',

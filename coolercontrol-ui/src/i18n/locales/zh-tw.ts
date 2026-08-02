@@ -1198,7 +1198,7 @@ export default {
         tray: {
             show: '顯示(&S)',
             hide: '隱藏(&H)',
-            daemonAddress: '守護行程位址(&D)',
+            daemonConnection: '守護行程連線(&D)…',
             quit: '結束(&Q)',
             modes: '模式',
             sensors: '感測器',

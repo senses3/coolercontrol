@@ -1245,7 +1245,7 @@ export default {
         tray: {
             show: 'दिखाएँ',
             hide: 'छिपाएँ',
-            daemonAddress: 'डीमन पता',
+            daemonConnection: 'डीमन कनेक्शन…',
             quit: 'बंद करें',
             modes: 'मोड',
             sensors: 'सेंसर',

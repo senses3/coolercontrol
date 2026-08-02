@@ -1272,7 +1272,7 @@ export default {
         tray: {
             show: '&Anzeigen',
             hide: '&Ausblenden',
-            daemonAddress: '&Daemon-Adresse',
+            daemonConnection: '&Daemon-Verbindung…',
             quit: '&Beenden',
             modes: 'Modi',
             sensors: 'Sensoren',

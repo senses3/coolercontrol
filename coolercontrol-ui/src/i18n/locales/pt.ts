@@ -1262,7 +1262,7 @@ export default {
         tray: {
             show: '&Mostrar',
             hide: '&Ocultar',
-            daemonAddress: 'Endereço do &daemon',
+            daemonConnection: 'Conexão do &daemon…',
             quit: '&Sair',
             modes: 'Modos',
             sensors: 'Sensores',

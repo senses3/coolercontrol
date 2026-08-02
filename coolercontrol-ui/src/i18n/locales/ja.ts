@@ -1249,7 +1249,7 @@ export default {
         tray: {
             show: '表示(&S)',
             hide: '非表示(&H)',
-            daemonAddress: 'デーモンアドレス(&D)',
+            daemonConnection: 'デーモン接続(&D)…',
             quit: '終了(&Q)',
             modes: 'モード',
             sensors: 'センサー',

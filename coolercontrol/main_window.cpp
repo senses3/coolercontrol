@@ -291,7 +291,7 @@ void MainWindow::initSystemTray() {
       Qt::QueuedConnection);
 
   m_addressAction =
-      new QAction(uiString("tray.daemonAddress", tr("&Daemon Address")), m_sysTrayIcon);
+      new QAction(uiString("tray.daemonConnection", tr("&Daemon Connection\u2026")), m_sysTrayIcon);
   connect(m_addressAction, &QAction::triggered, [this]() { displayAddressWizard(); });
 
   m_quitAction = new QAction(QIcon::fromTheme("application-exit", QIcon()),
