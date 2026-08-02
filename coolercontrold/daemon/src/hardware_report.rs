@@ -179,7 +179,7 @@ fn write_probe_summary(
 /// this way it costs nothing on a healthy machine and a couple of lines on a
 /// broken one, which removes a round trip for the common support case.
 async fn write_fan_summary(report: &mut String, devices: &[ReportDevice], exclusions_known: bool) {
-    let _ = writeln!(report, "\nFan channels");
+    let _ = writeln!(report, "\nHWMon Fan Channels");
     if exclusions_known.not() {
         // Same honesty as the liquidctl section: only the running daemon knows
         // which devices it chose to drop, so say that rather than let an
@@ -361,7 +361,7 @@ fn derive_findings(detection: &cc_detect::DetectionResults) -> Vec<SystemFinding
 }
 
 async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
-    let _ = writeln!(report, "\nFull hwmon tree");
+    let _ = writeln!(report, "\nFull HWMon Tree");
     for device in devices {
         let _ = writeln!(
             report,
@@ -741,22 +741,25 @@ mod tests {
     #[test]
     fn hidden_hwmon_devices_say_why() {
         let hidden = report_device("corsairpsu", Some(HwmonExclusion::DuplicateOfLiquidctl));
-        assert_eq!(
-            exclusion_suffix(&hidden),
-            ", not used: shown as a liquidctl device"
-        );
+        assert_eq!(exclusion_suffix(&hidden), ", handled by liquidctl");
     }
 
-    /// Goal: a device another repository serves is still in the app, so the
-    /// report must not call it hidden. amdgpu is dropped by the hwmon name
-    /// blacklist purely because the GPU repository owns it, and saying
-    /// anything else asserts something the user can see is false.
+    /// Goal: a device another repository serves is still in the app and its
+    /// sysfs files are still read, so the report must call it neither hidden
+    /// nor unused. amdgpu is dropped by the hwmon name blacklist purely
+    /// because the GPU repository owns it, and either word asserts something
+    /// the user can see is false.
     #[test]
-    fn a_device_served_elsewhere_is_not_called_hidden() {
-        let amdgpu = report_device("amdgpu", Some(HwmonExclusion::ServedByAnotherRepository));
-        let suffix = exclusion_suffix(&amdgpu);
-        assert_eq!(suffix, ", not used: shown by another repository");
-        assert!(suffix.contains("hidden").not(), "{suffix}");
+    fn a_device_served_elsewhere_is_neither_hidden_nor_unused() {
+        for reason in [
+            HwmonExclusion::ServedByGpuRepository,
+            HwmonExclusion::DuplicateOfLiquidctl,
+        ] {
+            let suffix = exclusion_suffix(&report_device("amdgpu", Some(reason)));
+            assert!(suffix.contains("handled by"), "{suffix}");
+            assert!(suffix.contains("hidden").not(), "{suffix}");
+            assert!(suffix.contains("not used").not(), "{suffix}");
+        }
     }
 
     /// Goal: the marker stays off the devices the app actually shows. One on
@@ -773,7 +776,7 @@ mod tests {
     fn every_exclusion_has_a_label() {
         for reason in [
             HwmonExclusion::DuplicateOfLiquidctl,
-            HwmonExclusion::ServedByAnotherRepository,
+            HwmonExclusion::ServedByGpuRepository,
             HwmonExclusion::UserDisabled,
             HwmonExclusion::AllChannelsIgnored,
         ] {

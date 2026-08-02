@@ -50,6 +50,9 @@ const PATTERN_HWMON_PATH_NUMBER: &str = r"/(?P<hwmon>hwmon)(?P<number>\d+)";
 pub const HWMON_DEVICE_NAME_BLACKLIST: [&str; 1] = [
     "amdgpu", // GPU Repo handles this
 ];
+// The hardware report names the GPU repository as this list's reason, which is
+// only true while the GPU repository is the only thing in it.
+const _: () = assert!(HWMON_DEVICE_NAME_BLACKLIST.len() == 1);
 const LAPTOP_DEVICE_NAMES: [&str; 3] = ["thinkpad", "asus-nb-wmi", "asus_fan"];
 pub const DEVICE_NAME_THINK_PAD: &str = "thinkpad";
 pub const DEVICE_NAME_MAC_SMC: &str = "macsmc-hwmon";

@@ -234,9 +234,10 @@ pub fn is_out_of_tree_candidate_family(hwmon_name: &str) -> bool {
 ///
 /// Two different things live here, and the wording keeps them apart. Some of
 /// these devices are gone from the app entirely; others are very much present,
-/// just read through a repository that offers more than hwmon does. Calling the
-/// second kind "hidden" states something false about hardware the user can see
-/// on their own screen, which is exactly what this feature exists not to do.
+/// just read through a repository that offers more than hwmon does. For that
+/// second kind the sysfs files are read either way, so neither "hidden" nor
+/// "not used" is true: all that differs is that the hwmon entry is not a
+/// separate device in the app.
 ///
 /// Not on the wire: this shapes a line of the text report, nothing more.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -244,9 +245,12 @@ pub enum HwmonExclusion {
     /// A liquidctl device already covers this chip and duplicates are hidden.
     /// The liquidctl entry offers more features, so it wins. Still in the app.
     DuplicateOfLiquidctl,
-    /// Excluded by name because a dedicated repository serves it, currently
-    /// the GPU one. Still in the app, read through that repository.
-    ServedByAnotherRepository,
+    /// Excluded by name because the GPU repository serves it. Still in the
+    /// app, and the same sysfs files are still read, just through that
+    /// repository. Named for the GPU one because that is the only thing the
+    /// hwmon name blacklist holds; a compile-time assertion beside the list
+    /// keeps this honest if it ever gains an entry.
+    ServedByGpuRepository,
     /// The user disabled the device in settings. Absent from the app.
     UserDisabled,
     /// The lm-sensors configuration ignores every channel it has. Absent from
@@ -258,12 +262,14 @@ impl HwmonExclusion {
     /// Phrased for a report a user pastes into a support channel, so it says
     /// what happened rather than naming the internal rule.
     ///
-    /// "not used" for a device the app still shows by another route, "hidden"
-    /// only where the device is genuinely absent.
+    /// The first two take no prefix at all. Both the device and its sysfs
+    /// files are still in use; only the standalone hwmon entry is absent, so
+    /// "hidden" and "not used" would each assert something false. "hidden"
+    /// belongs only where the device really is gone from the app.
     pub fn label(self) -> &'static str {
         match self {
-            Self::DuplicateOfLiquidctl => "not used: shown as a liquidctl device",
-            Self::ServedByAnotherRepository => "not used: shown by another repository",
+            Self::DuplicateOfLiquidctl => "handled by liquidctl",
+            Self::ServedByGpuRepository => "handled by the GPU repository",
             Self::UserDisabled => "hidden: disabled in settings",
             Self::AllChannelsIgnored => "hidden: every channel ignored by sensors.conf",
         }
