@@ -26,10 +26,6 @@
 
 namespace tls_trust {
 
-namespace {
-
-/// Pins are keyed by host and port, so moving the daemon to another machine is a new
-/// decision rather than a silently reused one.
 QString hostPort(const QString& host, const int port) {
   const auto lowered = host.toLower();
   // An IPv6 literal is full of colons, so bracket it as every other tool does. Without
@@ -40,6 +36,8 @@ QString hostPort(const QString& host, const int port) {
                              : lowered;
   return formatted % ":" % QString::number(port);
 }
+
+namespace {
 
 QString pinKey(const QString& host, const int port) {
   return QString(SETTING_GROUP_TLS_PINS.data()) % "/" % hostPort(host, port);

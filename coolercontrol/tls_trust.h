@@ -49,6 +49,10 @@ enum class Decision {
   AskChanged,   ///< Remote, pinned, and the certificate changed.
 };
 
+/// Canonical "host:port" key for one daemon, IPv6 literals bracketed. Pins use it, and
+/// so does anything else that caches state belonging to a single daemon.
+QString hostPort(const QString& host, int port);
+
 bool isLoopback(const QString& host);
 
 bool strictModeEnabled();

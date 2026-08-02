@@ -42,7 +42,11 @@ const std::string SETTING_GROUP_TRANSLATIONS = "translations";
 // Whether the user has been shown the one-time close-to-tray prompt.
 const std::string SETTING_CLOSE_PROMPT_SHOWN = "closePromptShown";
 // Identity and label of the sensors pinned in the UI, pushed over IPC.
-const std::string SETTING_PINNED_SENSORS = "pinnedSensors";
+// Pinned sensors belong to one daemon, so they are stored per host:port under this
+// group. The name differs from the legacy key below on purpose: QSettings::remove takes
+// a whole subtree, so sharing the name would wipe every other daemon on each write.
+const std::string SETTING_GROUP_PINNED_SENSORS = "trayPinnedSensors";
+const std::string SETTING_PINNED_SENSORS_LEGACY = "pinnedSensors";
 // Require a normally valid TLS certificate. Off by default, because the daemon ships a
 // self-signed one and the common case is a loopback connection.
 const std::string SETTING_TLS_STRICT = "tlsStrict";

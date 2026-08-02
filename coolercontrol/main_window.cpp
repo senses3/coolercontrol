@@ -635,10 +635,26 @@ void MainWindow::setTranslations(const QString& translationsJson) const {
   cacheUiStrings(translationsJson);
 }
 
+QString MainWindow::daemonSettingsKey() const {
+  const auto url = getDaemonUrl();
+  return tls_trust::hostPort(url.host(), url.port(DEFAULT_DAEMON_PORT));
+}
+
+/*
+  Stored per daemon, because the UI that pushes this list is served by the daemon itself.
+  A daemon running an older UI never calls this at all, and even a current one cannot
+  call it until its page has loaded, so a single shared value leaves whichever machine
+  was connected last showing its sensors under the new connection. Measured against a
+  4.3.1 daemon, whose bundle has no setPinnedSensors: twenty rows from another machine,
+  none of which resolve to anything here.
+*/
 void MainWindow::setPinnedSensors(const QString& sensorsJson) const {
   QSettings settings;
-  settings.setValue(SETTING_PINNED_SENSORS.data(), sensorsJson);
-  qDebug() << "Cached pinned sensors for the tray menu.";
+  settings.remove(SETTING_PINNED_SENSORS_LEGACY.data());  // pre-4.4 shared value
+  settings.beginGroup(SETTING_GROUP_PINNED_SENSORS.data());
+  settings.setValue(daemonSettingsKey(), sensorsJson);
+  settings.endGroup();
+  qDebug() << "Cached pinned sensors for" << daemonSettingsKey();
 }
 
 /*
@@ -650,8 +666,10 @@ void MainWindow::setPinnedSensors(const QString& sensorsJson) const {
   tick covers every row, so the cost does not grow with the number of pins.
 */
 void MainWindow::refreshTraySensors() {
-  const QSettings settings;
-  const auto json = settings.value(SETTING_PINNED_SENSORS.data()).toString();
+  QSettings settings;
+  settings.beginGroup(SETTING_GROUP_PINNED_SENSORS.data());
+  const auto json = settings.value(daemonSettingsKey()).toString();
+  settings.endGroup();
   if (json != m_builtSensorsJson) {
     buildTraySensorRows(QJsonDocument::fromJson(json.toUtf8()).array());
     m_builtSensorsJson = json;

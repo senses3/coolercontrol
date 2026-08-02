@@ -236,6 +236,9 @@ class MainWindow final : public QMainWindow {
   // One bulk status request, applied to every row.
   void pollTraySensors() const;
 
+  /// Settings key for the daemon currently configured, as "host:port".
+  QString daemonSettingsKey() const;
+
   /// Drops the readings, keeping the rows. Values that cannot be refreshed must not
   /// keep being shown: after an outage they are old, and after an address change they
   /// belong to a different machine entirely.
