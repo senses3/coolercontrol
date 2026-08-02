@@ -5507,12 +5507,12 @@
       }
     },
     "/hardware-support/{device_uid}/channels/{channel_name}/probe": {
-      "post": {
+      "get": {
         "tags": [
           "devices"
         ],
-        "summary": "Probe a fan channel's duty response",
-        "description": "Briefly changes the channel's duty and reports whether the fan responded, then restores the previous setting. The only endpoint that moves hardware to answer a question, so it is per channel and never automatic. Always 200 when the request was understood: a probe that declined to touch the fan returns the reason it declined.",
+        "summary": "Get the duty-response probe status",
+        "description": "Returns running / finished / failed for the channel's most recent probe, with the outcome once it has one. 404 when the channel has never been probed. Intended for UI polling while a probe is in flight.",
         "parameters": [
           {
             "in": "path",
@@ -5535,15 +5535,73 @@
         ],
         "responses": {
           "200": {
-            "description": "What one probe request produced.\n\n `Declined` is a result, not an error: \"we will not move this fan, and here\n is why\" is exactly the kind of observation this feature exists to state.",
+            "description": "The wire shape of [`ProbeStatus`]. A flat struct rather than a tagged enum\n because the outcome is itself internally tagged, and nesting the two reads\n badly from the client.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProbeOutcome"
+                  "$ref": "#/components/schemas/ProbeStatusDto"
                 }
               }
             }
           },
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Probe a fan channel's duty response",
+        "description": "Briefly changes the channel's duty to find out whether the fan responds, then restores the previous setting. The only endpoint that moves hardware to answer a question, so it is per channel and never automatic. Returns 202 once the probe is under way and 409 when one is already running for the channel; the probe waits for the board at each duty and so outlasts the API request timeout, and the result is read from GET on the same path.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "in": "path",
+            "name": "device_uid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Bad Request. The request is invalid"
           },
@@ -9666,6 +9724,35 @@
             "type": "string",
             "const": "too_warm_to_lower"
           }
+        ]
+      },
+      "ProbeStatusDto": {
+        "description": "The wire shape of [`ProbeStatus`]. A flat struct rather than a tagged enum\n because the outcome is itself internally tagged, and nesting the two reads\n badly from the client.",
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProbeOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "description": "`running`, `finished` or `failed`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
         ]
       },
       "Profile": {

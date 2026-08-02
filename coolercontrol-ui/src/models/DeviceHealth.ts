@@ -220,6 +220,17 @@ export class ProbeOutcomeDTO {
     probed_duty?: number
 }
 
+/**
+ * Where a probe has got to. The daemon runs it off the request, because a probe
+ * waits for the board at each duty and outlasts the API's request timeout.
+ */
+export class ProbeStatusDTO {
+    state: 'running' | 'finished' | 'failed' = 'running'
+    @Type(() => ProbeOutcomeDTO)
+    outcome?: ProbeOutcomeDTO
+    error?: string
+}
+
 /** One Super-I/O chip the startup probe found. */
 export class DetectedChip {
     name: string = ''

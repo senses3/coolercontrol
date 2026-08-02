@@ -44,22 +44,65 @@ const result = ref('')
  */
 const resultIsAdverse = ref(false)
 
+/** Poll cadence while a probe is in flight. */
+const POLL_INTERVAL_MS = 1_500
+
+/**
+ * Give-up point. Comfortably past the daemon's own ceiling of three rungs at
+ * twenty seconds each, so this only ever fires if the daemon stopped answering.
+ */
+const POLL_ATTEMPTS_MAX = 80
+
 async function run(): Promise<void> {
     if (running.value) return
     running.value = true
     result.value = ''
     try {
-        const outcome = await deviceStore.daemonClient.probeChannel(
+        const started = await deviceStore.daemonClient.startProbe(
             props.deviceUID,
             props.channelName,
         )
-        applyOutcome(outcome)
+        if (started instanceof ErrorResponse) {
+            applyOutcome(started)
+            return
+        }
+        await pollUntilFinished()
         // The daemon publishes what the probe established, so pull the health
         // snapshot back rather than deriving a second copy of the verdict here.
         await settingsStore.loadDeviceHealth()
     } finally {
         running.value = false
     }
+}
+
+/**
+ * Waits for the daemon's answer.
+ *
+ * The probe deliberately outlives the request that asked for it: it waits for
+ * the board at every duty, which on hardware that ramps takes the better part
+ * of a minute, and holding a request open that long only earns a 408.
+ */
+async function pollUntilFinished(): Promise<void> {
+    for (let attempt = 0; attempt < POLL_ATTEMPTS_MAX; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+        const status = await deviceStore.daemonClient.probeStatus(
+            props.deviceUID,
+            props.channelName,
+        )
+        if (status instanceof ErrorResponse) {
+            applyOutcome(status)
+            return
+        }
+        if (status.state === 'failed') {
+            applyOutcome(new ErrorResponse(status.error ?? 'the probe failed'))
+            return
+        }
+        if (status.state === 'finished' && status.outcome != null) {
+            applyOutcome(status.outcome)
+            return
+        }
+    }
+    applyOutcome(new ErrorResponse(t('layout.shell.coolingPage.probeTimedOut')))
 }
 
 defineExpose({ run })

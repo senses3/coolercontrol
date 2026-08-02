@@ -25,25 +25,50 @@
 use axum::extract::{Path, State};
 use axum::Json;
 
+use aide::NoApi;
+use axum::http::StatusCode;
+
 use crate::api::devices::DeviceChannelPath;
 use crate::api::{AppState, CCError};
-use crate::hardware_probe::ProbeOutcome;
+use crate::hardware_probe::ProbeStatusDto;
 
 /// POST /hardware-support/{`device_uid`}/channels/{`channel_name`}/probe
-pub async fn probe_channel(
+///
+/// Returns as soon as the probe is under way. A probe waits at each duty for
+/// the board to apply it, which outlasts the API's request timeout on hardware
+/// that ramps, so the answer is collected from the status route instead.
+pub async fn start_probe(
     Path(path): Path<DeviceChannelPath>,
     State(AppState {
         hardware_probe_handle,
         ..
     }): State<AppState>,
-) -> Result<Json<ProbeOutcome>, CCError> {
-    // Runs on the main runtime, which both writes the duty and serializes
-    // probes against each other.
+) -> Result<NoApi<StatusCode>, CCError> {
     hardware_probe_handle
-        .probe(path.device_uid, path.channel_name)
+        .start(path.device_uid, path.channel_name)
         .await
-        .map(Json)
+        .map(|()| NoApi(StatusCode::ACCEPTED))
+        .map_err(|err| CCError::Conflict {
+            msg: err.to_string(),
+        })
+}
+
+/// GET /hardware-support/{`device_uid`}/channels/{`channel_name`}/probe
+pub async fn probe_status(
+    Path(path): Path<DeviceChannelPath>,
+    State(AppState {
+        hardware_probe_handle,
+        ..
+    }): State<AppState>,
+) -> Result<Json<ProbeStatusDto>, CCError> {
+    hardware_probe_handle
+        .status(path.device_uid, path.channel_name)
+        .await
         .map_err(|err| CCError::InternalError {
-            msg: format!("Could not run the duty-response probe: {err}"),
+            msg: format!("Could not read the probe status: {err}"),
+        })?
+        .map(|status| Json(ProbeStatusDto::from(status)))
+        .ok_or_else(|| CCError::NotFound {
+            msg: "this channel has not been probed".to_string(),
         })
 }

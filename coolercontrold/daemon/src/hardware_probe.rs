@@ -302,6 +302,52 @@ impl ProbeOutcome {
     }
 }
 
+/// Where a probe has got to.
+///
+/// Kept after it finishes so a client that stopped waiting can still collect
+/// the answer, which matters because the probe outlasts any sensible request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProbeStatus {
+    Running,
+    Finished(ProbeOutcome),
+    Failed(String),
+}
+
+/// The wire shape of [`ProbeStatus`]. A flat struct rather than a tagged enum
+/// because the outcome is itself internally tagged, and nesting the two reads
+/// badly from the client.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ProbeStatusDto {
+    /// `running`, `finished` or `failed`.
+    pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<ProbeOutcome>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+impl From<ProbeStatus> for ProbeStatusDto {
+    fn from(status: ProbeStatus) -> Self {
+        match status {
+            ProbeStatus::Running => Self {
+                state: "running".to_string(),
+                outcome: None,
+                error: None,
+            },
+            ProbeStatus::Finished(outcome) => Self {
+                state: "finished".to_string(),
+                outcome: Some(outcome),
+                error: None,
+            },
+            ProbeStatus::Failed(error) => Self {
+                state: "failed".to_string(),
+                outcome: None,
+                error: Some(error),
+            },
+        }
+    }
+}
+
 /// Everything the probe needs from the running daemon.
 ///
 /// Split out so the sequence below can be tested without hardware. The

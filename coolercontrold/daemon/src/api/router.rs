@@ -1340,14 +1340,26 @@ fn detect_routes() -> ApiRouter<AppState> {
 fn hardware_probe_routes() -> ApiRouter<AppState> {
     ApiRouter::new().api_route(
         "/hardware-support/{device_uid}/channels/{channel_name}/probe",
-        post_with(hardware_probe::probe_channel, |o| {
+        post_with(hardware_probe::start_probe, |o| {
             o.summary("Probe a fan channel's duty response")
                 .description(
-                    "Briefly changes the channel's duty and reports whether the fan responded, \
+                    "Briefly changes the channel's duty to find out whether the fan responds, \
                      then restores the previous setting. The only endpoint that moves hardware \
-                     to answer a question, so it is per channel and never automatic. Always 200 \
-                     when the request was understood: a probe that declined to touch the fan \
-                     returns the reason it declined.",
+                     to answer a question, so it is per channel and never automatic. Returns 202 \
+                     once the probe is under way and 409 when one is already running for the \
+                     channel; the probe waits for the board at each duty and so outlasts the \
+                     API request timeout, and the result is read from GET on the same path.",
+                )
+                .tag("devices")
+                .security_requirement("CookieAuth")
+                .security_requirement("BearerAuth")
+        })
+        .get_with(hardware_probe::probe_status, |o| {
+            o.summary("Get the duty-response probe status")
+                .description(
+                    "Returns running / finished / failed for the channel's most recent probe, \
+                     with the outcome once it has one. 404 when the channel has never been \
+                     probed. Intended for UI polling while a probe is in flight.",
                 )
                 .tag("devices")
                 .security_requirement("CookieAuth")

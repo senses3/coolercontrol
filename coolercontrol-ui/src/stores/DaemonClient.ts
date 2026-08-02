@@ -51,7 +51,7 @@ import {
 } from '@/models/Mode'
 import defaultHealthCheck, { HealthCheck } from '@/models/HealthCheck.ts'
 import { Alert, AlertsDTO } from '@/models/Alert.ts'
-import { DetectionDTO, DeviceHealthDTO, ProbeOutcomeDTO } from '@/models/DeviceHealth.ts'
+import { DetectionDTO, DeviceHealthDTO, ProbeStatusDTO } from '@/models/DeviceHealth.ts'
 import type {
     Calibration,
     CalibrationBatchStatus,
@@ -80,13 +80,8 @@ export default class DaemonClient {
     private daemonTimeoutExtended: number = 15_000 // this is for image processing calls that can take significantly longer
     private daemonInitialConnectionTimeout: number = 20_000 // to allow extra time for the daemon to come up
     private daemonCompleteHistoryTimeout: number = 30_000 // takes a long time on a slow connection
-    // The daemon holds a duty-response probe open while it watches each rung of
-    // the ladder settle, and boards that ramp their duty take seconds per rung,
-    // so this outlasts every other call the UI makes by a wide margin.
-    private daemonTimeoutProbe: number = 90_000
     private killClientTimeout: number = 11_000
     private killClientTimeoutExtended: number = 16_000 // this is for image processing calls that can take significantly longer
-    private killClientTimeoutProbe: number = 91_000
     private responseLogging: boolean = false
     private readonly userId: string = 'CCAdmin'
     public readonly defaultPasswd: string = 'coolAdmin'
@@ -1343,33 +1338,56 @@ export default class DaemonClient {
     }
 
     /**
-     * Asks the daemon to briefly change a channel's duty and report whether the
-     * fan responded. The only call in the client that moves hardware, so it is
-     * never issued automatically. Its own timeout: the daemon holds the request
-     * open while the fan settles, which outlasts the ordinary one.
+     * Asks the daemon to start a duty-response probe on a channel. The only
+     * call in the client that moves hardware, so it is never issued
+     * automatically. Returns once the probe is under way, not once it is done:
+     * a probe waits for the board at each duty and outlasts any request, so the
+     * answer is collected from `probeStatus`.
      */
-    async probeChannel(
-        deviceUID: UID,
-        channelName: string,
-    ): Promise<ProbeOutcomeDTO | ErrorResponse> {
+    async startProbe(deviceUID: UID, channelName: string): Promise<undefined | ErrorResponse> {
         try {
             const response = await this.getClient().post(
                 `/hardware-support/${deviceUID}/channels/${channelName}/probe`,
-                {},
-                {
-                    timeout: this.daemonTimeoutProbe,
-                    signal: AbortSignal.timeout(this.killClientTimeoutProbe),
-                },
             )
-            this.logDaemonResponse(response, 'Probe Channel')
-            return plainToInstance(ProbeOutcomeDTO, response.data as object)
+            this.logDaemonResponse(response, 'Start Probe')
+            return undefined
         } catch (err: any) {
             this.logError(err)
-            if (err.response) {
-                return plainToInstance(ErrorResponse, err.response.data as object)
-            }
-            return new ErrorResponse('Probe request failed')
+            return this.asErrorResponse(err)
         }
+    }
+
+    /** How the channel's most recent probe is getting on. */
+    async probeStatus(
+        deviceUID: UID,
+        channelName: string,
+    ): Promise<ProbeStatusDTO | ErrorResponse> {
+        try {
+            const response = await this.getClient().get(
+                `/hardware-support/${deviceUID}/channels/${channelName}/probe`,
+            )
+            this.logDaemonResponse(response, 'Probe Status')
+            return plainToInstance(ProbeStatusDTO, response.data as object)
+        } catch (err: any) {
+            this.logError(err)
+            return this.asErrorResponse(err)
+        }
+    }
+
+    /**
+     * A daemon error as an `ErrorResponse`, whatever shape it arrived in.
+     *
+     * `plainToInstance` on a non-object body (a timeout's empty string, say)
+     * hands back that value rather than an instance, so an `instanceof` check
+     * at the call site silently failed and the caller read a string as a
+     * result object.
+     */
+    private asErrorResponse(err: any): ErrorResponse {
+        const data = err?.response?.data
+        if (data != null && typeof data === 'object') {
+            return plainToInstance(ErrorResponse, data as object)
+        }
+        return new ErrorResponse(err?.message ?? 'request failed')
     }
 
     async loadAlertsAndLogs(): Promise<AlertsDTO> {

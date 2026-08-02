@@ -16,37 +16,52 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Serializes duty-response probes onto the main runtime.
+//! Runs duty-response probes off the request that asked for one.
 //!
-//! The actor handles one message at a time, so two probes can never move two
-//! fans at once. That is deliberate rather than incidental: this is the only
-//! endpoint in the daemon that moves hardware to answer a question, and a
-//! burst of requests should queue behind each other rather than turn into a
-//! chorus of spinning fans.
+//! A probe walks a ladder of duties and waits at each rung for the board to
+//! apply it, which on hardware that ramps takes the better part of a minute.
+//! The API carries a 30 s timeout, so holding the request open until the answer
+//! arrived meant the client always got a 408 while the probe ran on to
+//! completion unseen. Starting it and polling for the result is the same
+//! arrangement calibration uses, and for the same reason.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use log::info;
 use moro_local::Scope;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 use crate::api::actor::{run_api_actor, ApiActor};
+use crate::calibration::ChannelKey;
 use crate::device::{ChannelName, DeviceUID};
 use crate::engine::main::Engine;
-use crate::hardware_probe::{run_probe, ProbeOutcome};
+use crate::hardware_probe::{run_probe, ProbeOutcome, ProbeStatus};
 use crate::hardware_support::HardwareSupportController;
+use crate::rt;
+
+/// Probe state per channel. Entries are kept after finishing so the client can
+/// still collect a result it was not waiting for.
+type ProbeStates = Rc<RefCell<HashMap<ChannelKey, ProbeStatus>>>;
 
 struct HardwareProbeActor {
     receiver: mpsc::Receiver<HardwareProbeMessage>,
     engine: Rc<Engine>,
     hardware_support: Rc<HardwareSupportController>,
+    states: ProbeStates,
 }
 
-struct HardwareProbeMessage {
-    device_uid: DeviceUID,
-    channel_name: ChannelName,
-    respond_to: oneshot::Sender<Result<ProbeOutcome>>,
+enum HardwareProbeMessage {
+    Start {
+        key: ChannelKey,
+        respond_to: oneshot::Sender<Result<()>>,
+    },
+    Status {
+        key: ChannelKey,
+        respond_to: oneshot::Sender<Option<ProbeStatus>>,
+    },
 }
 
 impl HardwareProbeActor {
@@ -59,8 +74,57 @@ impl HardwareProbeActor {
             receiver,
             engine,
             hardware_support,
+            states: Rc::new(RefCell::new(HashMap::new())),
         }
     }
+
+    /// Refuses a second probe on the same channel, then runs this one off the
+    /// mailbox so status queries are answered while it is in flight.
+    fn spawn_probe(&self, key: ChannelKey) -> Result<()> {
+        if matches!(self.states.borrow().get(&key), Some(ProbeStatus::Running)) {
+            return Err(anyhow!(
+                "a probe is already running for {}:{}",
+                key.0,
+                key.1
+            ));
+        }
+        self.states
+            .borrow_mut()
+            .insert(key.clone(), ProbeStatus::Running);
+        let engine = Rc::clone(&self.engine);
+        let hardware_support = Rc::clone(&self.hardware_support);
+        let states = Rc::clone(&self.states);
+        rt::spawn(async move {
+            let (device_uid, channel_name) = key.clone();
+            let result = run_probe(engine.as_ref(), &device_uid, &channel_name).await;
+            let status = match result {
+                Ok(outcome) => {
+                    info!("Duty-response probe for {device_uid}:{channel_name}: {outcome:?}");
+                    record_verdict(&hardware_support, &device_uid, &channel_name, &outcome);
+                    ProbeStatus::Finished(outcome)
+                }
+                Err(err) => {
+                    info!("Duty-response probe for {device_uid}:{channel_name} failed: {err}");
+                    ProbeStatus::Failed(err.to_string())
+                }
+            };
+            states.borrow_mut().insert(key, status);
+        });
+        Ok(())
+    }
+}
+
+/// Publishes what the probe established, when it established anything.
+fn record_verdict(
+    hardware_support: &HardwareSupportController,
+    device_uid: &str,
+    channel_name: &str,
+    outcome: &ProbeOutcome,
+) {
+    let Some(verdict) = outcome.verdict() else {
+        return;
+    };
+    hardware_support.record_probe_verdict(device_uid, channel_name, verdict);
 }
 
 impl ApiActor<HardwareProbeMessage> for HardwareProbeActor {
@@ -73,33 +137,24 @@ impl ApiActor<HardwareProbeMessage> for HardwareProbeActor {
     }
 
     async fn handle_message(&mut self, msg: HardwareProbeMessage) {
-        let HardwareProbeMessage {
-            device_uid,
-            channel_name,
-            respond_to,
-        } = msg;
-        // Worth a log line even on success: this is the one action in the
-        // daemon that moves a fan without the user setting a speed, so a
-        // support log should show that it happened and what came of it.
-        info!("Duty-response probe requested for {device_uid}:{channel_name}");
-        let result = run_probe(self.engine.as_ref(), &device_uid, &channel_name).await;
-        if let Ok(outcome) = &result {
-            info!("Duty-response probe for {device_uid}:{channel_name}: {outcome:?}");
-            if let Some(verdict) = outcome.verdict() {
-                self.hardware_support
-                    .record_probe_verdict(&device_uid, &channel_name, verdict);
+        match msg {
+            HardwareProbeMessage::Start { key, respond_to } => {
+                // Worth a log line even on success: this is the one action in
+                // the daemon that moves a fan without the user setting a speed.
+                info!("Duty-response probe requested for {}:{}", key.0, key.1);
+                let _ = respond_to.send(self.spawn_probe(key));
+            }
+            HardwareProbeMessage::Status { key, respond_to } => {
+                let _ = respond_to.send(self.states.borrow().get(&key).cloned());
             }
         }
-        let _ = respond_to.send(result);
     }
 }
 
-/// Cloneable handle for running a duty-response probe.
+/// Cloneable handle for the duty-response probe.
 ///
-/// Capacity 1: a probe is a human pressing a button on one channel, and the
-/// actor holds each one for several seconds while the fan settles. Queueing
-/// more than a single waiting request would only build a backlog of fan
-/// movements nobody is still watching.
+/// Capacity 1: both messages are trivial now that the probe itself runs off
+/// the mailbox, so nothing queues behind a running fan.
 #[derive(Clone)]
 pub struct HardwareProbeHandle {
     sender: mpsc::Sender<HardwareProbeMessage>,
@@ -118,18 +173,30 @@ impl HardwareProbeHandle {
         Self { sender }
     }
 
-    pub async fn probe(
-        &self,
-        device_uid: DeviceUID,
-        channel_name: ChannelName,
-    ) -> Result<ProbeOutcome> {
+    /// Starts a probe. Returns an error when one is already in flight for the
+    /// channel.
+    pub async fn start(&self, device_uid: DeviceUID, channel_name: ChannelName) -> Result<()> {
         let (tx, rx) = oneshot::channel();
-        let msg = HardwareProbeMessage {
-            device_uid,
-            channel_name,
+        let msg = HardwareProbeMessage::Start {
+            key: (device_uid, channel_name),
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
         rx.await?
+    }
+
+    /// The probe's state, or `None` when this channel has never been probed.
+    pub async fn status(
+        &self,
+        device_uid: DeviceUID,
+        channel_name: ChannelName,
+    ) -> Result<Option<ProbeStatus>> {
+        let (tx, rx) = oneshot::channel();
+        let msg = HardwareProbeMessage::Status {
+            key: (device_uid, channel_name),
+            respond_to: tx,
+        };
+        let _ = self.sender.send(msg).await;
+        Ok(rx.await?)
     }
 }

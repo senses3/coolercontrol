@@ -232,6 +232,7 @@ export default {
                 probeDeclinedTooWarmToLower:
                     'This fan is already near maximum and the machine is too warm to slow it down for a test.',
                 probeFailed: 'The test could not be completed: {error}',
+                probeTimedOut: 'the daemon stopped reporting on the test',
                 probeUnrecognized:
                     'The test finished, but this version of the app does not recognize the result. The daemon may be a different version than the app.',
                 activeMode: 'Active',
