@@ -1266,6 +1266,7 @@ export default {
             quit: '&Sair',
             modes: 'Modos',
             sensors: 'Sensores',
+            daemons: 'Daemons',
         },
         cert: {
             title: 'Certificado do daemon não verificado',
@@ -1302,6 +1303,13 @@ export default {
             errorCertUntrusted: 'O certificado do daemon não foi considerado confiável.',
             errorCertInvalid:
                 'O certificado do daemon não é válido e a validação de certificados está ativada.',
+            savedLabel: 'Conexão salva:',
+            newConnection: 'Nova conexão…',
+            removeConnection: 'Remover',
+            removeConnectionTooltip: 'Esquecer o daemon selecionado.',
+            removeConnectionBody: 'Parar de oferecer este daemon na bandeja?',
+            nameLabel: 'Nome:',
+            nameTooltip: 'Rótulo opcional para este daemon. Em branco mostra host:porta.',
             addressTitle: 'Endereço do daemon - Aplicação de ambiente de trabalho',
             addressSubtitle: 'Ajuste os campos de endereço conforme necessário.',
             hostLabel: 'Endereço do anfitrião:',

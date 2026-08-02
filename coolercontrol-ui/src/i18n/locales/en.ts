@@ -1247,6 +1247,7 @@ export default {
             quit: '&Quit',
             modes: 'Modes',
             sensors: 'Sensors',
+            daemons: 'Daemons',
         },
         // Shown when the daemon cannot be reached, so the UI itself may never have
         // loaded. Qt falls back to English until a successful run caches these.
@@ -1284,6 +1285,13 @@ export default {
             errorCertUntrusted: "The daemon's certificate was not trusted.",
             errorCertInvalid:
                 "The daemon's certificate does not validate, and certificate validation is enabled.",
+            savedLabel: 'Saved connection:',
+            newConnection: 'New connection…',
+            removeConnection: 'Remove',
+            removeConnectionTooltip: 'Forget the selected daemon.',
+            removeConnectionBody: 'Stop offering this daemon in the tray?',
+            nameLabel: 'Name:',
+            nameTooltip: 'Optional label for this daemon. Blank shows host:port.',
             addressTitle: 'Daemon Address - Desktop Application',
             addressSubtitle: 'Adjust the address fields as necessary.',
             hostLabel: 'Host address:',

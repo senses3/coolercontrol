@@ -1269,6 +1269,7 @@ export default {
             quit: '&Выход',
             modes: 'Режимы',
             sensors: 'Датчики',
+            daemons: 'Службы',
         },
         cert: {
             title: 'Непроверенный сертификат службы',
@@ -1303,6 +1304,13 @@ export default {
             errorCertUntrusted: 'Сертификат демона не был подтверждён как доверенный.',
             errorCertInvalid:
                 'Сертификат демона не проходит проверку, а проверка сертификатов включена.',
+            savedLabel: 'Сохранённое подключение:',
+            newConnection: 'Новое подключение…',
+            removeConnection: 'Удалить',
+            removeConnectionTooltip: 'Забыть выбранную службу.',
+            removeConnectionBody: 'Больше не предлагать эту службу в трее?',
+            nameLabel: 'Имя:',
+            nameTooltip: 'Необязательная метка для этой службы. Пусто показывает узел:порт.',
             addressTitle: 'Адрес службы - Настольное приложение',
             addressSubtitle: 'При необходимости измените поля адреса.',
             hostLabel: 'Адрес узла:',

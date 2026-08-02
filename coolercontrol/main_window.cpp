@@ -17,6 +17,7 @@
 #include "main_window.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCheckBox>
 #include <QDebug>
@@ -50,6 +51,7 @@
 #include <initializer_list>
 #include <memory>
 
+#include "connections.h"
 #include "constants.h"
 #include "notifier.h"
 #include "origin_filter.h"
@@ -84,6 +86,14 @@ QIcon hideIcon() { return themeIcon({"window-minimize", "window-minimize-symboli
   cookie and the daemon access token. The token is the more sensitive of the two, since
   it does not expire and carries write access.
 */
+QString accessTokenKey(const QString& daemonKey) {
+  return QString(SETTING_GROUP_ACCESS_TOKENS.data()) % "/" % daemonKey;
+}
+
+QString accessTokenIdKey(const QString& daemonKey) {
+  return QString(SETTING_GROUP_ACCESS_TOKEN_IDS.data()) % "/" % daemonKey;
+}
+
 void restrictSettingsFilePermissions(const QSettings& settings) {
   if (!QFile::setPermissions(settings.fileName(),
                              QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
@@ -224,6 +234,8 @@ MainWindow::MainWindow(QWidget* parent)
     // This is used so the UI Window will show when password input is required
     setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
     showNormal();
+    raise();
+    activateWindow();
     qInfo() << "Force UI Window to show.";
   });
 
@@ -263,22 +275,11 @@ void MainWindow::initWizard() {
       m_wizard->hide();
     }
   });
-  connect(m_wizard, &QDialog::accepted, [this]() {
-    QSettings settings;
-    settings.setValue(SETTING_DAEMON_ADDRESS.data(), m_wizard->field("address").toString());
-    settings.setValue(SETTING_DAEMON_PORT.data(), m_wizard->field("port").toInt());
-    settings.setValue(SETTING_DAEMON_SSL_ENABLED.data(), m_wizard->field("ssl").toBool());
-    settings.setValue(SETTING_TLS_STRICT.data(), m_wizard->field("strictTls").toBool());
-    settings.sync();  // the reload below reads these back immediately
-    m_changeAddress = true;
-    emit dropConnections();
-    delay(300);  // give signals a moment to process.
-    m_startup = true;
-    m_changeAddress = false;
-    m_uiLoadingStopped = false;
-    m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
-    loadVerifiedDaemonUi();
-  });
+  connect(m_wizard, &QDialog::accepted,
+          [this]() { applyDaemonConnection(m_addressPage->commit()); });
+  // Removing an entry never reaches applyDaemonConnection, so the menu is refreshed on
+  // the way out whatever the user did in there.
+  connect(m_wizard, &QDialog::finished, this, [this]() { rebuildDaemonsTrayMenu(); });
 }
 
 void MainWindow::initDelay() const {
@@ -338,6 +339,13 @@ void MainWindow::initSystemTray() {
   m_modesTrayMenu->setEnabled(false);
   m_trayIconMenu->addMenu(m_modesTrayMenu);
   m_trayIconMenu->addAction(m_showAction);
+  // Next to the entry that manages connections, and below Show/Hide so that stays where
+  // muscle memory expects it.
+  m_daemonsTrayMenu = new QMenu(this);
+  m_daemonsTrayMenu->setIcon(themeIcon({"network-server", "network-server-symbolic"}));
+  m_daemonsTrayMenu->setTitle(uiString("tray.daemons", tr("Daemons")));
+  m_trayIconMenu->addMenu(m_daemonsTrayMenu);
+  rebuildDaemonsTrayMenu();
   m_trayIconMenu->addAction(m_addressAction);
   m_trayIconMenu->addSeparator();
   m_trayIconMenu->addAction(m_quitAction);
@@ -992,17 +1000,14 @@ void MainWindow::showEvent(QShowEvent* event) {
 }
 
 QUrl MainWindow::getDaemonUrl(const bool forceHttp) {
-  const QSettings settings;
-  const auto host =
-      settings.value(SETTING_DAEMON_ADDRESS.data(), DEFAULT_DAEMON_ADDRESS.data()).toString();
-  const auto port = settings.value(SETTING_DAEMON_PORT.data(), DEFAULT_DAEMON_PORT).toInt();
-  const auto sslEnabled =
-      settings.value(SETTING_DAEMON_SSL_ENABLED.data(), DEFAULT_DAEMON_SSL_ENABLED).toBool();
-  const auto schema = forceHttp ? tr("http") : sslEnabled ? tr("https") : tr("http");
+  const auto connection = connections::current();
+  // Not tr(): a translated URL scheme would break every request this app makes.
+  const auto scheme =
+      (forceHttp || !connection.sslEnabled) ? QStringLiteral("http") : QStringLiteral("https");
   QUrl url;
-  url.setScheme(schema);
-  url.setHost(host);
-  url.setPort(port);
+  url.setScheme(scheme);
+  url.setHost(connection.host);
+  url.setPort(connection.port);
   return url;
 }
 
@@ -1014,10 +1019,102 @@ QUrl MainWindow::getEndpointUrl(const QString& endpoint, const bool forceHttp) {
   return url;
 }
 
+/*
+  Rebuilt outright on every change, the way the Modes submenu already is. Only the
+  submenu's own visibility touches the top-level menu, so hosts that cache the tray
+  layout over DBusMenu see a stable one.
+*/
+void MainWindow::rebuildDaemonsTrayMenu() {
+  const auto list = connections::all();
+  m_daemonsTrayMenu->menuAction()->setVisible(list.size() > 1);
+  m_daemonsTrayMenu->clear();
+  // The rows are parented to the group, so this is what frees the previous ones. It has
+  // to be deleteLater: this runs from one of those rows' own triggered handler, and
+  // deleting it outright would pull the object out from under the running signal.
+  if (m_daemonsActionGroup != nullptr) {
+    m_daemonsActionGroup->deleteLater();
+  }
+  m_daemonsActionGroup = new QActionGroup(m_daemonsTrayMenu);
+  m_daemonsActionGroup->setExclusive(true);
+  const auto liveIndex = connections::currentIndex();
+  for (auto i = 0; i < list.size(); ++i) {
+    const auto connection = list.at(i);
+    const auto action = new QAction(connections::displayName(connection), m_daemonsActionGroup);
+    action->setCheckable(true);
+    action->setChecked(i == liveIndex);
+    connect(action, &QAction::triggered, this,
+            [this, connection]() { applyDaemonConnection(connection); });
+    m_daemonsTrayMenu->addAction(action);
+  }
+}
+
+/*
+  Points the app at a saved daemon.
+
+  The window is brought up rather than left in the tray on purpose. The tray's modes,
+  pinned sensors and alert badge are all pushed by the UI over IPC, so until the new
+  daemon's page has loaded there is nothing for the tray to show. Connecting without
+  showing would leave it half empty with no way to tell why.
+*/
+void MainWindow::applyDaemonConnection(const connections::Connection connection) {
+  connections::upsert(connection);  // the live daemon is always a saved one
+  if (connections::sameConnection(connection, connections::current())) {
+    rebuildDaemonsTrayMenu();  // re-selection changes nothing, a rename does
+    return;
+  }
+  qInfo() << "Switching to daemon" << connections::displayName(connection);
+  connections::setCurrent(connection);
+  m_changeAddress = true;
+  emit dropConnections();
+  delay(300);  // give signals a moment to process.
+  m_changeAddress = false;
+  resetPerDaemonState();
+  setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
+  // Reactivating a discarded page reloads it at its old address, so it is blanked before
+  // the new origin is installed. Otherwise the old daemon gets one request that the
+  // origin filter then refuses, leaving an error page on screen.
+  restorePage();
+  m_view->load(QUrl(QStringLiteral("about:blank")));
+  showNormal();
+  raise();
+  activateWindow();
+  // showEvent skips its own work while m_startup is set, so the tray label is set here.
+  setTrayActionToHide();
+  m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
+  loadVerifiedDaemonUi();
+  rebuildDaemonsTrayMenu();  // moves the checked row
+}
+
+void MainWindow::resetPerDaemonState() {
+  m_accessToken.clear();
+  loadAccessToken();  // the new daemon's own, under its own key
+  m_activeModeUID.clear();
+  m_modesTrayMenu->clear();
+  m_modesTrayMenu->setEnabled(false);
+  stopTraySensorPolling();
+  m_sensorPollTicks = 0;
+  clearTraySensorReadings();
+  m_daemonHasErrors = false;
+  m_daemonHasWarnings = false;
+  m_uiAlertsActive = false;
+  applyTrayIconNotificationBadge();
+  m_disconnectNotified = false;
+  m_sseRetryDelayMs = 0;
+  m_loginWindowShown = false;
+  m_uiLoadRetryCount = 0;
+  m_lastConnectionError.clear();
+  m_uiLoadingStopped = false;
+  m_reloadOnShow = false;
+  m_startup = true;
+}
+
 void MainWindow::displayAddressWizard() const {
   if (m_wizard->isVisible()) {
     return;
   }
+  // The page is built once with the window, so it would otherwise still show whatever
+  // was configured at startup.
+  m_addressPage->reload();
   // Both pages, because the wizard reopens on whichever one was last shown, and a
   // failure that follows Apply lands the user back on the address page.
   m_introPage->setError(m_lastConnectionError);
@@ -1164,8 +1261,26 @@ void MainWindow::applyTrayIconNotificationBadge(const bool forceBadge) const {
 }
 
 void MainWindow::loadAccessToken() const {
-  const QSettings settings;
-  m_accessToken = settings.value(SETTING_ACCESS_TOKEN.data()).toByteArray();
+  const auto daemonKey = daemonSettingsKey();
+  QSettings settings;
+  m_accessToken = settings.value(accessTokenKey(daemonKey)).toByteArray();
+  if (m_accessToken.isEmpty()) {
+    // Pre-4.4 kept one token for whichever daemon was configured. Adopt it for that
+    // daemon and drop the old keys in the same breath: with them gone this cannot fire
+    // again later and hand one daemon's token to another.
+    if (const auto legacy = settings.value(SETTING_ACCESS_TOKEN.data()).toByteArray();
+        !legacy.isEmpty()) {
+      m_accessToken = legacy;
+      settings.setValue(accessTokenKey(daemonKey), legacy);
+      settings.setValue(accessTokenIdKey(daemonKey),
+                        settings.value(SETTING_ACCESS_TOKEN_ID.data()).toString());
+      settings.remove(SETTING_ACCESS_TOKEN.data());
+      settings.remove(SETTING_ACCESS_TOKEN_ID.data());
+      settings.sync();
+      restrictSettingsFilePermissions(settings);
+      qInfo() << "Adopted the stored access token for" << daemonKey;
+    }
+  }
   if (!m_accessToken.isEmpty()) {
     qInfo() << "Loaded stored daemon access token.";
   }
@@ -1185,7 +1300,7 @@ void MainWindow::clearAccessToken() const {
   qWarning() << "Daemon rejected the stored access token. Clearing it.";
   m_accessToken.clear();
   QSettings settings;
-  settings.remove(SETTING_ACCESS_TOKEN.data());
+  settings.remove(accessTokenKey(daemonSettingsKey()));
   // The id is deliberately kept so the next provision can delete the dead token
   // server-side. Deleting it here is not possible: /tokens is session-only, and a
   // rejected token usually means there is no valid session to delete it with either.
@@ -1227,9 +1342,12 @@ void MainWindow::provisionAccessToken() const {
   if (!m_accessToken.isEmpty()) {
     return;
   }
+  // Captured by value: a switch mid-flight must not file this token under whichever
+  // daemon happens to be live when the reply lands.
+  const auto daemonKey = daemonSettingsKey();
   // Left behind by a previous token this daemon rejected. Deleted once the replacement
   // exists, so a revoke-and-reconnect cycle cannot accumulate dead entries.
-  const auto supersededId = QSettings().value(SETTING_ACCESS_TOKEN_ID.data()).toString();
+  const auto supersededId = QSettings().value(accessTokenIdKey(daemonKey)).toString();
   QNetworkRequest tokenRequest;
   tokenRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   tokenRequest.setUrl(getEndpointUrl(ENDPOINT_TOKENS.data()));
@@ -1240,7 +1358,7 @@ void MainWindow::provisionAccessToken() const {
   const auto tokenReply =
       m_manager->post(tokenRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
   applyTlsPolicy(tokenReply);
-  connect(tokenReply, &QNetworkReply::finished, [tokenReply, supersededId, this]() {
+  connect(tokenReply, &QNetworkReply::finished, [tokenReply, supersededId, daemonKey, this]() {
     const auto status = tokenReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status >= 300) {
       // Not fatal: the session cookie still works while the renderer is alive, and
@@ -1258,8 +1376,8 @@ void MainWindow::provisionAccessToken() const {
     }
     m_accessToken = token.toUtf8();
     QSettings settings;
-    settings.setValue(SETTING_ACCESS_TOKEN.data(), m_accessToken);
-    settings.setValue(SETTING_ACCESS_TOKEN_ID.data(), rootObj.value("id").toString());
+    settings.setValue(accessTokenKey(daemonKey), m_accessToken);
+    settings.setValue(accessTokenIdKey(daemonKey), rootObj.value("id").toString());
     settings.sync();
     restrictSettingsFilePermissions(settings);
     qInfo() << "Created a desktop access token for daemon requests.";
@@ -1380,12 +1498,16 @@ void MainWindow::setTrayMenuModes(const QString& modesJson) const {
       setModeRequest.setUrl(url);
       applyAuth(setModeRequest);
       const auto setModeReply = m_manager->post(setModeRequest, QByteArray());
+      applyTlsPolicy(setModeReply);
       connect(setModeReply, &QNetworkReply::finished, [setModeReply, this]() {
         const auto status =
             setModeReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (status == 401) {
           clearAccessToken();
-          m_view->showNormal();  // show window if we have login credentials error
+          // Goes through the window-show path rather than m_view->showNormal(): calling
+          // it on the child view never brought the window up, so a credentials error
+          // raised from the tray left the user with nothing to log in to.
+          emit m_ipc->forceWindowShow();
           qWarning() << "Authentication no longer valid when trying to apply Mode. Please login.";
         }
         if (status >= 300) {

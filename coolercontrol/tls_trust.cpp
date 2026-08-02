@@ -22,6 +22,7 @@
 #include <QSettings>
 #include <QStringBuilder>
 
+#include "connections.h"
 #include "constants.h"
 
 namespace tls_trust {
@@ -54,10 +55,7 @@ bool isLoopback(const QString& host) {
   return !address.isNull() && address.isLoopback();
 }
 
-bool strictModeEnabled() {
-  const QSettings settings;
-  return settings.value(SETTING_TLS_STRICT.data(), false).toBool();
-}
+bool strictModeEnabled() { return connections::current().tlsStrict; }
 
 QString fingerprint(const QSslCertificate& certificate) {
   if (certificate.isNull()) {

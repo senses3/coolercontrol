@@ -1279,6 +1279,7 @@ export default {
             quit: '&Quitter',
             modes: 'Modes',
             sensors: 'Capteurs',
+            daemons: 'Démons',
         },
         cert: {
             title: 'Certificat du démon non vérifié',
@@ -1315,6 +1316,13 @@ export default {
             errorCertUntrusted: "Le certificat du démon n'a pas été approuvé.",
             errorCertInvalid:
                 "Le certificat du démon n'est pas valide et la validation des certificats est activée.",
+            savedLabel: 'Connexion enregistrée :',
+            newConnection: 'Nouvelle connexion…',
+            removeConnection: 'Supprimer',
+            removeConnectionTooltip: 'Oublier le démon sélectionné.',
+            removeConnectionBody: 'Ne plus proposer ce démon dans la zone de notification ?',
+            nameLabel: 'Nom :',
+            nameTooltip: 'Libellé facultatif pour ce démon. Vide affiche hôte:port.',
             addressTitle: 'Adresse du démon - Application de bureau',
             addressSubtitle: "Ajustez les champs d'adresse si nécessaire.",
             hostLabel: "Adresse de l'hôte :",

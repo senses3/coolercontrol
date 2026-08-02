@@ -1249,6 +1249,7 @@ export default {
             quit: 'बंद करें',
             modes: 'मोड',
             sensors: 'सेंसर',
+            daemons: 'डीमन',
         },
         cert: {
             title: 'असत्यापित डीमन प्रमाणपत्र',
@@ -1284,6 +1285,13 @@ export default {
             errorCertUntrusted: 'डेमॉन के प्रमाणपत्र पर भरोसा नहीं किया गया।',
             errorCertInvalid:
                 'डेमॉन का प्रमाणपत्र सत्यापित नहीं होता, और प्रमाणपत्र सत्यापन सक्षम है।',
+            savedLabel: 'सहेजा गया कनेक्शन:',
+            newConnection: 'नया कनेक्शन…',
+            removeConnection: 'हटाएँ',
+            removeConnectionTooltip: 'चयनित डीमन को भूल जाएँ।',
+            removeConnectionBody: 'क्या इस डीमन को ट्रे में दिखाना बंद करें?',
+            nameLabel: 'नाम:',
+            nameTooltip: 'इस डीमन के लिए वैकल्पिक लेबल। खाली रहने पर होस्ट:पोर्ट दिखेगा।',
             addressTitle: 'डीमन पता - डेस्कटॉप अनुप्रयोग',
             addressSubtitle: 'आवश्यकतानुसार पता फ़ील्ड समायोजित करें।',
             hostLabel: 'होस्ट पता:',

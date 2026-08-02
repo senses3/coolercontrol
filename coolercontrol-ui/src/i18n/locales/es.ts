@@ -1267,6 +1267,7 @@ export default {
             quit: '&Salir',
             modes: 'Modos',
             sensors: 'Sensores',
+            daemons: 'Demonios',
         },
         cert: {
             title: 'Certificado del demonio no verificado',
@@ -1304,6 +1305,13 @@ export default {
             errorCertUntrusted: 'No se confió en el certificado del demonio.',
             errorCertInvalid:
                 'El certificado del demonio no es válido y la validación de certificados está activada.',
+            savedLabel: 'Conexión guardada:',
+            newConnection: 'Nueva conexión…',
+            removeConnection: 'Eliminar',
+            removeConnectionTooltip: 'Olvidar el demonio seleccionado.',
+            removeConnectionBody: '¿Dejar de ofrecer este demonio en la bandeja?',
+            nameLabel: 'Nombre:',
+            nameTooltip: 'Etiqueta opcional para este demonio. En blanco muestra host:puerto.',
             addressTitle: 'Dirección del demonio - Aplicación de escritorio',
             addressSubtitle: 'Ajuste los campos de dirección según sea necesario.',
             hostLabel: 'Dirección del host:',

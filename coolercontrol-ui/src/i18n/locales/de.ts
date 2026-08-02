@@ -1276,6 +1276,7 @@ export default {
             quit: '&Beenden',
             modes: 'Modi',
             sensors: 'Sensoren',
+            daemons: 'Daemons',
         },
         cert: {
             title: 'Nicht verifiziertes Daemon-Zertifikat',
@@ -1313,6 +1314,13 @@ export default {
             errorCertUntrusted: 'Dem Zertifikat des Daemons wurde nicht vertraut.',
             errorCertInvalid:
                 'Das Zertifikat des Daemons ist ungültig und die Zertifikatsprüfung ist aktiviert.',
+            savedLabel: 'Gespeicherte Verbindung:',
+            newConnection: 'Neue Verbindung…',
+            removeConnection: 'Entfernen',
+            removeConnectionTooltip: 'Den ausgewählten Daemon vergessen.',
+            removeConnectionBody: 'Diesen Daemon nicht mehr im Systemabschnitt anbieten?',
+            nameLabel: 'Name:',
+            nameTooltip: 'Optionale Bezeichnung für diesen Daemon. Leer zeigt Host:Port.',
             addressTitle: 'Daemon-Adresse - Desktop-Anwendung',
             addressSubtitle: 'Passen Sie die Adressfelder nach Bedarf an.',
             hostLabel: 'Host-Adresse:',

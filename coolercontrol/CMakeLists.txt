@@ -21,6 +21,8 @@ qt_add_executable(
   main_window.h
   address_wizard.cpp
   address_wizard.h
+  connections.cpp
+  connections.h
   ipc.cpp
   ipc.h
   sse_parser.cpp
