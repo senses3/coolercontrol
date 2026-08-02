@@ -73,6 +73,10 @@ pub enum ChannelVerdict {
     PwmReadOnly,
     /// Probe proved writes are accepted and the fan never responded.
     IgnoresDuty,
+    /// Probe drove the channel to full duty and the tachometer never moved off
+    /// zero. Distinct from `IgnoresDuty`: the writes land and the control path
+    /// works, there is simply no working fan on the other end of it.
+    FanDoesNotSpin,
     /// No usable tachometer, so no probe can settle the question.
     Unverifiable,
 }
@@ -99,6 +103,7 @@ impl ChannelVerdict {
                 | Self::NoPwm
                 | Self::PwmReadOnly
                 | Self::IgnoresDuty
+                | Self::FanDoesNotSpin
                 | Self::Unverifiable
         )
     }

@@ -7468,6 +7468,11 @@
             "const": "ignores_duty"
           },
           {
+            "description": "Probe drove the channel to full duty and the tachometer never moved off\n zero. Distinct from `IgnoresDuty`: the writes land and the control path\n works, there is simply no working fan on the other end of it.",
+            "type": "string",
+            "const": "fan_does_not_spin"
+          },
+          {
             "description": "No usable tachometer, so no probe can settle the question.",
             "type": "string",
             "const": "unverifiable"
@@ -9650,11 +9655,6 @@
             "description": "No tachometer at all: the response can never be observed.",
             "type": "string",
             "const": "no_tachometer"
-          },
-          {
-            "description": "The channel is being driven and still reports no speed, which means an\n empty header. Probing it would manufacture an `IgnoresDuty` verdict for\n a connector with nothing on it.\n\n A channel at zero duty reporting zero speed is *not* this: that fan is\n merely stopped, and starting it is exactly what the probe is for.",
-            "type": "string",
-            "const": "no_baseline_rpm"
           },
           {
             "description": "An alert is active on this channel; moving its fan would confuse the\n user's own investigation and could trip further alerts.",

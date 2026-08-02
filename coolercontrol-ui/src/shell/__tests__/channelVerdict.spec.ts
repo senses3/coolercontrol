@@ -37,6 +37,7 @@ const VERDICT_KEYS: Record<ChannelVerdict, string | undefined> = {
     [ChannelVerdict.NoPwm]: 'verdictNoPwm',
     [ChannelVerdict.PwmReadOnly]: 'verdictPwmReadOnly',
     [ChannelVerdict.IgnoresDuty]: 'verdictIgnoresDuty',
+    [ChannelVerdict.FanDoesNotSpin]: 'verdictFanDoesNotSpin',
     [ChannelVerdict.Unverifiable]: 'verdictUnverifiable',
 }
 
@@ -46,7 +47,6 @@ const VERDICT_KEYS: Record<ChannelVerdict, string | undefined> = {
 const REFUSAL_KEYS: Record<ProbeRefusal, string> = {
     [ProbeRefusal.NotControllable]: 'probeDeclinedNotControllable',
     [ProbeRefusal.NoTachometer]: 'probeDeclinedNoTachometer',
-    [ProbeRefusal.NoBaselineRpm]: 'probeDeclinedNoBaselineRpm',
     [ProbeRefusal.AlertActive]: 'probeDeclinedAlertActive',
     [ProbeRefusal.TooWarmToLower]: 'probeDeclinedTooWarmToLower',
 }
@@ -65,6 +65,9 @@ describe('channel verdicts', () => {
         // rather than a hardware limitation, so neither gets a link.
         expect(verdictDocsLink(ChannelVerdict.Controllable)).toBeUndefined()
         expect(verdictDocsLink(ChannelVerdict.Unverifiable)).toBeUndefined()
+        // A fan that will not turn at full duty is a cable or a bearing, not
+        // anything the docs site can help with.
+        expect(verdictDocsLink(ChannelVerdict.FanDoesNotSpin)).toBeUndefined()
         for (const verdict of [
             ChannelVerdict.FirmwareOverride,
             ChannelVerdict.FamilyMayNeedOutOfTree,
@@ -110,6 +113,7 @@ describe('duty-response probe', () => {
             'probeNoResponse',
             'probeFirmwareOverride',
             'probeDidNotStart',
+            'probeStoppedShort',
         ]) {
             expect(typeof page[key], `missing string for ${key}`).toBe('string')
         }

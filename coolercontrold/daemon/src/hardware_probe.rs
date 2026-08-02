@@ -58,6 +58,18 @@ const RAISE_HEADROOM_CEILING: Duty = 80;
 /// a slow fan, small enough to stay unremarkable.
 const PROBE_STEP: Duty = 25;
 
+/// Duties tried in order when the fan is stopped and has to be started.
+///
+/// One step proves nothing here. Start thresholds vary widely between fans and
+/// plenty need more than a quarter duty to break away, so a single 25% attempt
+/// writes off fans that work perfectly at 40%. The last rung is full duty,
+/// which is what lets a failure be conclusive instead of inconclusive: a fan
+/// that will not turn at 100% is disconnected, blocked or dead.
+const START_LADDER: [Duty; 3] = [30, 60, 100];
+
+/// The ladder has to end at full duty or its failure means nothing.
+const _: () = assert!(START_LADDER[START_LADDER.len() - 1] == 100);
+
 /// Lowering spins a fan down, so it is gated on temperature. Above this the
 /// probe declines rather than reduce cooling on a machine already running warm.
 const LOWER_MAX_TEMP_CELSIUS: f64 = 70.0;
@@ -66,6 +78,14 @@ const LOWER_MAX_TEMP_CELSIUS: f64 = 70.0;
 /// enough for a slow 140mm fan, which takes longer to spin up than the status
 /// cache takes to refresh.
 const SETTLE_MS: u32 = 5_000;
+
+/// The same, per rung of the start ladder. Shorter on purpose: a fan that is
+/// going to break away does so almost at once, and the ladder only asks
+/// whether it turned at all rather than what speed it settled to. Waiting the
+/// full time on every rung would treble how long the request is held open.
+const START_SETTLE_MS: u32 = 2_500;
+
+const _: () = assert!(START_SETTLE_MS < SETTLE_MS);
 
 /// After settling, the sample still has to come from a status refresh that
 /// happened after the write, or it would report the pre-write speed.
@@ -88,13 +108,6 @@ pub enum ProbeRefusal {
     NotControllable,
     /// No tachometer at all: the response can never be observed.
     NoTachometer,
-    /// The channel is being driven and still reports no speed, which means an
-    /// empty header. Probing it would manufacture an `IgnoresDuty` verdict for
-    /// a connector with nothing on it.
-    ///
-    /// A channel at zero duty reporting zero speed is *not* this: that fan is
-    /// merely stopped, and starting it is exactly what the probe is for.
-    NoBaselineRpm,
     /// An alert is active on this channel; moving its fan would confuse the
     /// user's own investigation and could trip further alerts.
     AlertActive,
@@ -104,14 +117,34 @@ pub enum ProbeRefusal {
 }
 
 /// What the probe intends to do, once it has decided it may.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProbePlan {
     /// The duty to restore afterwards, captured before anything is written.
     pub original_duty: Duty,
-    /// The duty to write during the probe.
-    pub target_duty: Duty,
+    /// Duties to write in order, stopping at the first one the fan answers.
+    ///
+    /// One entry for a fan that is already turning, where a single step is
+    /// enough to see the speed change. The whole ladder for a stopped one,
+    /// because the question there is whether it starts at all.
+    pub steps: Vec<Duty>,
     /// True when the probe lowers rather than raises.
     pub lowers: bool,
+}
+
+impl ProbePlan {
+    /// How long to wait after each write before sampling.
+    fn settle_ms(&self) -> u32 {
+        if self.steps.len() > 1 {
+            return START_SETTLE_MS;
+        }
+        SETTLE_MS
+    }
+
+    /// Whether the last rung was full duty, which is what makes a fan that
+    /// never turned a conclusion rather than an open question.
+    fn ends_at_full_duty(&self) -> bool {
+        self.steps.last() == Some(&100)
+    }
 }
 
 /// Everything the decision needs, gathered by the caller.
@@ -138,20 +171,24 @@ pub fn plan_probe(conditions: ProbeConditions) -> Result<ProbePlan, ProbeRefusal
     if conditions.has_tachometer.not() {
         return Err(ProbeRefusal::NoTachometer);
     }
-    // Zero speed only means an empty header when something is actually
-    // driving the channel. At zero duty the fan is simply stopped, and
-    // refusing there declines to test the one case a user is most likely to
-    // be asking about.
-    if conditions.baseline_rpm == 0 && conditions.current_duty > 0 {
-        return Err(ProbeRefusal::NoBaselineRpm);
-    }
     if conditions.alert_active {
         return Err(ProbeRefusal::AlertActive);
+    }
+    if conditions.baseline_rpm == 0 {
+        // Nothing is turning, so there is no speed change to look for. The
+        // question is whether the fan starts at all, and only full duty can
+        // answer that in the negative. Cheap on an empty header, too: writing
+        // duty to a connector with nothing on it moves nothing.
+        return Ok(ProbePlan {
+            original_duty: conditions.current_duty,
+            steps: START_LADDER.to_vec(),
+            lowers: false,
+        });
     }
     if conditions.current_duty <= RAISE_HEADROOM_CEILING {
         return Ok(ProbePlan {
             original_duty: conditions.current_duty,
-            target_duty: (conditions.current_duty + PROBE_STEP).min(100),
+            steps: vec![(conditions.current_duty + PROBE_STEP).min(100)],
             lowers: false,
         });
     }
@@ -164,7 +201,7 @@ pub fn plan_probe(conditions: ProbeConditions) -> Result<ProbePlan, ProbeRefusal
     }
     Ok(ProbePlan {
         original_duty: conditions.current_duty,
-        target_duty: conditions.current_duty.saturating_sub(PROBE_STEP),
+        steps: vec![conditions.current_duty.saturating_sub(PROBE_STEP)],
         lowers: true,
     })
 }
@@ -191,33 +228,43 @@ fn response_threshold(baseline_rpm: u32) -> u32 {
 /// must be checked before concluding the fan ignores duty entirely. Reporting
 /// `IgnoresDuty` for an EC that took the channel back would send the user to
 /// the wrong documentation.
-pub fn interpret_probe(
-    manual_mode_held: bool,
-    baseline_rpm: u32,
-    observed_rpm: u32,
-) -> ChannelVerdict {
-    if manual_mode_held.not() {
+pub fn interpret_probe(observation: ProbeObservation) -> ChannelVerdict {
+    if observation.manual_mode_held.not() {
         return ChannelVerdict::FirmwareOverride;
     }
-    if rpm_responded(baseline_rpm, observed_rpm) {
+    if rpm_responded(observation.baseline_rpm, observation.observed_rpm) {
         return ChannelVerdict::Controllable;
     }
-    if baseline_rpm == 0 {
-        // A fan that never started and an empty header are the same
-        // observation from out here. `IgnoresDuty` would claim we know which,
-        // and it is the claim that sends a user to the wrong documentation.
-        return ChannelVerdict::Unverifiable;
+    if observation.baseline_rpm > 0 {
+        // It was turning and kept turning at the same speed: the writes land
+        // and something else is deciding the speed.
+        return ChannelVerdict::IgnoresDuty;
     }
-    ChannelVerdict::IgnoresDuty
+    if observation.reached_full_duty {
+        // Full duty and still nothing. The control path works, so this is not
+        // `IgnoresDuty`; there is simply no working fan on the other end.
+        return ChannelVerdict::FanDoesNotSpin;
+    }
+    // The ladder stopped short, so the question is still open.
+    ChannelVerdict::Unverifiable
+}
+
+/// Everything the verdict is derived from, gathered by the probe run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProbeObservation {
+    pub manual_mode_held: bool,
+    pub baseline_rpm: RPM,
+    pub observed_rpm: RPM,
+    /// Whether the last duty written was full. Only then does a fan that never
+    /// turned mean anything conclusive.
+    pub reached_full_duty: bool,
 }
 
 /// The verdict to record when a probe was refused. Only the two evidence gaps
 /// leave the question genuinely open; the rest are already explained.
 pub fn refusal_verdict(refusal: ProbeRefusal) -> Option<ChannelVerdict> {
     match refusal {
-        ProbeRefusal::NoTachometer | ProbeRefusal::NoBaselineRpm => {
-            Some(ChannelVerdict::Unverifiable)
-        }
+        ProbeRefusal::NoTachometer => Some(ChannelVerdict::Unverifiable),
         ProbeRefusal::NotControllable
         | ProbeRefusal::AlertActive
         | ProbeRefusal::TooWarmToLower => None,
@@ -332,44 +379,81 @@ pub async fn run_probe<H: ProbeHost + ?Sized>(
         Ok(plan) => plan,
         Err(refusal) => return Ok(ProbeOutcome::declined(refusal)),
     };
-    debug_assert_ne!(
-        plan.target_duty, plan.original_duty,
-        "a probe that writes the current duty proves nothing"
+    debug_assert!(
+        plan.steps.is_empty().not(),
+        "a plan with nothing to write proves nothing"
     );
     let snapshot = host.snapshot_setting(device_uid, channel_name);
-    let observation = observe_response(host, device_uid, channel_name, plan.target_duty).await;
+    let run = walk_the_plan(
+        host,
+        device_uid,
+        channel_name,
+        &plan,
+        conditions.baseline_rpm,
+    )
+    .await;
     let restored = host.restore_setting(&snapshot).await;
-    let (observed_rpm, manual_held) = observation?;
+    let run = run?;
     restored?;
-    Ok(ProbeOutcome::Completed {
-        verdict: interpret_probe(manual_held, conditions.baseline_rpm, observed_rpm),
+    let observation = ProbeObservation {
+        manual_mode_held: run.manual_mode_held,
         baseline_rpm: conditions.baseline_rpm,
-        observed_rpm,
+        observed_rpm: run.observed_rpm,
+        reached_full_duty: plan.ends_at_full_duty() && run.probed_duty == 100,
+    };
+    Ok(ProbeOutcome::Completed {
+        verdict: interpret_probe(observation),
+        baseline_rpm: conditions.baseline_rpm,
+        observed_rpm: run.observed_rpm,
         original_duty: plan.original_duty,
-        probed_duty: plan.target_duty,
+        probed_duty: run.probed_duty,
     })
 }
 
-/// Asserts control, writes the probe duty, and reports what the fan did.
-async fn observe_response<H: ProbeHost + ?Sized>(
+/// What one run of the plan actually saw.
+struct ProbeRun {
+    observed_rpm: RPM,
+    /// The last duty written, which is where `observed_rpm` was measured.
+    probed_duty: Duty,
+    manual_mode_held: bool,
+}
+
+/// Asserts control, then writes each duty in turn until the fan answers.
+///
+/// Stops at the first rung that produces a response, so a fan that starts at
+/// the bottom of the ladder is never driven to full duty just to prove a point.
+async fn walk_the_plan<H: ProbeHost + ?Sized>(
     host: &H,
     device_uid: &DeviceUID,
     channel_name: &str,
-    target_duty: Duty,
-) -> Result<(RPM, bool)> {
+    plan: &ProbePlan,
+    baseline_rpm: RPM,
+) -> Result<ProbeRun> {
     host.enter_manual_control(device_uid, channel_name).await?;
-    host.write_duty(device_uid, channel_name, target_duty)
-        .await?;
-    let observed_rpm = settle_and_sample(host, device_uid, channel_name)
-        .await
-        .ok_or_else(|| anyhow!("no fan speed reading after the probe write"))?;
+    let settle_ms = plan.settle_ms();
+    let mut observed_rpm = 0;
+    let mut probed_duty = plan.original_duty;
+    for &duty in &plan.steps {
+        host.write_duty(device_uid, channel_name, duty).await?;
+        probed_duty = duty;
+        observed_rpm = settle_and_sample(host, device_uid, channel_name, settle_ms)
+            .await
+            .ok_or_else(|| anyhow!("no fan speed reading after the probe write"))?;
+        if rpm_responded(baseline_rpm, observed_rpm) {
+            break;
+        }
+    }
     // Free here and only here: control has already been asserted and the probe
     // is a one-shot user action, so this read never reaches the write path.
-    let manual_held = host
+    let manual_mode_held = host
         .manual_control_held(device_uid, channel_name)
         .await
         .unwrap_or(true);
-    Ok((observed_rpm, manual_held))
+    Ok(ProbeRun {
+        observed_rpm,
+        probed_duty,
+        manual_mode_held,
+    })
 }
 
 /// Waits for the fan to reach its new speed, then for a status refresh that
@@ -378,9 +462,10 @@ async fn settle_and_sample<H: ProbeHost + ?Sized>(
     host: &H,
     device_uid: &DeviceUID,
     channel_name: &str,
+    settle_ms: u32,
 ) -> Option<RPM> {
     let before_ms = host.latest_status_timestamp_ms(device_uid).await;
-    host.sleep_millis(SETTLE_MS).await;
+    host.sleep_millis(settle_ms).await;
     for _ in 0..FRESH_STATUS_ATTEMPTS_MAX {
         if host.latest_status_timestamp_ms(device_uid).await != before_ms {
             return host.current_rpm(device_uid, channel_name).await;
@@ -414,51 +499,65 @@ mod tests {
     fn ordinary_probe_raises_duty() {
         let plan = plan_probe(healthy()).unwrap();
         assert_eq!(plan.original_duty, 40);
-        assert_eq!(plan.target_duty, 65);
+        assert_eq!(plan.steps, vec![65]);
         assert!(plan.lowers.not());
     }
 
-    /// Goal: a driven channel reading zero is an empty header, not a
-    /// baseline. Six headers on the validation machine sit at ~40% duty and
-    /// 0 rpm, and probing them would invent an IgnoresDuty verdict for each.
+    /// Goal: a stopped fan gets a ladder, not one attempt. Start thresholds
+    /// vary and plenty of fans need more than a quarter duty to break away, so
+    /// a single 25% try writes off fans that work fine at 40%.
     #[test]
-    fn zero_rpm_while_driven_is_not_a_baseline() {
-        let conditions = ProbeConditions {
-            baseline_rpm: 0,
-            current_duty: 40,
-            ..healthy()
-        };
-        assert_eq!(plan_probe(conditions), Err(ProbeRefusal::NoBaselineRpm));
+    fn a_stopped_fan_gets_the_whole_ladder() {
+        for current_duty in [0, 40] {
+            let conditions = ProbeConditions {
+                baseline_rpm: 0,
+                current_duty,
+                ..healthy()
+            };
+            let plan = plan_probe(conditions).unwrap();
+            assert_eq!(plan.original_duty, current_duty);
+            assert_eq!(plan.steps, START_LADDER.to_vec());
+            assert!(plan.ends_at_full_duty());
+        }
+    }
+
+    /// Goal: the ladder's rungs must climb and finish at full duty. A ladder
+    /// that stopped short could never turn a silent fan into a conclusion.
+    #[test]
+    fn the_ladder_climbs_to_full_duty() {
+        assert!(START_LADDER.windows(2).all(|pair| pair[0] < pair[1]));
+        assert_eq!(START_LADDER.last(), Some(&100));
+    }
+
+    /// Goal: full duty with nothing turning is conclusive, and it is not
+    /// IgnoresDuty. The writes landed and the control path works; there is no
+    /// working fan on the end of it, which is a different problem with a
+    /// different answer.
+    #[test]
+    fn no_spin_at_full_duty_is_conclusive() {
         assert_eq!(
-            refusal_verdict(ProbeRefusal::NoBaselineRpm),
-            Some(ChannelVerdict::Unverifiable)
+            interpret_probe(observed(0, 0, true)),
+            ChannelVerdict::FanDoesNotSpin
         );
     }
 
-    /// Goal: a stopped fan is not an empty header. At zero duty, zero speed is
-    /// the expected reading, and starting the fan is precisely the question the
-    /// user is asking. Refusing here declined to test the most interesting case.
+    /// Goal: a ladder that stopped short leaves the question open rather than
+    /// condemning a fan that simply was not asked hard enough.
     #[test]
-    fn zero_rpm_at_zero_duty_is_probed() {
-        let conditions = ProbeConditions {
-            baseline_rpm: 0,
-            current_duty: 0,
-            ..healthy()
-        };
-        let plan = plan_probe(conditions).unwrap();
-        assert_eq!(plan.original_duty, 0);
-        assert_eq!(plan.target_duty, 25);
+    fn no_spin_below_full_duty_stays_open() {
+        assert_eq!(
+            interpret_probe(observed(0, 0, false)),
+            ChannelVerdict::Unverifiable
+        );
     }
 
-    /// Goal: a fan that never started must not be called IgnoresDuty. From
-    /// outside, a stopped fan and an empty header are the same observation, and
-    /// naming one of them asserts knowledge the probe does not have.
+    /// Goal: a stopped fan that does start is just controllable.
     #[test]
-    fn a_fan_that_never_starts_is_unverifiable() {
-        assert_eq!(interpret_probe(true, 0, 0), ChannelVerdict::Unverifiable);
-        assert_eq!(interpret_probe(true, 0, 40), ChannelVerdict::Unverifiable);
-        // One that does start is simply controllable.
-        assert_eq!(interpret_probe(true, 0, 800), ChannelVerdict::Controllable);
+    fn a_fan_that_starts_is_controllable() {
+        assert_eq!(
+            interpret_probe(observed(0, 800, true)),
+            ChannelVerdict::Controllable
+        );
     }
 
     /// Goal: with no tachometer the question cannot be settled either way, so
@@ -496,7 +595,7 @@ mod tests {
             ..healthy()
         };
         let plan = plan_probe(cool).unwrap();
-        assert_eq!(plan.target_duty, 70);
+        assert_eq!(plan.steps, vec![70]);
         assert!(plan.lowers);
 
         let warm = ProbeConditions {
@@ -514,7 +613,7 @@ mod tests {
             current_duty: 80,
             ..healthy()
         };
-        assert_eq!(plan_probe(conditions).unwrap().target_duty, 100);
+        assert_eq!(plan_probe(conditions).unwrap().steps, vec![100]);
     }
 
     /// Goal: the response threshold scales with the fan. A 3000 rpm fan drifts
@@ -528,21 +627,31 @@ mod tests {
         assert!(rpm_responded(3000, 3400));
     }
 
+    fn observed(baseline_rpm: RPM, observed_rpm: RPM, reached_full_duty: bool) -> ProbeObservation {
+        ProbeObservation {
+            manual_mode_held: true,
+            baseline_rpm,
+            observed_rpm,
+            reached_full_duty,
+        }
+    }
+
     /// Goal: a reclaimed pwm_enable explains the lack of response, so it must
     /// outrank IgnoresDuty. Reporting the wrong one sends the user to the wrong
     /// documentation.
     #[test]
     fn reclaimed_manual_mode_outranks_ignores_duty() {
+        let reclaimed = ProbeObservation {
+            manual_mode_held: false,
+            ..observed(1000, 1000, false)
+        };
+        assert_eq!(interpret_probe(reclaimed), ChannelVerdict::FirmwareOverride);
         assert_eq!(
-            interpret_probe(false, 1000, 1000),
-            ChannelVerdict::FirmwareOverride
-        );
-        assert_eq!(
-            interpret_probe(true, 1000, 1000),
+            interpret_probe(observed(1000, 1000, false)),
             ChannelVerdict::IgnoresDuty
         );
         assert_eq!(
-            interpret_probe(true, 1000, 1400),
+            interpret_probe(observed(1000, 1400, false)),
             ChannelVerdict::Controllable
         );
     }
@@ -745,8 +854,7 @@ mod tests {
     fn refusal_writes_nothing() {
         let host = MockHost {
             conditions: Some(ProbeConditions {
-                baseline_rpm: 0,
-                current_duty: 40,
+                has_tachometer: false,
                 ..healthy()
             }),
             ..MockHost::responsive()
@@ -755,11 +863,52 @@ mod tests {
         assert_eq!(
             outcome,
             ProbeOutcome::Declined {
-                reason: ProbeRefusal::NoBaselineRpm,
+                reason: ProbeRefusal::NoTachometer,
                 verdict: Some(ChannelVerdict::Unverifiable),
             }
         );
         assert!(host.touched().is_empty(), "a refusal must not write");
+    }
+
+    /// Goal: the ladder stops the moment the fan answers. A fan that starts at
+    /// 30% must never be driven to full duty just to prove a point the probe
+    /// has already proved.
+    #[test]
+    fn the_ladder_stops_at_the_first_rung_that_works() {
+        let host = MockHost {
+            conditions: Some(ProbeConditions {
+                baseline_rpm: 0,
+                current_duty: 0,
+                ..healthy()
+            }),
+            rpm_after_write: Some(700),
+            ..MockHost::responsive()
+        };
+        let outcome = probe(&host).unwrap();
+        assert_eq!(outcome.verdict(), Some(ChannelVerdict::Controllable));
+        assert_eq!(host.touched(), vec!["manual", "duty:30", "restore"]);
+    }
+
+    /// Goal: a fan that answers no rung is walked all the way to full duty and
+    /// then condemned. Stopping short would leave the user with an open
+    /// question about a header that is demonstrably dead.
+    #[test]
+    fn a_silent_fan_is_walked_to_full_duty() {
+        let host = MockHost {
+            conditions: Some(ProbeConditions {
+                baseline_rpm: 0,
+                current_duty: 0,
+                ..healthy()
+            }),
+            rpm_after_write: Some(0),
+            ..MockHost::responsive()
+        };
+        let outcome = probe(&host).unwrap();
+        assert_eq!(outcome.verdict(), Some(ChannelVerdict::FanDoesNotSpin));
+        assert_eq!(
+            host.touched(),
+            vec!["manual", "duty:30", "duty:60", "duty:100", "restore"]
+        );
     }
 
     /// Goal: an unknown channel is an error, not a silent verdict about

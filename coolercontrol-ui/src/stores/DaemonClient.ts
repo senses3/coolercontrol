@@ -80,12 +80,13 @@ export default class DaemonClient {
     private daemonTimeoutExtended: number = 15_000 // this is for image processing calls that can take significantly longer
     private daemonInitialConnectionTimeout: number = 20_000 // to allow extra time for the daemon to come up
     private daemonCompleteHistoryTimeout: number = 30_000 // takes a long time on a slow connection
-    // The daemon holds a duty-response probe open while the fan settles, which
-    // outlasts every other call the UI makes.
-    private daemonTimeoutProbe: number = 30_000
+    // The daemon holds a duty-response probe open while the fan settles, and a
+    // stopped fan is tried at each rung of a ladder up to full duty, so this
+    // outlasts every other call the UI makes by a wide margin.
+    private daemonTimeoutProbe: number = 60_000
     private killClientTimeout: number = 11_000
     private killClientTimeoutExtended: number = 16_000 // this is for image processing calls that can take significantly longer
-    private killClientTimeoutProbe: number = 31_000
+    private killClientTimeoutProbe: number = 61_000
     private responseLogging: boolean = false
     private readonly userId: string = 'CCAdmin'
     public readonly defaultPasswd: string = 'coolAdmin'

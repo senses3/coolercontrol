@@ -51,6 +51,7 @@ export enum ChannelVerdict {
     NoPwm = 'no_pwm',
     PwmReadOnly = 'pwm_read_only',
     IgnoresDuty = 'ignores_duty',
+    FanDoesNotSpin = 'fan_does_not_spin',
     Unverifiable = 'unverifiable',
 }
 
@@ -187,6 +188,10 @@ export function verdictDocsLink(verdict: ChannelVerdict): string | undefined {
             return `${DOCS_BASE}#laptops`
         case ChannelVerdict.Controllable:
         case ChannelVerdict.Unverifiable:
+        // Nothing on the docs site can help with a fan that will not turn at
+        // full duty. That is a cable, an obstruction or a dead bearing, not a
+        // driver support question.
+        case ChannelVerdict.FanDoesNotSpin:
             return undefined
     }
 }
@@ -195,7 +200,6 @@ export function verdictDocsLink(verdict: ChannelVerdict): string | undefined {
 export enum ProbeRefusal {
     NotControllable = 'not_controllable',
     NoTachometer = 'no_tachometer',
-    NoBaselineRpm = 'no_baseline_rpm',
     AlertActive = 'alert_active',
     TooWarmToLower = 'too_warm_to_lower',
 }

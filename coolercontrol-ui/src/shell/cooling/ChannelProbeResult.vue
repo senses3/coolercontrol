@@ -72,7 +72,8 @@ function applyOutcome(outcome: ProbeOutcomeDTO | ErrorResponse): void {
     }
     resultIsAdverse.value =
         outcome.verdict === ChannelVerdict.IgnoresDuty ||
-        outcome.verdict === ChannelVerdict.FirmwareOverride
+        outcome.verdict === ChannelVerdict.FirmwareOverride ||
+        outcome.verdict === ChannelVerdict.FanDoesNotSpin
     result.value =
         outcome.outcome === 'completed' ? completedMessage(outcome) : declinedMessage(outcome)
 }
@@ -88,10 +89,12 @@ function completedMessage(outcome: ProbeOutcomeDTO): string {
             return t('layout.shell.coolingPage.probeResponded', values)
         case ChannelVerdict.FirmwareOverride:
             return t('layout.shell.coolingPage.probeFirmwareOverride')
-        // The fan was stopped to begin with and never started. A stopped fan
-        // and an empty header look identical from here, so say both.
-        case ChannelVerdict.Unverifiable:
+        // Walked all the way to full duty and nothing turned.
+        case ChannelVerdict.FanDoesNotSpin:
             return t('layout.shell.coolingPage.probeDidNotStart', values)
+        // The ladder stopped short, so nothing is settled.
+        case ChannelVerdict.Unverifiable:
+            return t('layout.shell.coolingPage.probeStoppedShort', values)
         default:
             return t('layout.shell.coolingPage.probeNoResponse', values)
     }
@@ -104,8 +107,6 @@ function declinedMessage(outcome: ProbeOutcomeDTO): string {
     switch (outcome.reason) {
         case ProbeRefusal.NoTachometer:
             return t('layout.shell.coolingPage.probeDeclinedNoTachometer')
-        case ProbeRefusal.NoBaselineRpm:
-            return t('layout.shell.coolingPage.probeDeclinedNoBaselineRpm')
         case ProbeRefusal.AlertActive:
             return t('layout.shell.coolingPage.probeDeclinedAlertActive')
         case ProbeRefusal.TooWarmToLower:
