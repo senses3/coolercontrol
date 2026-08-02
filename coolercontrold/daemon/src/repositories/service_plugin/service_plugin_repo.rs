@@ -23,6 +23,7 @@ use crate::device::{
 };
 use crate::device_health::FailsafeRef;
 use crate::grpc_api::device_service::v1::health_response;
+use crate::hardware_support::HardwareSupportController;
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
@@ -76,6 +77,8 @@ pub struct ServicePluginRepo {
     reset_plugin_user: bool,
     services: HashMap<ServiceId, (Option<Rc<DeviceServiceConnection>>, ServiceManifest)>,
     devices: HashMap<DeviceUID, (DeviceLock, Rc<DeviceServiceConnection>)>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     preloaded_statuses: RefCell<HashMap<DeviceUID, PreloadData>>,
     failsafe_statuses: RefCell<HashMap<DeviceUID, FailsafeStatusData>>,
     disabled_channels: HashMap<DeviceUID, HashSet<String>>,
@@ -172,6 +175,29 @@ fn synthesize_failsafe_seed(
 }
 
 impl ServicePluginRepo {
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, (device_lock, _)) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+        }
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
     pub fn new(
         config: Rc<Config>,
         api_up_token: CancellationToken,
@@ -187,6 +213,7 @@ impl ServicePluginRepo {
             reset_plugin_user,
             services: HashMap::new(),
             devices: HashMap::new(),
+            hardware_support: None,
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: HashMap::new(),
@@ -998,6 +1025,7 @@ impl Repository for ServicePluginRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("Service Plugin Repository initialized");
         Ok(())
     }

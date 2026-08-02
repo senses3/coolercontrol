@@ -22,6 +22,7 @@ use std::ops::Not;
 use std::rc::Rc;
 use std::time::Duration;
 
+use crate::hardware_support::HardwareSupportController;
 use crate::rt;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -87,6 +88,8 @@ pub enum GpuType {
 pub struct GpuRepo {
     config: Rc<Config>,
     devices: HashMap<UID, DeviceLock>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     gpu_type_count: HashMap<GpuType, u8>,
     gpus_nvidia: GpuNVidia,
     nvml_active: bool,
@@ -111,6 +114,29 @@ pub struct GpuRepo {
 }
 
 impl GpuRepo {
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, device_lock) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+        }
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
     pub fn new(config: Rc<Config>, nvidia_cli: bool) -> Self {
         // `poll_rate` is captured at daemon startup and cannot change
         // without a restart, so the derived permit timeouts are frozen
@@ -123,6 +149,7 @@ impl GpuRepo {
             gpus_amd: GpuAMD::new(Rc::clone(&config)),
             config,
             devices: HashMap::new(),
+            hardware_support: None,
             gpu_type_count: HashMap::new(),
             nvml_active: false,
             force_nvidia_cli: nvidia_cli,
@@ -371,6 +398,7 @@ impl Repository for GpuRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("GPU Repository initialized");
         Ok(())
     }

@@ -28,7 +28,7 @@
 //! verdict: there is nothing to attach it to.
 
 use crate::cc_fs;
-use crate::device::{ChannelName, DeviceUID};
+use crate::device::{ChannelName, DeviceInfo, DeviceUID};
 use log::{info, warn};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -63,6 +63,10 @@ pub enum ChannelVerdict {
     FirmwareOverride,
     /// No writable control, on a family where an out-of-tree driver may help.
     FamilyMayNeedOutOfTree,
+    /// The driver in use exposes no control for this channel. Reported by
+    /// repositories that know only whether a channel is drivable, with no
+    /// sysfs-level facts to back a more specific verdict.
+    NotSupportedByDriver,
     /// The driver exposes no `pwmN` for this channel.
     NoPwm,
     /// `pwmN` exists but the driver cleared its write bit.
@@ -91,6 +95,7 @@ impl ChannelVerdict {
             self,
             Self::Controllable
                 | Self::FamilyMayNeedOutOfTree
+                | Self::NotSupportedByDriver
                 | Self::NoPwm
                 | Self::PwmReadOnly
                 | Self::IgnoresDuty
@@ -109,7 +114,7 @@ impl ChannelVerdict {
 /// hardware, and collapsing them would discard the evidence this type exists
 /// to carry.
 #[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelEvidence {
     pub has_pwm: bool,
     pub pwm_writable: bool,
@@ -125,7 +130,11 @@ pub struct ChannelEvidence {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChannelDiagnosis {
     pub verdict: ChannelVerdict,
-    pub evidence: ChannelEvidence,
+    /// `None` when the reporting repository has no sysfs-level facts. Absent
+    /// beats all-false: four zeroed booleans read as measurements that were
+    /// never taken.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<ChannelEvidence>,
 }
 
 /// A diagnosis bound to the channel it describes, for the health snapshot.
@@ -134,7 +143,8 @@ pub struct ChannelVerdictRef {
     pub device_uid: DeviceUID,
     pub channel_name: ChannelName,
     pub verdict: ChannelVerdict,
-    pub evidence: ChannelEvidence,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<ChannelEvidence>,
 }
 
 /// Stable ordering so a client rendering the snapshot does not see rows
@@ -169,7 +179,27 @@ pub fn diagnose_channel(
     } else {
         ChannelVerdict::Controllable
     };
-    ChannelDiagnosis { verdict, evidence }
+    ChannelDiagnosis {
+        verdict,
+        evidence: Some(evidence),
+    }
+}
+
+/// The diagnosis a repository can make when all it knows is whether the
+/// channel is drivable.
+///
+/// Deliberately carries no evidence: liquidctl, GPU and plugin repositories
+/// have no pwm file to inspect, and reporting hwmon's fields as false would
+/// assert measurements nobody took.
+pub fn diagnose_driver_channel(controllable: bool) -> ChannelDiagnosis {
+    ChannelDiagnosis {
+        verdict: if controllable {
+            ChannelVerdict::Controllable
+        } else {
+            ChannelVerdict::NotSupportedByDriver
+        },
+        evidence: None,
+    }
 }
 
 /// Family guidance is evidence-gated, not identity-gated: it only ever
@@ -401,6 +431,30 @@ impl HardwareSupportController {
             detection,
             system_findings,
             channel_diagnoses: RefCell::new(HashMap::new()),
+        }
+    }
+
+    /// Records the drivability of a channel whose repository has no
+    /// sysfs-level facts. One line at each repository's call site.
+    pub fn record_driver_channel(&self, device_uid: &str, channel_name: &str, controllable: bool) {
+        self.record_channel_diagnosis(
+            device_uid,
+            channel_name,
+            diagnose_driver_channel(controllable),
+        );
+    }
+
+    /// Records drivability for every speed channel on a device.
+    ///
+    /// For repositories whose only fact is `SpeedOptions::fixed_enabled`.
+    /// hwmon does not use this: it has real sysfs evidence and publishes a
+    /// specific verdict per channel instead.
+    pub fn record_device_channels(&self, device_uid: &str, info: &DeviceInfo) {
+        for (channel_name, channel_info) in &info.channels {
+            let Some(speed_options) = channel_info.speed_options() else {
+                continue;
+            };
+            self.record_driver_channel(device_uid, channel_name, speed_options.fixed_enabled);
         }
     }
 

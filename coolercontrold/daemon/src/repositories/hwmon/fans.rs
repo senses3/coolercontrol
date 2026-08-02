@@ -95,14 +95,15 @@ fn log_channel_verdicts(base_path: &Path, device_name: &str, fans: &[HwmonChanne
         if diagnosis.verdict.is_controllable() {
             continue;
         }
+        let evidence = diagnosis.evidence.unwrap_or_default();
         info!(
             "Fan channel {} at {} is not controllable: {:?} (pwm: {}, writable: {}, rpm: {})",
             channel.name,
             base_path.display(),
             diagnosis.verdict,
-            diagnosis.evidence.has_pwm,
-            diagnosis.evidence.pwm_writable,
-            diagnosis.evidence.has_rpm,
+            evidence.has_pwm,
+            evidence.pwm_writable,
+            evidence.has_rpm,
         );
     }
 }

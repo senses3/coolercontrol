@@ -7378,6 +7378,11 @@
             "const": "family_may_need_out_of_tree"
           },
           {
+            "description": "The driver in use exposes no control for this channel. Reported by\n repositories that know only whether a channel is drivable, with no\n sysfs-level facts to back a more specific verdict.",
+            "type": "string",
+            "const": "not_supported_by_driver"
+          },
+          {
             "description": "The driver exposes no `pwmN` for this channel.",
             "type": "string",
             "const": "no_pwm"
@@ -7410,7 +7415,14 @@
             "type": "string"
           },
           "evidence": {
-            "$ref": "#/components/schemas/ChannelEvidence"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "verdict": {
             "$ref": "#/components/schemas/ChannelVerdict"
@@ -7419,8 +7431,7 @@
         "required": [
           "device_uid",
           "channel_name",
-          "verdict",
-          "evidence"
+          "verdict"
         ]
       },
       "CoolerControlAllDeviceSettingsDto": {

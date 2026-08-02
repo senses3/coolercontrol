@@ -31,6 +31,7 @@ use crate::device::{
     ChannelName, DeviceType, DeviceUID, Duty, LcInfo, Status, Temp, TempInfo, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
+use crate::hardware_support::HardwareSupportController;
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, FailureLogAction};
 use crate::repositories::hwmon::devices;
@@ -88,6 +89,8 @@ pub struct LiquidctlRepo {
     run_token: CancellationToken,
     device_mapper: DeviceMapper,
     devices: HashMap<UID, DeviceLock>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     preloaded_statuses: RefCell<HashMap<u8, LCStatus>>,
     failsafe_statuses: RefCell<HashMap<TypeIndex, FailsafeStatusData>>,
     disabled_channels: RefCell<HashMap<UID, Vec<ChannelName>>>,
@@ -100,6 +103,29 @@ pub struct LiquidctlRepo {
 }
 
 impl LiquidctlRepo {
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, device_lock) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+        }
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
     pub async fn new(
         config: Rc<Config>,
         run_token: CancellationToken,
@@ -163,6 +189,7 @@ impl LiquidctlRepo {
             run_token,
             device_mapper: DeviceMapper::new(),
             devices: HashMap::new(),
+            hardware_support: None,
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: RefCell::new(HashMap::new()),
@@ -1150,6 +1177,7 @@ impl Repository for LiquidctlRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("LIQUIDCTL Repository initialized");
         Ok(())
     }

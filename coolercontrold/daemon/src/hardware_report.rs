@@ -433,6 +433,7 @@ fn verdict_label(verdict: ChannelVerdict) -> &'static str {
         ChannelVerdict::Controllable => "controllable",
         ChannelVerdict::FirmwareOverride => "firmware override",
         ChannelVerdict::FamilyMayNeedOutOfTree => "no control, family may need out-of-tree driver",
+        ChannelVerdict::NotSupportedByDriver => "the driver in use exposes no control",
         ChannelVerdict::NoPwm => "no pwm control exposed",
         ChannelVerdict::PwmReadOnly => "pwm is read-only",
         ChannelVerdict::IgnoresDuty => "accepts duty writes but does not respond",
