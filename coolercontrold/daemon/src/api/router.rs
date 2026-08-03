@@ -1342,9 +1342,10 @@ fn hardware_report_routes() -> ApiRouter<AppState> {
         get_with(hardware_report::get_hardware_report, |o| {
             o.summary("Hardware Support Report")
                 .description(
-                    "Returns a paste-ready hardware support report as plain text. Same content \
-                     as the `coolercontrold report` subcommand, plus liquidctl devices, which \
-                     only the running daemon can enumerate without touching hardware.",
+                    "Returns a paste-ready hardware support report as plain text. `full` adds \
+                     the whole hwmon tree; the compact default is trimmed to stay pasteable. \
+                     Includes liquidctl devices, which only the running daemon can enumerate \
+                     without touching hardware.",
                 )
                 .tag("devices")
                 .security_requirement("CookieAuth")

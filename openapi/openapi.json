@@ -5512,7 +5512,7 @@
           "devices"
         ],
         "summary": "Hardware Support Report",
-        "description": "Returns a paste-ready hardware support report as plain text. Same content as the `coolercontrold report` subcommand, plus liquidctl devices, which only the running daemon can enumerate without touching hardware.",
+        "description": "Returns a paste-ready hardware support report as plain text. `full` adds the whole hwmon tree; the compact default is trimmed to stay pasteable. Includes liquidctl devices, which only the running daemon can enumerate without touching hardware.",
         "parameters": [
           {
             "in": "query",

@@ -307,7 +307,7 @@ fn main() -> Result<()> {
         // Publish the sidecar handle process-wide so reactor-bound work (process spawning, the
         // auth/token/liqctld/service-plugin transports) can reach it without threading a handle.
         sidecar::install_global(sidecar.handle());
-        handle_non_root_commands(&cmd_args).await?;
+        handle_non_root_commands(&cmd_args)?;
         let log_buf_handle = logger::setup_logging(&cmd_args, run_token.clone()).await?;
         verify_is_root()?;
         handle_detect_command(&cmd_args);
@@ -548,8 +548,6 @@ enum SubCommands {
     List,
     /// Validate all configuration files
     Check,
-    /// Print a paste-ready hardware support report to stdout. Needs neither root nor a
-    /// running daemon, though chip detection is only possible as root.
     /// Print the `OpenAPI` spec to stdout. Generated from the route table, so it needs
     /// neither root nor a running daemon. See `make openapi`.
     #[command(name = "openapi", hide = true)]
@@ -586,7 +584,7 @@ enum SubCommands {
 
 /// The stress subcommands run synchronously on plain threads, so this needs
 /// no runtime of its own.
-async fn handle_non_root_commands(args: &Args) -> Result<()> {
+fn handle_non_root_commands(args: &Args) -> Result<()> {
     if let Some(SubCommands::OpenApi) = &args.command {
         // Pretty-printed: the file is checked in, so a merge request diff has to be
         // readable. Whitespace compresses away to a couple of KB on the wire.

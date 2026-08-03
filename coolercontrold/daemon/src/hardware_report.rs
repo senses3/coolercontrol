@@ -18,8 +18,7 @@
 
 //! Paste-ready hardware report.
 //!
-//! Runs standalone so it still works over SSH when the UI will not come up,
-//! and reuses `fans::init_fans` and `hardware_support::diagnose_channel` rather
+//! Reuses `fans::init_fans` and `hardware_support::diagnose_channel` rather
 //! than re-deriving anything, so the report and the running daemon can never
 //! disagree about a verdict.
 //!
@@ -44,11 +43,11 @@ const HWMON_CLASS_PATH: &str = "/sys/class/hwmon";
 
 /// Appended when the compact report is trimmed, so the dropped detail is still
 /// reachable rather than silently gone.
-const TRIM_NOTICE: &str = "\n[trimmed, run `coolercontrold report --full` for the rest]\n";
+const TRIM_NOTICE: &str = "\n[trimmed, the full report has the rest]\n";
 
 /// Discord's message limit. The compact report is meant to be pasted whole, so
-/// it is trimmed with a pointer to `--full` rather than being allowed to run
-/// past this and get truncated by the client.
+/// it is trimmed with a pointer to the full report rather than being allowed to
+/// run past this and get truncated by the client.
 pub const COMPACT_CHARACTER_BUDGET: usize = 2000;
 
 /// Room held back for the ```` ``` ```` fences the UI wraps the text in when
@@ -616,7 +615,7 @@ mod tests {
             "fenced report was {} chars",
             fenced.chars().count()
         );
-        assert!(trimmed.contains("--full"));
+        assert!(trimmed.contains(TRIM_NOTICE.trim()));
     }
 
     /// Goal: a report already within budget must be returned untouched, so the

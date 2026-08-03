@@ -18,9 +18,9 @@
 
 //! The daemon-served hardware report.
 //!
-//! Same text the `report` subcommand prints, plus the liquidctl section, which
-//! the standalone CLI cannot produce safely. The daemon already holds the
-//! device list in memory, so this costs no extra hardware access.
+//! The daemon is the only thing that can enumerate liquidctl devices without
+//! touching hardware, and it already holds the device list in memory, so the
+//! liquidctl section costs no extra hardware access.
 
 use axum::extract::{Query, State};
 use axum::Json;
