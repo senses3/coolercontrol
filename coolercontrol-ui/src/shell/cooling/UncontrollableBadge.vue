@@ -53,8 +53,6 @@ const tooltip = computed<string>(() => {
             return t('layout.shell.coolingPage.verdictNoPwm')
         case ChannelVerdict.PwmReadOnly:
             return t('layout.shell.coolingPage.verdictPwmReadOnly')
-        case ChannelVerdict.FanDoesNotSpin:
-            return t('layout.shell.coolingPage.verdictFanDoesNotSpin')
         case ChannelVerdict.IgnoresDuty:
             return t('layout.shell.coolingPage.verdictIgnoresDuty')
         case ChannelVerdict.Unverifiable:

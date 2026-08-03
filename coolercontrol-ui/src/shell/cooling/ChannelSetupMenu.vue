@@ -19,7 +19,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiAutoFix, mdiChartMultiple, mdiFan, mdiSpeedometer } from '@mdi/js'
+import { mdiAutoFix, mdiChartMultiple, mdiSpeedometer } from '@mdi/js'
 import { DropdownMenuItem, DropdownMenuSeparator } from 'reka-ui'
 import { useI18n } from 'vue-i18n'
 import type { UID } from '@/models/Device.ts'
@@ -28,9 +28,6 @@ import { useToolWizards } from '@/composables/useToolWizards.ts'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 
 const props = defineProps<{ deviceUID: UID; channelName: string }>()
-// The probe moves hardware and reports back, so the page owns both the running
-// state and where the answer is rendered; the menu only asks for it.
-const emit = defineEmits<{ testFanResponse: [] }>()
 
 const { t } = useI18n()
 const fanWizard = useFanControlWizard()
@@ -80,10 +77,6 @@ const itemClass =
                 class="text-text-color-secondary"
             />
             {{ t('layout.shell.coolingPage.setupMenu.calibrateThisFan') }}
-        </DropdownMenuItem>
-        <DropdownMenuItem :class="itemClass" @select="emit('testFanResponse')">
-            <svg-icon type="mdi" :path="mdiFan" :size="15" class="text-text-color-secondary" />
-            {{ t('layout.shell.coolingPage.setupMenu.testFanResponse') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
         <DropdownMenuItem :class="itemClass" @select="autoCreateAllFans">

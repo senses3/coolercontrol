@@ -60,7 +60,6 @@ mod device_listener;
 mod device_uid;
 mod engine;
 mod grpc_api;
-mod hardware_probe;
 mod hardware_report;
 mod hardware_support;
 mod hashutil;

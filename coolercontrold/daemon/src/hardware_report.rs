@@ -597,7 +597,6 @@ fn verdict_label(verdict: ChannelVerdict) -> &'static str {
         ChannelVerdict::NoPwm => "no pwm control exposed",
         ChannelVerdict::PwmReadOnly => "pwm is read-only",
         ChannelVerdict::IgnoresDuty => "accepts duty writes but does not respond",
-        ChannelVerdict::FanDoesNotSpin => "no fan turns at full duty",
         ChannelVerdict::Unverifiable => "no usable tachometer",
     }
 }
@@ -692,7 +691,6 @@ mod tests {
             ChannelVerdict::NoPwm,
             ChannelVerdict::PwmReadOnly,
             ChannelVerdict::IgnoresDuty,
-            ChannelVerdict::FanDoesNotSpin,
             ChannelVerdict::Unverifiable,
         ] {
             assert!(verdict_label(verdict).is_empty().not());

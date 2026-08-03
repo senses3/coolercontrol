@@ -51,7 +51,6 @@ export enum ChannelVerdict {
     NoPwm = 'no_pwm',
     PwmReadOnly = 'pwm_read_only',
     IgnoresDuty = 'ignores_duty',
-    FanDoesNotSpin = 'fan_does_not_spin',
     Unverifiable = 'unverifiable',
 }
 
@@ -188,47 +187,8 @@ export function verdictDocsLink(verdict: ChannelVerdict): string | undefined {
             return `${DOCS_BASE}#laptops`
         case ChannelVerdict.Controllable:
         case ChannelVerdict.Unverifiable:
-        // Nothing on the docs site can help with a fan that will not turn at
-        // full duty. That is a cable, an obstruction or a dead bearing, not a
-        // driver support question.
-        case ChannelVerdict.FanDoesNotSpin:
             return undefined
     }
-}
-
-/** Why the daemon declined to move a fan. Every reason is a refusal to touch hardware. */
-export enum ProbeRefusal {
-    NotControllable = 'not_controllable',
-    NoTachometer = 'no_tachometer',
-    AlertActive = 'alert_active',
-    TooWarmToLower = 'too_warm_to_lower',
-}
-
-/**
- * The result of one duty-response probe, as an externally tagged union on
- * `outcome`. A declined probe is a result, not an error: the daemon has told
- * us why it will not move this fan.
- */
-export class ProbeOutcomeDTO {
-    outcome: 'completed' | 'declined' = 'declined'
-    /** Present on `completed`, and on `declined` when the refusal itself settles the question. */
-    verdict?: ChannelVerdict
-    reason?: ProbeRefusal
-    baseline_rpm?: number
-    observed_rpm?: number
-    original_duty?: number
-    probed_duty?: number
-}
-
-/**
- * Where a probe has got to. The daemon runs it off the request, because a probe
- * waits for the board at each duty and outlasts the API's request timeout.
- */
-export class ProbeStatusDTO {
-    state: 'running' | 'finished' | 'failed' = 'running'
-    @Type(() => ProbeOutcomeDTO)
-    outcome?: ProbeOutcomeDTO
-    error?: string
 }
 
 /** One Super-I/O chip the startup probe found. */

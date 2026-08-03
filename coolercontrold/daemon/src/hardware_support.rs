@@ -52,8 +52,10 @@ const OUT_OF_TREE_CANDIDATE_PREFIXES: [&str; 2] = ["nct6", "it8"];
 
 /// Why a fan channel can or cannot be driven, from local evidence only.
 ///
-/// `IgnoresDuty` and `Unverifiable` are reserved for the duty-response probe
-/// and are never produced by passive observation.
+/// `FirmwareOverride`, `IgnoresDuty` and `Unverifiable` can only come from a
+/// duty-response probe, which is not part of this work. They stay in the
+/// taxonomy and in the wire shape so the probe can land later without moving
+/// the API; until then nothing produces them, which is the honest answer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChannelVerdict {
@@ -73,10 +75,6 @@ pub enum ChannelVerdict {
     PwmReadOnly,
     /// Probe proved writes are accepted and the fan never responded.
     IgnoresDuty,
-    /// Probe drove the channel to full duty and the tachometer never moved off
-    /// zero. Distinct from `IgnoresDuty`: the writes land and the control path
-    /// works, there is simply no working fan on the other end of it.
-    FanDoesNotSpin,
     /// No usable tachometer, so no probe can settle the question.
     Unverifiable,
 }
@@ -103,7 +101,6 @@ impl ChannelVerdict {
                 | Self::NoPwm
                 | Self::PwmReadOnly
                 | Self::IgnoresDuty
-                | Self::FanDoesNotSpin
                 | Self::Unverifiable
         )
     }
@@ -612,24 +609,6 @@ impl HardwareSupportController {
             (device_uid.to_string(), channel_name.to_string()),
             diagnosis,
         );
-    }
-
-    /// Replaces a channel's verdict with one the duty-response probe
-    /// established, keeping the evidence already recorded for it.
-    ///
-    /// The probe answers a question the passive evidence could not; it does
-    /// not re-measure the sysfs facts, so overwriting them with nothing would
-    /// discard observations that are still true.
-    pub fn record_probe_verdict(
-        &self,
-        device_uid: &str,
-        channel_name: &str,
-        verdict: ChannelVerdict,
-    ) {
-        let key = (device_uid.to_string(), channel_name.to_string());
-        let mut diagnoses = self.channel_diagnoses.borrow_mut();
-        let evidence = diagnoses.get(&key).and_then(|prior| prior.evidence.clone());
-        diagnoses.insert(key, ChannelDiagnosis { verdict, evidence });
     }
 
     /// Splits the recorded diagnoses into the permanent capabilities and the

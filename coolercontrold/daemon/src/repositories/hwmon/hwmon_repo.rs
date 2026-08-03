@@ -2208,28 +2208,6 @@ impl Repository for HwmonRepo {
     async fn reinitialize_devices(&self) {
         error!("Reinitializing Devices is not supported for this Repository");
     }
-
-    /// Reads `pwmN_enable` back and compares it against manual.
-    ///
-    /// Compared against manual rather than tested for a specific auto value on
-    /// purpose: the vocabulary is driver-defined, not the 0-5 the sysfs
-    /// interface documents. An `nct6687` board reports 99 on headers its
-    /// driver is not managing, and a check for "reverted to 2 or 5" would
-    /// never fire there.
-    ///
-    /// `None` when the driver exposes no `pwmN_enable`, which means there is
-    /// no auto mode for firmware to reclaim the channel into. Apple SMC is
-    /// also `None`: it takes manual control through its own interface, so
-    /// there is no `pwmN_enable` to read back.
-    async fn manual_control_held(&self, device_uid: &UID, channel_name: &str) -> Option<bool> {
-        let (hwmon_driver, channel_info, _) = self.get_hwmon_info(device_uid, channel_name).ok()?;
-        if hwmon_driver.apple_smc.detected {
-            return None;
-        }
-        channel_info.pwm_enable_default?;
-        let current = fans::current_pwm_enable(&hwmon_driver.path, channel_info.number).await?;
-        Some(current == fans::PWM_ENABLE_MANUAL_VALUE)
-    }
 }
 
 #[cfg(test)]

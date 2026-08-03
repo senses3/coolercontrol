@@ -166,7 +166,6 @@ export default {
                     autoCreateThisFan: 'Auto-Create for This Fan',
                     createProfile: 'Create a New Profile',
                     calibrateThisFan: 'Calibrate This Fan',
-                    testFanResponse: 'Test Fan Response',
                     autoCreateAllFans: 'Auto-Create All Fans',
                     calibrateAllFans: 'Calibrate All Fans',
                 },
@@ -197,8 +196,6 @@ export default {
                     'The loaded driver exposes a fan control for this channel but marks it read-only.',
                 verdictIgnoresDuty:
                     'This channel accepted duty changes, but its measured speed never responded.',
-                verdictFanDoesNotSpin:
-                    'This channel was driven to full speed and the fan never turned. The fan is most likely unplugged, obstructed, or failed.',
                 verdictUnverifiable:
                     'This channel has no usable tachometer, so its response to duty changes cannot be verified.',
                 verdictEvidenceLabel: 'Measured on this machine:',
@@ -208,33 +205,6 @@ export default {
                 evidenceNoTachometer: 'no speed reading',
                 verdictLearnMore: 'What can I do about this?',
                 verdictFoundSomethingThatWorks: 'Found something that works? Tell us',
-                probeButton: 'Test fan response',
-                probeTooltip:
-                    'Briefly changes the fan speed and checks whether it actually responded, then puts your setting back.',
-                probeRunning:
-                    'Testing, the fan will change speed briefly. A stopped fan is tried at several speeds and boards that ramp slowly are waited out, so this can take up to a minute...',
-                probeResponded:
-                    'The fan responded: {baseline} rpm to {observed} rpm at {duty}% duty.',
-                probeNoResponse:
-                    'The fan accepted {duty}% duty but its speed did not change ({baseline} rpm to {observed} rpm). CoolerControl is not driving this fan.',
-                probeDidNotStart:
-                    'The fan did not turn at any speed up to {duty}%. It is most likely unplugged, obstructed, or failed.',
-                probeStoppedShort:
-                    'The fan did not turn at up to {duty}% duty, and the test could not go higher, so this is not conclusive.',
-                probeFirmwareOverride:
-                    'The firmware took this channel back during the test, so CoolerControl could not hold manual control.',
-                probeDeclinedNotControllable:
-                    'This channel has no writable fan control, so there is nothing to test.',
-                probeDeclinedNoTachometer:
-                    'This channel reports no speed, so a response could not be observed.',
-                probeDeclinedAlertActive:
-                    'An alert is active on this channel. The test was skipped so it does not interfere.',
-                probeDeclinedTooWarmToLower:
-                    'This fan is already near maximum and the machine is too warm to slow it down for a test.',
-                probeFailed: 'The test could not be completed: {error}',
-                probeTimedOut: 'the daemon stopped reporting on the test',
-                probeUnrecognized:
-                    'The test finished, but this version of the app does not recognize the result. The daemon may be a different version than the app.',
                 activeMode: 'Active',
                 previousMode: 'Previous',
                 activate: 'Activate',

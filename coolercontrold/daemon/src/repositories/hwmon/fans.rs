@@ -477,7 +477,7 @@ pub async fn get_fan_rpm(
 ///  - 5 : "Smart Fan IV" mode (modern `MoBo`'s with build-in smart fan control probably use this)
 /// Reads `pwmN_enable`. `None` when the driver exposes no such file, which
 /// means there is no auto mode to hand control back to.
-pub async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> {
+async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> {
     let pwm_enable_path = base_path.join(format_pwm_enable!(channel_number));
     let current_pwm_enable = cc_fs::read_sysfs(&pwm_enable_path)
         .await

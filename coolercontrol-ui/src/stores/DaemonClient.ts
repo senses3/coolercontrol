@@ -51,7 +51,7 @@ import {
 } from '@/models/Mode'
 import defaultHealthCheck, { HealthCheck } from '@/models/HealthCheck.ts'
 import { Alert, AlertsDTO } from '@/models/Alert.ts'
-import { DetectionDTO, DeviceHealthDTO, ProbeStatusDTO } from '@/models/DeviceHealth.ts'
+import { DetectionDTO, DeviceHealthDTO } from '@/models/DeviceHealth.ts'
 import type {
     Calibration,
     CalibrationBatchStatus,
@@ -1335,59 +1335,6 @@ export default class DaemonClient {
             this.logError(err)
             return ''
         }
-    }
-
-    /**
-     * Asks the daemon to start a duty-response probe on a channel. The only
-     * call in the client that moves hardware, so it is never issued
-     * automatically. Returns once the probe is under way, not once it is done:
-     * a probe waits for the board at each duty and outlasts any request, so the
-     * answer is collected from `probeStatus`.
-     */
-    async startProbe(deviceUID: UID, channelName: string): Promise<undefined | ErrorResponse> {
-        try {
-            const response = await this.getClient().post(
-                `/hardware-support/${deviceUID}/channels/${channelName}/probe`,
-            )
-            this.logDaemonResponse(response, 'Start Probe')
-            return undefined
-        } catch (err: any) {
-            this.logError(err)
-            return this.asErrorResponse(err)
-        }
-    }
-
-    /** How the channel's most recent probe is getting on. */
-    async probeStatus(
-        deviceUID: UID,
-        channelName: string,
-    ): Promise<ProbeStatusDTO | ErrorResponse> {
-        try {
-            const response = await this.getClient().get(
-                `/hardware-support/${deviceUID}/channels/${channelName}/probe`,
-            )
-            this.logDaemonResponse(response, 'Probe Status')
-            return plainToInstance(ProbeStatusDTO, response.data as object)
-        } catch (err: any) {
-            this.logError(err)
-            return this.asErrorResponse(err)
-        }
-    }
-
-    /**
-     * A daemon error as an `ErrorResponse`, whatever shape it arrived in.
-     *
-     * `plainToInstance` on a non-object body (a timeout's empty string, say)
-     * hands back that value rather than an instance, so an `instanceof` check
-     * at the call site silently failed and the caller read a string as a
-     * result object.
-     */
-    private asErrorResponse(err: any): ErrorResponse {
-        const data = err?.response?.data
-        if (data != null && typeof data === 'object') {
-            return plainToInstance(ErrorResponse, data as object)
-        }
-        return new ErrorResponse(err?.message ?? 'request failed')
     }
 
     async loadAlertsAndLogs(): Promise<AlertsDTO> {

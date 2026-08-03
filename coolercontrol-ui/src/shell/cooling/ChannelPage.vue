@@ -33,7 +33,6 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
-import ChannelProbeResult from '@/shell/cooling/ChannelProbeResult.vue'
 import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
 import UncontrollableBadge from '@/shell/cooling/UncontrollableBadge.vue'
 import FirmwareCurveBadge from '@/shell/cooling/FirmwareCurveBadge.vue'
@@ -89,8 +88,6 @@ const device = computed<Device | undefined>(() => {
 const channelInfo = computed(() => device.value?.info?.channels.get(props.channelName))
 const speedOptions = computed(() => channelInfo.value?.speed_options)
 const controllable = computed(() => speedOptions.value?.fixed_enabled ?? false)
-
-const probeRef = ref<InstanceType<typeof ChannelProbeResult> | null>(null)
 
 const uiSetting = computed(() =>
     settingsStore.allUIDeviceSettings
@@ -415,11 +412,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
         <template v-if="controllable">
             <div class="flex flex-wrap items-center gap-3">
                 <UiToggleGroup v-model="controlMode" :options="controlModeOptions" />
-                <ChannelSetupMenu
-                    :device-u-i-d="deviceUID"
-                    :channel-name="channelName"
-                    @test-fan-response="probeRef?.run()"
-                >
+                <ChannelSetupMenu :device-u-i-d="deviceUID" :channel-name="channelName">
                     <template #trigger>
                         <UiButton variant="outline">
                             <svg-icon type="mdi" :path="mdiAutoFix" :size="16" />
@@ -462,14 +455,6 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     }}
                 </UiButton>
             </div>
-
-            <!-- Renders nothing until a test has been asked for, so a channel
-                 nobody is questioning carries no extra row. -->
-            <ChannelProbeResult
-                ref="probeRef"
-                :device-u-i-d="deviceUID"
-                :channel-name="channelName"
-            />
 
             <!-- Manual -->
             <div
