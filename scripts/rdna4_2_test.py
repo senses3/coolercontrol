@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from time import sleep, time
 
-__VERSION__ = "0.2.0"
+__VERSION__ = "0.3.0"
 
 LOG_FILE = "rdna4_2_test.log"
 JSON_FILE = "rdna4_2_test.json"
