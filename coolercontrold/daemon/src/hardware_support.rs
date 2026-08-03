@@ -34,6 +34,9 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
+
+use crate::repositories::hwmon::hwmon_repo::HwmonDriverInfo;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -518,6 +521,10 @@ pub struct HardwareSupportController {
     /// (a re-initialization after sleep, say) must not double every row in the
     /// report.
     device_summaries: RefCell<HashMap<DeviceUID, crate::hardware_report::DeviceSummary>>,
+    /// The hwmon channel information the repository built at startup, kept so
+    /// the report can describe a device it already knows without walking sysfs
+    /// a second time.
+    hwmon_drivers: RefCell<Vec<Rc<HwmonDriverInfo>>>,
     /// hwmon devices and channels the daemon deliberately dropped, keyed by
     /// canonical path. Recorded where each decision is actually made rather
     /// than re-derived, so the report cannot disagree with what the daemon did.
@@ -534,6 +541,7 @@ impl HardwareSupportController {
             system_findings: RefCell::new(system_findings),
             channel_diagnoses: RefCell::new(HashMap::new()),
             device_summaries: RefCell::new(HashMap::new()),
+            hwmon_drivers: RefCell::new(Vec::new()),
             hidden_hardware: RefCell::new(HiddenHardware::default()),
         }
     }
@@ -641,6 +649,20 @@ impl HardwareSupportController {
             .collect::<Vec<_>>();
         summaries.sort_by(|a, b| a.name.cmp(&b.name));
         summaries
+    }
+
+    /// Retains an hwmon device's channel information for the report.
+    ///
+    /// The repository has already read every one of these files; re-reading
+    /// them to print a report is work the daemon does not need to repeat, and
+    /// on a device that talks over a bus it is work that can go wrong.
+    pub fn record_hwmon_driver(&self, driver: Rc<HwmonDriverInfo>) {
+        self.hwmon_drivers.borrow_mut().push(driver);
+    }
+
+    /// The retained hwmon devices, for the report.
+    pub fn hwmon_drivers(&self) -> Vec<Rc<HwmonDriverInfo>> {
+        self.hwmon_drivers.borrow().clone()
     }
 
     /// Records or replaces one channel's diagnosis.

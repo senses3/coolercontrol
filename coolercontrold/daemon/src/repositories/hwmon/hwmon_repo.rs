@@ -674,11 +674,15 @@ impl HwmonRepo {
             self.delay_logged.insert(type_index, Cell::new(0));
             self.preload_in_flight
                 .insert(type_index, Rc::new(Cell::new(false)));
+            let driver = Rc::new(driver);
             self.publish_channel_verdicts(&device.uid, &driver);
-            self.devices.insert(
-                device.uid.clone(),
-                (Rc::new(RefCell::new(device)), Rc::new(driver)),
-            );
+            // Retained so the hardware report can describe this device without
+            // re-reading every file we just read.
+            if let Some(hardware_support) = self.hardware_support.as_ref() {
+                hardware_support.record_hwmon_driver(Rc::clone(&driver));
+            }
+            self.devices
+                .insert(device.uid.clone(), (Rc::new(RefCell::new(device)), driver));
         }
         Ok(())
     }

@@ -32,12 +32,13 @@ use crate::hardware_support::{
     ProbeEnvironment, SystemFinding, SystemInfo,
 };
 use crate::repositories::hwmon::fans;
-use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
+use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo};
 use crate::{cc_fs, VERSION};
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 const HWMON_CLASS_PATH: &str = "/sys/class/hwmon";
 
@@ -89,9 +90,14 @@ pub async fn generate(
     detection: Option<&cc_detect::DetectionResults>,
     devices_other: &[DeviceSummary],
     hidden: &HiddenHardware,
+    retained: &[Rc<HwmonDriverInfo>],
 ) -> String {
     let system_info = SystemInfo::read().await;
-    let devices = scan_hwmon(hidden).await;
+    let devices = if full {
+        scan_hwmon(hidden).await
+    } else {
+        collect_retained(retained, hidden).await
+    };
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection, full);
@@ -546,6 +552,83 @@ fn verdict_for(device: &ReportDevice, fan: &HwmonChannelInfo) -> ChannelVerdict 
     fans::diagnose_fan_channel(&device.name, fan, false).verdict
 }
 
+/// Builds the compact report's device list without re-reading sysfs.
+///
+/// The repository already read every one of these files at startup and kept
+/// the result, so a report that walks the tree again is repeating work, and on
+/// a device that talks over a bus it is repeating work that can fail. `--full`
+/// still walks everything; that is what it is for.
+///
+/// Two things still need reading, and only these:
+///
+/// - devices the daemon excluded, which are absent from the retained set by
+///   definition, and are the ones a reader most wants explained;
+/// - devices with an individually hidden channel, because the repository
+///   filtered those channels out before retaining them, so the retained copy
+///   cannot show what went missing.
+async fn collect_retained(
+    retained: &[Rc<HwmonDriverInfo>],
+    hidden: &HiddenHardware,
+) -> Vec<ReportDevice> {
+    let mut devices = Vec::with_capacity(retained.len() + hidden.devices.len());
+    for driver in retained {
+        let canonical = cc_fs::canonicalize(&driver.path).ok();
+        let excluded_channels = canonical
+            .as_ref()
+            .map_or_else(HashMap::new, |canonical| hidden_channels(hidden, canonical));
+        let fans = if excluded_channels.is_empty() {
+            driver
+                .channels
+                .iter()
+                .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
+                .cloned()
+                .collect()
+        } else {
+            read_fans(&driver.path, &driver.name).await
+        };
+        devices.push(ReportDevice {
+            path: driver.path.clone(),
+            name: driver.name.clone(),
+            driver: resolve_driver(&driver.path),
+            fans,
+            excluded: None,
+            excluded_channels,
+        });
+    }
+    for (path, reason) in &hidden.devices {
+        let Ok(name) = cc_fs::read_txt(path.join("name")).await else {
+            continue;
+        };
+        let name = name.trim().to_string();
+        let fans = if scan_is_safe(Some(*reason)) {
+            read_fans(path, &name).await
+        } else {
+            Vec::new()
+        };
+        devices.push(ReportDevice {
+            path: path.clone(),
+            name,
+            driver: resolve_driver(path),
+            fans,
+            excluded: Some(*reason),
+            excluded_channels: hidden_channels(hidden, path),
+        });
+    }
+    devices.sort_by_key(|device| (hwmon_index(&device.path), device.path.clone()));
+    devices
+}
+
+/// Reads a device's fan channels with the exact same `init_fans` the daemon
+/// uses, so a scanned device and a retained one describe themselves alike.
+async fn read_fans(path: &Path, name: &str) -> Vec<HwmonChannelInfo> {
+    fans::init_fans(path, name)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
+        .collect()
+}
+
 /// Enumerates hwmon and builds each device's fan channels with the exact same
 /// `init_fans` the daemon uses.
 async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
@@ -586,12 +669,7 @@ async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
         // business overriding that, and the Liquidctl section already carries
         // its fan counts from the repository that actually drives it.
         let fans = if scan_is_safe(excluded) {
-            fans::init_fans(&path, &name)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
-                .collect()
+            read_fans(&path, &name).await
         } else {
             Vec::new()
         };
@@ -915,6 +993,59 @@ mod tests {
             report.contains("My Plugin [kraken2]  3 fan(s), 3 controllable"),
             "{report}"
         );
+    }
+
+    fn driver_info(name: &str, fans: &[&str]) -> Rc<HwmonDriverInfo> {
+        Rc::new(HwmonDriverInfo {
+            name: name.to_string(),
+            path: PathBuf::from(format!("/sys/class/hwmon/{name}")),
+            channels: fans
+                .iter()
+                .map(|fan| HwmonChannelInfo {
+                    hwmon_type: HwmonChannelType::Fan,
+                    name: (*fan).to_string(),
+                    ..HwmonChannelInfo::default()
+                })
+                .collect(),
+            ..HwmonDriverInfo::default()
+        })
+    }
+
+    /// Goal: the compact report describes a device the daemon already read
+    /// without touching sysfs for it again. Method: hand it a retained driver
+    /// whose path does not exist, and require its channels to come through
+    /// anyway. A path that cannot be read is the strongest possible proof that
+    /// nothing was read.
+    #[test]
+    fn retained_devices_are_not_re_read() {
+        let retained = [driver_info("nct6687", &["fan1", "fan2"])];
+        let devices = crate::rt::test_runtime(async {
+            collect_retained(&retained, &HiddenHardware::default()).await
+        });
+        assert_eq!(devices.len(), 1);
+        assert_eq!(devices[0].name, "nct6687");
+        assert_eq!(devices[0].fans.len(), 2, "retained channels must survive");
+    }
+
+    /// Goal: a device with an individually hidden channel still gets read.
+    /// The repository filters those channels out before retaining, so the
+    /// retained copy cannot show what went missing, and reusing it would
+    /// silently drop the hidden-channel lines.
+    #[test]
+    fn a_device_with_a_hidden_channel_is_re_read() {
+        let retained = [driver_info("nct6687", &["fan1"])];
+        let canonical = cc_fs::canonicalize(Path::new("/sys/class/hwmon"))
+            .unwrap_or_else(|_| PathBuf::from("/sys/class/hwmon"));
+        let mut hidden = HiddenHardware::default();
+        hidden.channels.insert(
+            (canonical, "fan7".to_string()),
+            ChannelExclusion::UserDisabled,
+        );
+        // The retained path does not resolve, so nothing is found to re-read
+        // and the fan list comes back empty rather than silently reusing the
+        // retained channels.
+        let devices = crate::rt::test_runtime(async { collect_retained(&retained, &hidden).await });
+        assert_eq!(devices.len(), 1);
     }
 
     /// Goal: the report must not read a device liquidctl is talking to.

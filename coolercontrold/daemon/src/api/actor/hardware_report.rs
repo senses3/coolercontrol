@@ -116,9 +116,19 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 // Cloned rather than borrowed: the generation below awaits, and
                 // a `RefCell` borrow must not be held across an await point.
                 let detection = self.hardware_support.detection();
+                // Read at startup by the repository and kept, so the compact
+                // report describes what the daemon already knows rather than
+                // walking sysfs again.
+                let retained = self.hardware_support.hwmon_drivers();
                 let report = rt::timeout(
                     GENERATE_TIMEOUT,
-                    hardware_report::generate(full, detection.as_ref(), &devices_other, &hidden),
+                    hardware_report::generate(
+                        full,
+                        detection.as_ref(),
+                        &devices_other,
+                        &hidden,
+                        &retained,
+                    ),
                 )
                 .await
                 .unwrap_or_else(|_| {
