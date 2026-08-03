@@ -17,7 +17,7 @@
  */
 
 use crate::cc_fs;
-use crate::device::{ChannelName, ChannelStatus, Duty, RPM};
+use crate::device::{ChannelStatus, Duty, RPM};
 use crate::repositories::hwmon::devices::DEVICE_NAME_MAC_SMC;
 use crate::repositories::hwmon::fans;
 use crate::repositories::hwmon::hwmon_repo::{
@@ -96,19 +96,15 @@ impl AppleMacSMC {
         Self::default()
     }
 
-    pub async fn init_fans(
-        base_path: &Path,
-        channels: &mut Vec<HwmonChannelInfo>,
-        disabled_channels: &[ChannelName],
-    ) {
-        match Self::init_apple_fans(base_path).await {
-            Ok(fans) => channels.extend(
-                fans.into_iter()
-                    .filter(|fan| disabled_channels.contains(&fan.name).not())
-                    .collect::<Vec<HwmonChannelInfo>>(),
-            ),
-            Err(err) => error!("Error initializing Apple Mac SMC Fans: {err}"),
-        }
+    /// Returns every detected fan, including ones the user has disabled. The
+    /// caller drops those, so both hwmon branches record the same exclusions.
+    pub async fn init_fans(base_path: &Path) -> Vec<HwmonChannelInfo> {
+        Self::init_apple_fans(base_path)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Error initializing Apple Mac SMC Fans: {err}");
+                Vec::new()
+            })
     }
 
     async fn init_apple_fans(base_path: &Path) -> Result<Vec<HwmonChannelInfo>> {
@@ -988,9 +984,11 @@ mod tests {
         });
     }
 
+    /// Disabled channels are dropped by the caller, not here, so that the same
+    /// place also records the exclusion for the hardware report.
     #[test]
     #[serial]
-    fn test_init_fans_with_disabled_channels() {
+    fn test_init_fans_returns_disabled_channels() {
         cc_fs::test_runtime(async {
             let ctx = setup().await;
             // given:
@@ -1010,15 +1008,13 @@ mod tests {
             cc_fs::write(test_base_path.join("fan1_max"), b"6500".to_vec())
                 .await
                 .unwrap();
-            let mut channels = vec![];
-            let disabled_channels = vec!["fan1".to_string()];
-
             // when:
-            AppleMacSMC::init_fans(test_base_path, &mut channels, &disabled_channels).await;
+            let channels = AppleMacSMC::init_fans(test_base_path).await;
 
             // then:
             teardown(&ctx).await;
-            assert!(channels.is_empty());
+            assert_eq!(channels.len(), 1);
+            assert_eq!(channels[0].name, "fan1");
         });
     }
 

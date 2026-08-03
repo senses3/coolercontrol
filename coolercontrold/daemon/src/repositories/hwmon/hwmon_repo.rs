@@ -704,7 +704,8 @@ impl HwmonRepo {
     ///
     /// `firmware_override_observed` is false here by construction: at init
     /// nothing has attempted control yet, so there has been nothing to
-    /// reclaim. The writer task republishes a channel if that changes.
+    /// reclaim. Nothing republishes a channel afterwards: only a duty-response
+    /// probe can observe a reclaim, and that is not part of this work.
     fn publish_channel_verdicts(&self, device_uid: &UID, driver: &HwmonDriverInfo) {
         let Some(hardware_support) = self.hardware_support.as_ref() else {
             return;
@@ -1660,29 +1661,27 @@ impl Repository for HwmonRepo {
             // `ignore` statements, and reused below for the labels and the summary log.
             let chip = chip_name::derive(&path).await;
             let mut channels = vec![];
-            if DEVICE_NAMES_APPLE.contains(&device_name.as_str()) {
-                AppleMacSMC::init_fans(&path, &mut channels, &disabled_channels).await;
+            let fans = if DEVICE_NAMES_APPLE.contains(&device_name.as_str()) {
+                AppleMacSMC::init_fans(&path).await
             } else {
-                match fans::init_fans(&path, &device_name).await {
-                    Ok(fans) => {
-                        for fan in &fans {
-                            if disabled_channels.contains(&fan.name) {
-                                self.record_excluded_channel(
-                                    &path,
-                                    &fan.name,
-                                    ChannelExclusion::UserDisabled,
-                                );
-                            }
-                        }
-                        channels.extend(
-                            fans.into_iter()
-                                .filter(|fan| disabled_channels.contains(&fan.name).not())
-                                .collect::<Vec<HwmonChannelInfo>>(),
-                        );
-                    }
-                    Err(err) => error!("Error initializing Hwmon Fans: {err}"),
+                fans::init_fans(&path, &device_name)
+                    .await
+                    .unwrap_or_else(|err| {
+                        error!("Error initializing Hwmon Fans: {err}");
+                        Vec::new()
+                    })
+            };
+            // Recorded for both branches, so the report's hidden count is not
+            // silently zero on Apple hardware the user has disabled fans on.
+            for fan in &fans {
+                if disabled_channels.contains(&fan.name) {
+                    self.record_excluded_channel(&path, &fan.name, ChannelExclusion::UserDisabled);
                 }
             }
+            channels.extend(
+                fans.into_iter()
+                    .filter(|fan| disabled_channels.contains(&fan.name).not()),
+            );
             match temps::init_temps(&path, &device_name).await {
                 Ok(temps) => channels.extend(
                     temps
