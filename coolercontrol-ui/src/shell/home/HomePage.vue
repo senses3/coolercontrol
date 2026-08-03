@@ -258,6 +258,8 @@ const capabilityDetail = (verdict: ChannelVerdict): string => {
             return t('layout.shell.coolingPage.verdictPwmReadOnly')
         case ChannelVerdict.IgnoresDuty:
             return t('layout.shell.coolingPage.verdictIgnoresDuty')
+        case ChannelVerdict.Unverifiable:
+            return t('layout.shell.coolingPage.verdictUnverifiable')
         default:
             return t('layout.shell.coolingPage.notControllable')
     }
@@ -284,6 +286,11 @@ const detectionOpen = ref(false)
 const supportRows = computed((): Array<SupportRow> => {
     const rows: Array<SupportRow> = []
     for (const finding of settingsStore.healthSystemFindings) {
+        // A statement about the build, not a problem with this machine. The
+        // daemon leaves it out of its actionable set for the same reason, and a
+        // row here would put a docs link in front of every non-x86_64 user
+        // whose fans work.
+        if (finding.kind === SystemFindingKind.DetectionUnsupported) continue
         // Machine-scope, so there is no channel to route to. The docs page is
         // the only useful destination.
         rows.push({
