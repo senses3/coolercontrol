@@ -41,10 +41,18 @@ const loading = ref(false)
 const full = ref(false)
 const copied = ref(false)
 
+// Toggling compact/full twice in quick succession can have the first request
+// resolve last, which would leave the preview showing the variant the switch is
+// no longer set to. Only the newest request may write.
+let requestId = 0
+
 async function load(): Promise<void> {
+    const thisRequest = ++requestId
     loading.value = true
     copied.value = false
-    report.value = await deviceStore.daemonClient.loadHardwareReport(full.value)
+    const loaded = await deviceStore.daemonClient.loadHardwareReport(full.value)
+    if (thisRequest !== requestId) return
+    report.value = loaded
     loading.value = false
 }
 
