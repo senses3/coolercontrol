@@ -419,13 +419,33 @@ class FanCtrl:
             points.append((temp, duty))
         return points
 
+    def points_writable(self, points):
+        """Whether every point is inside the ranges the driver will accept.
+
+        A card with no custom curve set reads back as all zeros, which is below both
+        minimums, so the current curve cannot always be written back verbatim.
+        """
+        return bool(points) and all(
+            self.temp_min <= temp <= self.temp_max
+            and self.duty_min <= duty <= self.duty_max
+            for temp, duty in points
+        )
+
     def shape_nudged_baseline(self):
-        """The current curve with one duty moved, so the table is guaranteed to differ.
+        """A valid curve guaranteed to differ from what the firmware currently holds.
 
         A commit that changes nothing is skipped entirely by the driver and reports
         success, which would make a pass here meaningless.
         """
-        points = list(self.baseline_points) or self.shape_ascending()
+        if self.points_writable(self.baseline_points):
+            points = list(self.baseline_points)
+        else:
+            log.info(
+                f"  baseline {self.baseline_points} is outside the writable ranges "
+                f"(temp {self.temp_min}-{self.temp_max}, duty {self.duty_min}-{self.duty_max}); "
+                "no custom curve is set. Using a generated curve instead."
+            )
+            points = self.shape_ascending()
         temp, duty = points[-1]
         nudged = duty - 1 if duty > self.duty_min else duty + 1
         points[-1] = (temp, max(self.duty_min, min(self.duty_max, nudged)))
@@ -1126,15 +1146,27 @@ def phase_6_restore(fan, report):
     line_filler()
     fan.sysfs.phase = "phase-6"
 
+    # The reset restores the firmware's own defaults, which is the whole job when no
+    # custom curve was set. Writing points back would create one that was not there.
     reset_op = fan.reset_curve("final")
-    restored = reset_op.ok
-    if fan.baseline_points:
+    after_reset = fan.log_snapshot("after reset")
+    if reset_op.ok and after_reset["points"] == fan.baseline_points:
+        report.record("restored_to_baseline", True)
+        log.info("  The reset restored the original curve. Nothing further to write.")
+        return
+
+    if fan.points_writable(fan.baseline_points):
         _, commit_op = fan.apply(fan.baseline_points, "restore baseline")
-        restored = restored and commit_op.ok
-    final = fan.log_snapshot("final")
-    report.record(
-        "restored_to_baseline", restored and final["points"] == fan.baseline_points
-    )
+        final = fan.log_snapshot("final")
+        restored = commit_op.ok and final["points"] == fan.baseline_points
+    else:
+        restored = False
+        log.warning(
+            f"  The original curve {fan.baseline_points} cannot be written back; it is "
+            "outside the ranges the driver accepts."
+        )
+
+    report.record("restored_to_baseline", restored)
     if not restored:
         log.error(
             "Could not restore the original fan curve. Reboot to return the GPU to a known state."
