@@ -48,6 +48,9 @@ pub struct DetectedChipDto {
     pub driver: String,
     pub address: String,
     pub base_address: String,
+    /// The chip's own id register. Reported so a chip line in a pasted report
+    /// can be matched against a pasted log.
+    pub device_id: String,
     pub features: Vec<String>,
     pub module_status: String,
 }
@@ -70,6 +73,7 @@ impl From<cc_detect::DetectionResults> for DetectResponse {
                     driver: c.driver,
                     address: c.address,
                     base_address: c.base_address,
+                    device_id: c.device_id,
                     features: c.features,
                     module_status: c.module_status,
                 })

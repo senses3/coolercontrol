@@ -7901,6 +7901,10 @@
           "base_address": {
             "type": "string"
           },
+          "device_id": {
+            "description": "The chip's own id register. Reported so a chip line in a pasted report\n can be matched against a pasted log.",
+            "type": "string"
+          },
           "driver": {
             "type": "string"
           },
@@ -7922,6 +7926,7 @@
           "driver",
           "address",
           "base_address",
+          "device_id",
           "features",
           "module_status"
         ]
