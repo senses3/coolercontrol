@@ -132,14 +132,29 @@ pub async fn get_detect(
 
 /// POST /detect — Run detection and optionally load modules.
 pub async fn post_detect(
-    State(AppState { detect_handle, .. }): State<AppState>,
+    State(AppState {
+        detect_handle,
+        hardware_report_handle,
+        ..
+    }): State<AppState>,
     Json(request): Json<DetectRequest>,
 ) -> Result<Json<DetectResponse>, CCError> {
-    detect_handle
-        .run(request.load_modules)
+    let results =
+        detect_handle
+            .run(request.load_modules)
+            .await
+            .map_err(|e| CCError::InternalError {
+                msg: format!("Detection failed: {e}"),
+            })?;
+    // This scan is newer than the retained one and may have just loaded a
+    // module, so the health snapshot has to be brought along with it. A failed
+    // hand-off leaves the older results in place, which is stale but not wrong,
+    // so it does not fail the request the user actually made.
+    if let Err(err) = hardware_report_handle
+        .refresh_detection(results.clone())
         .await
-        .map(|r| Json(DetectResponse::from(r)))
-        .map_err(|e| CCError::InternalError {
-            msg: format!("Detection failed: {e}"),
-        })
+    {
+        log::warn!("Could not refresh the retained detection results: {err}");
+    }
+    Ok(Json(DetectResponse::from(results)))
 }

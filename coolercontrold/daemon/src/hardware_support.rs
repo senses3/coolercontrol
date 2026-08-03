@@ -498,8 +498,14 @@ impl SystemInfo {
 /// different question than the one the user is asking.
 pub struct HardwareSupportController {
     pub system_info: SystemInfo,
-    pub detection: Option<cc_detect::DetectionResults>,
-    pub system_findings: Vec<SystemFinding>,
+    /// What the last detection run found, seeded at startup and replaced by an
+    /// explicit `POST /detect`. That request is the only other point where
+    /// module loading can happen, so leaving this frozen would keep reporting a
+    /// chip as unbound after the user just loaded its driver.
+    detection: RefCell<Option<cc_detect::DetectionResults>>,
+    /// Derived from `detection` and the bound drivers, so it is recomputed
+    /// whenever `detection` is replaced.
+    system_findings: RefCell<Vec<SystemFinding>>,
     /// Keyed by `(device_uid, channel_name)`. Seeded when a repository
     /// initializes its channels and updated when a runtime observation, such
     /// as a firmware reclaim, changes a verdict.
@@ -520,12 +526,31 @@ impl HardwareSupportController {
         let system_findings = Self::compute_findings(detection.as_ref());
         Self {
             system_info,
-            detection,
-            system_findings,
+            detection: RefCell::new(detection),
+            system_findings: RefCell::new(system_findings),
             channel_diagnoses: RefCell::new(HashMap::new()),
             liquidctl_devices: RefCell::new(Vec::new()),
             hidden_hardware: RefCell::new(HiddenHardware::default()),
         }
+    }
+
+    /// What the last detection run found. `None` means no probe was made.
+    pub fn detection(&self) -> Option<cc_detect::DetectionResults> {
+        self.detection.borrow().clone()
+    }
+
+    /// The findings the health snapshot and the report both answer from.
+    pub fn system_findings(&self) -> Vec<SystemFinding> {
+        self.system_findings.borrow().clone()
+    }
+
+    /// Replaces the retained results after an explicit re-scan, and recomputes
+    /// the findings from them so the health snapshot cannot keep asserting a
+    /// driver is unbound after the same request loaded it.
+    pub fn refresh_detection(&self, results: cc_detect::DetectionResults) {
+        let findings = Self::compute_findings(Some(&results));
+        *self.detection.borrow_mut() = Some(results);
+        *self.system_findings.borrow_mut() = findings;
     }
 
     /// Records that an hwmon device was left out, and why.
@@ -683,7 +708,7 @@ impl HardwareSupportController {
         if self.has_actionable_finding() {
             self.log_machine_context();
         }
-        for finding in &self.system_findings {
+        for finding in self.system_findings.borrow().iter() {
             match finding {
                 SystemFinding::NoDriverBound {
                     chip_name,
@@ -710,6 +735,7 @@ impl HardwareSupportController {
     /// with the machine, so it does not warrant dumping board context.
     fn has_actionable_finding(&self) -> bool {
         self.system_findings
+            .borrow()
             .iter()
             .any(|finding| matches!(finding, SystemFinding::DetectionUnsupported).not())
     }
@@ -728,7 +754,7 @@ impl HardwareSupportController {
             "Hardware support: board {board_vendor} {board_name}, BIOS {bios_vendor} \
              {bios_release}"
         );
-        if let Some(detection) = &self.detection {
+        if let Some(detection) = self.detection.borrow().as_ref() {
             info!(
                 "Hardware support: {} Super-I/O chip(s) detected",
                 detection.detected_chips.len()
@@ -740,6 +766,46 @@ impl HardwareSupportController {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Goal: an explicit re-scan must move the findings the health snapshot is
+    /// built from, otherwise `/devices/health` keeps naming a chip as unbound
+    /// after the request that loaded its driver. Method: start from no
+    /// detection at all, hand in results naming a driver nothing can be bound
+    /// to, and read the findings back.
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn refreshed_detection_recomputes_the_findings() {
+        crate::cc_fs::test_runtime(async {
+            let controller = HardwareSupportController::init(None).await;
+            assert!(controller.system_findings().is_empty());
+
+            controller.refresh_detection(cc_detect::DetectionResults {
+                detected_chips: vec![cc_detect::DetectedChipInfo {
+                    name: "CC-TEST-CHIP".to_string(),
+                    driver: "cc_test_no_such_driver".to_string(),
+                    address: "0x4e".to_string(),
+                    base_address: "0x4e".to_string(),
+                    device_id: "0xd592".to_string(),
+                    features: Vec::new(),
+                    module_status: "detection_only".to_string(),
+                }],
+                blacklisted: Vec::new(),
+                environment: cc_detect::EnvironmentInfo {
+                    is_container: false,
+                    is_secure_boot: false,
+                    has_dev_port: true,
+                },
+            });
+
+            let findings = controller.system_findings();
+            assert_eq!(findings.len(), 1, "expected exactly one finding");
+            assert!(matches!(
+                &findings[0],
+                SystemFinding::NoDriverBound { chip_name, .. } if chip_name == "CC-TEST-CHIP"
+            ));
+            assert!(controller.detection().is_some());
+        });
+    }
 
     fn evidence(has_pwm: bool, pwm_writable: bool, has_pwm_enable: bool) -> ChannelEvidence {
         ChannelEvidence {

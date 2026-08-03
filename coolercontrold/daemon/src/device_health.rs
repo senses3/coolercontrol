@@ -166,9 +166,9 @@ pub struct DeviceHealthController {
     missing: RefCell<Vec<SourceRef>>,
     stale_source: RefCell<Vec<SourceRef>>,
     failsafe: RefCell<Vec<FailsafeRef>>,
+    hardware_support: Option<Rc<crate::hardware_support::HardwareSupportController>>,
     /// Temp-source references extracted from config. Re-extracted only when the
     /// config generation moves, so unchanged ticks parse no config at all.
-    hardware_support: Option<Rc<crate::hardware_support::HardwareSupportController>>,
     candidates: RefCell<Vec<SourceRef>>,
     config_generation_seen: Cell<Option<u64>>,
 }
@@ -218,7 +218,7 @@ impl DeviceHealthController {
         let system_findings = self
             .hardware_support
             .as_ref()
-            .map(|hs| hs.system_findings.clone())
+            .map(|hs| hs.system_findings())
             .unwrap_or_default();
         DeviceHealthDto {
             failsafe: self.failsafe.borrow().clone(),

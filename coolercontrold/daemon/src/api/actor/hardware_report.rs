@@ -44,6 +44,12 @@ enum HardwareReportMessage {
     RetainedDetection {
         respond_to: oneshot::Sender<Option<cc_detect::DetectionResults>>,
     },
+    /// An explicit re-scan replaces what the retained results say, so the
+    /// health snapshot stops contradicting a scan the user just ran.
+    RefreshDetection {
+        results: Box<cc_detect::DetectionResults>,
+        respond_to: oneshot::Sender<()>,
+    },
     Generate {
         full: bool,
         respond_to: oneshot::Sender<String>,
@@ -74,7 +80,14 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
     async fn handle_message(&mut self, msg: HardwareReportMessage) {
         match msg {
             HardwareReportMessage::RetainedDetection { respond_to } => {
-                let _ = respond_to.send(self.hardware_support.detection.clone());
+                let _ = respond_to.send(self.hardware_support.detection());
+            }
+            HardwareReportMessage::RefreshDetection {
+                results,
+                respond_to,
+            } => {
+                self.hardware_support.refresh_detection(*results);
+                let _ = respond_to.send(());
             }
             HardwareReportMessage::Generate { full, respond_to } => {
                 // Retained at startup, so this never re-enumerates USB devices
@@ -84,13 +97,11 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 // the report says why a chip is missing from the app instead of
                 // leaving it looking broken.
                 let hidden = self.hardware_support.hidden_hardware();
-                let report = hardware_report::generate(
-                    full,
-                    self.hardware_support.detection.as_ref(),
-                    &liquidctl,
-                    &hidden,
-                )
-                .await;
+                // Cloned rather than borrowed: the generation below awaits, and
+                // a `RefCell` borrow must not be held across an await point.
+                let detection = self.hardware_support.detection();
+                let report =
+                    hardware_report::generate(full, detection.as_ref(), &liquidctl, &hidden).await;
                 let _ = respond_to.send(report);
             }
         }
@@ -124,6 +135,18 @@ impl HardwareReportHandle {
     pub async fn retained_detection(&self) -> Result<Option<cc_detect::DetectionResults>> {
         let (tx, rx) = oneshot::channel();
         let msg = HardwareReportMessage::RetainedDetection { respond_to: tx };
+        let _ = self.sender.send(msg).await;
+        Ok(rx.await?)
+    }
+
+    /// Hands a fresh scan back to the retained state. Called by `POST /detect`,
+    /// which is the only request that can load modules after startup.
+    pub async fn refresh_detection(&self, results: cc_detect::DetectionResults) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        let msg = HardwareReportMessage::RefreshDetection {
+            results: Box::new(results),
+            respond_to: tx,
+        };
         let _ = self.sender.send(msg).await;
         Ok(rx.await?)
     }
