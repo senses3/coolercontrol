@@ -175,29 +175,6 @@ fn synthesize_failsafe_seed(
 }
 
 impl ServicePluginRepo {
-    /// Publishes whether each channel can be driven. This repository has no
-    /// sysfs-level evidence, so the verdict carries none: an unexplained
-    /// "not controllable" is honest, invented measurements are not.
-    fn publish_channel_drivability(&self) {
-        let Some(hardware_support) = self.hardware_support.as_ref() else {
-            return;
-        };
-        for (device_uid, (device_lock, _)) in &self.devices {
-            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
-        }
-    }
-
-    /// Attaches the hardware-support registry. `None` in tests, which simply
-    /// skips publishing.
-    #[must_use]
-    pub fn with_hardware_support(
-        mut self,
-        hardware_support: Rc<HardwareSupportController>,
-    ) -> Self {
-        self.hardware_support = Some(hardware_support);
-        self
-    }
-
     pub fn new(
         config: Rc<Config>,
         api_up_token: CancellationToken,
@@ -219,6 +196,29 @@ impl ServicePluginRepo {
             disabled_channels: HashMap::new(),
             device_delays: HashMap::new(),
         })
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, (device_lock, _)) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+        }
     }
 
     fn load_device_delays(&mut self) {

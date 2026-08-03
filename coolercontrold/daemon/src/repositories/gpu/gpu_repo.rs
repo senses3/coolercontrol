@@ -114,29 +114,6 @@ pub struct GpuRepo {
 }
 
 impl GpuRepo {
-    /// Publishes whether each channel can be driven. This repository has no
-    /// sysfs-level evidence, so the verdict carries none: an unexplained
-    /// "not controllable" is honest, invented measurements are not.
-    fn publish_channel_drivability(&self) {
-        let Some(hardware_support) = self.hardware_support.as_ref() else {
-            return;
-        };
-        for (device_uid, device_lock) in &self.devices {
-            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
-        }
-    }
-
-    /// Attaches the hardware-support registry. `None` in tests, which simply
-    /// skips publishing.
-    #[must_use]
-    pub fn with_hardware_support(
-        mut self,
-        hardware_support: Rc<HardwareSupportController>,
-    ) -> Self {
-        self.hardware_support = Some(hardware_support);
-        self
-    }
-
     pub fn new(config: Rc<Config>, nvidia_cli: bool) -> Self {
         // `poll_rate` is captured at daemon startup and cannot change
         // without a restart, so the derived permit timeouts are frozen
@@ -157,6 +134,29 @@ impl GpuRepo {
             device_permits: HashMap::new(),
             device_read_permit_timeout,
             device_write_permit_timeout,
+        }
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, device_lock) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
         }
     }
 
@@ -643,5 +643,60 @@ mod permit_timeout_tests {
             device_write_permit_timeout_for(5.0),
             Duration::from_secs(40)
         );
+    }
+}
+
+#[cfg(test)]
+mod verdict_publish_tests {
+    use super::*;
+    use crate::cc_fs;
+    use crate::device::{ChannelInfo, ChannelKind, Device, DeviceInfo, SpeedOptions};
+    use crate::hardware_support::ChannelVerdict;
+    use serial_test::serial;
+    use std::cell::RefCell;
+
+    /// Goal: prove this repository's publish path reaches the registry the
+    /// health snapshot is served from. Its channels carry no sysfs evidence, so
+    /// `fixed_enabled` is the only fact behind the verdict and a broken hand-off
+    /// would silently show nothing rather than fail. Method: attach a
+    /// controller, publish one undrivable channel, read the partition back.
+    #[test]
+    #[serial]
+    fn publishes_drivability_for_gpu_channels() {
+        cc_fs::test_runtime(async {
+            let hardware_support = Rc::new(HardwareSupportController::init(None).await);
+            let mut repo = GpuRepo::new(Rc::new(Config::init_default_config().unwrap()), false)
+                .with_hardware_support(Rc::clone(&hardware_support));
+            let mut info = DeviceInfo::default();
+            info.channels.insert(
+                "fan1".to_string(),
+                ChannelInfo {
+                    label: None,
+                    kind: ChannelKind::Speed(SpeedOptions {
+                        fixed_enabled: false,
+                        ..Default::default()
+                    }),
+                },
+            );
+            let device = Device::new(
+                "Test GPU".to_string(),
+                DeviceType::GPU,
+                1,
+                None,
+                info,
+                None,
+                1.0,
+            );
+            let uid = device.uid.clone();
+            repo.devices.insert(uid, Rc::new(RefCell::new(device)));
+
+            repo.publish_channel_drivability();
+
+            let (permanent, current) = hardware_support.partitioned_verdicts();
+            assert!(current.is_empty(), "unexpected current-state verdicts");
+            assert_eq!(permanent.len(), 1, "expected one published verdict");
+            assert_eq!(permanent[0].channel_name, "fan1");
+            assert_eq!(permanent[0].verdict, ChannelVerdict::NotSupportedByDriver);
+        });
     }
 }

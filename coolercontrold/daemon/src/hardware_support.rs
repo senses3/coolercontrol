@@ -807,6 +807,68 @@ mod tests {
         });
     }
 
+    /// Goal: the path every non-hwmon repository publishes through must turn
+    /// `fixed_enabled` into a verdict, skip channels that are not speed
+    /// channels, and leave drivable ones out of the health lists. Method: one
+    /// device carrying all three cases, read back through the same partition
+    /// the health snapshot is built from.
+    #[test]
+    fn recorded_driver_channels_become_verdicts() {
+        crate::cc_fs::test_runtime(async {
+            let controller = HardwareSupportController::init(None).await;
+            let mut info = DeviceInfo::default();
+            info.channels.insert(
+                "fan1".to_string(),
+                crate::device::ChannelInfo {
+                    label: None,
+                    kind: crate::device::ChannelKind::Speed(crate::device::SpeedOptions {
+                        fixed_enabled: true,
+                        ..Default::default()
+                    }),
+                },
+            );
+            info.channels.insert(
+                "fan2".to_string(),
+                crate::device::ChannelInfo {
+                    label: None,
+                    kind: crate::device::ChannelKind::Speed(crate::device::SpeedOptions {
+                        fixed_enabled: false,
+                        ..Default::default()
+                    }),
+                },
+            );
+            info.channels.insert(
+                "led1".to_string(),
+                crate::device::ChannelInfo {
+                    label: None,
+                    kind: crate::device::ChannelKind::Lighting(Vec::new()),
+                },
+            );
+
+            controller.record_device_channels("gpu-uid", &info);
+
+            let (permanent, current) = controller.partitioned_verdicts();
+            assert!(current.is_empty(), "unexpected current-state verdicts");
+            // Only the undrivable speed channel: the drivable one has nothing
+            // to report and the lighting channel has no speed options at all.
+            assert_eq!(permanent.len(), 1);
+            assert_eq!(permanent[0].channel_name, "fan2");
+            assert_eq!(permanent[0].verdict, ChannelVerdict::NotSupportedByDriver);
+            // No sysfs was read, so no evidence may be claimed.
+            assert!(permanent[0].evidence.is_none());
+        });
+    }
+
+    /// The negative space of the case above: a repository that can drive the
+    /// channel must not put it in front of the user at all.
+    #[test]
+    fn drivable_driver_channel_is_controllable() {
+        let diagnosis = diagnose_driver_channel(true);
+        assert_eq!(diagnosis.verdict, ChannelVerdict::Controllable);
+        assert!(diagnosis.verdict.is_controllable());
+        assert!(diagnosis.evidence.is_none());
+    }
+
     fn evidence(has_pwm: bool, pwm_writable: bool, has_pwm_enable: bool) -> ChannelEvidence {
         ChannelEvidence {
             has_pwm,
