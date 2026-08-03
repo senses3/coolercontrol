@@ -1313,7 +1313,9 @@ fn detect_routes() -> ApiRouter<AppState> {
             get_with(detect::get_detect, |o| {
                 o.summary("Detect Hardware")
                     .description(
-                        "Run Super-I/O hardware detection and return results without loading modules.",
+                        "Return what the startup Super-I/O detection found, retained rather than \
+                         re-probed. `probed` is false when no detection ran at all, so an empty \
+                         chip list means \"not looked for\" rather than \"none present\".",
                     )
                     .tag("detect")
                     .security_requirement("CookieAuth")

@@ -5403,7 +5403,7 @@
           "detect"
         ],
         "summary": "Detect Hardware",
-        "description": "Run Super-I/O hardware detection and return results without loading modules.",
+        "description": "Return what the startup Super-I/O detection found, retained rather than re-probed. `probed` is false when no detection ran at all, so an empty chip list means \"not looked for\" rather than \"none present\".",
         "responses": {
           "200": {
             "description": "Response for GET/POST /detect",
