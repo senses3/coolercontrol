@@ -75,6 +75,13 @@ pub fn diagnose_fan_channel(
     firmware_override_observed: bool,
 ) -> ChannelDiagnosis {
     debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
+    if channel.caps.has_pwm().not() && channel.caps.is_fan_controllable() {
+        // Apple SMC fans are driven through `fanN_output`, not `pwmN`, so the
+        // pwm-shaped evidence below would condemn a channel we are writing to.
+        // There is no pwm file to state facts about, so the diagnosis carries
+        // none rather than four misleading booleans.
+        return hardware_support::diagnose_driver_channel(true);
+    }
     let evidence = ChannelEvidence {
         has_pwm: channel.caps.has_pwm(),
         pwm_writable: channel.caps.is_fan_controllable(),
@@ -720,6 +727,7 @@ pub fn duty_to_pwm_value(speed_duty: u8) -> u8 {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
+    use crate::hardware_support::ChannelVerdict;
     use crate::repositories::hwmon::drivetemp;
     use serial_test::serial;
     use std::path::{Path, PathBuf};
@@ -1647,5 +1655,48 @@ mod tests {
             assert!(any_failure.not());
             assert!(statuses.is_empty());
         });
+    }
+
+    /// Goal: an Apple SMC fan is driven through `fanN_output` and never has a
+    /// `pwmN`, so the pwm-shaped evidence must not condemn it. Method: build
+    /// the capability set `AppleMacSMC::detect_apple_smc_fans` produces and
+    /// check the verdict, which in a debug build also exercises the assertion
+    /// that a writable pwm implies a pwm.
+    #[test]
+    fn apple_smc_fan_without_pwm_is_controllable() {
+        let channel = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 1,
+            name: "fan1".to_string(),
+            caps: HwmonChannelCapabilities::APPLE_SMC
+                | HwmonChannelCapabilities::FAN_WRITABLE
+                | HwmonChannelCapabilities::RPM,
+            ..Default::default()
+        };
+
+        let diagnosis = diagnose_fan_channel("macsmc-hwmon", &channel, false);
+
+        assert_eq!(diagnosis.verdict, ChannelVerdict::Controllable);
+        // No pwm file means no pwm facts to report, not four false ones.
+        assert!(diagnosis.evidence.is_none());
+    }
+
+    /// Goal: the negative space of the case above. A fan that only reports
+    /// speed is still `NoPwm`, so the Apple branch cannot swallow a genuinely
+    /// uncontrollable channel.
+    #[test]
+    fn rpm_only_fan_is_still_condemned() {
+        let channel = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 9,
+            name: "fan9".to_string(),
+            caps: HwmonChannelCapabilities::RPM,
+            ..Default::default()
+        };
+
+        let diagnosis = diagnose_fan_channel("aquacomputer_d5next", &channel, false);
+
+        assert_eq!(diagnosis.verdict, ChannelVerdict::NoPwm);
+        assert!(diagnosis.evidence.is_some());
     }
 }
