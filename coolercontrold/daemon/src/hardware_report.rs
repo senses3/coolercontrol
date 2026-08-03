@@ -80,37 +80,30 @@ struct ReportDevice {
 }
 
 /// Builds the report. `full` adds the whole hwmon tree with per-channel state.
+///
+/// `detection` is what the *startup* probe found, retained rather than re-run:
+/// module loading only happens at startup, so that run is the one that explains
+/// an unbound chip, and reading a report must never poke I/O ports as a side
+/// effect.
 pub async fn generate(
     full: bool,
-    is_root: bool,
-    liquidctl: Option<&[LiquidctlSummary]>,
-    hidden: Option<&HiddenHardware>,
+    detection: Option<&cc_detect::DetectionResults>,
+    liquidctl: &[LiquidctlSummary],
+    hidden: &HiddenHardware,
 ) -> String {
     let system_info = SystemInfo::read().await;
     let devices = scan_hwmon(hidden).await;
-    let detection = run_probe(is_root);
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
-    write_probe_summary(&mut report, detection.as_ref(), is_root, full);
-    write_fan_summary(&mut report, &devices, hidden.is_some()).await;
+    write_probe_summary(&mut report, detection, full);
+    write_fan_summary(&mut report, &devices).await;
     write_liquidctl_section(&mut report, liquidctl);
-    write_findings(&mut report, detection.as_ref(), is_root);
+    write_findings(&mut report, detection);
     if full {
         write_full_tree(&mut report, &devices).await;
         return report;
     }
     trim_to_budget(report)
-}
-
-/// The probe needs `/dev/port`, so without root it would report a blocked
-/// environment that is really just a permissions problem. Returning `None`
-/// keeps the report from asserting something it did not observe.
-fn run_probe(is_root: bool) -> Option<cc_detect::DetectionResults> {
-    if is_root.not() {
-        return None;
-    }
-    // `false`: a report must never load modules as a side effect of being read.
-    Some(cc_detect::run_detection(false, None))
 }
 
 fn write_header(report: &mut String, system_info: &SystemInfo) {
@@ -138,7 +131,6 @@ fn write_header(report: &mut String, system_info: &SystemInfo) {
 fn write_probe_summary(
     report: &mut String,
     detection: Option<&cc_detect::DetectionResults>,
-    is_root: bool,
     full: bool,
 ) {
     if cc_detect::DETECTION_SUPPORTED.not() {
@@ -146,15 +138,7 @@ fn write_probe_summary(
         return;
     }
     let Some(detection) = detection else {
-        let _ = writeln!(
-            report,
-            "Probe    skipped ({})",
-            if is_root {
-                "detection disabled"
-            } else {
-                "needs root, re-run with sudo for chip detection"
-            }
-        );
+        let _ = writeln!(report, "Probe    skipped (detection disabled)");
         return;
     };
     let environment = &detection.environment;
@@ -189,17 +173,8 @@ fn write_probe_summary(
 /// the compact report past the paste budget on an ordinary desktop. Restricted
 /// this way it costs nothing on a healthy machine and a couple of lines on a
 /// broken one, which removes a round trip for the common support case.
-async fn write_fan_summary(report: &mut String, devices: &[ReportDevice], exclusions_known: bool) {
+async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
     let _ = writeln!(report, "\nHWMon Fan Channels");
-    if exclusions_known.not() {
-        // Same honesty as the liquidctl section: only the running daemon knows
-        // which devices it chose to drop, so say that rather than let an
-        // unmarked list read as "nothing is hidden".
-        let _ = writeln!(
-            report,
-            "  (run from the app to see which devices are hidden and why)"
-        );
-    }
     let mut any = false;
     for device in devices {
         if device.fans.is_empty() {
@@ -268,24 +243,12 @@ pub struct LiquidctlSummary {
     pub hwmon_backed: bool,
 }
 
-/// Writes the liquidctl section, or explains its absence.
+/// Writes the liquidctl section.
 ///
-/// `None` means the caller could not enumerate them. The standalone CLI cannot:
-/// liqctld's only listing call, `GET /devices`, returns its cache when
-/// populated but otherwise runs `find_liquidctl_devices()` and
-/// `_connect_device()` on everything it finds, so a read-only report cannot
-/// call it safely. Its socket is root-only besides. The daemon already holds
-/// the device list in memory and passes `Some`.
-fn write_liquidctl_section(report: &mut String, devices: Option<&[LiquidctlSummary]>) {
+/// Taken from what the daemon retained at startup, so generating a report
+/// never re-enumerates USB devices and disabled devices are still listed.
+fn write_liquidctl_section(report: &mut String, devices: &[LiquidctlSummary]) {
     let _ = writeln!(report, "\nLiquidctl");
-    let Some(devices) = devices else {
-        let _ = writeln!(
-            report,
-            "  not enumerated by this report; devices with a kernel driver are \
-             listed above"
-        );
-        return;
-    };
     if devices.is_empty() {
         let _ = writeln!(report, "  no devices");
         return;
@@ -315,26 +278,14 @@ fn write_liquidctl_section(report: &mut String, devices: Option<&[LiquidctlSumma
     }
 }
 
-fn write_findings(
-    report: &mut String,
-    detection: Option<&cc_detect::DetectionResults>,
-    is_root: bool,
-) {
+fn write_findings(report: &mut String, detection: Option<&cc_detect::DetectionResults>) {
     let _ = writeln!(report, "\nSystem findings");
     if cc_detect::DETECTION_SUPPORTED.not() {
         let _ = writeln!(report, "  detection unsupported on this architecture");
         return;
     }
     let Some(detection) = detection else {
-        let _ = writeln!(
-            report,
-            "  not determined ({})",
-            if is_root {
-                "detection disabled"
-            } else {
-                "needs root"
-            }
-        );
+        let _ = writeln!(report, "  not determined (detection disabled)");
         return;
     };
     let findings = derive_findings(detection);
@@ -461,12 +412,9 @@ async fn channel_notes(
 
 /// The channels this device lost individually, keyed by name.
 fn hidden_channels(
-    hidden: Option<&HiddenHardware>,
+    hidden: &HiddenHardware,
     canonical: &Path,
 ) -> HashMap<ChannelName, ChannelExclusion> {
-    let Some(hidden) = hidden else {
-        return HashMap::new();
-    };
     hidden
         .channels
         .iter()
@@ -500,7 +448,7 @@ fn verdict_for(device: &ReportDevice, fan: &HwmonChannelInfo) -> ChannelVerdict 
 
 /// Enumerates hwmon and builds each device's fan channels with the exact same
 /// `init_fans` the daemon uses.
-async fn scan_hwmon(hidden: Option<&HiddenHardware>) -> Vec<ReportDevice> {
+async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
     let mut devices = Vec::new();
     let Ok(entries) = cc_fs::read_dir(Path::new(HWMON_CLASS_PATH)) else {
         return devices;
@@ -532,8 +480,7 @@ async fn scan_hwmon(hidden: Option<&HiddenHardware>) -> Vec<ReportDevice> {
         let canonical = cc_fs::canonicalize(&path).ok();
         let excluded = canonical
             .as_ref()
-            .zip(hidden)
-            .and_then(|(canonical, hidden)| hidden.devices.get(canonical).copied());
+            .and_then(|canonical| hidden.devices.get(canonical).copied());
         let excluded_channels = canonical
             .as_ref()
             .map_or_else(HashMap::new, |canonical| hidden_channels(hidden, canonical));
@@ -816,7 +763,7 @@ mod tests {
         let mut report = String::new();
         write_liquidctl_section(
             &mut report,
-            Some(&[liquidctl("NZXT Kraken", true), liquidctl("Old Pump", false)]),
+            &[liquidctl("NZXT Kraken", true), liquidctl("Old Pump", false)],
         );
         assert!(report.contains("NZXT Kraken"), "{report}");
         assert!(report.contains("Old Pump"), "{report}");
@@ -825,15 +772,12 @@ mod tests {
         assert!(report.contains("NZXT Kraken [kraken2]\n"), "{report}");
     }
 
-    /// Goal: when the caller cannot enumerate them at all, say so rather than
-    /// implying the machine has none. The standalone CLI is in this case.
+    /// Goal: a machine with no liquidctl devices says so, rather than leaving
+    /// the section blank and looking truncated.
     #[test]
-    fn absent_liquidctl_list_is_distinguished_from_empty() {
-        let mut unknown = String::new();
-        write_liquidctl_section(&mut unknown, None);
-        assert!(unknown.contains("not enumerated"), "{unknown}");
+    fn an_empty_liquidctl_list_says_so() {
         let mut empty = String::new();
-        write_liquidctl_section(&mut empty, Some(&[]));
+        write_liquidctl_section(&mut empty, &[]);
         assert!(empty.contains("no devices"), "{empty}");
     }
 
@@ -861,7 +805,7 @@ mod tests {
             },
         };
         let mut compact = String::new();
-        write_probe_summary(&mut compact, Some(&detection), true, false);
+        write_probe_summary(&mut compact, Some(&detection), false);
         assert!(
             compact.contains("Nuvoton NCT6687D-R eSIO at 0x4E id:0xD592 -> nct6687"),
             "unexpected chip line:\n{compact}"
@@ -869,7 +813,7 @@ mod tests {
         assert!(compact.contains("base address").not());
 
         let mut full = String::new();
-        write_probe_summary(&mut full, Some(&detection), true, true);
+        write_probe_summary(&mut full, Some(&detection), true);
         assert!(full.contains("base address 0x0A20"), "{full}");
     }
 
@@ -897,18 +841,16 @@ mod tests {
         assert_eq!(hwmon_index(Path::new("/sys/class/hwmon/oddball")), u32::MAX);
     }
 
-    /// Goal: without root the report must not claim the environment blocked the
-    /// probe. `/dev/port` is unreadable for a non-root user regardless of how
-    /// the machine is configured, so reporting NoDevPort there would be a claim
-    /// we cannot back with an observation.
+    /// Goal: with detection switched off the report says so rather than
+    /// asserting an environment it never observed. Reporting NoDevPort when no
+    /// probe ran would be a claim we cannot back.
     #[test]
-    fn non_root_does_not_run_or_assert_a_probe() {
-        assert!(run_probe(false).is_none());
+    fn absent_detection_asserts_nothing_about_the_environment() {
         let mut report = String::new();
-        write_probe_summary(&mut report, None, false, false);
-        assert!(report.contains("needs root"));
+        write_probe_summary(&mut report, None, false);
+        assert!(report.contains("skipped"));
         let mut findings = String::new();
-        write_findings(&mut findings, None, false);
+        write_findings(&mut findings, None);
         assert!(findings.contains("not determined"));
         assert!(findings.contains("Secure Boot").not());
     }

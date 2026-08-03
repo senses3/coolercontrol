@@ -550,11 +550,6 @@ enum SubCommands {
     Check,
     /// Print a paste-ready hardware support report to stdout. Needs neither root nor a
     /// running daemon, though chip detection is only possible as root.
-    Report {
-        /// Include the whole hwmon tree instead of the compact summary
-        #[arg(long)]
-        full: bool,
-    },
     /// Print the `OpenAPI` spec to stdout. Generated from the route table, so it needs
     /// neither root nor a running daemon. See `make openapi`.
     #[command(name = "openapi", hide = true)]
@@ -596,16 +591,6 @@ async fn handle_non_root_commands(args: &Args) -> Result<()> {
         // Pretty-printed: the file is checked in, so a merge request diff has to be
         // readable. Whitespace compresses away to a couple of KB on the wire.
         println!("{}", serde_json::to_string_pretty(&api::openapi_spec())?);
-        exit_successfully();
-    }
-    if let Some(SubCommands::Report { full }) = &args.command {
-        // Runs before `verify_is_root`, so it still works over SSH for a user
-        // whose daemon will not start. `Uid::effective().is_root()` only
-        // decides whether the Super-I/O probe is attempted.
-        print!(
-            "{}",
-            hardware_report::generate(*full, Uid::effective().is_root(), None, None).await
-        );
         exit_successfully();
     }
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {

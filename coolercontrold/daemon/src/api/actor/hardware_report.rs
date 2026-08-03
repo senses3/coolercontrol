@@ -46,7 +46,6 @@ enum HardwareReportMessage {
     },
     Generate {
         full: bool,
-        is_root: bool,
         respond_to: oneshot::Sender<String>,
     },
 }
@@ -77,11 +76,7 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
             HardwareReportMessage::RetainedDetection { respond_to } => {
                 let _ = respond_to.send(self.hardware_support.detection.clone());
             }
-            HardwareReportMessage::Generate {
-                full,
-                is_root,
-                respond_to,
-            } => {
+            HardwareReportMessage::Generate { full, respond_to } => {
                 // Retained at startup, so this never re-enumerates USB devices
                 // and still includes devices the user has disabled.
                 let liquidctl = self.hardware_support.liquidctl_devices();
@@ -89,8 +84,13 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 // the report says why a chip is missing from the app instead of
                 // leaving it looking broken.
                 let hidden = self.hardware_support.hidden_hardware();
-                let report =
-                    hardware_report::generate(full, is_root, Some(&liquidctl), Some(&hidden)).await;
+                let report = hardware_report::generate(
+                    full,
+                    self.hardware_support.detection.as_ref(),
+                    &liquidctl,
+                    &hidden,
+                )
+                .await;
                 let _ = respond_to.send(report);
             }
         }
@@ -128,11 +128,10 @@ impl HardwareReportHandle {
         Ok(rx.await?)
     }
 
-    pub async fn generate(&self, full: bool, is_root: bool) -> Result<String> {
+    pub async fn generate(&self, full: bool) -> Result<String> {
         let (tx, rx) = oneshot::channel();
         let msg = HardwareReportMessage::Generate {
             full,
-            is_root,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;

@@ -24,7 +24,6 @@
 
 use axum::extract::{Query, State};
 use axum::Json;
-use nix::unistd::Uid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -53,10 +52,10 @@ pub async fn get_hardware_report(
 ) -> Result<Json<ReportResponse>, CCError> {
     // Generation runs on the main runtime: it reads sysfs through `cc_fs`,
     // whose futures are not `Send` and so cannot be awaited in a handler.
-    // Liquidctl devices come from what the daemon retained at startup, so no
-    // USB enumeration happens here and disabled devices are still listed.
+    // Liquidctl devices and the startup detection both come from what the
+    // daemon retained, so nothing is re-enumerated or re-probed here.
     let report = hardware_report_handle
-        .generate(query.full, Uid::effective().is_root())
+        .generate(query.full)
         .await
         .map_err(|err| CCError::InternalError {
             msg: format!("Could not generate the hardware report: {err}"),
