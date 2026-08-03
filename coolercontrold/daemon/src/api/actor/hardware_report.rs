@@ -108,7 +108,7 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
             HardwareReportMessage::Generate { full, respond_to } => {
                 // Retained at startup, so this never re-enumerates USB devices
                 // and still includes devices the user has disabled.
-                let liquidctl = self.hardware_support.liquidctl_devices();
+                let devices_other = self.hardware_support.device_summaries();
                 // Recorded by the repositories as they dropped each device, so
                 // the report says why a chip is missing from the app instead of
                 // leaving it looking broken.
@@ -118,7 +118,7 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 let detection = self.hardware_support.detection();
                 let report = rt::timeout(
                     GENERATE_TIMEOUT,
-                    hardware_report::generate(full, detection.as_ref(), &liquidctl, &hidden),
+                    hardware_report::generate(full, detection.as_ref(), &devices_other, &hidden),
                 )
                 .await
                 .unwrap_or_else(|_| {

@@ -156,7 +156,13 @@ impl GpuRepo {
             return;
         };
         for (device_uid, device_lock) in &self.devices {
-            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+            let device = device_lock.borrow();
+            hardware_support.record_device_channels(device_uid, &device.info);
+            // Enabled by construction: a disabled device never reaches this map.
+            hardware_support.record_device_summary(
+                device_uid,
+                crate::hardware_report::DeviceSummary::from_device(&device, true),
+            );
         }
     }
 

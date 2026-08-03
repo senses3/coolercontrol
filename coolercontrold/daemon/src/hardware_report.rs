@@ -26,7 +26,7 @@
 //! meant to be pasted into a public support channel, so the identifying fields
 //! are limited to board and BIOS, which is what actually narrows a diagnosis.
 
-use crate::device::ChannelName;
+use crate::device::{ChannelName, Device, DeviceInfo, DeviceType};
 use crate::hardware_support::{
     self, ChannelExclusion, ChannelVerdict, DetectedChipRef, HiddenHardware, HwmonExclusion,
     ProbeEnvironment, SystemFinding, SystemInfo,
@@ -87,7 +87,7 @@ struct ReportDevice {
 pub async fn generate(
     full: bool,
     detection: Option<&cc_detect::DetectionResults>,
-    liquidctl: &[LiquidctlSummary],
+    devices_other: &[DeviceSummary],
     hidden: &HiddenHardware,
 ) -> String {
     let system_info = SystemInfo::read().await;
@@ -96,7 +96,7 @@ pub async fn generate(
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection, full);
     write_fan_summary(&mut report, &devices).await;
-    write_liquidctl_section(&mut report, liquidctl);
+    write_device_sections(&mut report, devices_other);
     write_findings(&mut report, detection);
     if full {
         write_full_tree(&mut report, &devices).await;
@@ -220,60 +220,138 @@ async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
     }
 }
 
-/// One liquidctl device, reduced to what a maintainer needs.
+/// One non-hwmon device, reduced to what a maintainer needs.
 ///
-/// Built by the caller from the daemon's live device list. Deliberately has no
-/// field for a serial number or a device id: this ends up in a pasted report,
-/// and liqctld's own payload carries a serial that must not travel with it.
+/// Built by each repository from the daemon's live device list. Deliberately
+/// has no field for a serial number or a device id: this ends up in a pasted
+/// report, and liqctld's own payload carries a serial that must not travel
+/// with it.
 #[derive(Clone)]
-pub struct LiquidctlSummary {
+pub struct DeviceSummary {
+    /// Which repository serves it, so the report can group by section.
+    pub device_type: DeviceType,
     pub name: String,
     /// False when the user has disabled the device. Disabled devices are
     /// deliberately still listed: "the app cannot see my cooler" and "I turned
     /// that cooler off" look identical in a support thread otherwise.
     pub enabled: bool,
-    /// The liquidctl driver class.
-    pub driver_class: Option<String>,
-    /// The liquidctl version in use, not the device firmware.
-    pub liquidctl_version: Option<String>,
+    /// Kernel driver name or liquidctl driver class, whichever the repository
+    /// knows.
+    pub driver: Option<String>,
+    /// The driver's own version: liquidctl's for liquidctl devices, the
+    /// proprietary driver's for Nvidia.
+    pub driver_version: Option<String>,
+    /// Speed channels the device exposes, and how many can actually be driven.
+    ///
+    /// Counted from the same `speed_options` the channel verdicts come from, so
+    /// counts and verdicts can never disagree. Informational: these
+    /// repositories have no sysfs-level evidence to back a stronger claim.
+    pub fan_count: usize,
+    pub controllable_fan_count: usize,
     pub firmware_version: Option<String>,
     /// True when the device is also exposed through a kernel hwmon driver, in
-    /// which case it appears under Fan channels as well.
+    /// which case it appears under the hwmon section as well.
     pub hwmon_backed: bool,
 }
 
-/// Writes the liquidctl section.
+impl DeviceSummary {
+    /// The parts every repository can answer, counts included.
+    pub fn from_device(device: &Device, enabled: bool) -> Self {
+        let (fan_count, controllable_fan_count) = Self::count_fans(&device.info);
+        Self {
+            device_type: device.d_type,
+            name: device.name.clone(),
+            enabled,
+            driver: device.info.driver_info.name.clone(),
+            driver_version: device.info.driver_info.version.clone(),
+            fan_count,
+            controllable_fan_count,
+            firmware_version: None,
+            hwmon_backed: false,
+        }
+    }
+
+    /// A speed channel is one the daemon would drive if the driver allowed it;
+    /// `fixed_enabled` is whether it actually can.
+    fn count_fans(info: &DeviceInfo) -> (usize, usize) {
+        let mut fans = 0;
+        let mut controllable = 0;
+        for channel_info in info.channels.values() {
+            let Some(speed_options) = channel_info.speed_options() else {
+                continue;
+            };
+            fans += 1;
+            if speed_options.fixed_enabled {
+                controllable += 1;
+            }
+        }
+        (fans, controllable)
+    }
+}
+
+/// Writes one section per non-hwmon repository, so the report accounts for
+/// every fan on the machine rather than only the ones the kernel exposes.
 ///
-/// Taken from what the daemon retained at startup, so generating a report
-/// never re-enumerates USB devices and disabled devices are still listed.
-fn write_liquidctl_section(report: &mut String, devices: &[LiquidctlSummary]) {
-    let _ = writeln!(report, "\nLiquidctl");
-    if devices.is_empty() {
+/// Empty sections still print: "no service plugin devices" is an answer, a
+/// missing heading is a question.
+fn write_device_sections(report: &mut String, devices: &[DeviceSummary]) {
+    for (heading, device_type) in [
+        ("Liquidctl", DeviceType::Liquidctl),
+        ("GPU", DeviceType::GPU),
+        ("Service Plugins", DeviceType::ServicePlugin),
+    ] {
+        write_device_section(report, heading, device_type, devices);
+    }
+}
+
+/// Taken from what each repository retained at startup, so generating a report
+/// never re-enumerates devices and disabled ones are still listed.
+fn write_device_section(
+    report: &mut String,
+    heading: &str,
+    device_type: DeviceType,
+    devices: &[DeviceSummary],
+) {
+    let _ = writeln!(report, "\n{heading}");
+    let matching = devices
+        .iter()
+        .filter(|device| device.device_type == device_type)
+        .collect::<Vec<_>>();
+    if matching.is_empty() {
         let _ = writeln!(report, "  no devices");
         return;
     }
-    for device in devices {
+    for device in &matching {
         let _ = writeln!(
             report,
-            "  {} [{}]{}{}",
+            "  {} [{}]{}{}  {} fan(s), {} controllable",
             device.name,
-            device.driver_class.as_deref().unwrap_or("unknown driver"),
+            device.driver.as_deref().unwrap_or("unknown driver"),
             if device.hwmon_backed {
                 ", hwmon-backed"
             } else {
                 ""
             },
-            if device.enabled { "" } else { ", disabled" }
+            if device.enabled { "" } else { ", disabled" },
+            device.fan_count,
+            device.controllable_fan_count
         );
         if let Some(firmware) = device.firmware_version.as_deref() {
             let _ = writeln!(report, "    firmware {firmware}");
         }
     }
-    if let Some(version) = devices
+    // One tool or driver version serves the whole section, so it goes at the
+    // foot rather than being repeated on every line.
+    if let Some(version) = matching
         .iter()
-        .find_map(|device| device.liquidctl_version.as_deref())
+        .find_map(|device| device.driver_version.as_deref())
     {
-        let _ = writeln!(report, "  liquidctl {version}");
+        let label = if device_type == DeviceType::Liquidctl {
+            "liquidctl"
+        } else {
+            "driver"
+        };
+        let _ = writeln!(report, "  {label} {version}");
     }
 }
 
@@ -743,12 +821,15 @@ mod tests {
         }
     }
 
-    fn liquidctl(name: &str, enabled: bool) -> LiquidctlSummary {
-        LiquidctlSummary {
+    fn summary(device_type: DeviceType, name: &str, enabled: bool, fans: usize) -> DeviceSummary {
+        DeviceSummary {
+            device_type,
             name: name.to_string(),
             enabled,
-            driver_class: Some("kraken2".to_string()),
-            liquidctl_version: Some("1.15.0".to_string()),
+            driver: Some("kraken2".to_string()),
+            driver_version: Some("1.15.0".to_string()),
+            fan_count: fans,
+            controllable_fan_count: fans,
             firmware_version: Some("1.2.3".to_string()),
             hwmon_backed: false,
         }
@@ -758,26 +839,57 @@ mod tests {
     /// "CoolerControl cannot see my cooler" and "I turned that cooler off"
     /// produce identical reports, which sends a support thread the wrong way.
     #[test]
-    fn disabled_liquidctl_devices_are_listed_and_marked() {
+    fn disabled_devices_are_listed_and_marked() {
         let mut report = String::new();
-        write_liquidctl_section(
+        write_device_sections(
             &mut report,
-            &[liquidctl("NZXT Kraken", true), liquidctl("Old Pump", false)],
+            &[
+                summary(DeviceType::Liquidctl, "NZXT Kraken", true, 2),
+                summary(DeviceType::Liquidctl, "Old Pump", false, 1),
+            ],
         );
-        assert!(report.contains("NZXT Kraken"), "{report}");
-        assert!(report.contains("Old Pump"), "{report}");
         assert!(report.contains("Old Pump [kraken2], disabled"), "{report}");
         // The enabled device must not pick up the marker.
-        assert!(report.contains("NZXT Kraken [kraken2]\n"), "{report}");
+        assert!(
+            report.contains("NZXT Kraken [kraken2]  2 fan(s)"),
+            "{report}"
+        );
     }
 
-    /// Goal: a machine with no liquidctl devices says so, rather than leaving
-    /// the section blank and looking truncated.
+    /// Goal: every repository that can own a fan gets a heading and a count.
+    /// A maintainer reading a pasted report should be able to account for every
+    /// fan on the machine, not just the ones hwmon exposes.
     #[test]
-    fn an_empty_liquidctl_list_says_so() {
-        let mut empty = String::new();
-        write_liquidctl_section(&mut empty, &[]);
-        assert!(empty.contains("no devices"), "{empty}");
+    fn every_repository_reports_its_fan_counts() {
+        let mut report = String::new();
+        write_device_sections(
+            &mut report,
+            &[
+                summary(DeviceType::Liquidctl, "NZXT Kraken", true, 2),
+                summary(DeviceType::GPU, "RTX 4090", true, 1),
+                summary(DeviceType::ServicePlugin, "My Plugin", true, 3),
+            ],
+        );
+        for heading in ["Liquidctl", "GPU", "Service Plugins"] {
+            assert!(report.contains(heading), "missing {heading}: {report}");
+        }
+        assert!(
+            report.contains("RTX 4090 [kraken2]  1 fan(s), 1 controllable"),
+            "{report}"
+        );
+        assert!(
+            report.contains("My Plugin [kraken2]  3 fan(s), 3 controllable"),
+            "{report}"
+        );
+    }
+
+    /// Goal: a repository with nothing on this machine says so. A missing
+    /// heading reads as "the report forgot", and sends the reader looking.
+    #[test]
+    fn a_repository_with_no_devices_says_so() {
+        let mut report = String::new();
+        write_device_sections(&mut report, &[]);
+        assert_eq!(report.matches("no devices").count(), 3, "{report}");
     }
 
     /// Goal: a chip line carries the address and device id, matching the

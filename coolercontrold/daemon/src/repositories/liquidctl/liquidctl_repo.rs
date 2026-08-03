@@ -104,27 +104,23 @@ pub struct LiquidctlRepo {
 
 /// Maps a device onto what the hardware report prints for it. A pure helper so
 /// the mapping is testable without standing up liqctld.
-fn liquidctl_summary(device: &Device, enabled: bool) -> crate::hardware_report::LiquidctlSummary {
-    crate::hardware_report::LiquidctlSummary {
-        name: device.name.clone(),
-        enabled,
-        driver_class: device
-            .lc_info
-            .as_ref()
-            .map(|lc| lc.driver_type.to_string())
-            .or_else(|| device.info.driver_info.name.clone()),
-        liquidctl_version: device.info.driver_info.version.clone(),
-        firmware_version: device
-            .lc_info
-            .as_ref()
-            .and_then(|lc| lc.firmware_version.clone()),
-        hwmon_backed: device
-            .info
-            .driver_info
-            .locations
-            .iter()
-            .any(|location| location.contains("hwmon")),
+///
+/// Starts from the shape every repository shares, then adds the two things
+/// only this one knows: the liquidctl driver class, which is more precise than
+/// the generic driver name, and the device firmware.
+fn liquidctl_summary(device: &Device, enabled: bool) -> crate::hardware_report::DeviceSummary {
+    let mut summary = crate::hardware_report::DeviceSummary::from_device(device, enabled);
+    if let Some(lc_info) = device.lc_info.as_ref() {
+        summary.driver = Some(lc_info.driver_type.to_string());
+        summary.firmware_version = lc_info.firmware_version.clone();
     }
+    summary.hwmon_backed = device
+        .info
+        .driver_info
+        .locations
+        .iter()
+        .any(|location| location.contains("hwmon"));
+    summary
 }
 
 impl LiquidctlRepo {
@@ -218,7 +214,7 @@ impl LiquidctlRepo {
         let Some(hardware_support) = self.hardware_support.as_ref() else {
             return;
         };
-        hardware_support.record_liquidctl_device(liquidctl_summary(device, enabled));
+        hardware_support.record_device_summary(&device.uid, liquidctl_summary(device, enabled));
     }
 
     /// Publishes whether each channel can be driven. This repository has no
@@ -1889,8 +1885,8 @@ mod summary_tests {
         );
         assert!(backed.hwmon_backed);
         assert!(backed.enabled);
-        assert_eq!(backed.driver_class.as_deref(), Some("Kraken"));
-        assert_eq!(backed.liquidctl_version.as_deref(), Some("1.14.0"));
+        assert_eq!(backed.driver.as_deref(), Some("Kraken"));
+        assert_eq!(backed.driver_version.as_deref(), Some("1.14.0"));
 
         let usb_only = liquidctl_summary(
             &device_with(DriverInfo {

@@ -510,10 +510,14 @@ pub struct HardwareSupportController {
     /// initializes its channels and updated when a runtime observation, such
     /// as a firmware reclaim, changes a verdict.
     channel_diagnoses: RefCell<HashMap<(DeviceUID, ChannelName), ChannelDiagnosis>>,
-    /// Every liquidctl device found at startup, including ones the user has
-    /// disabled. Retained here so the report never has to re-enumerate USB
-    /// devices just to be generated.
-    liquidctl_devices: RefCell<Vec<crate::hardware_report::LiquidctlSummary>>,
+    /// Every non-hwmon device found at startup, including ones the user has
+    /// disabled. Retained here so the report never has to re-enumerate devices
+    /// just to be generated.
+    ///
+    /// Keyed by device rather than appended: a repository that publishes twice
+    /// (a re-initialization after sleep, say) must not double every row in the
+    /// report.
+    device_summaries: RefCell<HashMap<DeviceUID, crate::hardware_report::DeviceSummary>>,
     /// hwmon devices and channels the daemon deliberately dropped, keyed by
     /// canonical path. Recorded where each decision is actually made rather
     /// than re-derived, so the report cannot disagree with what the daemon did.
@@ -529,7 +533,7 @@ impl HardwareSupportController {
             detection: RefCell::new(detection),
             system_findings: RefCell::new(system_findings),
             channel_diagnoses: RefCell::new(HashMap::new()),
-            liquidctl_devices: RefCell::new(Vec::new()),
+            device_summaries: RefCell::new(HashMap::new()),
             hidden_hardware: RefCell::new(HiddenHardware::default()),
         }
     }
@@ -613,14 +617,30 @@ impl HardwareSupportController {
         }
     }
 
-    /// Records a liquidctl device found at startup, enabled or not.
-    pub fn record_liquidctl_device(&self, device: crate::hardware_report::LiquidctlSummary) {
-        self.liquidctl_devices.borrow_mut().push(device);
+    /// Records a non-hwmon device found at startup, enabled or not.
+    pub fn record_device_summary(
+        &self,
+        device_uid: &str,
+        summary: crate::hardware_report::DeviceSummary,
+    ) {
+        self.device_summaries
+            .borrow_mut()
+            .insert(device_uid.to_string(), summary);
     }
 
-    /// The retained liquidctl devices, for the report.
-    pub fn liquidctl_devices(&self) -> Vec<crate::hardware_report::LiquidctlSummary> {
-        self.liquidctl_devices.borrow().clone()
+    /// The retained devices, for the report.
+    ///
+    /// Sorted by name so a report generated twice reads the same way; an
+    /// unordered map would shuffle the rows between runs.
+    pub fn device_summaries(&self) -> Vec<crate::hardware_report::DeviceSummary> {
+        let mut summaries = self
+            .device_summaries
+            .borrow()
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        summaries.sort_by(|a, b| a.name.cmp(&b.name));
+        summaries
     }
 
     /// Records or replaces one channel's diagnosis.
