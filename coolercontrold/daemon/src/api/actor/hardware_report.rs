@@ -23,6 +23,7 @@
 //! the same arrangement every other repository-touching endpoint uses.
 
 use anyhow::Result;
+use log::error;
 use moro_local::Scope;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
@@ -30,7 +31,22 @@ use tokio_util::sync::CancellationToken;
 use crate::api::actor::{run_api_actor, ApiActor};
 use crate::hardware_report;
 use crate::hardware_support::HardwareSupportController;
+use crate::rt;
 use std::rc::Rc;
+use std::time::Duration;
+
+/// The report walks every hwmon directory itself, including devices the daemon
+/// dropped, so it cannot take the per-device permits `HwmonRepo` holds. A
+/// driver that never returns a read would otherwise wedge this actor for good,
+/// taking `GET /detect` down with it, since both share the mailbox. Kept under
+/// the API's own 30s timeout so the client sees the failure rather than a hang.
+const GENERATE_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Returned instead of a partial report, which would read as the whole truth
+/// about the machine when it is not.
+const TIMED_OUT_REPORT: &str =
+    "The hardware report timed out while reading sysfs. A driver is not answering; \
+     check the daemon log for which device.";
 
 struct HardwareReportActor {
     receiver: mpsc::Receiver<HardwareReportMessage>,
@@ -100,8 +116,15 @@ impl ApiActor<HardwareReportMessage> for HardwareReportActor {
                 // Cloned rather than borrowed: the generation below awaits, and
                 // a `RefCell` borrow must not be held across an await point.
                 let detection = self.hardware_support.detection();
-                let report =
-                    hardware_report::generate(full, detection.as_ref(), &liquidctl, &hidden).await;
+                let report = rt::timeout(
+                    GENERATE_TIMEOUT,
+                    hardware_report::generate(full, detection.as_ref(), &liquidctl, &hidden),
+                )
+                .await
+                .unwrap_or_else(|_| {
+                    error!("Timed out after {GENERATE_TIMEOUT:?} generating the hardware report");
+                    TIMED_OUT_REPORT.to_string()
+                });
                 let _ = respond_to.send(report);
             }
         }
