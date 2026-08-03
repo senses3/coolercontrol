@@ -176,6 +176,19 @@ async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
     let _ = writeln!(report, "\nHWMon Fan Channels");
     let mut any = false;
     for device in devices {
+        if scan_is_safe(device.excluded).not() {
+            // Listed but not inspected. Saying so beats omitting it, which
+            // would read as the report having missed the device entirely.
+            any = true;
+            let _ = writeln!(
+                report,
+                "  {} [{}]  not scanned{}, see the Liquidctl section for its fans",
+                device.name,
+                device.driver.as_deref().unwrap_or("no driver link"),
+                exclusion_suffix(device)
+            );
+            continue;
+        }
         if device.fans.is_empty() {
             continue;
         }
@@ -509,6 +522,16 @@ fn hidden_channel_suffix(count: usize) -> String {
     format!(", {count} hidden")
 }
 
+/// Whether the report may read this device's channels.
+///
+/// Everything except a liquidctl duplicate: that is one piece of hardware with
+/// another process actively talking to it, and a read here can break its
+/// transfers. Every other exclusion is a device nothing else is using, so
+/// inspecting it is free and often the whole point.
+fn scan_is_safe(excluded: Option<HwmonExclusion>) -> bool {
+    excluded != Some(HwmonExclusion::DuplicateOfLiquidctl)
+}
+
 /// The trailing "hidden: ..." note, or nothing for a device the app shows.
 ///
 /// Silent when the daemon kept the device, which is the common case: a marker
@@ -546,12 +569,6 @@ async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
             continue;
         }
         let driver = resolve_driver(&path);
-        let fans = fans::init_fans(&path, &name)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
-            .collect();
         // Matched on the canonical path: the entries here are symlinks into
         // the bus tree, while the daemon recorded its own walk of it.
         let canonical = cc_fs::canonicalize(&path).ok();
@@ -561,6 +578,23 @@ async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
         let excluded_channels = canonical
             .as_ref()
             .map_or_else(HashMap::new, |canonical| hidden_channels(hidden, canonical));
+        // Reading a device liquidctl owns means two programs on one piece of
+        // hardware. `corsairpsu` reads go out over USB HID to the PSU, so this
+        // was both slow and enough to make liqctld's own transfers fail with
+        // "possible conflict with another program". The daemon excluded the
+        // device precisely so it would not be touched; the report has no
+        // business overriding that, and the Liquidctl section already carries
+        // its fan counts from the repository that actually drives it.
+        let fans = if scan_is_safe(excluded) {
+            fans::init_fans(&path, &name)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
+                .collect()
+        } else {
+            Vec::new()
+        };
         devices.push(ReportDevice {
             path,
             name,
@@ -881,6 +915,44 @@ mod tests {
             report.contains("My Plugin [kraken2]  3 fan(s), 3 controllable"),
             "{report}"
         );
+    }
+
+    /// Goal: the report must not read a device liquidctl is talking to.
+    ///
+    /// `corsairpsu` is excluded from the daemon precisely because liqctld owns
+    /// the same PSU, and its hwmon reads go out over USB HID. Scanning it here
+    /// was slow and made liqctld's own transfers fail with "possible conflict
+    /// with another program". Every other exclusion is a device nothing else is
+    /// using, so those stay scannable.
+    #[test]
+    fn a_device_liquidctl_owns_is_never_read() {
+        assert!(scan_is_safe(Some(HwmonExclusion::DuplicateOfLiquidctl)).not());
+        assert!(scan_is_safe(None));
+        for reason in [
+            HwmonExclusion::ServedByGpuRepository,
+            HwmonExclusion::UserDisabled,
+            HwmonExclusion::AllChannelsIgnored,
+        ] {
+            assert!(
+                scan_is_safe(Some(reason)),
+                "{reason:?} should stay scannable"
+            );
+        }
+    }
+
+    /// Goal: a device we chose not to read is still listed, and says why plus
+    /// where its fans are accounted for. Omitting it would read as the report
+    /// having missed the hardware.
+    #[test]
+    fn an_unscanned_device_is_still_listed() {
+        let device = report_device("corsairpsu", Some(HwmonExclusion::DuplicateOfLiquidctl));
+        let mut report = String::new();
+        crate::rt::test_runtime(async {
+            write_fan_summary(&mut report, std::slice::from_ref(&device)).await;
+        });
+        assert!(report.contains("corsairpsu"), "{report}");
+        assert!(report.contains("not scanned"), "{report}");
+        assert!(report.contains("Liquidctl section"), "{report}");
     }
 
     /// Goal: a repository with nothing on this machine says so. A missing
