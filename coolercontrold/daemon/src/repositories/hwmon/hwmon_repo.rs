@@ -700,22 +700,24 @@ impl HwmonRepo {
         hardware_support.record_excluded_channel(path, channel_name, reason);
     }
 
-    /// Publishes the passive verdict for every fan channel on a device.
+    /// Publishes the passive verdict for every fan channel on a device, and
+    /// logs the ones we cannot drive. Init only, so the log lines are written
+    /// once per boot rather than once per hardware report.
     ///
     /// `firmware_override_observed` is false here by construction: at init
     /// nothing has attempted control yet, so there has been nothing to
     /// reclaim. Nothing republishes a channel afterwards: only a duty-response
     /// probe can observe a reclaim, and that is not part of this work.
     fn publish_channel_verdicts(&self, device_uid: &UID, driver: &HwmonDriverInfo) {
-        let Some(hardware_support) = self.hardware_support.as_ref() else {
-            return;
-        };
         for channel in &driver.channels {
             if channel.hwmon_type != HwmonChannelType::Fan {
                 continue;
             }
             let diagnosis = fans::diagnose_fan_channel(&driver.name, channel, false);
-            hardware_support.record_channel_diagnosis(device_uid, &channel.name, diagnosis);
+            fans::log_uncontrollable_channel(&driver.path, channel, &diagnosis);
+            if let Some(hardware_support) = self.hardware_support.as_ref() {
+                hardware_support.record_channel_diagnosis(device_uid, &channel.name, diagnosis);
+            }
         }
     }
 

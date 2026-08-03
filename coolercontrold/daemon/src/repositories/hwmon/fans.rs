@@ -56,7 +56,6 @@ pub async fn init_fans(base_path: &Path, device_name: &str) -> Result<Vec<HwmonC
     let mut fans = caps_to_hwmon_fans(base_path, device_name, fan_caps).await?;
     fans.sort_by_key(|c| c.number);
     auto_curve::init_auto_curve_fans(base_path, &mut fans, device_name).await?;
-    log_channel_verdicts(base_path, device_name, &fans);
     trace!(
         "Hwmon pwm fans detected: {fans:?} for {}",
         base_path.display()
@@ -93,26 +92,31 @@ pub fn diagnose_fan_channel(
     hardware_support::diagnose_channel(evidence, hwmon_name, firmware_override_observed)
 }
 
-/// Logs a reason for every channel we cannot drive, replacing the previous
-/// bare "uncontrollable fan found" line. Controllable channels stay silent,
+/// Logs the reason a channel cannot be driven, replacing the previous bare
+/// "uncontrollable fan found" line. Controllable channels stay silent,
 /// consistent with making no noise for working hardware.
-fn log_channel_verdicts(base_path: &Path, device_name: &str, fans: &[HwmonChannelInfo]) {
-    for channel in fans {
-        let diagnosis = diagnose_fan_channel(device_name, channel, false);
-        if diagnosis.verdict.is_controllable() {
-            continue;
-        }
-        let evidence = diagnosis.evidence.unwrap_or_default();
-        info!(
-            "Fan channel {} at {} is not controllable: {:?} (pwm: {}, writable: {}, rpm: {})",
-            channel.name,
-            base_path.display(),
-            diagnosis.verdict,
-            evidence.has_pwm,
-            evidence.pwm_writable,
-            evidence.has_rpm,
-        );
+///
+/// Called from repository init only. `init_fans` is the wrong home for it: the
+/// hardware report calls that too, so every report request would re-log the
+/// same lines.
+pub fn log_uncontrollable_channel(
+    base_path: &Path,
+    channel: &HwmonChannelInfo,
+    diagnosis: &ChannelDiagnosis,
+) {
+    if diagnosis.verdict.is_controllable() {
+        return;
     }
+    let evidence = diagnosis.evidence.clone().unwrap_or_default();
+    info!(
+        "Fan channel {} at {} is not controllable: {:?} (pwm: {}, writable: {}, rpm: {})",
+        channel.name,
+        base_path.display(),
+        diagnosis.verdict,
+        evidence.has_pwm,
+        evidence.pwm_writable,
+        evidence.has_rpm,
+    );
 }
 
 /// Detects if a fan has pwm capability and pwm-write capabilities.
