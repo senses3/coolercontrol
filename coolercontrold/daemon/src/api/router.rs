@@ -1483,10 +1483,31 @@ fn metrics_routes() -> ApiRouter<AppState> {
 fn sse_routes() -> ApiRouter<AppState> {
     ApiRouter::new()
         .api_route(
+            "/sse",
+            get_with(sse::combined, |o| {
+                o.summary("Server Sent Events")
+                    .description(
+                        "Subscribes to every event stream on one connection. Optional \
+                         `events` query parameter narrows the subscription to a \
+                         comma-separated subset of: status, health, logs, modes, alerts, \
+                         notifications. Prefer this over the per-stream endpoints: browsers \
+                         cap concurrent connections per origin over HTTP/1.1.",
+                    )
+                    .tag("sse")
+                    .response::<200, sse::SseStream>()
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_middleware)),
+        )
+        .api_route(
             "/sse/logs",
             get_with(sse::logs, |o| {
                 o.summary("Log Server Sent Events")
-                    .description("Subscribes and returns the Server Sent Events for a Log stream")
+                    .description(
+                        "Deprecated: use GET /sse?events=logs. Subscribes and returns the \
+                         Server Sent Events for a Log stream",
+                    )
                     .tag("sse")
                     .security_requirement("CookieAuth")
                     .security_requirement("BearerAuth")
@@ -1498,7 +1519,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::status, |o| {
                 o.summary("Recent Status Server Sent Events")
                     .description(
-                        "Subscribes and returns the Server Sent Events for a Status stream",
+                        "Deprecated: use GET /sse?events=status,health. Subscribes and returns \
+                         the Server Sent Events for a Status stream",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")
@@ -1511,7 +1533,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::modes, |o| {
                 o.summary("Activated Mode Events")
                     .description(
-                        "Subscribes and returns the Server Sent Events for a ModeActivated stream",
+                        "Deprecated: use GET /sse?events=modes. Subscribes and returns the \
+                         Server Sent Events for a ModeActivated stream",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")
@@ -1524,7 +1547,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::alerts, |o| {
                 o.summary("Alert Events")
                     .description(
-                        "Subscribes and returns Events for when an Alert State has changed",
+                        "Deprecated: use GET /sse?events=alerts. Subscribes and returns Events \
+                         for when an Alert State has changed",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")
@@ -1537,8 +1561,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::notifications, |o| {
                 o.summary("Desktop Notification Events")
                     .description(
-                        "Subscribes and returns Events for desktop notifications \
-                         that should be displayed to the user",
+                        "Deprecated: use GET /sse?events=notifications. Subscribes and returns \
+                         Events for desktop notifications that should be displayed to the user",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")

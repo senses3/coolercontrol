@@ -1259,6 +1259,96 @@ export default {
             hasErrors: 'Hat Fehler',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'In den Tray minimieren?',
+            body: 'Der CoolerControl-Daemon läuft in beiden Fällen im Hintergrund weiter, Ihre Kühlungseinstellungen bleiben also aktiv. Behalten Sie die Oberfläche im Tray für schnellen Zugriff und Desktop-Benachrichtigungen, oder beenden Sie sie ganz.',
+            keepInTray: 'Im Tray behalten',
+            quit: 'Beenden',
+            remember: 'Auswahl merken',
+        },
+        tray: {
+            show: '&Anzeigen',
+            hide: '&Ausblenden',
+            daemonConnection: '&Daemon-Verbindung…',
+            quit: '&Beenden',
+            modes: 'Modi',
+            sensors: 'Sensoren',
+            daemons: 'Daemons',
+        },
+        cert: {
+            title: 'Nicht verifiziertes Daemon-Zertifikat',
+            changedTitle: 'Zertifikat geändert',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 verwendet ein selbstsigniertes Zertifikat, das nicht automatisch überprüft werden kann. Fahren Sie nur fort, wenn Sie diesen Daemon kennen.',
+            changedBody:
+                'Das Zertifikat für %1 ist nicht das zuvor vertraute. Das kann bedeuten, dass der Daemon neu installiert wurde, oder dass die Verbindung abgefangen wird.',
+            fingerprint: 'Fingerabdruck (SHA-256):',
+            trust: 'Diesem Zertifikat vertrauen',
+            cancel: 'Abbrechen',
+        },
+        wizard: {
+            windowTitle: 'Daemon-Verbindungsfehler',
+            windowTitleOk: 'Daemon-Verbindung',
+            apply: '&Anwenden',
+            retry: '&Wiederholen',
+            quitApp: '&App beenden',
+            introPurpose:
+                'Diese Einstellungen legen fest, wie sich die Desktop-App mit dem CoolerControl-Daemon verbindet.',
+            introFailed: 'Es konnte keine Verbindung zum CoolerControl-Daemon hergestellt werden.',
+            introCheckService:
+                'Bitte stellen Sie sicher, dass der systemd-Dienst läuft und verfügbar ist.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Installationsanweisungen finden Sie auf der %1.',
+            introDocsLink: 'Dokumentationswebsite',
+            introCommands:
+                'Einige nützliche Befehle, um den Daemon-Status zu aktivieren und zu prüfen:',
+            introCustomAddress:
+                'Wenn Sie eine abweichende Adresse für die Verbindung zum Daemon konfiguriert haben, können Sie diese in den folgenden Schritten festlegen:',
+            lastError: 'Letzter Fehler:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'Die Adresse hat geantwortet, aber nicht als CoolerControl Daemon (HTTP %1).',
+            errorCertUntrusted: 'Dem Zertifikat des Daemons wurde nicht vertraut.',
+            errorCertInvalid:
+                'Das Zertifikat des Daemons ist ungültig und die Zertifikatsprüfung ist aktiviert.',
+            savedLabel: 'Gespeicherte Verbindung:',
+            newConnection: 'Neue Verbindung…',
+            removeConnection: 'Entfernen',
+            removeConnectionTooltip: 'Den ausgewählten Daemon vergessen.',
+            removeConnectionBody: 'Diesen Daemon nicht mehr im Systemabschnitt anbieten?',
+            nameLabel: 'Name:',
+            nameTooltip: 'Optionale Bezeichnung für diesen Daemon. Leer zeigt Host:Port.',
+            addressTitle: 'Daemon-Adresse - Desktop-Anwendung',
+            addressSubtitle: 'Passen Sie die Adressfelder nach Bedarf an.',
+            hostLabel: 'Host-Adresse:',
+            hostTooltip:
+                'Die IPv4-, IPv6-Adresse oder der Hostname für die Kommunikation mit dem Daemon.',
+            portLabel: 'Port:',
+            portTooltip: 'Die Portnummer für die Kommunikation mit dem Daemon.',
+            sslTooltip: 'SSL/TLS (HTTPS) aktivieren oder deaktivieren',
+            strictTls: 'Zertifikat überprüfen',
+            strictTlsTooltip:
+                'Ein normal überprüfbares Zertifikat verlangen. Ausgeschaltet lassen, um das selbstsignierte Zertifikat des Daemons zu verwenden, dem bei entfernten Daemons beim ersten Verbinden vertraut wird.',
+            defaults: 'Standardwerte',
+            defaultsTooltip: 'Die Daemon-Adresse auf die Standardwerte zurücksetzen',
+            forgetCerts: 'Vertraute Zertifikate vergessen',
+            forgetCertsTooltip:
+                'Entfernt die Zertifikate entfernter Daemons, denen diese App vertrauen soll.',
+            forgetCertsBody:
+                'Diesen Daemon-Zertifikaten wird derzeit vertraut. Wenn Sie sie vergessen, werden Sie bei der nächsten Verbindung erneut um Bestätigung gebeten.',
+        },
+        versionMismatch: {
+            title: 'Versionskonflikt',
+            text: 'Die Version der Desktop-App (%1) stimmt nicht mit der Daemon-Version (%2) überein.',
+            informative:
+                'Bitte starten Sie die Desktop-App neu, um die passende Oberflächenversion zu laden.',
+            quitApp: '&App beenden',
+            continueAnyway: 'Trotzdem fortfahren',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sitzung abgelaufen',

@@ -112,7 +112,9 @@ fn liquidctl_summary(device: &Device, enabled: bool) -> crate::hardware_report::
     let mut summary = crate::hardware_report::DeviceSummary::from_device(device, enabled);
     if let Some(lc_info) = device.lc_info.as_ref() {
         summary.driver = Some(lc_info.driver_type.to_string());
-        summary.firmware_version = lc_info.firmware_version.clone();
+        summary
+            .firmware_version
+            .clone_from(&lc_info.firmware_version);
     }
     summary.hwmon_backed = device
         .info

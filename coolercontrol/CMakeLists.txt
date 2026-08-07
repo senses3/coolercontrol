@@ -21,8 +21,18 @@ qt_add_executable(
   main_window.h
   address_wizard.cpp
   address_wizard.h
+  connections.cpp
+  connections.h
   ipc.cpp
-  ipc.h)
+  ipc.h
+  sse_parser.cpp
+  sse_parser.h
+  translations.cpp
+  translations.h
+  tls_trust.cpp
+  tls_trust.h
+  origin_filter.cpp
+  origin_filter.h)
 
 target_link_libraries(
   coolercontrol PRIVATE Qt::Core Qt::Widgets Qt::WebEngineWidgets

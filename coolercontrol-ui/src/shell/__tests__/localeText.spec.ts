@@ -32,16 +32,22 @@ const localeSources = import.meta.glob('../../i18n/locales/*.ts', {
 }) as Record<string, string>
 
 /**
- * The characters that can reorder rendered text (CVE-2021-42574), plus the
- * marks that can do it subtly. None of them belongs in a translation: the
- * renderer applies the Unicode bidirectional algorithm on its own, and every
- * locale here reads correctly without any of these.
+ * The explicit formatting characters, which open a directional scope that runs
+ * until it is popped and so can reorder whole spans of a line (CVE-2021-42574).
+ * A translation never needs one: the renderer applies the Unicode bidirectional
+ * algorithm on its own.
+ *
+ * The implicit marks (LRM, RLM, ALM) are deliberately absent. They are ordinary
+ * typography in a mixed-direction string, where they settle which way the
+ * neutral characters around an embedded Latin word lean, and the Arabic locale
+ * uses one for exactly that. They open no scope, so they cannot carry the
+ * attack this guards against.
  *
  * Held as code points rather than literals. A literal here is invisible in an
  * editor, and it makes this file itself trip every Trojan Source scanner that
  * looks for the raw characters.
  */
-const BIDI_CONTROLS: Array<[number, string]> = [
+const BIDI_FORMATTING: Array<[number, string]> = [
     [0x202a, 'LEFT-TO-RIGHT EMBEDDING'],
     [0x202b, 'RIGHT-TO-LEFT EMBEDDING'],
     [0x202c, 'POP DIRECTIONAL FORMATTING'],
@@ -51,9 +57,6 @@ const BIDI_CONTROLS: Array<[number, string]> = [
     [0x2067, 'RIGHT-TO-LEFT ISOLATE'],
     [0x2068, 'FIRST STRONG ISOLATE'],
     [0x2069, 'POP DIRECTIONAL ISOLATE'],
-    [0x200e, 'LEFT-TO-RIGHT MARK'],
-    [0x200f, 'RIGHT-TO-LEFT MARK'],
-    [0x061c, 'ARABIC LETTER MARK'],
 ]
 
 describe('locale text', () => {
@@ -63,11 +66,11 @@ describe('locale text', () => {
         expect(Object.keys(localeSources).length).toBeGreaterThan(5)
     })
 
-    it('has no bidi control characters in locales', () => {
+    it('has no bidi formatting characters in locales', () => {
         const offences: string[] = []
         for (const [path, source] of Object.entries(localeSources)) {
             source.split('\n').forEach((line, index) => {
-                for (const [codePoint, name] of BIDI_CONTROLS) {
+                for (const [codePoint, name] of BIDI_FORMATTING) {
                     if (line.includes(String.fromCodePoint(codePoint))) {
                         offences.push(`${path}:${index + 1} contains ${name}`)
                     }

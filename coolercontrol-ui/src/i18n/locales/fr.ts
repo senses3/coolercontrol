@@ -1262,6 +1262,95 @@ export default {
             hasErrors: 'A des Erreurs',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Réduire dans la zone de notification ?',
+            body: "Le démon CoolerControl continue de fonctionner en arrière-plan dans les deux cas, vos réglages de refroidissement restent donc actifs. Gardez l'interface dans la zone de notification pour un accès rapide et les notifications du bureau, ou quittez-la complètement.",
+            keepInTray: 'Garder dans la zone de notification',
+            quit: 'Quitter',
+            remember: 'Mémoriser mon choix',
+        },
+        tray: {
+            show: '&Afficher',
+            hide: '&Masquer',
+            daemonConnection: 'Connexion au &démon…',
+            quit: '&Quitter',
+            modes: 'Modes',
+            sensors: 'Capteurs',
+            daemons: 'Démons',
+        },
+        cert: {
+            title: 'Certificat du démon non vérifié',
+            changedTitle: 'Certificat modifié',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 utilise un certificat auto-signé, qui ne peut pas être vérifié automatiquement. Ne continuez que si vous reconnaissez ce démon.',
+            changedBody:
+                "Le certificat de %1 n'est pas celui approuvé précédemment. Cela peut signifier que le démon a été réinstallé, ou que la connexion est interceptée.",
+            fingerprint: 'Empreinte (SHA-256) :',
+            trust: 'Faire confiance à ce certificat',
+            cancel: 'Annuler',
+        },
+        wizard: {
+            windowTitle: 'Erreur de connexion au démon',
+            windowTitleOk: 'Connexion au démon',
+            apply: '&Appliquer',
+            retry: '&Réessayer',
+            quitApp: '&Quitter',
+            introPurpose:
+                "Ces paramètres déterminent comment l'application de bureau se connecte au démon CoolerControl.",
+            introFailed: "La connexion au démon CoolerControl n'a pas pu être établie.",
+            introCheckService:
+                'Veuillez vérifier que le service systemd est démarré et disponible.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: "Consultez le %1 pour les instructions d'installation.",
+            introDocsLink: 'site de documentation',
+            introCommands: "Quelques commandes utiles pour activer et vérifier l'état du démon :",
+            introCustomAddress:
+                'Si vous avez configuré une adresse non standard pour vous connecter au démon, vous pouvez la définir aux étapes suivantes :',
+            lastError: 'Dernière erreur :',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                "L'adresse a répondu, mais pas en tant que démon CoolerControl (HTTP %1).",
+            errorCertUntrusted: "Le certificat du démon n'a pas été approuvé.",
+            errorCertInvalid:
+                "Le certificat du démon n'est pas valide et la validation des certificats est activée.",
+            savedLabel: 'Connexion enregistrée :',
+            newConnection: 'Nouvelle connexion…',
+            removeConnection: 'Supprimer',
+            removeConnectionTooltip: 'Oublier le démon sélectionné.',
+            removeConnectionBody: 'Ne plus proposer ce démon dans la zone de notification ?',
+            nameLabel: 'Nom :',
+            nameTooltip: 'Libellé facultatif pour ce démon. Vide affiche hôte:port.',
+            addressTitle: 'Adresse du démon - Application de bureau',
+            addressSubtitle: "Ajustez les champs d'adresse si nécessaire.",
+            hostLabel: "Adresse de l'hôte :",
+            hostTooltip:
+                "L'adresse IPv4, IPv6 ou le nom d'hôte à utiliser pour communiquer avec le démon.",
+            portLabel: 'Port :',
+            portTooltip: 'Le numéro de port à utiliser pour communiquer avec le démon.',
+            sslTooltip: 'Activer ou désactiver SSL/TLS (HTTPS)',
+            strictTls: 'Valider le certificat',
+            strictTlsTooltip:
+                'Exiger un certificat vérifiable normalement. Laissez désactivé pour utiliser le certificat auto-signé du démon, approuvé à la première connexion pour les démons distants.',
+            defaults: 'Valeurs par défaut',
+            defaultsTooltip: "Réinitialiser l'adresse du démon aux valeurs par défaut",
+            forgetCerts: 'Oublier les certificats approuvés',
+            forgetCertsTooltip:
+                'Supprime les certificats des démons distants auxquels cette application fait confiance.',
+            forgetCertsBody:
+                "Ces certificats de démon sont actuellement approuvés. Les oublier signifie qu'une confirmation vous sera demandée à la prochaine connexion.",
+        },
+        versionMismatch: {
+            title: 'Version incompatible',
+            text: "La version de l'application de bureau (%1) ne correspond pas à la version du démon (%2).",
+            informative:
+                "Veuillez redémarrer l'application de bureau pour charger la bonne version de l'interface.",
+            quitApp: '&Quitter',
+            continueAnyway: 'Continuer quand même',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Session expirée',

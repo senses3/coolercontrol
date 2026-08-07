@@ -1236,6 +1236,91 @@ export default {
             hasErrors: 'エラーあり',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'トレイに閉じますか？',
+            body: 'CoolerControl デーモンはいずれの場合もバックグラウンドで動作し続けるため、冷却設定は有効なままです。すばやいアクセスとデスクトップ通知のために UI をトレイに残すか、完全に終了することもできます。',
+            keepInTray: 'トレイに残す',
+            quit: '終了',
+            remember: '選択を記憶する',
+        },
+        tray: {
+            show: '表示(&S)',
+            hide: '非表示(&H)',
+            daemonConnection: 'デーモン接続(&D)…',
+            quit: '終了(&Q)',
+            modes: 'モード',
+            sensors: 'センサー',
+            daemons: 'デーモン',
+        },
+        cert: {
+            title: '検証されていないデーモン証明書',
+            changedTitle: '証明書が変更されました',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 は自己署名証明書を使用しており、自動的に検証できません。このデーモンに心当たりがある場合のみ続行してください。',
+            changedBody:
+                '%1 の証明書が以前に信頼したものと異なります。デーモンが再インストールされたか、接続が傍受されている可能性があります。',
+            fingerprint: 'フィンガープリント (SHA-256):',
+            trust: 'この証明書を信頼する',
+            cancel: 'キャンセル',
+        },
+        wizard: {
+            windowTitle: 'デーモン接続エラー',
+            windowTitleOk: 'デーモン接続',
+            apply: '適用(&A)',
+            retry: '再試行(&R)',
+            quitApp: 'アプリを終了(&Q)',
+            introPurpose:
+                'これらの設定は、デスクトップアプリが CoolerControl デーモンに接続する方法を制御します。',
+            introFailed: 'CoolerControl デーモンに接続できませんでした。',
+            introCheckService: 'systemd サービスが実行中で利用可能であることを確認してください。',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'インストール手順については %1 を参照してください。',
+            introDocsLink: 'ドキュメントサイト',
+            introCommands: 'デーモンの有効化と状態確認に役立つコマンド:',
+            introCustomAddress:
+                'デーモンへの接続に標準以外のアドレスを設定している場合は、次の手順で指定できます:',
+            lastError: '前回のエラー:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'アドレスは応答しましたが、CoolerControl デーモンではありませんでした (HTTP %1)。',
+            errorCertUntrusted: 'デーモンの証明書は信頼されませんでした。',
+            errorCertInvalid: 'デーモンの証明書が検証できず、証明書の検証が有効になっています。',
+            savedLabel: '保存された接続:',
+            newConnection: '新しい接続…',
+            removeConnection: '削除',
+            removeConnectionTooltip: '選択したデーモンを削除します。',
+            removeConnectionBody: 'このデーモンをトレイに表示しないようにしますか？',
+            nameLabel: '名前:',
+            nameTooltip: 'このデーモンの任意のラベル。空欄の場合はホスト:ポートを表示します。',
+            addressTitle: 'デーモンアドレス - デスクトップアプリケーション',
+            addressSubtitle: '必要に応じてアドレス項目を調整してください。',
+            hostLabel: 'ホストアドレス:',
+            hostTooltip: 'デーモンとの通信に使用する IPv4、IPv6 アドレスまたはホスト名。',
+            portLabel: 'ポート:',
+            portTooltip: 'デーモンとの通信に使用するポート番号。',
+            sslTooltip: 'SSL/TLS (HTTPS) の有効・無効を切り替えます',
+            strictTls: '証明書を検証する',
+            strictTlsTooltip:
+                '通常どおり検証できる証明書を要求します。オフのままにすると、デーモンの自己署名証明書を使用し、リモートデーモンでは初回接続時に信頼します。',
+            defaults: '既定値',
+            defaultsTooltip: 'デーモンアドレスを既定値に戻します',
+            forgetCerts: '信頼した証明書を削除',
+            forgetCertsTooltip: 'このアプリが信頼しているリモートデーモンの証明書を削除します。',
+            forgetCertsBody:
+                'これらのデーモン証明書は現在信頼されています。削除すると、次回接続時に再度確認を求められます。',
+        },
+        versionMismatch: {
+            title: 'バージョンの不一致',
+            text: 'デスクトップアプリのバージョン (%1) がデーモンのバージョン (%2) と一致しません。',
+            informative:
+                '正しいインターフェースバージョンを読み込むため、デスクトップアプリを再起動してください。',
+            quitApp: 'アプリを終了(&Q)',
+            continueAnyway: 'このまま続行',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'セッションの有効期限切れ',

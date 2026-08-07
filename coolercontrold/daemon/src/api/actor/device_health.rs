@@ -74,6 +74,7 @@ impl ApiActor<DeviceHealthMessage> for DeviceHealthActor {
 pub struct DeviceHealthHandle {
     sender: mpsc::Sender<DeviceHealthMessage>,
     broadcaster: broadcast::Sender<HealthEvent>,
+    cancel_token: CancellationToken,
 }
 
 impl DeviceHealthHandle {
@@ -87,11 +88,16 @@ impl DeviceHealthHandle {
         let handle = Self {
             sender,
             broadcaster,
+            cancel_token: cancel_token.clone(),
         };
         controller.set_handle(handle.clone());
         let actor = DeviceHealthActor::new(receiver, controller);
         main_scope.spawn(run_api_actor(actor, cancel_token));
         handle
+    }
+
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancel_token.clone()
     }
 
     pub async fn get_all(&self) -> DeviceHealthDto {

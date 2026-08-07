@@ -70,6 +70,14 @@ class IPC final : public QObject {
 
   void setAlertsActive(bool active) const;
 
+  // JSON map of the strings Qt renders itself, in the UI's active locale. Qt has no
+  // translation pipeline, and a discarded renderer cannot be asked, so these are cached.
+  void setTranslations(const QString& translationsJson) const;
+
+  // Identity and label of the sensors pinned in the UI. Values are not sent: Qt fetches
+  // them when the tray menu opens, since the renderer is gone while in the tray.
+  void setPinnedSensors(const QString& sensorsJson) const;
+
   void forceQuit() const;
 
   void forceRefresh() const;

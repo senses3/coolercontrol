@@ -21,6 +21,7 @@ import { RouterView, useRouter } from 'vue-router'
 import { startupRouteName } from '@/shell/sections.ts'
 import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
 import { TOUR_STEPS } from '@/shell/tour.ts'
+import { buildQtStrings } from '@/shell/qtStrings.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
@@ -309,18 +310,18 @@ onMounted(async () => {
             await ipc.loadFinished()
             // Push the current alert state now the IPC bridge is confirmed ready.
             settingsStore.pushTrayAlertState()
+            // Qt renders its own dialogs and has no translations. Hand it the strings
+            // it needs in the active locale; it caches them, since a discarded
+            // renderer cannot be asked later.
+            ipc.setTranslations(JSON.stringify(buildQtStrings(t)))
+            // Seed the tray's sensor list. The watch only fires on later changes.
+            settingsStore.pushTrayPinnedSensors()
         }
     }
     // Fire-and-forget: SW manages its own SSE connection independently.
     deviceStore.initNotificationWorker()
     // async functions that run for the lifetime of the application:
-    await Promise.all([
-        deviceStore.updateStatusFromSSE(),
-        deviceStore.updateLogsFromSSE(),
-        deviceStore.updateAlertsFromSSE(),
-        deviceStore.updateActiveModeFromSSE(),
-        signalLoadFinished(),
-    ])
+    await Promise.all([deviceStore.updateFromSSE(), signalLoadFinished()])
 })
 </script>
 
