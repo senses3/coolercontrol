@@ -15,9 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
- * FileSessionStore based on tower-sessions-file-store by Silas
- * Copyright (c) 2024 Silas
- * Licensed under the MIT License
+ * FileSessionStore is based on the design of tower-sessions-file-store by Silas:
  * https://github.com/nyabinary/tower-sessions-file-store
  */
 
