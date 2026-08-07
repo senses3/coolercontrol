@@ -10,7 +10,7 @@ ui_dir := 'coolercontrol-ui'
 qt_dir := 'coolercontrol'
 
 # Detect cargo or fallback (prefer newer; mirrors coolercontrold/Makefile ordering)
-CARGO := $(shell command -v cargo || command -v cargo-1.88 || command -v cargo-1.85 || command -v cargo-1.91)
+CARGO := $(shell command -v cargo || command -v cargo-1.91 || command -v cargo-1.88)
 
 .PHONY: help \
 	build build-ui build-daemon build-qt \

@@ -13,8 +13,8 @@ ENV PYTHONFAULTHANDLER=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100
 
-# Default build needs Rust 1.88 (compio-rt feature). The 1.85 path is the `--no-default-features`
-# build only. If jammy apt lacks cargo-1.88, switch to the rustup block below (RUST_VERSION=1.88.0).
+# MSRV is 1.88. If jammy apt lacks a new enough cargo, switch to the rustup block below
+# (RUST_VERSION=1.88.0).
 #ENV RUSTUP_HOME=/usr/local/rustup \
 #    CARGO_HOME=/usr/local/cargo \
 #    PATH=/usr/local/cargo/bin:$PATH \

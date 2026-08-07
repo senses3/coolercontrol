@@ -2,7 +2,7 @@
 name = "cc-stress"
 version = "0.1.1"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "CPU, GPU, and RAM stress testing for thermal validation"
 categories = ["hardware-support"]
 keywords = ["stress", "hardware", "thermal", "benchmark"]
@@ -22,7 +22,8 @@ nix = { version = "0.31.3", default-features = false, features = [
   "sched",
   "ioctl",
 ] }
-# newer versions require >1.85
+# Held at 24: 25 through 30 carry breaking API changes across the stress backends,
+# and moving needs re-validation on real GPUs. Not an MSRV hold.
 wgpu = { version = "24", default-features = false, features = [
   "vulkan-portability",
   "angle",
