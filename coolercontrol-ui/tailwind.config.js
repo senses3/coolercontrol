@@ -248,9 +248,16 @@ module.exports = {
                 // interface-font setting swaps both roles at the variable.
                 numeric: 'var(--font-numeric)',
             },
+            keyframes: {
+                'hue-rotate': {
+                    from: { filter: 'hue-rotate(0deg)' },
+                    to: { filter: 'hue-rotate(360deg)' },
+                },
+            },
             animation: {
                 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'spin-slow': 'spin 2s linear infinite',
+                'hue-rotate': 'hue-rotate 3s linear infinite',
             },
             boxShadow: {
                 // Elevation for floating overlays; shadow-md is invisible on dark surfaces.

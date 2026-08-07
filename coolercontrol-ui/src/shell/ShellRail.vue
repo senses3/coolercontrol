@@ -48,7 +48,6 @@ const railSections = computed(() => {
     return [...sections, PLUGINS_SECTION]
 })
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
-const logoUrl = computed(() => (settingsStore.eyeCandy ? '/logo-animated.svg' : '/logo.svg'))
 // The logo resets to the configured startup page, which is what sets it apart
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
@@ -60,9 +59,15 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
         <RouterLink
             id="logo"
             :to="startupTarget"
-            class="rounded-lg p-1 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="group rounded-lg p-1 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
         >
-            <img :src="logoUrl" alt="CoolerControl" class="h-10 w-10" />
+            <!-- The glyph is a single gradient path, so cycling the hue on the
+                 image matches what the old animated variant did to the path. -->
+            <img
+                src="/logo.svg"
+                alt="CoolerControl"
+                class="h-10 w-10 motion-safe:group-hover:animate-hue-rotate"
+            />
         </RouterLink>
         <RouterLink
             v-for="section in railSections"
