@@ -103,6 +103,16 @@ include:
 - template: Security/Dependency-Scanning.gitlab-ci.yml
 
 semgrep-sast:
+  variables:
+    # The BiDiTrojanSource rule reports the Arabic locale on the strength of its
+    # right-to-left script alone, and would report it again for the directional
+    # mark that locale needs to set an embedded Latin word off from the text
+    # around it. These are translation string tables, not logic, so scanning
+    # them buys nothing. `has no bidi formatting characters in locales` in the
+    # UI test suite enforces the invariant the rule was reaching for, precisely.
+    # The first four entries are the template defaults, repeated because setting
+    # this replaces them rather than adding to them.
+    SAST_EXCLUDED_PATHS: 'spec, test, tests, tmp, coolercontrol-ui/src/i18n/locales'
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never

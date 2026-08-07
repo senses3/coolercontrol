@@ -18,6 +18,7 @@
 
 use crate::cc_fs;
 use crate::device::ChannelStatus;
+use crate::hardware_support::{self, ChannelDiagnosis, ChannelEvidence};
 use crate::repositories::hwmon::hwmon_repo::{
     AutoCurveInfo, HwmonChannelCapabilities, HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo,
 };
@@ -60,6 +61,62 @@ pub async fn init_fans(base_path: &Path, device_name: &str) -> Result<Vec<HwmonC
         base_path.display()
     );
     Ok(fans)
+}
+
+/// Diagnoses why one fan channel is or is not controllable.
+///
+/// `firmware_override_observed` is reserved for the duty-response probe, which
+/// is the only thing that can establish it without adding reads to the write
+/// path. Passive callers pass `false`.
+pub fn diagnose_fan_channel(
+    hwmon_name: &str,
+    channel: &HwmonChannelInfo,
+    firmware_override_observed: bool,
+) -> ChannelDiagnosis {
+    debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
+    if channel.caps.has_pwm().not() && channel.caps.is_fan_controllable() {
+        // Apple SMC fans are driven through `fanN_output`, not `pwmN`, so the
+        // pwm-shaped evidence below would condemn a channel we are writing to.
+        // There is no pwm file to state facts about, so the diagnosis carries
+        // none rather than four misleading booleans.
+        return hardware_support::diagnose_driver_channel(true);
+    }
+    let evidence = ChannelEvidence {
+        has_pwm: channel.caps.has_pwm(),
+        pwm_writable: channel.caps.is_fan_controllable(),
+        has_rpm: channel.caps.has_rpm(),
+        // `pwm_enable_default` is `Some` exactly when the driver exposed a
+        // `pwmN_enable` file for this channel.
+        has_pwm_enable: channel.pwm_enable_default.is_some(),
+    };
+    hardware_support::diagnose_channel(evidence, hwmon_name, firmware_override_observed)
+}
+
+/// Logs the reason a channel cannot be driven, replacing the previous bare
+/// "uncontrollable fan found" line. Controllable channels stay silent,
+/// consistent with making no noise for working hardware.
+///
+/// Called from repository init only. `init_fans` is the wrong home for it: the
+/// hardware report calls that too, so every report request would re-log the
+/// same lines.
+pub fn log_uncontrollable_channel(
+    base_path: &Path,
+    channel: &HwmonChannelInfo,
+    diagnosis: &ChannelDiagnosis,
+) {
+    if diagnosis.verdict.is_controllable() {
+        return;
+    }
+    let evidence = diagnosis.evidence.clone().unwrap_or_default();
+    info!(
+        "Fan channel {} at {} is not controllable: {:?} (pwm: {}, writable: {}, rpm: {})",
+        channel.name,
+        base_path.display(),
+        diagnosis.verdict,
+        evidence.has_pwm,
+        evidence.pwm_writable,
+        evidence.has_rpm,
+    );
 }
 
 /// Detects if a fan has pwm capability and pwm-write capabilities.
@@ -132,18 +189,15 @@ async fn caps_to_hwmon_fans(
 ) -> Result<Vec<HwmonChannelInfo>> {
     let mut fans = vec![];
     for (channel_number, fan_cap) in fan_caps {
-        let current_pwm_enable = get_current_pwm_enable(base_path, &channel_number).await;
-        let pwm_enable_default = adjusted_pwm_default(current_pwm_enable, device_name);
+        let pwm_enable_at_init = current_pwm_enable(base_path, channel_number).await;
+        let pwm_enable_default = adjusted_pwm_default(pwm_enable_at_init, device_name);
         let channel_name = get_fan_channel_name(channel_number);
         let label = get_fan_channel_label(base_path, &channel_number).await;
         // deprecated setting:
         // determine_pwm_mode_support(base_path, &channel_number).await;
-        if fan_cap.is_non_controllable_rpm_fan() {
-            info!(
-                "Uncontrollable RPM-only fan found at {}/fan{channel_number}_input",
-                base_path.display()
-            );
-        }
+        // Uncontrollable channels are reported by `log_channel_verdicts` once
+        // the full channel is built, which can name a cause instead of a
+        // symptom.
         let pwm_path = if fan_cap.has_pwm() {
             Some(base_path.join(format_pwm!(channel_number)))
         } else {
@@ -375,7 +429,7 @@ async fn get_pwm_duty(
                 io_err.raw_os_error().is_some() && io_err.kind() != ErrorKind::NotFound
             });
             if is_kernel_refusal {
-                if let Some(pwm_enable) = get_current_pwm_enable(base_path, channel_number).await {
+                if let Some(pwm_enable) = current_pwm_enable(base_path, *channel_number).await {
                     if pwm_enable >= PWM_ENABLE_AUTO_VALUE {
                         debug!(
                             "pwmX read refused by kernel driver in auto mode \
@@ -432,7 +486,9 @@ pub async fn get_fan_rpm(
 ///  - 3 : "Fan Speed Cruise" mode (?)
 ///  - 4 : "Smart Fan III" mode (NCT6775F only)
 ///  - 5 : "Smart Fan IV" mode (modern `MoBo`'s with build-in smart fan control probably use this)
-async fn get_current_pwm_enable(base_path: &Path, channel_number: &u8) -> Option<u8> {
+/// Reads `pwmN_enable`. `None` when the driver exposes no such file, which
+/// means there is no auto mode to hand control back to.
+async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> {
     let pwm_enable_path = base_path.join(format_pwm_enable!(channel_number));
     let current_pwm_enable = cc_fs::read_sysfs(&pwm_enable_path)
         .await
@@ -577,7 +633,7 @@ pub async fn set_pwm_enable_to_default_or_auto(
 
 /// This sets `pwm_enable` to the desired value. Unlike other operations,
 /// it will not check if it's already set to the desired value.
-/// See also `get_current_pwm_enable`.
+/// See also `current_pwm_enable`.
 pub async fn set_pwm_enable(
     pwm_enable_value: u8,
     base_path: &Path,
@@ -597,7 +653,7 @@ pub async fn set_pwm_enable(
 }
 
 /// This sets `pwm_enable` to the desired value if it's not already set to the desired value.
-/// See also `get_current_pwm_enable`.
+/// See also `current_pwm_enable`.
 pub async fn set_pwm_enable_if_not_already(
     pwm_enable_value: u8,
     base_path: &Path,
@@ -675,6 +731,7 @@ pub fn duty_to_pwm_value(speed_duty: u8) -> u8 {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
+    use crate::hardware_support::ChannelVerdict;
     use crate::repositories::hwmon::drivetemp;
     use serial_test::serial;
     use std::path::{Path, PathBuf};
@@ -1602,5 +1659,48 @@ mod tests {
             assert!(any_failure.not());
             assert!(statuses.is_empty());
         });
+    }
+
+    /// Goal: an Apple SMC fan is driven through `fanN_output` and never has a
+    /// `pwmN`, so the pwm-shaped evidence must not condemn it. Method: build
+    /// the capability set `AppleMacSMC::detect_apple_smc_fans` produces and
+    /// check the verdict, which in a debug build also exercises the assertion
+    /// that a writable pwm implies a pwm.
+    #[test]
+    fn apple_smc_fan_without_pwm_is_controllable() {
+        let channel = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 1,
+            name: "fan1".to_string(),
+            caps: HwmonChannelCapabilities::APPLE_SMC
+                | HwmonChannelCapabilities::FAN_WRITABLE
+                | HwmonChannelCapabilities::RPM,
+            ..Default::default()
+        };
+
+        let diagnosis = diagnose_fan_channel("macsmc-hwmon", &channel, false);
+
+        assert_eq!(diagnosis.verdict, ChannelVerdict::Controllable);
+        // No pwm file means no pwm facts to report, not four false ones.
+        assert!(diagnosis.evidence.is_none());
+    }
+
+    /// Goal: the negative space of the case above. A fan that only reports
+    /// speed is still `NoPwm`, so the Apple branch cannot swallow a genuinely
+    /// uncontrollable channel.
+    #[test]
+    fn rpm_only_fan_is_still_condemned() {
+        let channel = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 9,
+            name: "fan9".to_string(),
+            caps: HwmonChannelCapabilities::RPM,
+            ..Default::default()
+        };
+
+        let diagnosis = diagnose_fan_channel("aquacomputer_d5next", &channel, false);
+
+        assert_eq!(diagnosis.verdict, ChannelVerdict::NoPwm);
+        assert!(diagnosis.evidence.is_some());
     }
 }

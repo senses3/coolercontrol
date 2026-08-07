@@ -32,16 +32,20 @@ import {
     mdiOpenInNew,
     mdiSpeedometer,
 } from '@mdi/js'
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Emitter, EventType } from 'mitt'
 import type { RouteLocationRaw } from 'vue-router'
 import { $enum } from 'ts-enum-util'
 import { DeviceType } from '@/models/Device.ts'
 import {
+    ChannelVerdict,
     type FailsafeRef,
+    HARDWARE_SUPPORT_DOCS,
     HealthEntityType,
     type SourceRef,
+    type SystemFinding,
+    SystemFindingKind,
     failsafeKey,
     sourceKey,
     sourceTempDisplayName,
@@ -56,6 +60,8 @@ import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
+import HardwareReportModal from '@/shell/home/HardwareReportModal.vue'
+import DetectionModal from '@/shell/home/DetectionModal.vue'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
 const deviceStore = useDeviceStore()
@@ -228,6 +234,87 @@ const healthRows = computed((): Array<HealthRow> => {
             label: `${entityTypeLabel(ref.entity_type)}: ${sourceEntityLabel(ref)}`,
             detail: `${t('views.appInfo.staleTempSource')}: ${sourceTempLabel(ref)}`,
             to: sourceRoute(ref),
+        })
+    }
+    return rows
+})
+
+// Permanent hardware facts, kept in their own card. These are not faults and
+// must not sit in the health list: a capability shown among failures implies
+// the user should wait for it to clear, which it never will.
+interface SupportRow {
+    key: string
+    label: string
+    detail: string
+    to?: RouteLocationRaw
+    href?: string
+}
+
+const capabilityDetail = (verdict: ChannelVerdict): string => {
+    switch (verdict) {
+        case ChannelVerdict.FirmwareOverride:
+            return t('layout.shell.coolingPage.verdictFirmwareOverride')
+        case ChannelVerdict.FamilyMayNeedOutOfTree:
+            return t('layout.shell.coolingPage.verdictFamilyMayNeedOutOfTree')
+        case ChannelVerdict.NotSupportedByDriver:
+            return t('layout.shell.coolingPage.verdictNotSupportedByDriver')
+        case ChannelVerdict.NoPwm:
+            return t('layout.shell.coolingPage.verdictNoPwm')
+        case ChannelVerdict.PwmReadOnly:
+            return t('layout.shell.coolingPage.verdictPwmReadOnly')
+        case ChannelVerdict.IgnoresDuty:
+            return t('layout.shell.coolingPage.verdictIgnoresDuty')
+        case ChannelVerdict.Unverifiable:
+            return t('layout.shell.coolingPage.verdictUnverifiable')
+        default:
+            return t('layout.shell.coolingPage.notControllable')
+    }
+}
+
+const findingDetail = (finding: SystemFinding): string => {
+    switch (finding.kind) {
+        case SystemFindingKind.NoDriverBound:
+            return t('views.appInfo.findingNoDriverBound')
+        case SystemFindingKind.Blacklisted:
+            return t('views.appInfo.findingBlacklisted')
+        case SystemFindingKind.BlockedByEnvironment:
+            return t('views.appInfo.findingBlockedByEnvironment')
+        default:
+            return t('views.appInfo.findingDetectionUnsupported')
+    }
+}
+
+// The report is useful even when nothing is wrong, so its button is not gated
+// on there being findings.
+const reportOpen = ref(false)
+const detectionOpen = ref(false)
+
+const supportRows = computed((): Array<SupportRow> => {
+    const rows: Array<SupportRow> = []
+    for (const finding of settingsStore.healthSystemFindings) {
+        // A statement about the build, not a problem with this machine. The
+        // daemon leaves it out of its actionable set for the same reason, and a
+        // row here would put a docs link in front of every non-x86_64 user
+        // whose fans work.
+        if (finding.kind === SystemFindingKind.DetectionUnsupported) continue
+        // Machine-scope, so there is no channel to route to. The docs page is
+        // the only useful destination.
+        rows.push({
+            key: `finding/${finding.kind}/${finding.chip_name ?? finding.driver ?? ''}`,
+            label: finding.chip_name ?? finding.driver ?? t('views.appInfo.hardwareSupport'),
+            detail: findingDetail(finding),
+            href: HARDWARE_SUPPORT_DOCS,
+        })
+    }
+    for (const ref of settingsStore.healthChannelCapabilities) {
+        const deviceSettings = settingsStore.allUIDeviceSettings.get(ref.device_uid)
+        const channelName =
+            deviceSettings?.sensorsAndChannels.get(ref.channel_name)?.name ?? ref.channel_name
+        rows.push({
+            key: `capability/${ref.device_uid}/${ref.channel_name}`,
+            label: `${deviceSettings?.name ?? ref.device_uid} | ${channelName}`,
+            detail: capabilityDetail(ref.verdict),
+            to: channelRoute(deviceStore.allDevices(), ref.device_uid, ref.channel_name),
         })
     }
     return rows
@@ -497,9 +584,61 @@ const shortcutClasses =
                 </div>
             </div>
 
+            <!-- Hardware support: permanent facts, deliberately its own card so a
+                 capability is never read as a fault waiting to clear. The rows
+                 are hidden when there is nothing to say, but the report stays
+                 reachable because it is what the mods will ask for. -->
+            <div :class="cardClasses">
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3">
+                    <span class="text-lg font-medium text-text-color">
+                        {{ t('views.appInfo.hardwareSupport') }}
+                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <UiButton size="sm" variant="outline" @click="detectionOpen = true">
+                            {{ t('views.appInfo.detectionButton') }}
+                        </UiButton>
+                        <UiButton size="sm" variant="outline" @click="reportOpen = true">
+                            {{ t('views.appInfo.hardwareReportButton') }}
+                        </UiButton>
+                    </div>
+                </div>
+                <div v-if="supportRows.length === 0" class="text-base text-text-color-secondary">
+                    {{ t('views.appInfo.hardwareSupportOk') }}
+                </div>
+                <div v-else class="flex flex-col gap-1">
+                    <RouterLink
+                        v-for="row in supportRows.filter((r) => r.to)"
+                        :key="row.key"
+                        :to="row.to!"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="text-base text-text-color">{{ row.label }}</span>
+                        <span class="block text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </RouterLink>
+                    <a
+                        v-for="row in supportRows.filter((r) => r.href)"
+                        :key="row.key"
+                        :href="row.href"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="rounded-lg px-2 py-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <span class="text-base text-text-color">{{ row.label }}</span>
+                        <span class="block text-sm text-text-color-secondary">
+                            {{ row.detail }}
+                        </span>
+                    </a>
+                </div>
+            </div>
+
             <!-- Stress tests -->
             <StressTestsCard />
         </div>
         <div class="pb-8" />
     </div>
+
+    <HardwareReportModal v-model:open="reportOpen" />
+    <DetectionModal v-model:open="detectionOpen" />
 </template>

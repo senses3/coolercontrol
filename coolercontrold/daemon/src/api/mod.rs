@@ -27,6 +27,7 @@ mod device_health;
 pub mod devices;
 mod dual_protocol;
 mod functions;
+mod hardware_report;
 mod metrics;
 pub mod modes;
 mod plugins;
@@ -45,8 +46,9 @@ mod tokens;
 use crate::alerts::AlertController;
 use crate::api::actor::{
     AlertHandle, AuthHandle, CalibrationHandle, CustomSensorHandle, DetectHandle, DeviceHandle,
-    DeviceHealthHandle, FunctionHandle, HealthHandle, ModeHandle, PluginHandle, ProfileHandle,
-    SettingHandle, StatsHandle, StatusHandle, StressTestHandle, TokenHandle,
+    DeviceHealthHandle, FunctionHandle, HardwareReportHandle, HealthHandle, ModeHandle,
+    PluginHandle, ProfileHandle, SettingHandle, StatsHandle, StatusHandle, StressTestHandle,
+    TokenHandle,
 };
 use crate::api::dual_protocol::Protocol;
 use crate::api::session_store::{FileSessionStore, MemorySessionStore};
@@ -130,6 +132,7 @@ pub async fn start_server<'s>(
     modes_controller: Rc<ModeController>,
     alert_controller: Rc<AlertController>,
     device_health_controller: Rc<DeviceHealthController>,
+    hardware_support: Rc<crate::hardware_support::HardwareSupportController>,
     overrides_controller: Rc<OverridesController>,
     plugin_controller: Rc<PluginController>,
     log_buf_handle: LogBufHandle,
@@ -165,6 +168,7 @@ pub async fn start_server<'s>(
         &modes_controller,
         &alert_controller,
         &device_health_controller,
+        hardware_support,
         overrides_controller,
         plugin_controller,
         log_buf_handle,
@@ -651,6 +655,7 @@ async fn create_app_state<'s>(
     modes_controller: &Rc<ModeController>,
     alert_controller: &Rc<AlertController>,
     device_health_controller: &Rc<DeviceHealthController>,
+    hardware_support: Rc<crate::hardware_support::HardwareSupportController>,
     overrides_controller: Rc<OverridesController>,
     plugin_controller: Rc<PluginController>,
     log_buf_handle: LogBufHandle,
@@ -665,6 +670,8 @@ async fn create_app_state<'s>(
         cancel_token.clone(),
         main_scope,
     );
+    let hardware_report_handle =
+        HardwareReportHandle::new(hardware_support, cancel_token.clone(), main_scope);
     let auth_handle = AuthHandle::new(cancel_token.clone());
     let token_handle = TokenHandle::new(cancel_token.clone()).await;
     let device_handle = DeviceHandle::new(
@@ -720,6 +727,7 @@ async fn create_app_state<'s>(
     AppState {
         health,
         detect_handle,
+        hardware_report_handle,
         auth_handle,
         token_handle,
         device_handle,
@@ -1309,6 +1317,7 @@ impl OperationOutput for CCError {
 pub struct AppState {
     pub health: HealthHandle,
     pub detect_handle: DetectHandle,
+    pub hardware_report_handle: HardwareReportHandle,
     pub auth_handle: AuthHandle,
     pub token_handle: TokenHandle,
     pub device_handle: DeviceHandle,

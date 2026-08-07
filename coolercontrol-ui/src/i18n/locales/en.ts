@@ -184,6 +184,27 @@ export default {
                 forkForFan: 'Fork for this fan',
                 notControllable:
                     'This channel reports its speed but cannot be controlled by CoolerControl.',
+                verdictFirmwareOverride:
+                    'CoolerControl set this channel to manual control, but the firmware changed it back.',
+                verdictFamilyMayNeedOutOfTree:
+                    'No writable fan control was found for this channel. On this chip family, a different kernel driver sometimes provides it.',
+                verdictNotSupportedByDriver:
+                    'The driver in use does not expose fan control for this channel.',
+                verdictNoPwm:
+                    'The loaded driver exposes no fan control for this channel, only its speed.',
+                verdictPwmReadOnly:
+                    'The loaded driver exposes a fan control for this channel but marks it read-only.',
+                verdictIgnoresDuty:
+                    'This channel accepted duty changes, but its measured speed never responded.',
+                verdictUnverifiable:
+                    'This channel has no usable tachometer, so its response to duty changes cannot be verified.',
+                verdictEvidenceLabel: 'Measured on this machine:',
+                evidenceNoPwmFile: 'no fan control exposed',
+                evidencePwmNotWritable: 'fan control is read-only',
+                evidenceHasTachometer: 'speed reading available',
+                evidenceNoTachometer: 'no speed reading',
+                verdictLearnMore: 'What can I do about this?',
+                verdictFoundSomethingThatWorks: 'Found something that works? Tell us',
                 activeMode: 'Active',
                 previousMode: 'Previous',
                 activate: 'Activate',
@@ -522,6 +543,32 @@ export default {
             downloadCurrentLog: 'Download Current Log',
             deviceHealth: 'Device Health',
             deviceHealthOk: 'All sensors and channels are healthy.',
+            detection: 'Chip Detection',
+            detectionDescription:
+                'What the Super-I/O chip probe found when the daemon started. Module loading happens at startup, so this is the run that explains an unbound chip.',
+            detectionButton: 'Chip Detection',
+            detectionNotRun:
+                'No detection was run, so nothing is known about Super-I/O chips on this machine.',
+            detectionSecureBoot: 'Secure Boot',
+            detectionContainer: 'Container',
+            detectionDevPort: '/dev/port available',
+            detectionChips: 'Detected chips',
+            detectionNoChips: 'No Super-I/O chips were detected.',
+            detectionBlacklisted: 'Blacklisted drivers',
+            hardwareSupportOk: 'All detected hardware is supported and controllable.',
+            hardwareReport: 'Hardware Report',
+            hardwareReportDescription:
+                'A summary of what CoolerControl can see on this machine, ready to paste into a support channel. Serial numbers and identifiers are excluded.',
+            hardwareReportFull: 'Include the full hwmon tree',
+            hardwareReportEmpty: 'The report could not be generated.',
+            hardwareReportButton: 'Hardware Report',
+            hardwareReportCopy: 'Copy',
+            hardwareReportCopied: 'Copied',
+            findingNoDriverBound: 'A chip was detected, but no loaded driver is serving it.',
+            findingBlacklisted: 'This driver is blacklisted and was not loaded.',
+            findingBlockedByEnvironment: 'Hardware detection could not run in this environment.',
+            findingDetectionUnsupported:
+                'Hardware detection is not supported on this architecture.',
             failsafeActive: 'Failsafe values in use',
             missingTempSource: 'Missing temp source',
             staleTempSource: 'Temp source using failsafe values',

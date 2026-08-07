@@ -33,6 +33,8 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
+import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
+import UncontrollableBadge from '@/shell/cooling/UncontrollableBadge.vue'
 import FirmwareCurveBadge from '@/shell/cooling/FirmwareCurveBadge.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
@@ -435,6 +437,11 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     :channel-name="channelName"
                     :size="20"
                 />
+                <UncontrollableBadge
+                    :device-u-i-d="deviceUID"
+                    :channel-name="channelName"
+                    :size="20"
+                />
                 <UiButton
                     class="ml-auto"
                     :class="{ 'animate-pulse-fast': editorDirty }"
@@ -543,9 +550,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 </div>
             </div>
         </template>
-        <p v-else class="text-base text-text-color-secondary">
-            {{ t('layout.shell.coolingPage.notControllable') }}
-        </p>
+        <ChannelVerdictNotice v-else :device-u-i-d="deviceUID" :channel-name="channelName" />
 
         <!-- relative lifts this above the ProfileEditor's empty overhang box,
              which otherwise swallows pointer events on the link and chart top. -->

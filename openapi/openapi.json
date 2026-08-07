@@ -1561,7 +1561,7 @@
         "description": "Returns the failsafe channels and missing temp-source references currently tracked by the daemon.",
         "responses": {
           "200": {
-            "description": "Full current health snapshot returned by `GET /devices/health`.",
+            "description": "Full current health snapshot returned by `GET /devices/health`.\n\n Two sections with different meanings, deliberately not interleaved.\n `failsafe`, `missing`, `stale_source` and `firmware_overrides` are\n **current state**: conditions that can clear on their own.\n `channel_capabilities` and `system_findings` are **permanent**: facts about\n what this hardware can do, which will not change while the machine is\n running. Presenting a permanent capability as a fault would imply the user\n should wait for it to resolve; presenting a fault as a capability would\n imply the opposite.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5403,7 +5403,7 @@
           "detect"
         ],
         "summary": "Detect Hardware",
-        "description": "Run Super-I/O hardware detection and return results without loading modules.",
+        "description": "Return what the startup Super-I/O detection found, retained rather than re-probed. `probed` is false when no detection ran at all, so an empty chip list means \"not looked for\" rather than \"none present\".",
         "responses": {
           "200": {
             "description": "Response for GET/POST /detect",
@@ -5470,6 +5470,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DetectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/hardware-report": {
+      "get": {
+        "tags": [
+          "devices"
+        ],
+        "summary": "Hardware Support Report",
+        "description": "Returns a paste-ready hardware support report as plain text. `full` adds the whole hwmon tree; the compact default is trimmed to stay pasteable. Includes liquidctl devices, which only the running daemon can enumerate without touching hardware.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "full",
+            "description": "Include the whole hwmon tree instead of the compact summary.",
+            "schema": {
+              "description": "Include the whole hwmon tree instead of the compact summary.",
+              "type": "boolean",
+              "default": false
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
                 }
               }
             }
@@ -7162,6 +7225,31 @@
           "profile_uid"
         ]
       },
+      "ChannelEvidence": {
+        "description": "The raw facts a `ChannelVerdict` was computed from.\n\n Carried alongside the verdict so every surface can show what was measured\n rather than asking the user to trust a label.\n\n The bools are four genuinely independent sysfs observations, not a state\n machine that wants an enum: any combination of them can occur on real\n hardware, and collapsing them would discard the evidence this type exists\n to carry.",
+        "type": "object",
+        "properties": {
+          "has_pwm": {
+            "type": "boolean"
+          },
+          "has_pwm_enable": {
+            "description": "A missing `pwmN_enable` is not a defect. Drivers implement different\n feature sets; its absence usually means only that fan control cannot be\n handed back to the BIOS. It is evidence *against* `FirmwareOverride`,\n because there is no auto mode to revert to.",
+            "type": "boolean"
+          },
+          "has_rpm": {
+            "type": "boolean"
+          },
+          "pwm_writable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "has_pwm",
+          "pwm_writable",
+          "has_rpm",
+          "has_pwm_enable"
+        ]
+      },
       "ChannelExtensionNames": {
         "description": "Channel extension names that signal which `ChannelExtensions` are applicable\n for a particular device channel.",
         "type": "string",
@@ -7387,6 +7475,81 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "ChannelVerdict": {
+        "description": "Why a fan channel can or cannot be driven, from local evidence only.\n\n `FirmwareOverride`, `IgnoresDuty` and `Unverifiable` can only come from a\n duty-response probe, which is not part of this work. They stay in the\n taxonomy and in the wire shape so the probe can land later without moving\n the API; until then nothing produces them, which is the honest answer.",
+        "oneOf": [
+          {
+            "description": "`pwmN` is present and writable and nothing has reclaimed it.",
+            "type": "string",
+            "const": "controllable"
+          },
+          {
+            "description": "Manual mode was set and later read back as something else.",
+            "type": "string",
+            "const": "firmware_override"
+          },
+          {
+            "description": "No writable control, on a family where an out-of-tree driver may help.",
+            "type": "string",
+            "const": "family_may_need_out_of_tree"
+          },
+          {
+            "description": "The driver in use exposes no control for this channel. Reported by\n repositories that know only whether a channel is drivable, with no\n sysfs-level facts to back a more specific verdict.",
+            "type": "string",
+            "const": "not_supported_by_driver"
+          },
+          {
+            "description": "The driver exposes no `pwmN` for this channel.",
+            "type": "string",
+            "const": "no_pwm"
+          },
+          {
+            "description": "`pwmN` exists but the driver cleared its write bit.",
+            "type": "string",
+            "const": "pwm_read_only"
+          },
+          {
+            "description": "Probe proved writes are accepted and the fan never responded.",
+            "type": "string",
+            "const": "ignores_duty"
+          },
+          {
+            "description": "No usable tachometer, so no probe can settle the question.",
+            "type": "string",
+            "const": "unverifiable"
+          }
+        ]
+      },
+      "ChannelVerdictRef": {
+        "description": "A diagnosis bound to the channel it describes, for the health snapshot.",
+        "type": "object",
+        "properties": {
+          "channel_name": {
+            "type": "string"
+          },
+          "device_uid": {
+            "type": "string"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChannelEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/ChannelVerdict"
+          }
+        },
+        "required": [
+          "device_uid",
+          "channel_name",
+          "verdict"
         ]
       },
       "CoolerControlAllDeviceSettingsDto": {
@@ -7865,12 +8028,17 @@
           },
           "environment": {
             "$ref": "#/components/schemas/EnvironmentDto"
+          },
+          "probed": {
+            "description": "False when no probe was made at all, so an empty `detected_chips` means\n \"not looked for\" rather than \"none present\". Detection can be switched\n off by config or environment, and is unsupported off `x86_64`.",
+            "type": "boolean"
           }
         },
         "required": [
           "detected_chips",
           "blacklisted",
-          "environment"
+          "environment",
+          "probed"
         ]
       },
       "DetectedChipDto": {
@@ -7880,6 +8048,10 @@
             "type": "string"
           },
           "base_address": {
+            "type": "string"
+          },
+          "device_id": {
+            "description": "The chip's own id register. Reported so a chip line in a pasted report\n can be matched against a pasted log.",
             "type": "string"
           },
           "driver": {
@@ -7903,6 +8075,7 @@
           "driver",
           "address",
           "base_address",
+          "device_id",
           "features",
           "module_status"
         ]
@@ -7998,13 +8171,27 @@
         ]
       },
       "DeviceHealthDto": {
-        "description": "Full current health snapshot returned by `GET /devices/health`.",
+        "description": "Full current health snapshot returned by `GET /devices/health`.\n\n Two sections with different meanings, deliberately not interleaved.\n `failsafe`, `missing`, `stale_source` and `firmware_overrides` are\n **current state**: conditions that can clear on their own.\n `channel_capabilities` and `system_findings` are **permanent**: facts about\n what this hardware can do, which will not change while the machine is\n running. Presenting a permanent capability as a fault would imply the user\n should wait for it to resolve; presenting a fault as a capability would\n imply the opposite.",
         "type": "object",
         "properties": {
+          "channel_capabilities": {
+            "description": "Permanent: channels that cannot be driven, and why. Controllable\n channels are omitted; there is nothing to report about working hardware.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelVerdictRef"
+            }
+          },
           "failsafe": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FailsafeRef"
+            }
+          },
+          "firmware_overrides": {
+            "description": "Current state: firmware reclaimed a channel this daemon controls.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChannelVerdictRef"
             }
           },
           "missing": {
@@ -8018,12 +8205,22 @@
             "items": {
               "$ref": "#/components/schemas/SourceRef"
             }
+          },
+          "system_findings": {
+            "description": "Permanent: machine-scope facts, such as a detected chip with no driver\n bound or a probe blocked by the environment.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemFinding"
+            }
           }
         },
         "required": [
           "failsafe",
           "missing",
-          "stale_source"
+          "stale_source",
+          "firmware_overrides",
+          "channel_capabilities",
+          "system_findings"
         ]
       },
       "DeviceInfo": {
@@ -8332,6 +8529,15 @@
         "required": [
           "duty",
           "rpm"
+        ]
+      },
+      "EnvironmentBlocker": {
+        "description": "Why the Super-I/O probe could not run.",
+        "type": "string",
+        "enum": [
+          "secure_boot",
+          "container",
+          "no_dev_port"
         ]
       },
       "EnvironmentDto": {
@@ -9713,6 +9919,28 @@
           "profiles"
         ]
       },
+      "ReportQuery": {
+        "type": "object",
+        "properties": {
+          "full": {
+            "description": "Include the whole hwmon tree instead of the compact summary.",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "ReportResponse": {
+        "type": "object",
+        "properties": {
+          "report": {
+            "description": "The report as plain text, ready to paste.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "report"
+        ]
+      },
       "SetPasswdRequest": {
         "type": "object",
         "properties": {
@@ -10506,6 +10734,79 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "SystemFinding": {
+        "description": "A fact about the machine rather than about one channel.",
+        "oneOf": [
+          {
+            "description": "A chip was detected but no loaded driver serves its family.",
+            "type": "object",
+            "properties": {
+              "chip_name": {
+                "type": "string"
+              },
+              "expected_driver": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "const": "no_driver_bound"
+              }
+            },
+            "required": [
+              "kind",
+              "chip_name",
+              "expected_driver"
+            ]
+          },
+          {
+            "description": "modprobe refused because the driver is blacklisted.",
+            "type": "object",
+            "properties": {
+              "driver": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "const": "blacklisted"
+              }
+            },
+            "required": [
+              "kind",
+              "driver"
+            ]
+          },
+          {
+            "description": "The probe could not run at all.",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "blocked_by_environment"
+              },
+              "reason": {
+                "$ref": "#/components/schemas/EnvironmentBlocker"
+              }
+            },
+            "required": [
+              "kind",
+              "reason"
+            ]
+          },
+          {
+            "description": "Not an `x86_64` target, so no probe was ever attempted. Distinct from\n `BlockedByEnvironment` because the stub reports `has_dev_port: false`\n on platforms where `/dev/port` is simply irrelevant, and reporting that\n as a blocker would be a claim we cannot back with an observation.",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "detection_unsupported"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
         ]
       },
       "TempInfo": {

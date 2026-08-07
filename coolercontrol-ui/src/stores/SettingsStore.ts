@@ -72,6 +72,7 @@ import { Emitter, EventType } from 'mitt'
 import _ from 'lodash'
 import { Alert, AlertLog, AlertState, alertIsSilenced } from '@/models/Alert.ts'
 import {
+    ChannelVerdictRef,
     DeviceHealthDTO,
     FailsafeDelta,
     failsafeKey,
@@ -80,6 +81,7 @@ import {
     SourceDelta,
     sourceKey,
     SourceRef,
+    SystemFinding,
 } from '@/models/DeviceHealth.ts'
 import { useI18n } from 'vue-i18n'
 
@@ -141,6 +143,25 @@ export const useSettingsStore = defineStore('settings', () => {
     const healthFailsafe: Ref<Array<FailsafeRef>> = ref([])
     const healthMissing: Ref<Array<SourceRef>> = ref([])
     const healthStaleSource: Ref<Array<SourceRef>> = ref([])
+    // Permanent hardware facts, kept apart from the fault lists above so a
+    // capability is never rendered as something that might clear on its own.
+    const healthChannelCapabilities: Ref<Array<ChannelVerdictRef>> = ref([])
+    const healthFirmwareOverrides: Ref<Array<ChannelVerdictRef>> = ref([])
+    const healthSystemFindings: Ref<Array<SystemFinding>> = ref([])
+
+    /**
+     * The daemon's verdict for one channel, or undefined when it reported none.
+     * Controllable channels are absent by design: the daemon only publishes
+     * what it cannot drive.
+     */
+    function channelVerdict(deviceUID: UID, channelName: string): ChannelVerdictRef | undefined {
+        const matches = (ref: ChannelVerdictRef): boolean =>
+            ref.device_uid === deviceUID && ref.channel_name === channelName
+        return (
+            healthFirmwareOverrides.value.find(matches) ??
+            healthChannelCapabilities.value.find(matches)
+        )
+    }
 
     const allUIDeviceSettings: Ref<AllDeviceSettings> = ref(new Map<UID, DeviceUISettings>())
 
@@ -1034,6 +1055,9 @@ export const useSettingsStore = defineStore('settings', () => {
         healthFailsafe.value = health.failsafe
         healthMissing.value = health.missing
         healthStaleSource.value = health.stale_source
+        healthChannelCapabilities.value = health.channel_capabilities
+        healthFirmwareOverrides.value = health.firmware_overrides
+        healthSystemFindings.value = health.system_findings
     }
 
     function applyFailsafeDelta(delta: FailsafeDelta): void {
@@ -1702,6 +1726,10 @@ export const useSettingsStore = defineStore('settings', () => {
         setAlertEnabled,
         deleteAlert,
         healthFailsafe,
+        healthChannelCapabilities,
+        healthFirmwareOverrides,
+        healthSystemFindings,
+        channelVerdict,
         healthMissing,
         healthStaleSource,
         loadDeviceHealth,

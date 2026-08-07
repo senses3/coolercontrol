@@ -60,6 +60,8 @@ mod device_listener;
 mod device_uid;
 mod engine;
 mod grpc_api;
+mod hardware_report;
+mod hardware_support;
 mod hashutil;
 mod logger;
 mod main_loop;
@@ -321,8 +323,11 @@ fn main() -> Result<()> {
         sidecar::handle().run(admin::load_passwd).await??;
 
         pause_before_startup(&config).await?;
-        run_sensors_detection(&config);
+        let detection_results = run_sensors_detection(&config);
         rt::log_active_backend();
+        let hardware_support =
+            Rc::new(hardware_support::HardwareSupportController::init(detection_results).await);
+        hardware_support.log_findings();
 
         let sensors_conf = Rc::new(load_sensors_conf(&config).await);
         let overrides_controller = Rc::new(
@@ -336,6 +341,7 @@ fn main() -> Result<()> {
                 &cmd_args,
                 run_token.clone(),
                 Rc::clone(&overrides_controller),
+                Rc::clone(&hardware_support),
             )
             .await?;
         let all_devices = create_devices_map(&repos).await;
@@ -383,12 +389,15 @@ fn main() -> Result<()> {
                     )
                     .await?,
                 );
-                let device_health_controller = Rc::new(device_health::DeviceHealthController::new(
-                    Rc::clone(&all_devices),
-                    Rc::clone(&config),
-                    Rc::clone(&repos),
-                    Rc::clone(&overrides_controller),
-                ));
+                let device_health_controller = Rc::new(
+                    device_health::DeviceHealthController::new(
+                        Rc::clone(&all_devices),
+                        Rc::clone(&config),
+                        Rc::clone(&repos),
+                        Rc::clone(&overrides_controller),
+                    )
+                    .with_hardware_support(Rc::clone(&hardware_support)),
+                );
                 AlertController::watch_for_shutdown(
                     &alert_controller,
                     run_token.clone(),
@@ -424,6 +433,7 @@ fn main() -> Result<()> {
                     Rc::clone(&mode_controller),
                     Rc::clone(&alert_controller),
                     Rc::clone(&device_health_controller),
+                    Rc::clone(&hardware_support),
                     Rc::clone(&overrides_controller),
                     plugin_controller,
                     log_buf_handle,
@@ -712,11 +722,14 @@ fn exit_successfully() -> ! {
 }
 
 /// Run Super-I/O hardware detection and load kernel modules if enabled.
+/// Returns the results so they can be retained for the lifetime of the daemon.
+/// `None` means no probe was made, which is not the same as a probe that found
+/// nothing and must not produce findings.
 #[cfg(target_arch = "x86_64")]
-fn run_sensors_detection(config: &Rc<Config>) {
+fn run_sensors_detection(config: &Rc<Config>) -> Option<cc_detect::DetectionResults> {
     if is_env_disabled(ENV_SENSORS_DETECT) {
         info!("Super-I/O hardware detection disabled by environment variable");
-        return;
+        return None;
     }
     match config.get_settings() {
         Ok(settings) if settings.sensors_auto_detect => {
@@ -731,19 +744,23 @@ fn run_sensors_detection(config: &Rc<Config>) {
             if results.detected_chips.is_empty() && !results.environment.is_container {
                 info!("No Super-I/O chips detected");
             }
+            Some(results)
         }
         Ok(_) => {
             info!("Super-I/O hardware detection disabled by configuration");
+            None
         }
         Err(err) => {
             warn!("Could not read settings for sensors detection: {err}");
+            None
         }
     }
 }
 
 #[cfg(not(target_arch = "x86_64"))]
-fn run_sensors_detection(_config: &Rc<Config>) {
+fn run_sensors_detection(_config: &Rc<Config>) -> Option<cc_detect::DetectionResults> {
     // Super-I/O detection is x86_64-only
+    None
 }
 
 /// Some hardware needs additional time to come up and be ready to communicate.
@@ -764,6 +781,7 @@ async fn initialize_device_repos(
     cmd_args: &Args,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<(
     Repos,
     Rc<CustomSensorsRepo>,
@@ -776,7 +794,14 @@ async fn initialize_device_repos(
     let mut lc_locations = Vec::new();
     let mut lc_repo_typed: Option<Rc<LiquidctlRepo>> = None;
     // liquidctl should be first
-    match init_liquidctl_repo(config.clone(), run_token, Rc::clone(&overrides)).await {
+    match init_liquidctl_repo(
+        config.clone(),
+        run_token,
+        Rc::clone(&overrides),
+        Rc::clone(&hardware_support),
+    )
+    .await
+    {
         Ok((repo, mut lc_locs)) => {
             lc_locations.append(&mut lc_locs);
             lc_repo_typed = Some(Rc::clone(&repo));
@@ -799,13 +824,26 @@ async fn initialize_device_repos(
             }
         });
         init_scope.spawn(async {
-            match init_gpu_repo(config.clone(), cmd_args.nvidia_cli).await {
+            match init_gpu_repo(
+                config.clone(),
+                cmd_args.nvidia_cli,
+                Rc::clone(&hardware_support),
+            )
+            .await
+            {
                 Ok(repo) => repos.gpu = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing GPU Repo: {err}"),
             }
         });
         init_scope.spawn(async {
-            match init_hwmon_repo(config.clone(), lc_locations, Rc::clone(&overrides)).await {
+            match init_hwmon_repo(
+                config.clone(),
+                lc_locations,
+                Rc::clone(&overrides),
+                Rc::clone(&hardware_support),
+            )
+            .await
+            {
                 Ok(repo) => repos.hwmon = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing HWMON Repo: {err}"),
             }
@@ -816,6 +854,7 @@ async fn initialize_device_repos(
                 api_up_token.clone(),
                 cmd_args.reset_plugin_user,
                 Rc::clone(&overrides),
+                Rc::clone(&hardware_support),
             )
             .await
             {
@@ -854,8 +893,11 @@ async fn init_liquidctl_repo(
     config: Rc<Config>,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<(Rc<LiquidctlRepo>, Vec<String>)> {
-    let mut lc_repo = LiquidctlRepo::new(config, run_token, overrides).await?;
+    let mut lc_repo = LiquidctlRepo::new(config, run_token, overrides)
+        .await?
+        .with_hardware_support(hardware_support);
     lc_repo.get_devices().await?;
     lc_repo.initialize_devices().await?;
     let lc_locations = lc_repo.get_all_driver_locations();
@@ -889,8 +931,12 @@ async fn init_cpu_repo(
     Ok(cpu_repo)
 }
 
-async fn init_gpu_repo(config: Rc<Config>, nvidia_cli: bool) -> Result<GpuRepo> {
-    let mut gpu_repo = GpuRepo::new(config, nvidia_cli);
+async fn init_gpu_repo(
+    config: Rc<Config>,
+    nvidia_cli: bool,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
+) -> Result<GpuRepo> {
+    let mut gpu_repo = GpuRepo::new(config, nvidia_cli).with_hardware_support(hardware_support);
     gpu_repo.initialize_devices().await?;
     Ok(gpu_repo)
 }
@@ -899,8 +945,10 @@ async fn init_hwmon_repo(
     config: Rc<Config>,
     lc_locations: Vec<String>,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<HwmonRepo> {
-    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides);
+    let mut hwmon_repo =
+        HwmonRepo::new(config, lc_locations, overrides).with_hardware_support(hardware_support);
     hwmon_repo.initialize_devices().await?;
     Ok(hwmon_repo)
 }
@@ -910,9 +958,11 @@ async fn init_service_plugin_repo(
     api_up_token: CancellationToken,
     reset_plugin_user: bool,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<ServicePluginRepo> {
     let mut external_repo =
-        ServicePluginRepo::new(config, api_up_token, reset_plugin_user, overrides)?;
+        ServicePluginRepo::new(config, api_up_token, reset_plugin_user, overrides)?
+            .with_hardware_support(hardware_support);
     external_repo.initialize_devices().await?;
     Ok(external_repo)
 }

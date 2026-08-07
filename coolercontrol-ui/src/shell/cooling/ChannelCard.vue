@@ -29,6 +29,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
 import FirmwareCurveBadge from '@/shell/cooling/FirmwareCurveBadge.vue'
+import UncontrollableBadge from '@/shell/cooling/UncontrollableBadge.vue'
 import ChannelMiniGraph from '@/shell/cooling/ChannelMiniGraph.vue'
 import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
 import { HealthEntityType } from '@/models/DeviceHealth.ts'
@@ -160,6 +161,10 @@ const failsafeTooltip = computed((): string => {
                         :channel-name="channel.channelName"
                     />
                     <CalibrationBadge
+                        :device-u-i-d="channel.deviceUID"
+                        :channel-name="channel.channelName"
+                    />
+                    <UncontrollableBadge
                         :device-u-i-d="channel.deviceUID"
                         :channel-name="channel.channelName"
                     />

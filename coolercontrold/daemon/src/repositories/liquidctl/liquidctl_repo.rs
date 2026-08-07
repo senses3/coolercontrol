@@ -31,6 +31,7 @@ use crate::device::{
     ChannelName, DeviceType, DeviceUID, Duty, LcInfo, Status, Temp, TempInfo, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
+use crate::hardware_support::HardwareSupportController;
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, FailureLogAction};
 use crate::repositories::hwmon::devices;
@@ -88,6 +89,8 @@ pub struct LiquidctlRepo {
     run_token: CancellationToken,
     device_mapper: DeviceMapper,
     devices: HashMap<UID, DeviceLock>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     preloaded_statuses: RefCell<HashMap<u8, LCStatus>>,
     failsafe_statuses: RefCell<HashMap<TypeIndex, FailsafeStatusData>>,
     disabled_channels: RefCell<HashMap<UID, Vec<ChannelName>>>,
@@ -97,6 +100,29 @@ pub struct LiquidctlRepo {
     /// never opens more concurrent connections to one device than liqctld (which processes each
     /// device serially) can use.
     device_permits: HashMap<u8, Semaphore>,
+}
+
+/// Maps a device onto what the hardware report prints for it. A pure helper so
+/// the mapping is testable without standing up liqctld.
+///
+/// Starts from the shape every repository shares, then adds the two things
+/// only this one knows: the liquidctl driver class, which is more precise than
+/// the generic driver name, and the device firmware.
+fn liquidctl_summary(device: &Device, enabled: bool) -> crate::hardware_report::DeviceSummary {
+    let mut summary = crate::hardware_report::DeviceSummary::from_device(device, enabled);
+    if let Some(lc_info) = device.lc_info.as_ref() {
+        summary.driver = Some(lc_info.driver_type.to_string());
+        summary
+            .firmware_version
+            .clone_from(&lc_info.firmware_version);
+    }
+    summary.hwmon_backed = device
+        .info
+        .driver_info
+        .locations
+        .iter()
+        .any(|location| location.contains("hwmon"));
+    summary
 }
 
 impl LiquidctlRepo {
@@ -163,12 +189,46 @@ impl LiquidctlRepo {
             run_token,
             device_mapper: DeviceMapper::new(),
             devices: HashMap::new(),
+            hardware_support: None,
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: RefCell::new(HashMap::new()),
             device_delays: HashMap::new(),
             device_permits: HashMap::new(),
         })
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
+    /// Retains one detected device for the report, enabled or not. Reads only
+    /// what is already in memory, so generating a report never re-enumerates
+    /// USB devices.
+    fn record_detected_device(&self, device: &Device, enabled: bool) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_device_summary(&device.uid, liquidctl_summary(device, enabled));
+    }
+
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, device_lock) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+        }
     }
 
     /// Spawns the liqctld supervisor on the sidecar Tokio runtime. Sets `running` true now and
@@ -290,7 +350,11 @@ impl LiquidctlRepo {
                 poll_rate,
             );
             let cc_device_setting = self.config.get_cc_settings_for_device(&device.uid)?;
-            if cc_device_setting.as_ref().is_some_and(|s| s.disable) {
+            let disabled = cc_device_setting.as_ref().is_some_and(|s| s.disable);
+            // Recorded before the skip: a disabled device must still appear in
+            // the report, or "not detected" and "turned off" look identical.
+            self.record_detected_device(&device, disabled.not());
+            if disabled {
                 info!(
                     "Skipping disabled device: {} with UID: {}",
                     device.name, device.uid
@@ -1150,6 +1214,7 @@ impl Repository for LiquidctlRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("LIQUIDCTL Repository initialized");
         Ok(())
     }
@@ -1783,5 +1848,60 @@ mod tests {
                 "the waiter proceeds once the delay elapses and the permit drops"
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod summary_tests {
+    use super::*;
+    use crate::device::{DeviceInfo, DeviceType, DriverInfo, DriverType};
+
+    fn device_with(driver: DriverInfo) -> Device {
+        Device::new(
+            "NZXT Kraken".to_string(),
+            DeviceType::Liquidctl,
+            1,
+            None,
+            DeviceInfo {
+                driver_info: driver,
+                ..Default::default()
+            },
+            None,
+            1.0,
+        )
+    }
+
+    /// Goal: the report has to say whether a liquidctl device is backed by a
+    /// kernel driver, since that decides whether hwmon shows it too. Method:
+    /// one device whose driver locations mention hwmon and one that does not.
+    #[test]
+    fn hwmon_backing_comes_from_the_driver_locations() {
+        let backed = liquidctl_summary(
+            &device_with(DriverInfo {
+                drv_type: DriverType::Liquidctl,
+                name: Some("Kraken".to_string()),
+                version: Some("1.14.0".to_string()),
+                locations: vec!["/sys/class/hwmon/hwmon4".to_string()],
+            }),
+            true,
+        );
+        assert!(backed.hwmon_backed);
+        assert!(backed.enabled);
+        assert_eq!(backed.driver.as_deref(), Some("Kraken"));
+        assert_eq!(backed.driver_version.as_deref(), Some("1.14.0"));
+
+        let usb_only = liquidctl_summary(
+            &device_with(DriverInfo {
+                drv_type: DriverType::Liquidctl,
+                name: Some("Kraken".to_string()),
+                version: Some("1.14.0".to_string()),
+                locations: vec!["/dev/hidraw3".to_string()],
+            }),
+            false,
+        );
+        // A disabled device still belongs in the report: it explains why the
+        // app shows nothing for hardware the user can see is plugged in.
+        assert!(usb_only.hwmon_backed.not());
+        assert!(usb_only.enabled.not());
     }
 }
