@@ -36,21 +36,25 @@ const localeSources = import.meta.glob('../../i18n/locales/*.ts', {
  * marks that can do it subtly. None of them belongs in a translation: the
  * renderer applies the Unicode bidirectional algorithm on its own, and every
  * locale here reads correctly without any of these.
+ *
+ * Held as code points rather than literals. A literal here is invisible in an
+ * editor, and it makes this file itself trip every Trojan Source scanner that
+ * looks for the raw characters.
  */
-const BIDI_CONTROLS: Record<string, string> = {
-    '‪': 'LEFT-TO-RIGHT EMBEDDING',
-    '‫': 'RIGHT-TO-LEFT EMBEDDING',
-    '‬': 'POP DIRECTIONAL FORMATTING',
-    '‭': 'LEFT-TO-RIGHT OVERRIDE',
-    '‮': 'RIGHT-TO-LEFT OVERRIDE',
-    '⁦': 'LEFT-TO-RIGHT ISOLATE',
-    '⁧': 'RIGHT-TO-LEFT ISOLATE',
-    '⁨': 'FIRST STRONG ISOLATE',
-    '⁩': 'POP DIRECTIONAL ISOLATE',
-    '‎': 'LEFT-TO-RIGHT MARK',
-    '‏': 'RIGHT-TO-LEFT MARK',
-    '؜': 'ARABIC LETTER MARK',
-}
+const BIDI_CONTROLS: Array<[number, string]> = [
+    [0x202a, 'LEFT-TO-RIGHT EMBEDDING'],
+    [0x202b, 'RIGHT-TO-LEFT EMBEDDING'],
+    [0x202c, 'POP DIRECTIONAL FORMATTING'],
+    [0x202d, 'LEFT-TO-RIGHT OVERRIDE'],
+    [0x202e, 'RIGHT-TO-LEFT OVERRIDE'],
+    [0x2066, 'LEFT-TO-RIGHT ISOLATE'],
+    [0x2067, 'RIGHT-TO-LEFT ISOLATE'],
+    [0x2068, 'FIRST STRONG ISOLATE'],
+    [0x2069, 'POP DIRECTIONAL ISOLATE'],
+    [0x200e, 'LEFT-TO-RIGHT MARK'],
+    [0x200f, 'RIGHT-TO-LEFT MARK'],
+    [0x061c, 'ARABIC LETTER MARK'],
+]
 
 describe('locale text', () => {
     it('ships at least the locales the app advertises', () => {
@@ -63,8 +67,8 @@ describe('locale text', () => {
         const offences: string[] = []
         for (const [path, source] of Object.entries(localeSources)) {
             source.split('\n').forEach((line, index) => {
-                for (const [character, name] of Object.entries(BIDI_CONTROLS)) {
-                    if (line.includes(character)) {
+                for (const [codePoint, name] of BIDI_CONTROLS) {
+                    if (line.includes(String.fromCodePoint(codePoint))) {
                         offences.push(`${path}:${index + 1} contains ${name}`)
                     }
                 }
