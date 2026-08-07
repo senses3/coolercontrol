@@ -257,7 +257,7 @@ module.exports = {
             animation: {
                 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'spin-slow': 'spin 2s linear infinite',
-                'hue-rotate': 'hue-rotate 3s linear infinite',
+                'hue-rotate': 'hue-rotate 2.0s linear infinite',
             },
             boxShadow: {
                 // Elevation for floating overlays; shadow-md is invisible on dark surfaces.
