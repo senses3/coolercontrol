@@ -111,7 +111,9 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
             <svg-icon type="mdi" :path="mdiCog" :size="deviceStore.getREMSize(1.5)" />
             <span class="text-[0.8125rem] leading-tight">{{ t('layout.shell.settings') }}</span>
         </RouterLink>
-        <UiDropdownMenu>
+        <!-- Both menus hang off the rail rather than over it. They are docked at the
+             rail bottom, so `end` bottom-aligns them with their trigger. -->
+        <UiDropdownMenu side="right" align="end" :side-offset="8">
             <template #trigger>
                 <button
                     id="access"
@@ -130,7 +132,7 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
             </template>
             <ShellAccessMenuItems />
         </UiDropdownMenu>
-        <UiDropdownMenu>
+        <UiDropdownMenu side="right" align="end" :side-offset="8">
             <template #trigger>
                 <button
                     id="restart"

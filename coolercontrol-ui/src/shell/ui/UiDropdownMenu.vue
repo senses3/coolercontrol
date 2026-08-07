@@ -24,10 +24,14 @@ import {
     DropdownMenuTrigger,
 } from 'reka-ui'
 
-withDefaults(defineProps<{ align?: 'start' | 'center' | 'end'; sideOffset?: number }>(), {
-    align: 'end',
-    sideOffset: 2,
-})
+withDefaults(
+    defineProps<{
+        side?: 'top' | 'right' | 'bottom' | 'left'
+        align?: 'start' | 'center' | 'end'
+        sideOffset?: number
+    }>(),
+    { side: 'bottom', align: 'end', sideOffset: 2 },
+)
 </script>
 
 <template>
@@ -37,6 +41,7 @@ withDefaults(defineProps<{ align?: 'start' | 'center' | 'end'; sideOffset?: numb
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
             <DropdownMenuContent
+                :side="side"
                 :align="align"
                 :side-offset="sideOffset"
                 class="z-[1300] min-w-44 rounded-lg border border-border-one bg-bg-two p-1 shadow-overlay-lg"
