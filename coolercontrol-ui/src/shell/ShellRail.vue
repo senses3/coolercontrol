@@ -62,11 +62,14 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
             class="group rounded-lg p-1 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
         >
             <!-- The glyph is a single gradient path, so cycling the hue on the
-                 image matches what the old animated variant did to the path. -->
+                 image matches what the old animated variant did to the path.
+                 The identity filter is the resting state the transition eases
+                 back to when the pointer leaves mid-cycle; without it the base
+                 is `none`, which the transition would fight over on hover-in. -->
             <img
                 src="/logo.svg"
                 alt="CoolerControl"
-                class="h-10 w-10 motion-safe:group-hover:animate-hue-rotate"
+                class="h-10 w-10 [filter:hue-rotate(0deg)] transition-[filter] duration-300 motion-safe:group-hover:animate-hue-rotate"
             />
         </RouterLink>
         <RouterLink
