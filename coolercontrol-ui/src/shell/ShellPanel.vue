@@ -81,6 +81,18 @@ const isInView = (element: Element): boolean => {
     )
 }
 
+// scrollIntoView also scrolls every scrollable ancestor, and the splitter panel
+// counts as one (reka gives it overflow: hidden), which took the panel heading
+// off screen. Scroll the entry's own container instead, centred rather than
+// flush to an edge: an edge is exactly where the fade is.
+const centreInView = (element: Element): void => {
+    const container = scrollParent(element)
+    if (container == null) return
+    const bounds = element.getBoundingClientRect()
+    const view = container.getBoundingClientRect()
+    container.scrollTop += bounds.top - view.top - (container.clientHeight / 2 - bounds.height / 2)
+}
+
 // Only ensure an entry for this page is on screen; never move the list when one
 // already is. Clicking inside a panel would otherwise re-scroll under the user.
 const revealActiveEntry = async (): Promise<void> => {
@@ -90,9 +102,7 @@ const revealActiveEntry = async (): Promise<void> => {
     const entries = entriesForRoute(root)
     if (entries.length === 0) return
     if (entries.some(isInView)) return
-    // Centred rather than 'nearest': nearest parks the entry flush against an
-    // edge, which is exactly where the fade is.
-    entries[0].scrollIntoView({ block: 'center' })
+    centreInView(entries[0])
 }
 watch(() => route.fullPath, revealActiveEntry)
 onMounted(revealActiveEntry)
@@ -105,15 +115,20 @@ onMounted(revealActiveEntry)
                 {{ t(section.labelKey) }}
             </div>
             <UiSeparator />
-            <UiScrollArea>
-                <HomePanel v-if="section.id === 'home'" />
-                <CoolingPanel v-else-if="section.id === 'cooling'" />
-                <MonitoringPanel v-else-if="section.id === 'monitoring'" />
-                <DevicesPanel v-else-if="section.id === 'devices'" />
-                <PluginsPanel v-else-if="section.id === 'plugins'" />
-                <SettingsPanel v-else-if="section.id === 'settings'" />
-                <div v-else />
-            </UiScrollArea>
+            <!-- min-h-0 flex-1: h-full alone makes the scroll area's flex base and
+                 its automatic minimum the full panel height, so the heading pushes
+                 the column past the splitter panel, which clips it. -->
+            <div class="min-h-0 flex-1">
+                <UiScrollArea>
+                    <HomePanel v-if="section.id === 'home'" />
+                    <CoolingPanel v-else-if="section.id === 'cooling'" />
+                    <MonitoringPanel v-else-if="section.id === 'monitoring'" />
+                    <DevicesPanel v-else-if="section.id === 'devices'" />
+                    <PluginsPanel v-else-if="section.id === 'plugins'" />
+                    <SettingsPanel v-else-if="section.id === 'settings'" />
+                    <div v-else />
+                </UiScrollArea>
+            </div>
         </template>
     </div>
 </template>
