@@ -100,10 +100,10 @@ pub async fn generate(
     };
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
-    write_probe_summary(&mut report, detection, full);
+    write_probe_summary(&mut report, detection, full, cc_detect::DETECTION_SUPPORTED);
     write_fan_summary(&mut report, &devices).await;
     write_device_sections(&mut report, devices_other);
-    write_findings(&mut report, detection);
+    write_findings(&mut report, detection, cc_detect::DETECTION_SUPPORTED);
     if full {
         write_full_tree(&mut report, &devices).await;
         return report;
@@ -133,12 +133,16 @@ fn write_header(report: &mut String, system_info: &SystemInfo) {
     );
 }
 
+/// `detection_supported` is passed in rather than read from
+/// `cc_detect::DETECTION_SUPPORTED` so both branches are reachable in tests on
+/// any host architecture.
 fn write_probe_summary(
     report: &mut String,
     detection: Option<&cc_detect::DetectionResults>,
     full: bool,
+    detection_supported: bool,
 ) {
-    if cc_detect::DETECTION_SUPPORTED.not() {
+    if detection_supported.not() {
         let _ = writeln!(report, "Probe    not supported on this architecture");
         return;
     }
@@ -374,9 +378,14 @@ fn write_device_section(
     }
 }
 
-fn write_findings(report: &mut String, detection: Option<&cc_detect::DetectionResults>) {
+/// See `write_probe_summary` for why `detection_supported` is a parameter.
+fn write_findings(
+    report: &mut String,
+    detection: Option<&cc_detect::DetectionResults>,
+    detection_supported: bool,
+) {
     let _ = writeln!(report, "\nSystem findings");
-    if cc_detect::DETECTION_SUPPORTED.not() {
+    if detection_supported.not() {
         let _ = writeln!(report, "  detection unsupported on this architecture");
         return;
     }
@@ -1119,7 +1128,7 @@ mod tests {
             },
         };
         let mut compact = String::new();
-        write_probe_summary(&mut compact, Some(&detection), false);
+        write_probe_summary(&mut compact, Some(&detection), false, true);
         assert!(
             compact.contains("Nuvoton NCT6687D-R eSIO at 0x4E id:0xD592 -> nct6687"),
             "unexpected chip line:\n{compact}"
@@ -1127,7 +1136,7 @@ mod tests {
         assert!(compact.contains("base address").not());
 
         let mut full = String::new();
-        write_probe_summary(&mut full, Some(&detection), true);
+        write_probe_summary(&mut full, Some(&detection), true, true);
         assert!(full.contains("base address 0x0A20"), "{full}");
     }
 
@@ -1161,11 +1170,28 @@ mod tests {
     #[test]
     fn absent_detection_asserts_nothing_about_the_environment() {
         let mut report = String::new();
-        write_probe_summary(&mut report, None, false);
+        write_probe_summary(&mut report, None, false, true);
         assert!(report.contains("skipped"));
         let mut findings = String::new();
-        write_findings(&mut findings, None);
+        write_findings(&mut findings, None, true);
         assert!(findings.contains("not determined"));
         assert!(findings.contains("Secure Boot").not());
+    }
+
+    /// Goal: on an architecture with no Super-I/O bus (aarch64), the report says
+    /// the probe is unsupported rather than claiming a blocked environment. This
+    /// runs on every host, so the non-x86 path stays covered on x86 CI too.
+    #[test]
+    fn unsupported_architecture_reports_no_environment_claim() {
+        let mut report = String::new();
+        write_probe_summary(&mut report, None, false, false);
+        assert!(report.contains("not supported on this architecture"));
+        assert!(report.contains("skipped").not());
+
+        let mut findings = String::new();
+        write_findings(&mut findings, None, false);
+        assert!(findings.contains("detection unsupported on this architecture"));
+        assert!(findings.contains("Secure Boot").not());
+        assert!(findings.contains("not determined").not());
     }
 }
