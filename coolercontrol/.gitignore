@@ -6,7 +6,6 @@ CMakeCache.txt
 cmake_install.cmake
 .cmake
 .idea/*
-!.idea/copyright
 .vscode
 Testing
 
