@@ -378,7 +378,7 @@ fn write_findings(
         let _ = writeln!(report, "  not determined (detection disabled)");
         return;
     };
-    let findings = derive_findings(detection);
+    let findings = derive_findings(detection, detection_supported);
     if findings.is_empty() {
         let _ = writeln!(report, "  none");
         return;
@@ -388,7 +388,11 @@ fn write_findings(
     }
 }
 
-fn derive_findings(detection: &cc_detect::DetectionResults) -> Vec<SystemFinding> {
+/// See `write_probe_summary` for why `detection_supported` is a parameter.
+fn derive_findings(
+    detection: &cc_detect::DetectionResults,
+    detection_supported: bool,
+) -> Vec<SystemFinding> {
     let bound_drivers = hardware_support::resolve_bound_drivers(Path::new(HWMON_CLASS_PATH));
     let chips = detection
         .detected_chips
@@ -404,7 +408,7 @@ fn derive_findings(detection: &cc_detect::DetectionResults) -> Vec<SystemFinding
         has_dev_port: detection.environment.has_dev_port,
     };
     hardware_support::derive_system_findings(
-        cc_detect::DETECTION_SUPPORTED,
+        detection_supported,
         &chips,
         &detection.blacklisted,
         &environment,
