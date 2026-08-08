@@ -105,6 +105,15 @@ To use it, make sure you have [Nix installed](https://nixos.org/download/#nix-in
 Then run `nix-shell /path/to/coolercontrol/shell.nix`. This will give a shell without modifying your
 system.
 
+#### Copyright headers
+
+Every file must declare its copyright and license, which CI verifies with
+[REUSE](https://reuse.software). Source files carry a two-line SPDX header; everything else is
+covered by `REUSE.toml`. New files need a header, and `make copyright-fix` adds one for you, dating
+it from the file's first commit. Check your work with `make copyright-check`.
+
+Both targets need the `reuse` tool: `pipx install "reuse[charset-normalizer]"`.
+
 ## AI-Assisted Contributions
 
 AI coding assistants (such as GitHub Copilot, Claude, or ChatGPT) are welcome as tools to help you
