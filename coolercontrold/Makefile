@@ -4,17 +4,12 @@ prefix := '/usr'
 executable := 'coolercontrold'
 release :=
 
-# Detect cargo or fallback
-CARGO := $(shell command -v cargo || command -v cargo-1.88 || command -v cargo-1.85 || command -v cargo-1.91)
+# Detect cargo or fallback (prefer newer)
+CARGO := $(shell command -v cargo || command -v cargo-1.91 || command -v cargo-1.88)
 
-# Default build uses the compio runtime (needs Rust 1.88). Older toolchains (>= 1.85) auto fall
-# back to the tokio runtime via --no-default-features, so each OBS/distro target builds the best
-# runtime its cargo supports.
-CARGO_VER := $(if $(CARGO),$(shell $(CARGO) --version | awk '{print $$2}'))
-# Empty (compio) when cargo >= 1.88, i.e. when [1.88, cargo version] is already in ascending
-# order. Any 1.88+ release (1.88.1, 1.96.0, ...) selects compio; 1.85.x/1.87.x select tokio.
-# `-c` not `-C`: BusyBox sort (Alpine) has no `-C`, and would fail into the tokio fallback.
-FEATURES := $(shell printf '1.88\n%s\n' "$(CARGO_VER)" | sort -V -c 2>/dev/null || echo --no-default-features)
+# Empty selects the default compio runtime. Override to build the tokio runtime instead:
+#   make build FEATURES=--no-default-features
+FEATURES :=
 
 .PHONY: build sync-app test clippy ci-test dev-run openapi vendor clean clean-app install uninstall
 

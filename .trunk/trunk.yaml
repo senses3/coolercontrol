@@ -70,7 +70,6 @@ lint:
         - .gitlab/images/**
         - .gitlab-ci.yml
         - openapi/openapi.json
-        - coolercontrold/patches/**
 actions:
   disabled:
     - trunk-announce
