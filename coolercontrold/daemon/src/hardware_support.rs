@@ -491,6 +491,10 @@ pub struct HardwareSupportController {
     /// module loading can happen, so leaving this frozen would keep reporting a
     /// chip as unbound after the user just loaded its driver.
     detection: RefCell<Option<cc_detect::DetectionResults>>,
+    /// Whether this architecture has a Super-I/O bus to probe at all. Retained
+    /// rather than read from `cc_detect::DETECTION_SUPPORTED` at each use so a
+    /// test can exercise both branches on any host.
+    detection_supported: bool,
     /// Derived from `detection` and the bound drivers, so it is recomputed
     /// whenever `detection` is replaced.
     system_findings: RefCell<Vec<SystemFinding>>,
@@ -517,12 +521,16 @@ pub struct HardwareSupportController {
 }
 
 impl HardwareSupportController {
-    pub async fn init(detection: Option<cc_detect::DetectionResults>) -> Self {
+    pub async fn init(
+        detection: Option<cc_detect::DetectionResults>,
+        detection_supported: bool,
+    ) -> Self {
         let system_info = SystemInfo::read().await;
-        let system_findings = Self::compute_findings(detection.as_ref());
+        let system_findings = Self::compute_findings(detection.as_ref(), detection_supported);
         Self {
             system_info,
             detection: RefCell::new(detection),
+            detection_supported,
             system_findings: RefCell::new(system_findings),
             channel_diagnoses: RefCell::new(HashMap::new()),
             device_summaries: RefCell::new(HashMap::new()),
@@ -545,7 +553,7 @@ impl HardwareSupportController {
     /// the findings from them so the health snapshot cannot keep asserting a
     /// driver is unbound after the same request loaded it.
     pub fn refresh_detection(&self, results: cc_detect::DetectionResults) {
-        let findings = Self::compute_findings(Some(&results));
+        let findings = Self::compute_findings(Some(&results), self.detection_supported);
         *self.detection.borrow_mut() = Some(results);
         *self.system_findings.borrow_mut() = findings;
     }
@@ -698,8 +706,11 @@ impl HardwareSupportController {
     /// `None` detection means the probe was switched off by config or
     /// environment, which is not an observation and therefore yields no
     /// findings.
-    fn compute_findings(detection: Option<&cc_detect::DetectionResults>) -> Vec<SystemFinding> {
-        if cc_detect::DETECTION_SUPPORTED.not() {
+    fn compute_findings(
+        detection: Option<&cc_detect::DetectionResults>,
+        detection_supported: bool,
+    ) -> Vec<SystemFinding> {
+        if detection_supported.not() {
             return vec![SystemFinding::DetectionUnsupported];
         }
         let Some(results) = detection else {
@@ -799,11 +810,10 @@ mod tests {
     /// after the request that loaded its driver. Method: start from no
     /// detection at all, hand in results naming a driver nothing can be bound
     /// to, and read the findings back.
-    #[cfg(target_arch = "x86_64")]
     #[test]
     fn refreshed_detection_recomputes_the_findings() {
         crate::cc_fs::test_runtime(async {
-            let controller = HardwareSupportController::init(None).await;
+            let controller = HardwareSupportController::init(None, true).await;
             assert!(controller.system_findings().is_empty());
 
             controller.refresh_detection(cc_detect::DetectionResults {
@@ -834,6 +844,45 @@ mod tests {
         });
     }
 
+    /// Goal: on an architecture with no Super-I/O bus (aarch64), findings say
+    /// detection is unsupported rather than asserting an environment nothing
+    /// observed, and a re-scan cannot talk the controller out of it. Runs on
+    /// every host, so the non-x86 branch stays covered on x86 CI too.
+    #[test]
+    fn unsupported_architecture_yields_only_the_unsupported_finding() {
+        crate::cc_fs::test_runtime(async {
+            let controller = HardwareSupportController::init(None, false).await;
+            assert_eq!(
+                controller.system_findings(),
+                vec![SystemFinding::DetectionUnsupported]
+            );
+
+            controller.refresh_detection(cc_detect::DetectionResults {
+                detected_chips: vec![cc_detect::DetectedChipInfo {
+                    name: "CC-TEST-CHIP".to_string(),
+                    driver: "cc_test_no_such_driver".to_string(),
+                    address: "0x4e".to_string(),
+                    base_address: "0x4e".to_string(),
+                    device_id: "0xd592".to_string(),
+                    features: Vec::new(),
+                    module_status: "detection_only".to_string(),
+                }],
+                blacklisted: Vec::new(),
+                environment: cc_detect::EnvironmentInfo {
+                    is_container: false,
+                    is_secure_boot: false,
+                    has_dev_port: true,
+                },
+            });
+
+            assert_eq!(
+                controller.system_findings(),
+                vec![SystemFinding::DetectionUnsupported],
+                "an unsupported arch must not derive findings from a re-scan"
+            );
+        });
+    }
+
     /// Goal: the path every non-hwmon repository publishes through must turn
     /// `fixed_enabled` into a verdict, skip channels that are not speed
     /// channels, and leave drivable ones out of the health lists. Method: one
@@ -842,7 +891,7 @@ mod tests {
     #[test]
     fn recorded_driver_channels_become_verdicts() {
         crate::cc_fs::test_runtime(async {
-            let controller = HardwareSupportController::init(None).await;
+            let controller = HardwareSupportController::init(None, true).await;
             let mut info = DeviceInfo::default();
             info.channels.insert(
                 "fan1".to_string(),

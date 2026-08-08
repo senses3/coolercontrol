@@ -655,7 +655,7 @@ mod verdict_publish_tests {
     #[serial]
     fn publishes_drivability_for_gpu_channels() {
         cc_fs::test_runtime(async {
-            let hardware_support = Rc::new(HardwareSupportController::init(None).await);
+            let hardware_support = Rc::new(HardwareSupportController::init(None, true).await);
             let mut repo = GpuRepo::new(Rc::new(Config::init_default_config().unwrap()), false)
                 .with_hardware_support(Rc::clone(&hardware_support));
             let mut info = DeviceInfo::default();
