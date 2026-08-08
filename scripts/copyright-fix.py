@@ -17,14 +17,18 @@ SPDX-License-Identifier are left alone, which makes this safe to re-run.
 Non-source files (docs, configs, binary assets) are covered by REUSE.toml
 instead and are never touched here.
 """
-import subprocess
+import shutil
+import subprocess  # nosec B404
 import sys
 from datetime import date
 from pathlib import Path
 
-__VERSION__ = "0.1.0"
+__VERSION__ = "0.2.0"
 
 LICENSE = "GPL-3.0-or-later"
+
+# Absolute path so the calls below cannot resolve through a mutated PATH.
+GIT = shutil.which("git")
 
 # extension -> comment style
 STYLES = {
@@ -56,9 +60,11 @@ def holder(path: str) -> str:
 
 
 def first_year(path: str) -> str:
-    out = subprocess.run(
+    # Fixed argument list, no shell; `path` is separated by `--` so it cannot be
+    # read as a flag.
+    out = subprocess.run(  # nosec B603
         [
-            "git",
+            GIT,
             "log",
             "--follow",
             "--diff-filter=A",
@@ -69,6 +75,7 @@ def first_year(path: str) -> str:
         ],
         capture_output=True,
         text=True,
+        check=False,
     ).stdout.split()
     return out[-1] if out else str(date.today().year)
 
@@ -98,12 +105,16 @@ def insert_at(lines: list[str]) -> int:
 
 
 def tracked_files() -> list[str]:
-    return subprocess.run(
-        ["git", "ls-files"], capture_output=True, text=True
+    # Fixed argument list, no shell, no caller input.
+    return subprocess.run(  # nosec B603
+        [GIT, "ls-files"], capture_output=True, text=True, check=False
     ).stdout.splitlines()
 
 
 def main() -> int:
+    if GIT is None:
+        print("git not found on PATH", file=sys.stderr)
+        return 1
     if "--version" in sys.argv:
         print(__VERSION__)
         return 0
