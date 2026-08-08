@@ -165,7 +165,9 @@ copyright:
   before_script:
     # slim image has python + pip but no make, which copyright-check runs through.
     - apt-get update && apt-get install -y --no-install-recommends make
-    - pip install --quiet reuse
+    # The charset-normalizer extra is required: reuse defaults to python-magic,
+    # which needs the libmagic C library that the slim image does not ship.
+    - pip install --quiet "reuse[charset-normalizer]"
     - reuse --version
   script:
     - make copyright-check
