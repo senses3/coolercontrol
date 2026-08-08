@@ -27,8 +27,26 @@ Release notes are automatically generated from this file and git tags.
   (`auto_profiles.toml`)
 - Calibration wizard with a batch API, per-fan warnings surfaced in the picker and completion log,
   resume support, and abort on an active alert
+- Calibration understands firmware fan curves: firmware-controlled fans are flagged in the picker,
+  their curves are mapped through calibration, and sweeps skip the clamped duty band
+- Calibration state and firmware-curve status are shown on cooling channel cards, with the curve
+  dialog acting as the calibration hub
 - Device health tracking: a daemon-side registry of failsafed channels and missing or stale temp
-  sources, surfaced as menu badges, a health panel, entity-page warnings, and a Home status dot
+  sources, surfaced as menu badges, a health panel, entity-page warnings, and a Home status dot,
+  split into permanently unsupported and currently degraded sections
+- Hardware Support card on Home, separate from device health: what the startup detection found, why
+  a given fan channel cannot be controlled, and a paste-ready hardware report that can be previewed
+  in-app and copied as a code block for bug reports
+- Saved daemon connections in the desktop app: a managed list in the connection wizard, a tray
+  submenu to switch daemons, and per-connection access tokens and pinned sensors
+- TLS certificate pinning and validation in the desktop app, with a prompt to trust an unknown
+  daemon certificate and a manager for the ones already trusted
+- Pinned sensor readings in the tray menu, colored to match the UI and clickable to open their page,
+  grouped into a submenu when many are pinned
+- The desktop app's tray, connection wizard and dialogs are now translated, using strings pushed
+  from the UI
+- A single multiplexed `GET /sse` endpoint carrying every event kind on one connection, with an
+  `events` filter to narrow the subscription; the UI and the desktop app each use one stream now
 - User-defined device and channel names are now daemon-owned in a hand-editable `overrides.toml`,
   editable from any entity page, with detected-name hints and a one-time migration from
   `config-ui.json`
@@ -50,6 +68,15 @@ Release notes are automatically generated from this file and git tags.
 - Temperature and power readings shown during stress tests
 - Per-channel failsafes for service plugin devices
 - Section hotkeys, a configurable startup page, and a menu collapse button in the header
+- Interface font setting, with IBM Plex bundled and a numeric face used for live values
+- Live chart on the custom sensor page
+- Reworked product tour, replayed once for everyone
+- Daemon settings grouped into subsections, with a range unlock for guarded values and a startup
+  delay that now reaches 120 seconds
+- Hotspot temperature for NVIDIA Blackwell (RTX 50xx) cards, read from an NVAPI register
+- Firmware-reclaimed fan control is detected and re-asserted, so a fan taken back by the board
+  firmware returns to CoolerControl
+- Debian and Ubuntu packages are published to `apt.coolercontrol.org`, including Ubuntu arm64 builds
 - `make pr-check` pre-PR gate and a gated-tests feature for the daemon test suite
 
 ### Changed
@@ -69,15 +96,30 @@ Release notes are automatically generated from this file and git tags.
 - Info and Tools was dissolved into the Home section
 - Warning and success colors darken on light themes to stay legible, and status colors are now
   checked for contrast in the test suite
+- The desktop app authenticates with its own bearer token per connection instead of a shared
+  session, and discards the web renderer while it sits in the tray
+- The per-stream `/sse/{logs,status,modes,alerts,notifications}` routes are deprecated in favour of
+  `GET /sse`, and are scheduled for removal in 5.2.0
+- AMD GPU fan curves are no longer reset before every apply, and unusable curves are rejected rather
+  than written
 - Idle liqctld connections are reaped, and NVML is released when all GPUs are disabled or none are
   detected
+- `pwm_enable` is no longer read on the fan write path
 - NVAPI thermal lookups and PCI bus lookups are cached, and live chart animation is throttled and
   paused off-screen
 - Auto-created laptop profiles retuned: shorter EMA windows, no smoothing on Performance, and a 40C
   fan-off point for Silent and Balanced
+- The app accent is now the logo blue, the current section is marked with a brand gradient, and the
+  control-flow chain end and its temp source are tinted to match
 - The Makefiles were split and documented behind `make help`
 - protoc is no longer a build dependency; protox generates the gRPC code
-- Many upstream dependencies updated across Cargo and npm
+- The minimum supported Rust version is 1.88
+- License headers were converted to SPDX short-form, an AUTHORS file was added, and REUSE compliance
+  is checked in CI
+- The OpenAPI specification is generated offline, pretty-printed, and refreshed on every version
+  bump
+- Many upstream dependencies updated across Cargo and npm, and derive_more, axum-typed-multipart and
+  zstd compression were dropped
 
 ### Fixed
 
@@ -94,11 +136,23 @@ Release notes are automatically generated from this file and git tags.
 - Name overrides survive a save error instead of losing the cascade
 - REST and gRPC server startup are decoupled, so one failing does not block the other
 - Chart axis titles no longer overlap the neighbouring axis, and the temp line is clamped to range
-- Korean locale detection, and translations synced across all supported locales
+- Charts and their observers are torn down when a page unmounts, which was the main source of memory
+  growth in the desktop app over long sessions
+- AMD zero-RPM support is detected by reading the firmware setting rather than guessing, a failed
+  curve apply is aborted instead of half-written, and an EIO now says what caused it
+- Apple SMC fans are no longer condemned as broken, and fans a device has disabled are reported as
+  hidden rather than missing
+- The desktop app no longer loops on reconnect notifications, applies certificate validation without
+  a restart, and raises its window when tray-mode authentication fails
+- Home no longer waits on a health request before it will open
+- Korean locale detection, translations synced across all supported locales, and translations that
+  had drifted from the English source refreshed
 - Disabled IP family is logged at info instead of warning
 - FIFO pairing could wedge the test suite, and sysfs read tests handle ENODATA
 - Numerous UI fixes: dropdowns above modal dialogs, focus-visible on the rail, pinned name priority,
-  profile graph padding, hover action focus, wizard chart zoom, and start page routing
+  profile graph padding, hover action focus, wizard chart zoom, start page routing, rail menus
+  opening over the rail, a scrolling panel heading, a saved menu width being ignored, and a blank
+  custom sensor page
 
 ### Removed
 
@@ -112,6 +166,10 @@ Release notes are automatically generated from this file and git tags.
 ### Security
 
 - Device and channel name overrides reject injection-capable characters
+- The desktop app pins and validates the daemon's TLS certificate and confines its web engine to the
+  daemon it is connected to
+- The desktop app's settings file is owner-only, and superseded access tokens are deleted
+- npm dependency install scripts are denied during the UI build
 - Backup archives are created owner-only, bounded on extraction, and restore only files listed in
   the manifest; restored credentials are written owner-only
 - Dependencies updated to clear audit advisories
