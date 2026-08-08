@@ -953,7 +953,7 @@ mod tests {
     #[test]
     fn verdict_sections_split_permanent_from_current() {
         let controller = crate::rt::test_runtime(async {
-            crate::hardware_support::HardwareSupportController::init(None).await
+            crate::hardware_support::HardwareSupportController::init(None, true).await
         });
         let evidence = crate::hardware_support::ChannelEvidence {
             has_pwm: true,

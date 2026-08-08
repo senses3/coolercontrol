@@ -310,8 +310,13 @@ fn main() -> Result<()> {
         pause_before_startup(&config).await?;
         let detection_results = run_sensors_detection(&config);
         rt::log_active_backend();
-        let hardware_support =
-            Rc::new(hardware_support::HardwareSupportController::init(detection_results).await);
+        let hardware_support = Rc::new(
+            hardware_support::HardwareSupportController::init(
+                detection_results,
+                cc_detect::DETECTION_SUPPORTED,
+            )
+            .await,
+        );
         hardware_support.log_findings();
 
         let sensors_conf = Rc::new(load_sensors_conf(&config).await);

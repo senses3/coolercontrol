@@ -5774,7 +5774,7 @@ mod verdict_publish_tests {
     #[serial]
     fn publishes_a_verdict_for_a_pwmless_fan_channel() {
         cc_fs::test_runtime(async {
-            let hardware_support = Rc::new(HardwareSupportController::init(None).await);
+            let hardware_support = Rc::new(HardwareSupportController::init(None, true).await);
             let repo = HwmonRepo::new(
                 Rc::new(Config::init_default_config().unwrap()),
                 vec![],
