@@ -1,6 +1,6 @@
 [package]
 name = "cc-detect"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Super-I/O hardware detection"

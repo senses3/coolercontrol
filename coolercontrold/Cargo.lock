@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "cc-detect"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "log",
  "serde",
@@ -621,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "cc-image"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "gifski",
@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "cc-stress"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "libc",
@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "coolercontrold"
-version = "4.3.1"
+version = "5.0.0"
 dependencies = [
  "aide",
  "anyhow",
