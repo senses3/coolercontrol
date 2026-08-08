@@ -14,8 +14,8 @@ Release notes are automatically generated from this file and git tags.
 
 ### Added
 
-- Rebuilt application shell: Home, Cooling, Monitoring, Devices, Plugins and Settings sections, with
-  a persistent icon rail, per-section side panels, and landing pages for each area
+- Rebuilt application UI shell: Home, Cooling, Monitoring, Devices, Plugins and Settings sections,
+  with a persistent icon rail, per-section side panels, and landing pages for each area
 - Mobile layout with bottom navigation, a header overflow menu for the Access, Power and Plugins
   menus, a dashboard switcher, and responsive editors throughout
 - Consolidated channel page in the Cooling section: embedded profile editor, mini curve previews,
@@ -24,7 +24,6 @@ Release notes are automatically generated from this file and git tags.
   links from each chain pill to its editor and persisted open state
 - Auto-Create Profiles wizard that generates cooling entities for CPU coolers, GPU fans, AIO pumps
   and radiators, case fans and laptops, driven by editable tuning data compiled into the daemon
-  (`auto_profiles.toml`)
 - Calibration wizard with a batch API, per-fan warnings surfaced in the picker and completion log,
   resume support, and abort on an active alert
 - Calibration understands firmware fan curves: firmware-controlled fans are flagged in the picker,
@@ -104,13 +103,8 @@ Release notes are automatically generated from this file and git tags.
   than written
 - Idle liqctld connections are reaped, and NVML is released when all GPUs are disabled or none are
   detected
-- `pwm_enable` is no longer read on the fan write path
-- NVAPI thermal lookups and PCI bus lookups are cached, and live chart animation is throttled and
-  paused off-screen
-- Auto-created laptop profiles retuned: shorter EMA windows, no smoothing on Performance, and a 40C
-  fan-off point for Silent and Balanced
-- The app accent is now the logo blue, the current section is marked with a brand gradient, and the
-  control-flow chain end and its temp source are tinted to match
+- NVAPI thermal lookups and PCI bus lookups are cached
+- Live chart animation is throttled and paused off-screen
 - The Makefiles were split and documented behind `make help`
 - protoc is no longer a build dependency; protox generates the gRPC code
 - The minimum supported Rust version is 1.88
@@ -129,7 +123,6 @@ Release notes are automatically generated from this file and git tags.
 - Calibration now enters manual control mode before measuring (#583)
 - Older AMD GPUs without hwmon load sensors report load from DRM fdinfo (#562)
 - GPU stress tests now run off the async runtime and are judged by power draw, fixing newer cards
-- Clearing a device or channel name no longer restarts the UI, and falls back to the detected name
 - Settings are skipped for channels a device no longer offers, instead of erroring
 - Generated curve floors are clamped to the channel minimum so a low floor cannot stall a fan
 - Duplicate device UIDs no longer drop devices from AMD and liquidctl repositories
@@ -140,19 +133,12 @@ Release notes are automatically generated from this file and git tags.
   growth in the desktop app over long sessions
 - AMD zero-RPM support is detected by reading the firmware setting rather than guessing, a failed
   curve apply is aborted instead of half-written, and an EIO now says what caused it
-- Apple SMC fans are no longer condemned as broken, and fans a device has disabled are reported as
-  hidden rather than missing
 - The desktop app no longer loops on reconnect notifications, applies certificate validation without
   a restart, and raises its window when tray-mode authentication fails
-- Home no longer waits on a health request before it will open
 - Korean locale detection, translations synced across all supported locales, and translations that
   had drifted from the English source refreshed
 - Disabled IP family is logged at info instead of warning
 - FIFO pairing could wedge the test suite, and sysfs read tests handle ENODATA
-- Numerous UI fixes: dropdowns above modal dialogs, focus-visible on the rail, pinned name priority,
-  profile graph padding, hover action focus, wizard chart zoom, start page routing, rail menus
-  opening over the rail, a scrolling panel heading, a saved menu width being ignored, and a blank
-  custom sensor page
 
 ### Removed
 
