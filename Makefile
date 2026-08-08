@@ -111,15 +111,24 @@ ci-check:
 ci-fmt:
 	@./trunk fmt --all
 
+# `reuse` is a pip package, not bundled with trunk. The charset-normalizer extra
+# avoids a hard dependency on the libmagic C library.
+require_reuse = command -v reuse >/dev/null || { \
+	echo 'reuse not found. Install it with:'; \
+	echo '    pipx install "reuse[charset-normalizer]"'; \
+	echo '(replace pipx with pip if you do not use pipx)'; exit 1; }
+
 # Verify every file declares copyright and license (REUSE spec). This is what
 # the copyright CI job runs.
 copyright-check:
+	@$(require_reuse)
 	@reuse lint
 
 # Fix what copyright-check reports: adds SPDX headers to source files that lack
 # them, dating each from its first commit. Safe to re-run. Non-source files are
 # covered by REUSE.toml and are never touched.
 copyright-fix:
+	@$(require_reuse)
 	@python3 scripts/copyright-fix.py
 	@reuse lint
 
