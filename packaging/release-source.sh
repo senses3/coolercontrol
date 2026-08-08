@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2025 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # This script creates a source taball that contains a number of files that are not directly in
 # version control:

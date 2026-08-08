@@ -1,0 +1,33 @@
+version = 1
+
+# Files that cannot carry a comment header: docs, configs, packaging metadata,
+# binary assets, and captured sysfs test fixtures. Source files declare their
+# licensing inline instead (see scripts/copyright-fix.py).
+#
+# Later entries win, so the catch-all comes first and third-party assets follow.
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2021 Guy Boldon and contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# IBM Plex, bundled for the UI. Upstream license text ships beside the fonts.
+[[annotations]]
+path = [
+  "coolercontrol-ui/public/fonts/ibm-plex-**",
+  "coolercontrol-ui/public/fonts/OFL.txt",
+]
+SPDX-FileCopyrightText = "2017 IBM Corp."
+SPDX-License-Identifier = "OFL-1.1"
+
+# Roboto, embedded for LCD rendering.
+[[annotations]]
+path = "coolercontrold/cc-image/resources/Roboto**"
+SPDX-FileCopyrightText = "2011 Google Inc."
+SPDX-License-Identifier = "Apache-2.0"
+
+# AppStream metadata is CC0 so distros and app stores can reuse it verbatim.
+[[annotations]]
+path = "packaging/metadata/org.coolercontrol.CoolerControl.metainfo.xml"
+SPDX-FileCopyrightText = "2021 Guy Boldon and contributors"
+SPDX-License-Identifier = "CC0-1.0"

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Experiment harness for GPU stress shapes. A diagnostic, not a product
 //! path: it measures which submission pattern and shader body actually load
 //! a GPU, reading power and load from the same sysfs the daemon uses.

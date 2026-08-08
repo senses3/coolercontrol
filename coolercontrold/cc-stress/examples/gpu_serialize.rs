@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Shows why `run_gpu_stress` gives each adapter its own OS thread.
 //!
 //! An earlier version drove every adapter from a `tokio::spawn` task on the

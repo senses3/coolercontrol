@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests for DeviceExecutor's per-channel write coalescing.
 
 These exercise `submit_write`'s cap-at-1 supersession against a stub

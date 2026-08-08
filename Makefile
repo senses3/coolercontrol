@@ -18,6 +18,7 @@ CARGO := $(shell command -v cargo || command -v cargo-1.91 || command -v cargo-1
 	test test-ui test-daemon test-qt \
 	ci-install ci-test ci-test-ui ci-test-daemon ci-test-qt \
 	ci-check ci-fmt ci-local pr-check validate-metadata \
+	copyright-check copyright-fix \
 	clean clean-ui install install-source uninstall dev-run dev-install openapi
 
 # Run `make help` for the common developer targets.
@@ -37,7 +38,9 @@ help:
 	@printf '  \033[1mFormat & lint\033[0m\n'
 	@printf '    make ci-fmt           Auto-format all files (trunk)\n'
 	@printf '    make ci-check         Run formatting/lint checks (trunk)\n'
-	@printf '    make openapi          Regenerate openapi/openapi.json (no daemon needed)\n\n'
+	@printf '    make openapi          Regenerate openapi/openapi.json (no daemon needed)\n'
+	@printf '    make copyright-check  Verify SPDX headers (REUSE), as CI does\n'
+	@printf '    make copyright-fix    Add missing SPDX headers, then re-check\n\n'
 	@printf '  \033[1mRun & install\033[0m\n'
 	@printf '    make dev-run          Incremental build + run daemon locally (sudo)\n'
 	@printf '    make install          Install daemon + Qt binaries (DESTDIR aware)\n'
@@ -107,6 +110,18 @@ ci-check:
 
 ci-fmt:
 	@./trunk fmt --all
+
+# Verify every file declares copyright and license (REUSE spec). This is what
+# the copyright CI job runs.
+copyright-check:
+	@reuse lint
+
+# Fix what copyright-check reports: adds SPDX headers to source files that lack
+# them, dating each from its first commit. Safe to re-run. Non-source files are
+# covered by REUSE.toml and are never touched.
+copyright-fix:
+	@python3 scripts/copyright-fix.py
+	@reuse lint
 
 clean: clean-ui
 	@$(MAKE) -C $(daemon_dir) $@

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, defineStore, setActivePinia, storeToRefs } from 'pinia'

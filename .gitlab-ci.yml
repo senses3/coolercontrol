@@ -149,6 +149,27 @@ gemnasium-python-dependency_scanning:
       when: never
     - if: $CI_COMMIT_TAG == null
 
+############################################## Copyright / licensing (REUSE)
+# Every file must declare copyright and license. Source files carry SPDX headers;
+# everything else is covered by REUSE.toml. Fix a failure with `make copyright-fix`.
+copyright:
+  stage: test
+  image: python:3-slim
+  tags:
+    - saas-linux-small-amd64
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_TAG == null
+  before_script:
+    # slim image has python + pip but no make, which copyright-check runs through.
+    - apt-get update && apt-get install -y --no-install-recommends make
+    - pip install --quiet reuse
+    - reuse --version
+  script:
+    - make copyright-check
+
 ############################################## Tests
 test_all:
   stage: test

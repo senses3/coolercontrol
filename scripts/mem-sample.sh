@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # mem-sample.sh - memory footprint of the CoolerControl Qt app and its QtWebEngine tree.
 #
 # Reports PSS per process (tagged by Chromium process type) plus VRAM/GTT deduplicated by
