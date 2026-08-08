@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Configure apt to install CoolerControl from apt.coolercontrol.org.
 #
 #   curl -fsSL https://apt.coolercontrol.org/setup.sh | sudo sh

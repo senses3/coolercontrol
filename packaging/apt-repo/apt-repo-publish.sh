@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Publish debs into the CoolerControl apt repository.
 #
 #   apt-repo-publish --repo debian|ubuntu|both [--keep N] <deb>...

@@ -149,6 +149,32 @@ gemnasium-python-dependency_scanning:
       when: never
     - if: $CI_COMMIT_TAG == null
 
+############################################## Copyright / licensing (REUSE)
+# Every file must declare copyright and license. Source files carry SPDX headers;
+# everything else is covered by REUSE.toml. Fix a failure with `make copyright-fix`.
+copyright:
+  stage: test
+  image: python:3-slim
+  tags:
+    - saas-linux-small-amd64
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_TAG == null
+  before_script:
+    # make: copyright-check runs through it. git: reuse only honours .gitignore
+    # when it can find a git executable; without one it ignores nothing and
+    # scans the CI caches (.pip, .cargo) and build output as project files.
+    - apt-get update && apt-get install -y --no-install-recommends make git
+    # The charset-normalizer extra is required: reuse defaults to python-magic,
+    # which needs the libmagic C library that the slim image does not ship.
+    - pip install --quiet "reuse[charset-normalizer]"
+    - reuse --version
+    - git --version
+  script:
+    - make copyright-check
+
 ############################################## Tests
 test_all:
   stage: test

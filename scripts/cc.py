@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2024 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """
 This script is an example of how to interact with the CoolerControl daemon via the REST API.
 It can be uses as a reference for how to create your own scripts or a CLI tool.
