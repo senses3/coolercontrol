@@ -23,7 +23,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-__VERSION__ = "0.2.0"
+__VERSION__ = "0.3.0"
 
 LICENSE = "GPL-3.0-or-later"
 
@@ -45,7 +45,9 @@ STYLES = {
     "vue": "xml",
     "html": "xml",
     "svg": "xml",
-    "xml": "xml",
+    # .xml is deliberately absent: the only one is the AppStream metainfo, which
+    # states its own licensing in <metadata_license> and is annotated in
+    # REUSE.toml. Injecting a comment there would be a third copy of one fact.
     "py": "hash",
     "sh": "hash",
 }

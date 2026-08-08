@@ -1,9 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  SPDX-FileCopyrightText: 2021 Guy Boldon and contributors
-  SPDX-License-Identifier: CC0-1.0
--->
-
 <component type="desktop-application">
     <id>org.coolercontrol.CoolerControl</id>
     <name>CoolerControl</name>
