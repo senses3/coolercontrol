@@ -959,7 +959,8 @@ export default {
                 calibrateFirst: '先校正風扇以獲得最佳一致性（需幾分鐘）',
                 skip: '略過',
                 noFans: '未偵測到可控制的風扇。',
-                tempsIntro: '確認關鍵溫度。這些值已作為最佳猜測預先填入，請核實。',
+                tempsIntro:
+                    '選擇您的設定應跟隨的溫度。留空即表示不使用該溫度：使用內建顯示卡的系統不需要 GPU 溫度，而選擇它正是讓 GPU 參與 AIO 冷排與機殼風扇曲線的方式。',
                 cpuTemp: 'CPU 溫度',
                 gpuTemp: 'GPU 溫度',
                 liquidTemp: '液體溫度',
@@ -970,9 +971,10 @@ export default {
                 cfmCaveat: '正壓偏置基於工作週期（duty），而非氣流：風扇數量不均衡時無法保證正壓。',
                 previewIntro: '檢視將要建立並套用的內容。在您確認之前不會儲存任何內容。',
                 previewAssignments: '風扇指派',
+                reusedHeader: '已存在',
+                reused: '重複使用',
                 willCreateHeader: '將建立',
-                startingPointNote:
-                    '這是一個簡便的起點，而不是從零開始。它們不會適合每個系統，因此建立後請核實、測試並調整。',
+                startingPointNote: '這是風扇設定的通用起點，應當據此調整，而不是原樣保留。',
                 replaces: '取代 {name}',
                 generated: '已產生 {count} 個設定檔。',
                 generateError: '無法產生設定檔。',

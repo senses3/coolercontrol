@@ -1021,7 +1021,7 @@ export default {
                 skip: 'Überspringen',
                 noFans: 'Keine steuerbaren Lüfter erkannt.',
                 tempsIntro:
-                    'Bestätigen Sie Ihre wichtigen Temperaturen. Diese sind als beste Schätzung vorausgefüllt: Bitte überprüfen Sie sie.',
+                    'Wählen Sie die Temperaturen, denen Ihr Setup folgen soll. Lassen Sie eine leer, um sie auszuschließen: Ein System mit integrierter Grafik braucht keine GPU-Temp., und erst deren Auswahl bezieht die GPU in die Kurven von AIO-Radiator und Gehäuselüftern ein.',
                 cpuTemp: 'CPU-Temp.',
                 gpuTemp: 'GPU-Temp.',
                 liquidTemp: 'Flüssigkeitstemp.',
@@ -1034,9 +1034,11 @@ export default {
                 previewIntro:
                     'Überprüfen Sie, was erstellt und angewendet wird. Es wird nichts gespeichert, bis Sie bestätigen.',
                 previewAssignments: 'Lüfterzuweisungen',
+                reusedHeader: 'Bereits vorhanden',
+                reused: 'wiederverwendet',
                 willCreateHeader: 'Wird erstellt',
                 startingPointNote:
-                    'Ein einfacher Ausgangspunkt, statt bei null anzufangen. Sie sind nicht für jedes System perfekt, also überprüfen, testen und passen Sie sie nach dem Erstellen an.',
+                    'Ein allgemeiner Ausgangspunkt für Ihr Lüfter-Setup, gedacht zum Anpassen und nicht zum unveränderten Übernehmen.',
                 replaces: 'ersetzt {name}',
                 generated: '{count} Profile erstellt.',
                 generateError: 'Profile konnten nicht erstellt werden.',

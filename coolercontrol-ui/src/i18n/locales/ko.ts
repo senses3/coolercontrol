@@ -990,7 +990,7 @@ export default {
                 skip: '건너뛰기',
                 noFans: '제어 가능한 팬이 감지되지 않았습니다.',
                 tempsIntro:
-                    '주요 온도를 확인하세요. 최선의 추정값으로 미리 채워져 있으니 확인해 주세요.',
+                    '설정이 따를 온도를 선택하세요. 사용하지 않을 온도는 비워 두면 됩니다. 내장 그래픽 시스템에는 GPU 온도가 필요 없으며, GPU 온도를 선택해야 AIO 라디에이터와 케이스 팬 곡선에 GPU가 반영됩니다.',
                 cpuTemp: 'CPU 온도',
                 gpuTemp: 'GPU 온도',
                 liquidTemp: '액체 온도',
@@ -1003,9 +1003,11 @@ export default {
                 previewIntro:
                     '생성 및 적용될 내용을 검토하세요. 확인하기 전에는 아무것도 저장되지 않습니다.',
                 previewAssignments: '팬 할당',
+                reusedHeader: '이미 있음',
+                reused: '재사용',
                 willCreateHeader: '생성될 항목',
                 startingPointNote:
-                    '처음부터 만드는 대신 간편한 출발점입니다. 모든 시스템에 완벽하지는 않으므로 생성 후 확인, 테스트, 조정하세요.',
+                    '팬 설정을 위한 일반적인 출발점이며, 그대로 두기보다 조정해서 사용하도록 만들어졌습니다.',
                 replaces: '{name} 대체',
                 generated: '프로필 {count}개를 생성했습니다.',
                 generateError: '프로필을 생성할 수 없습니다.',

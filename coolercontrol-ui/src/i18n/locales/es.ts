@@ -1012,7 +1012,7 @@ export default {
                 skip: 'Omitir',
                 noFans: 'No se detectaron ventiladores controlables.',
                 tempsIntro:
-                    'Confirme sus temperaturas clave. Están rellenadas como mejor estimación: verifíquelas.',
+                    'Elija las temperaturas que debe seguir su configuración. Deje una vacía para excluirla: un sistema con gráficos integrados no necesita temp. GPU, y elegirla es lo que hace participar a la GPU en las curvas del radiador AIO y de los ventiladores de la caja.',
                 cpuTemp: 'Temp. CPU',
                 gpuTemp: 'Temp. GPU',
                 liquidTemp: 'Temp. del líquido',
@@ -1025,9 +1025,11 @@ export default {
                 previewIntro:
                     'Revise lo que se creará y aplicará. No se guarda nada hasta que confirme.',
                 previewAssignments: 'Asignaciones de ventiladores',
+                reusedHeader: 'Ya existe',
+                reused: 'reutilizado',
                 willCreateHeader: 'Se creará',
                 startingPointNote:
-                    'Un punto de partida sencillo en lugar de empezar desde cero. No serán perfectos para todos los sistemas, así que verifíquelos, pruébelos y ajústelos después de crearlos.',
+                    'Un punto de partida general para su configuración de ventiladores, pensado para ajustarse y no para dejarse tal cual.',
                 replaces: 'reemplaza {name}',
                 generated: '{count} perfiles generados.',
                 generateError: 'No se pudieron generar los perfiles.',
