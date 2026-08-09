@@ -46,6 +46,7 @@ pub static TUNING: LazyLock<TuningConfig> = LazyLock::new(|| {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TuningConfig {
+    pub scale: ScaleTuning,
     pub functions: HashMap<String, FunctionSpec>,
     pub cpu_cooler: PresetMap,
     pub gpu_fan: PresetMap,
@@ -53,6 +54,39 @@ pub struct TuningConfig {
     pub aio_radiator: RadiatorBands,
     pub case: CaseTuning,
     pub laptop: PresetMap,
+}
+
+/// The nominal fan model that converts an authored PWM curve to the true-duty scale a calibrated
+/// channel reads. `nominal_dead_zone_percent` is the PWM a typical fan starts turning at: below it
+/// a raw channel writes duty the fan cannot use, while a calibrated channel has that span removed
+/// already. See the file header for why this is one figure rather than each fan's own calibration.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScaleTuning {
+    pub nominal_dead_zone_percent: Duty,
+}
+
+impl ScaleTuning {
+    /// The true duty a calibrated channel needs to spin as fast as `pwm` would on a raw one.
+    ///
+    /// Both ends are exact rather than modelled, because they are the same physical state on
+    /// either scale: 0 is a stopped fan and 100 is the fan flat out. Only what lies between them
+    /// is an approximation of the fan's response. Anything the author wanted spinning stays at 1%
+    /// or above, so a low duty can never round down into a stopped fan.
+    pub fn pwm_to_true_duty(&self, pwm: Duty) -> Duty {
+        if pwm == 0 {
+            return 0;
+        }
+        if pwm >= 100 {
+            return 100;
+        }
+        let dead = self.nominal_dead_zone_percent;
+        debug_assert!(dead < 100, "validated at load");
+        let span = u32::from(100 - dead);
+        let above = u32::from(pwm.saturating_sub(dead));
+        let true_duty = (above * 100 + span / 2) / span;
+        Duty::try_from(true_duty.min(100)).unwrap_or(100).max(1)
+    }
 }
 
 /// A named hysteresis function referenced by graph entries. A spec with none of
@@ -179,6 +213,12 @@ impl TuningConfig {
             "case.pressure.floor_percent",
             self.case.pressure.floor_percent,
         )?;
+        if self.scale.nominal_dead_zone_percent >= 100 {
+            return Err(format!(
+                "scale.nominal_dead_zone_percent must be within 0..=99, got {}",
+                self.scale.nominal_dead_zone_percent
+            ));
+        }
         Ok(())
     }
 
@@ -368,6 +408,50 @@ mod tests {
             SetupEntry::Graph { curve, .. } => curve[0].1,
             SetupEntry::Fixed { duty } => *duty,
         }
+    }
+
+    /// Goal: the nominal conversion behaves at the ends and in the middle, since every calibrated
+    /// curve goes through it. Method: convert the boundary duties and one mid-curve value.
+    #[test]
+    fn pwm_to_true_duty_maps_the_scale_ends_and_middle() {
+        let scale = &TUNING.scale;
+        assert_eq!(scale.pwm_to_true_duty(0), 0, "an off fan stays off");
+        assert_eq!(scale.pwm_to_true_duty(100), 100, "full speed is full speed");
+        assert!(
+            scale.pwm_to_true_duty(99) < 100,
+            "the exact-100 case does not swallow the duties below it"
+        );
+        assert_eq!(
+            scale.pwm_to_true_duty(scale.nominal_dead_zone_percent),
+            1,
+            "the dead zone's top is the slowest a fan still turns"
+        );
+        assert_eq!(
+            scale.pwm_to_true_duty(scale.nominal_dead_zone_percent / 2),
+            1,
+            "inside the dead zone never reads as off"
+        );
+        // Integer division puts the halfway PWM up to half a percent low, so allow one point.
+        let midpoint = (100 + u16::from(scale.nominal_dead_zone_percent)) / 2;
+        let converted = scale.pwm_to_true_duty(Duty::try_from(midpoint).expect("under 100"));
+        assert!(
+            converted.abs_diff(50) <= 1,
+            "halfway up the usable span is half the true scale, got {converted}"
+        );
+    }
+
+    /// Goal: a dead zone of 100 would divide by zero when converting, so it is rejected at load.
+    /// Method: set it to 100 and assert validation fails.
+    #[test]
+    fn rejects_a_full_dead_zone() {
+        let bad = TUNING_TOML.replacen(
+            "nominal_dead_zone_percent = 25",
+            "nominal_dead_zone_percent = 100",
+            1,
+        );
+        let config: TuningConfig =
+            toml_edit::de::from_str(&bad).expect("still parses structurally");
+        assert!(config.validate().is_err());
     }
 
     /// Goal: a graph entry referencing a function with no table is rejected. Method: rewrite one

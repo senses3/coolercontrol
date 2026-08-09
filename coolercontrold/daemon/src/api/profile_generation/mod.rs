@@ -177,7 +177,12 @@ pub async fn generate(
     let mut devices = device_handle.devices_get().await?;
     let calibration_map = build_calibration_map(&calibration_handle).await;
     apply_effective_speed_options(&mut devices, &calibration_map);
-    let context = DeviceContext::from_devices(&devices);
+    let calibrated_channels = calibration_map
+        .iter()
+        .filter(|(_, calibration)| calibration.true_to_device(100).is_some())
+        .map(|(key, _)| key.clone())
+        .collect();
+    let context = DeviceContext::from_devices(&devices, calibrated_channels);
     let profiles = profile_handle.get_all().await?;
     let functions = function_handle.get_all().await?;
     let custom_sensors = custom_sensor_handle.get_all().await?;
@@ -225,6 +230,17 @@ fn validate_case_preset_coupling(request: &GenerateProfilesRequest) -> Result<()
         });
     }
     Ok(())
+}
+
+/// The display name of a generated profile: the kind, its preset, and a marker when the channel
+/// reads duties on the calibrated scale. The marker is what keeps a calibrated fan from being
+/// handed a raw-scale profile by reuse-by-name on a later run.
+fn profile_name(label: &str, preset: Preset, duty: ChannelDuty) -> String {
+    if duty.calibrated {
+        format!("{label} ({preset}, Calibrated)")
+    } else {
+        format!("{label} ({preset})")
+    }
 }
 
 /// Dispatches one fan assignment to its kind-specific generator. The match is exhaustive so
@@ -288,14 +304,14 @@ fn add_cpu_cooler(
     preset: Preset,
 ) {
     let entry = TUNING.cpu_cooler.get(preset);
-    let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
+    let duty = context.duty_for(assignment, true);
     let profile_uid = build_from_entry(
         proposal,
         context,
         entry,
         cpu_temp,
-        &format!("CPU Cooler ({preset})"),
-        Some(min_duty),
+        &profile_name("CPU Cooler", preset, duty),
+        duty,
     );
     proposal.assign(assignment, profile_uid);
 }
@@ -310,13 +326,14 @@ fn add_gpu_fan(
     preset: Preset,
 ) {
     let entry = TUNING.gpu_fan.get(preset);
+    let duty = context.duty_for(assignment, false);
     let profile_uid = build_from_entry(
         proposal,
         context,
         entry,
         gpu_temp,
-        &format!("GPU Fan ({preset})"),
-        None,
+        &profile_name("GPU Fan", preset, duty),
+        duty,
     );
     proposal.assign(assignment, profile_uid);
 }
@@ -341,15 +358,17 @@ fn add_case_fan(
     preset: Preset,
     role: CaseRole,
 ) -> Result<(), CCError> {
-    let base_uid = build_case_base(proposal, context, key_temps, preset)?;
+    // Case members idle near stop, so the floor is the overlay's, not the channel's.
+    let duty = context.duty_for(assignment, false);
+    let base_uid = build_case_base(proposal, context, key_temps, preset, duty)?;
     let pressure = &TUNING.case.pressure;
     let (name, offset_profile) = match role {
         CaseRole::Intake => (
-            format!("Case Intake ({preset})"),
+            profile_name("Case Intake", preset, duty),
             intake_offset_profile(pressure.floor_percent),
         ),
         CaseRole::Exhaust => (
-            format!("Case Exhaust ({preset})"),
+            profile_name("Case Exhaust", preset, duty),
             exhaust_offset_profile(pressure.floor_percent, pressure.exhaust_bias_percent),
         ),
     };
@@ -367,17 +386,18 @@ fn build_case_base(
     context: &DeviceContext,
     key_temps: &KeyTemps,
     preset: Preset,
+    duty: ChannelDuty,
 ) -> Result<ProfileUID, CCError> {
     let cpu_temp = key_temps.cpu.as_ref().ok_or_else(|| CCError::UserError {
         msg: "Case fans were assigned but no CPU temp was selected".to_string(),
     })?;
-    let cpu_member_uid = build_case_member(proposal, context, cpu_temp, preset, "CPU");
+    let cpu_member_uid = build_case_member(proposal, context, cpu_temp, preset, "CPU", duty);
     let Some(gpu_temp) = key_temps.gpu.as_ref() else {
         return Ok(cpu_member_uid);
     };
-    let gpu_member_uid = build_case_member(proposal, context, gpu_temp, preset, "GPU");
+    let gpu_member_uid = build_case_member(proposal, context, gpu_temp, preset, "GPU", duty);
     let mix = build_mix_profile(
-        &format!("Case Airflow ({preset})"),
+        &profile_name("Case Airflow", preset, duty),
         vec![cpu_member_uid, gpu_member_uid],
         ProfileMixFunctionType::Max,
     );
@@ -393,6 +413,7 @@ fn build_case_member(
     temp: &TempSource,
     preset: Preset,
     label: &str,
+    duty: ChannelDuty,
 ) -> ProfileUID {
     let entry = TUNING.case.member.get(preset);
     build_from_entry(
@@ -400,8 +421,8 @@ fn build_case_member(
         context,
         entry,
         temp,
-        &format!("Case {label} ({preset})"),
-        None,
+        &profile_name(&format!("Case {label}"), preset, duty),
+        duty,
     )
 }
 
@@ -479,9 +500,12 @@ fn add_aio_pump(
     preset: Preset,
 ) -> Result<(), CCError> {
     let entry = TUNING.aio_pump.get(preset);
-    let name = format!("AIO Pump ({preset})");
+    let duty = context.duty_for(assignment, true);
+    let name = profile_name("AIO Pump", preset, duty);
     let profile_uid = match entry {
-        SetupEntry::Fixed { duty } => proposal.intern_profile(build_fixed_profile(&name, *duty)),
+        SetupEntry::Fixed { duty: fixed } => {
+            proposal.intern_profile(build_fixed_profile(&name, duty.apply_to_duty(*fixed)))
+        }
         SetupEntry::Graph { .. } => {
             let base = key_temps
                 .cpu
@@ -491,8 +515,7 @@ fn add_aio_pump(
                     msg: "An AIO pump was assigned but no CPU or liquid temp was selected"
                         .to_string(),
                 })?;
-            let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
-            build_from_entry(proposal, context, entry, base, &name, Some(min_duty))
+            build_from_entry(proposal, context, entry, base, &name, duty)
         }
     };
     proposal.assign(assignment, profile_uid);
@@ -532,18 +555,18 @@ fn add_aio_radiator(
     assignment: &FanAssignment,
     preset: Preset,
 ) -> Result<(), CCError> {
-    let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
+    let duty = context.duty_for(assignment, true);
     let gpu_temp = key_temps.gpu.as_ref();
     let loop_uid = build_radiator_loop(
         proposal,
         context,
         key_temps,
         preset,
-        min_duty,
+        duty,
         gpu_temp.is_some(),
     )?;
     let profile_uid = match gpu_temp {
-        Some(gpu_temp) => build_radiator_mix(proposal, context, gpu_temp, preset, loop_uid),
+        Some(gpu_temp) => build_radiator_mix(proposal, context, gpu_temp, preset, duty, loop_uid),
         None => loop_uid,
     };
     proposal.assign(assignment, profile_uid);
@@ -559,7 +582,7 @@ fn build_radiator_loop(
     context: &DeviceContext,
     key_temps: &KeyTemps,
     preset: Preset,
-    min_duty: Duty,
+    duty: ChannelDuty,
     mixes_gpu: bool,
 ) -> Result<ProfileUID, CCError> {
     let (source, band) = resolve_radiator_source(proposal, context, key_temps)?;
@@ -568,19 +591,16 @@ fn build_radiator_loop(
         RadiatorBand::Liquid => TUNING.aio_radiator.liquid.get(preset),
         RadiatorBand::Cpu => TUNING.cpu_cooler.get(preset),
     };
-    let name = if mixes_gpu {
-        format!("AIO Radiator {} ({preset})", band.label())
+    let label = if mixes_gpu {
+        format!("AIO Radiator {}", band.label())
     } else {
-        format!("AIO Radiator ({preset})")
+        "AIO Radiator".to_string()
     };
+    let name = profile_name(&label, preset, duty);
     // Radiator follows a raw source (liquid and Delta are already slow-moving), so the cpu_cooler
     // fallback's smoothing is intentionally bypassed via build_entry_with_source.
     Ok(build_entry_with_source(
-        proposal,
-        entry,
-        source,
-        &name,
-        Some(min_duty),
+        proposal, entry, source, &name, duty,
     ))
 }
 
@@ -593,18 +613,24 @@ fn build_radiator_mix(
     context: &DeviceContext,
     gpu_temp: &TempSource,
     preset: Preset,
+    duty: ChannelDuty,
     loop_uid: ProfileUID,
 ) -> ProfileUID {
+    // The member must be able to idle below the loop curve, so it does not take the channel floor.
+    let member_duty = ChannelDuty {
+        floor: None,
+        calibrated: duty.calibrated,
+    };
     let gpu_uid = build_from_entry(
         proposal,
         context,
         TUNING.case.member.get(preset),
         gpu_temp,
-        &format!("AIO Radiator GPU ({preset})"),
-        None,
+        &profile_name("AIO Radiator GPU", preset, member_duty),
+        member_duty,
     );
     let mix = build_mix_profile(
-        &format!("AIO Radiator ({preset})"),
+        &profile_name("AIO Radiator", preset, duty),
         vec![loop_uid, gpu_uid],
         ProfileMixFunctionType::Max,
     );
@@ -694,16 +720,16 @@ fn add_laptop_fan(
     let strategy = assignment
         .laptop_temp_strategy
         .unwrap_or(LaptopTempStrategy::EmaCpu);
-    let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
+    let duty = context.duty_for(assignment, laptop_holds_floor(preset));
     let profile_uid = match strategy {
         LaptopTempStrategy::MixCpuGpu if key_temps.gpu.is_some() => {
-            build_laptop_mix(proposal, context, key_temps, preset, min_duty)?
+            build_laptop_mix(proposal, context, key_temps, preset, duty)?
         }
         LaptopTempStrategy::ThinkpadSensor => {
-            build_laptop_graph(proposal, context, key_temps, preset, false, min_duty)?
+            build_laptop_graph(proposal, context, key_temps, preset, false, duty)?
         }
         // EmaCpu, or MixCpuGpu with no GPU temp (degrade to the EMA-CPU default).
-        _ => build_laptop_graph(proposal, context, key_temps, preset, true, min_duty)?,
+        _ => build_laptop_graph(proposal, context, key_temps, preset, true, duty)?,
     };
     proposal.assign(assignment, profile_uid);
     Ok(())
@@ -711,10 +737,10 @@ fn add_laptop_fan(
 
 /// Silent and Balanced idle the fan off below their first knee, so their floor is NOT raised to
 /// the channel minimum. Performance has no 0% entry and keeps the clamp so it stays spinning.
-fn laptop_floor(preset: Preset, min_duty: Duty) -> Option<Duty> {
+fn laptop_holds_floor(preset: Preset) -> bool {
     match preset {
-        Preset::Silent | Preset::Balanced => None,
-        Preset::Performance => Some(min_duty),
+        Preset::Silent | Preset::Balanced => false,
+        Preset::Performance => true,
     }
 }
 
@@ -725,18 +751,17 @@ fn build_laptop_graph(
     key_temps: &KeyTemps,
     preset: Preset,
     smooth: bool,
-    min_duty: Duty,
+    duty: ChannelDuty,
 ) -> Result<ProfileUID, CCError> {
     let cpu = key_temps.cpu.as_ref().ok_or_else(|| CCError::UserError {
         msg: "A laptop fan was assigned but no CPU temp was selected".to_string(),
     })?;
     let entry = TUNING.laptop.get(preset);
-    let name = format!("Laptop Fan ({preset})");
-    let floor = laptop_floor(preset, min_duty);
+    let name = profile_name("Laptop Fan", preset, duty);
     let profile_uid = if smooth {
-        build_from_entry(proposal, context, entry, cpu, &name, floor)
+        build_from_entry(proposal, context, entry, cpu, &name, duty)
     } else {
-        build_entry_with_source(proposal, entry, cpu.clone(), &name, floor)
+        build_entry_with_source(proposal, entry, cpu.clone(), &name, duty)
     };
     Ok(profile_uid)
 }
@@ -748,7 +773,7 @@ fn build_laptop_mix(
     context: &DeviceContext,
     key_temps: &KeyTemps,
     preset: Preset,
-    min_duty: Duty,
+    duty: ChannelDuty,
 ) -> Result<ProfileUID, CCError> {
     let cpu = key_temps.cpu.as_ref().ok_or_else(|| CCError::UserError {
         msg: "A laptop fan was assigned but no CPU temp was selected".to_string(),
@@ -756,10 +781,10 @@ fn build_laptop_mix(
     let gpu = key_temps.gpu.as_ref().ok_or_else(|| CCError::UserError {
         msg: "A laptop Mix source needs a GPU temp".to_string(),
     })?;
-    let cpu_member = build_laptop_member(proposal, context, cpu, preset, min_duty);
-    let gpu_member = build_laptop_member(proposal, context, gpu, preset, min_duty);
+    let cpu_member = build_laptop_member(proposal, context, cpu, preset, duty);
+    let gpu_member = build_laptop_member(proposal, context, gpu, preset, duty);
     let mix = build_mix_profile(
-        &format!("Laptop Mix ({preset})"),
+        &profile_name("Laptop Mix", preset, duty),
         vec![cpu_member, gpu_member],
         ProfileMixFunctionType::Max,
     );
@@ -772,7 +797,7 @@ fn build_laptop_member(
     context: &DeviceContext,
     temp: &TempSource,
     preset: Preset,
-    min_duty: Duty,
+    duty: ChannelDuty,
 ) -> ProfileUID {
     let entry = TUNING.laptop.get(preset);
     build_from_entry(
@@ -780,37 +805,33 @@ fn build_laptop_member(
         context,
         entry,
         temp,
-        &format!("Laptop {} ({preset})", temp.temp_name),
-        laptop_floor(preset, min_duty),
+        &profile_name(&format!("Laptop {}", temp.temp_name), preset, duty),
+        duty,
     )
 }
 
 /// Builds a profile from a tuning entry using an already-resolved source. A Fixed entry becomes a
 /// Fixed profile (the source is unused); a Graph entry applies its curve and named function to the
-/// source. `clamp_min_duty`, when set, raises the floor so a low curve or duty cannot stall a fan
-/// that needs more to spin; pass None for channels that may idle at 0% (a zero-RPM GPU fan). The
-/// entry's smoothing is NOT applied here: the caller resolves the source, so kinds that follow a
-/// raw signal (radiator, laptop `ThinkPad` sensor) can bypass smoothing.
+/// source. `duty` carries the channel's reading of those duties: its scale, and the floor that
+/// keeps a low curve from stalling a fan that needs more to spin. The entry's smoothing is NOT
+/// applied here: the caller resolves the source, so kinds that follow a raw signal (radiator,
+/// laptop `ThinkPad` sensor) can bypass smoothing.
 fn build_entry_with_source(
     proposal: &mut Proposal,
     entry: &SetupEntry,
     source: TempSource,
     name: &str,
-    clamp_min_duty: Option<Duty>,
+    duty: ChannelDuty,
 ) -> ProfileUID {
     match entry {
-        SetupEntry::Fixed { duty } => {
-            let duty = clamp_min_duty.map_or(*duty, |min_duty| (*duty).max(min_duty));
-            proposal.intern_profile(build_fixed_profile(name, duty))
+        SetupEntry::Fixed { duty: fixed } => {
+            proposal.intern_profile(build_fixed_profile(name, duty.apply_to_duty(*fixed)))
         }
         SetupEntry::Graph {
             curve, function, ..
         } => {
             let function_uid = proposal.intern_function(build_function(function));
-            let curve = match clamp_min_duty {
-                Some(min_duty) => clamp_curve_floor(curve.clone(), min_duty),
-                None => curve.clone(),
-            };
+            let curve = duty.apply_to_curve(curve.clone());
             assert_valid_curve(&curve);
             proposal.intern_profile(build_graph_profile(name, source, function_uid, curve))
         }
@@ -826,7 +847,7 @@ fn build_from_entry(
     entry: &SetupEntry,
     base_temp: &TempSource,
     name: &str,
-    clamp_min_duty: Option<Duty>,
+    duty: ChannelDuty,
 ) -> ProfileUID {
     let source = match entry {
         SetupEntry::Graph { smoothing, .. } => {
@@ -834,7 +855,7 @@ fn build_from_entry(
         }
         SetupEntry::Fixed { .. } => base_temp.clone(),
     };
-    build_entry_with_source(proposal, entry, source, name, clamp_min_duty)
+    build_entry_with_source(proposal, entry, source, name, duty)
 }
 
 /// Resolves the temp source for a graph entry: the raw temp, or (when the entry sets smoothing and
@@ -916,15 +937,6 @@ fn build_ema_sensor(source: TempSource, window_seconds: u16) -> CustomSensor {
     }
 }
 
-/// Raises every duty in the curve to at least `min_duty` so a low floor cannot stall a fan
-/// that needs more to spin. Monotonicity is preserved because the clamp is applied uniformly.
-fn clamp_curve_floor(curve: Vec<(Temp, Duty)>, min_duty: Duty) -> Vec<(Temp, Duty)> {
-    curve
-        .into_iter()
-        .map(|(temp, duty)| (temp, duty.max(min_duty)))
-        .collect()
-}
-
 /// Asserts a generated curve is well-formed: enough points spanning enough temperature to render
 /// as a curve, temps strictly increasing, duties non-decreasing. Every generated curve descends
 /// from a validated tuning curve and clamping only raises duties, so these cannot fire in a
@@ -975,18 +987,56 @@ fn build_graph_profile(
     }
 }
 
+/// How one channel reads the duties of the profile it is given.
+///
+/// A calibrated channel reads them as true duty (the fraction of the fan's usable RPM span), so the
+/// authored PWM curve is converted before it is written into a profile. Everything else takes them
+/// as raw PWM. The two scales never share a profile name, or reuse-by-name across runs would hand
+/// a calibrated fan a curve written for a raw one.
+#[derive(Debug, Clone, Copy)]
+struct ChannelDuty {
+    /// Raise every duty to at least this, so a low curve cannot stall a fan that needs more to
+    /// spin. None for channels that may idle at 0% (a zero-RPM GPU fan, a quiet laptop preset).
+    floor: Option<Duty>,
+    /// The channel remaps duties through its calibration.
+    calibrated: bool,
+}
+
+impl ChannelDuty {
+    /// Applies the channel's reading of a curve: convert to its scale, then hold the floor. A
+    /// calibrated channel has no dead zone left to clear, so its floor is already 0.
+    fn apply_to_curve(self, curve: Vec<(Temp, Duty)>) -> Vec<(Temp, Duty)> {
+        curve
+            .into_iter()
+            .map(|(temp, duty)| (temp, self.apply_to_duty(duty)))
+            .collect()
+    }
+
+    fn apply_to_duty(self, duty: Duty) -> Duty {
+        let scaled = if self.calibrated {
+            TUNING.scale.pwm_to_true_duty(duty)
+        } else {
+            duty
+        };
+        self.floor.map_or(scaled, |floor| scaled.max(floor))
+    }
+}
+
 /// The device facts the generator needs: each controllable channel's effective (calibration
-/// aware) minimum duty, and the custom-sensors device UID where generated EMA and Delta sensors
-/// live so a profile can reference them.
+/// aware) minimum duty, which channels remap duties through a calibration, and the custom-sensors
+/// device UID where generated EMA and Delta sensors live so a profile can reference them.
 struct DeviceContext {
     min_duty_by_channel: HashMap<ChannelKey, Duty>,
+    calibrated_channels: HashSet<ChannelKey>,
     custom_sensors_device_uid: Option<DeviceUID>,
 }
 
 type ChannelKey = (DeviceUID, ChannelName);
 
 impl DeviceContext {
-    fn from_devices(devices: &[DeviceDto]) -> Self {
+    /// `calibrated_channels` holds the channels that remap duties, which is the Smooth-calibrated
+    /// ones: a Stepped or absent calibration is a passthrough and reads duty as raw PWM.
+    fn from_devices(devices: &[DeviceDto], calibrated_channels: HashSet<ChannelKey>) -> Self {
         let mut min_duty_by_channel = HashMap::new();
         let mut custom_sensors_device_uid = None;
         for device in devices {
@@ -1002,14 +1052,22 @@ impl DeviceContext {
         }
         Self {
             min_duty_by_channel,
+            calibrated_channels,
             custom_sensors_device_uid,
         }
     }
 
-    /// The channel's effective minimum duty, or 0 when the channel is unknown.
-    fn min_duty(&self, device_uid: &str, channel_name: &str) -> Duty {
-        let key = (device_uid.to_string(), channel_name.to_string());
-        self.min_duty_by_channel.get(&key).copied().unwrap_or(0)
+    /// How the channel reads a profile's duties. `floor` is the caller's call: pass None for a
+    /// channel that may idle at 0%, otherwise the channel's effective minimum duty is held.
+    fn duty_for(&self, assignment: &FanAssignment, floored: bool) -> ChannelDuty {
+        let key = (
+            assignment.device_uid.clone(),
+            assignment.channel_name.clone(),
+        );
+        ChannelDuty {
+            floor: floored.then(|| self.min_duty_by_channel.get(&key).copied().unwrap_or(0)),
+            calibrated: self.calibrated_channels.contains(&key),
+        }
     }
 }
 
@@ -1375,10 +1433,12 @@ mod tests {
         }
     }
 
-    /// A context with a custom-sensors device present and no per-channel minimum duties.
+    /// A context with a custom-sensors device present, no per-channel minimum duties and no
+    /// calibrated channels, so curves reach profiles in the scale they were authored in.
     fn test_context() -> DeviceContext {
         DeviceContext {
             min_duty_by_channel: HashMap::new(),
+            calibrated_channels: HashSet::new(),
             custom_sensors_device_uid: Some("dev-custom-sensors".to_string()),
         }
     }
@@ -1393,6 +1453,19 @@ mod tests {
         min_duty_by_channel.insert((device_uid.to_string(), channel_name.to_string()), min_duty);
         DeviceContext {
             min_duty_by_channel,
+            calibrated_channels: HashSet::new(),
+            custom_sensors_device_uid: Some("dev-custom-sensors".to_string()),
+        }
+    }
+
+    /// A context where one channel is calibrated, so it reads duties on the true-duty scale. A
+    /// calibrated channel's effective minimum duty is 0: the mapping absorbs the dead zone.
+    fn context_with_calibrated(device_uid: &str, channel_name: &str) -> DeviceContext {
+        let mut calibrated_channels = HashSet::new();
+        calibrated_channels.insert((device_uid.to_string(), channel_name.to_string()));
+        DeviceContext {
+            min_duty_by_channel: HashMap::new(),
+            calibrated_channels,
             custom_sensors_device_uid: Some("dev-custom-sensors".to_string()),
         }
     }
@@ -2296,6 +2369,119 @@ mod tests {
             &test_context()
         )
         .is_err());
+    }
+
+    /// Goal: a calibrated channel gets the curve converted to the scale it actually reads, so the
+    /// same preset means the same fan speed calibrated or not. Method: generate a CPU cooler on a
+    /// calibrated channel and assert every duty matches the nominal conversion of the authored
+    /// curve, and that the temps are untouched.
+    #[test]
+    fn a_calibrated_channel_gets_the_curve_converted() {
+        let response = propose(
+            &cpu_cooler_request(&["fan1"], Preset::Balanced),
+            &context_with_calibrated("dev-mb-1", "fan1"),
+        )
+        .expect("generates");
+        let authored = entry_curve(TUNING.cpu_cooler.get(Preset::Balanced));
+        let curve = response.profiles[0].speed_profile().expect("has curve");
+        assert_eq!(curve.len(), authored.len());
+        for (converted, (temp, duty)) in curve.iter().zip(authored) {
+            assert_eq!(converted.0, *temp, "temps are not rescaled");
+            assert_eq!(converted.1, TUNING.scale.pwm_to_true_duty(*duty));
+            assert!(converted.1 <= *duty, "the true scale never asks for more");
+        }
+        assert!(
+            curve[0].1 < authored[0].1,
+            "the true scale drops the dead zone below full speed"
+        );
+        assert_eq!(
+            curve[curve.len() - 1].1,
+            authored[authored.len() - 1].1,
+            "full speed is full speed on either scale"
+        );
+    }
+
+    /// Goal: the two scales never share a profile name, or a later run's reuse-by-name would hand
+    /// a calibrated fan a curve written for a raw one. Method: generate the same kind and preset
+    /// on a calibrated and an uncalibrated channel and assert the names and curves differ.
+    #[test]
+    fn the_calibrated_scale_gets_its_own_profile() {
+        let raw = propose(
+            &cpu_cooler_request(&["fan1"], Preset::Balanced),
+            &test_context(),
+        )
+        .expect("generates");
+        let calibrated = propose(
+            &cpu_cooler_request(&["fan1"], Preset::Balanced),
+            &context_with_calibrated("dev-mb-1", "fan1"),
+        )
+        .expect("generates");
+        assert_eq!(raw.profiles[0].name, "CPU Cooler (Balanced)");
+        assert_eq!(
+            calibrated.profiles[0].name,
+            "CPU Cooler (Balanced, Calibrated)"
+        );
+        assert_ne!(
+            raw.profiles[0].speed_profile(),
+            calibrated.profiles[0].speed_profile()
+        );
+    }
+
+    /// Goal: converting keeps a curve well formed, so the shape rules hold on both scales. Method:
+    /// generate every kind on a calibrated channel and assert each curve still climbs, keeps its
+    /// zero-idle entries at zero, and never lands on an unspinnable 0 where the author asked for
+    /// movement.
+    #[test]
+    fn converting_keeps_curves_well_formed() {
+        let mut request = full_request();
+        let mut calibrated_channels = HashSet::new();
+        for assignment in &request.assignments {
+            calibrated_channels.insert((
+                assignment.device_uid.clone(),
+                assignment.channel_name.clone(),
+            ));
+        }
+        request
+            .assignments
+            .retain(|assignment| assignment.kind != FanKind::LaptopFan);
+        let context = DeviceContext {
+            min_duty_by_channel: HashMap::new(),
+            calibrated_channels,
+            custom_sensors_device_uid: Some("dev-custom-sensors".to_string()),
+        };
+        let response = propose(&request, &context).expect("generates");
+        let mut checked = 0_usize;
+        for profile in &response.profiles {
+            let Some(curve) = profile.speed_profile() else {
+                continue;
+            };
+            assert!(
+                curve.windows(2).all(|w| w[0].1 <= w[1].1),
+                "{} duties still climb",
+                profile.name
+            );
+            assert!(
+                curve.iter().all(|(_, duty)| *duty <= 100),
+                "{} stays within range",
+                profile.name
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "the full config proposes graphs");
+    }
+
+    /// Goal: a curve that idles the fan off keeps idling it off after conversion, since a
+    /// zero-RPM GPU fan must stay stopped. Method: generate a GPU fan on a calibrated channel and
+    /// assert its opening duty is still 0.
+    #[test]
+    fn converting_keeps_a_zero_idle_at_zero() {
+        let response = propose(
+            &gpu_request(&["fan1"], Preset::Balanced),
+            &context_with_calibrated("dev-mb-1", "fan1"),
+        )
+        .expect("generates");
+        let curve = response.profiles[0].speed_profile().expect("has curve");
+        assert_eq!(curve[0].1, 0, "zero-RPM idle survives the conversion");
     }
 
     /// Goal: re-running the wizard reuses what the first run created instead of minting a suffixed

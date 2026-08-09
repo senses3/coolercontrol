@@ -19,6 +19,7 @@
 #     out near 15C), reach the top duty at the reachable knee and pad the rest of the span with
 #     repeated duties rather than stretching the ramp past what the sensor ever reads.
 #   - Every `function = "name"` must reference a table under [functions].
+#   - [scale] nominal_dead_zone_percent must be within 0..=99.
 #   - Every kind must define all three presets (silent, balanced, performance).
 #
 # Entry shapes:
@@ -27,6 +28,29 @@
 # `smoothing` omitted means the raw temp is followed; `smoothing = { ema_window_seconds = N }`
 # wraps the source in an N-second EMA custom sensor (skipped automatically if the system has no
 # custom-sensors device). Temps are decimals (45.0), duties are whole percents (25).
+
+# ---------------------------------------------------------------------------
+# The scale the curves below are written in, and how to leave it.
+#
+# Curves here are plain PWM percentages, which is what an uncontrolled channel writes straight to
+# the hardware. A calibrated channel reads a profile's duty as TRUE duty instead: the fraction of
+# the fan's usable RPM span above its floor, with the dead zone the fan cannot spin in already
+# taken out. The same number therefore means a much faster fan once calibrated, so the generator
+# converts each curve for calibrated channels with
+#
+#   true = (pwm - dead) / (100 - dead), floored at 1%
+#
+# Both ends are exact rather than modelled, because they are the same physical state on either
+# scale: 0 is a stopped fan and 100 is the fan flat out. Only what lies between them is an
+# approximation of the fan's response.
+#
+# `dead` is the PWM a typical fan starts turning at. Converting through each fan's own calibration
+# instead would be exact, but the curve would then be fan-specific and could no longer be shared by
+# the fans of a kind, so the generator uses this one nominal figure. Raise it if generated profiles
+# run calibrated fans too fast, lower it if too slow.
+# ---------------------------------------------------------------------------
+[scale]
+nominal_dead_zone_percent = 25
 
 # ---------------------------------------------------------------------------
 # Shared functions. Referenced by name from graph entries. A table with none of
