@@ -175,6 +175,11 @@ duty = 100
 # The Delta band's usable range ends near 15C, so each Delta curve reaches its top duty there and
 # holds it flat out to the 20C span the UI needs. Liquid idles near 30C and is genuinely hot by
 # 45C, so those curves top out there and hold.
+#
+# Selecting a GPU temp mixes one in: radiator fans move the case air the card heats even though the
+# loop never carries that heat. That member reuses the [case.member] curve below, since a radiator
+# fan answering to a component temp is doing case-fan work. Every case member opens no higher than
+# the loop curves above it, so an idle GPU never lifts the fan; a test pins that.
 # ---------------------------------------------------------------------------
 [aio_radiator.delta.silent]
 type = "graph"
@@ -204,26 +209,6 @@ function = "balanced"
 [aio_radiator.liquid.performance]
 type = "graph"
 curve = [[26.0, 45], [34.0, 80], [40.0, 100], [46.0, 100]]
-function = "performance"
-
-# The GPU member of the radiator Mix, used in code when a GPU temp is selected: the loop never
-# carries GPU heat, but radiator fans move the case air that does. Each curve opens at 0% so an
-# idle GPU adds nothing and the loop member alone drives the fan; the Max mix lifts it only once
-# the card is genuinely hot. Silent smooths the spiky GPU temp.
-[aio_radiator.gpu.silent]
-type = "graph"
-curve = [[50.0, 0], [65.0, 40], [78.0, 70], [85.0, 70]]
-smoothing = { ema_window_seconds = 8 }
-function = "identity"
-
-[aio_radiator.gpu.balanced]
-type = "graph"
-curve = [[45.0, 0], [60.0, 45], [75.0, 80], [85.0, 100]]
-function = "balanced"
-
-[aio_radiator.gpu.performance]
-type = "graph"
-curve = [[40.0, 0], [55.0, 55], [70.0, 90], [80.0, 100]]
 function = "performance"
 
 # ---------------------------------------------------------------------------

@@ -123,14 +123,13 @@ pub struct SmoothingSpec {
 }
 
 /// Radiator curves keyed by the available temp signal. The CPU-fallback band reuses the
-/// `cpu_cooler` curve in the parent module, so it has no table here. `gpu` is not a band: it is
-/// the GPU member the parent module mixes in when a GPU temp exists.
+/// `cpu_cooler` curve in the parent module, and the GPU member of a radiator Mix reuses
+/// `case.member`, so neither has a table here.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RadiatorBands {
     pub delta: PresetMap,
     pub liquid: PresetMap,
-    pub gpu: PresetMap,
 }
 
 /// Case-fan tuning: the shared Mix member curve plus the positive-pressure parameters.
@@ -155,13 +154,12 @@ impl TuningConfig {
     /// Validates every curve, smoothing window, function reference, and percent field. Returns the
     /// first problem found so a malformed edit surfaces a clear reason.
     pub fn validate(&self) -> Result<(), String> {
-        let labeled: [(&str, &PresetMap); 8] = [
+        let labeled: [(&str, &PresetMap); 7] = [
             ("cpu_cooler", &self.cpu_cooler),
             ("gpu_fan", &self.gpu_fan),
             ("aio_pump", &self.aio_pump),
             ("aio_radiator.delta", &self.aio_radiator.delta),
             ("aio_radiator.liquid", &self.aio_radiator.liquid),
-            ("aio_radiator.gpu", &self.aio_radiator.gpu),
             ("case.member", &self.case.member),
             ("laptop", &self.laptop),
         ];
@@ -306,7 +304,6 @@ mod tests {
             ("aio_pump", &TUNING.aio_pump),
             ("aio_radiator.delta", &TUNING.aio_radiator.delta),
             ("aio_radiator.liquid", &TUNING.aio_radiator.liquid),
-            ("aio_radiator.gpu", &TUNING.aio_radiator.gpu),
             ("case.member", &TUNING.case.member),
             ("laptop", &TUNING.laptop),
         ];
@@ -342,6 +339,35 @@ mod tests {
             spec.deviance.is_some(),
             "a stepped curve needs hysteresis to hold its shelves"
         );
+    }
+
+    /// Goal: the case member reused as a radiator Mix member can never lift the fan on its own, so
+    /// an idle GPU leaves the loop curve in charge. Method: for every preset, assert the case
+    /// member's opening duty is no higher than the opening duty of each radiator band it is mixed
+    /// with.
+    #[test]
+    fn case_member_never_outbids_an_idle_radiator() {
+        for preset in [Preset::Silent, Preset::Balanced, Preset::Performance] {
+            let case_floor = opening_duty(TUNING.case.member.get(preset));
+            for (band, presets) in [
+                ("delta", &TUNING.aio_radiator.delta),
+                ("liquid", &TUNING.aio_radiator.liquid),
+                ("cpu", &TUNING.cpu_cooler),
+            ] {
+                assert!(
+                    case_floor <= opening_duty(presets.get(preset)),
+                    "case member outbids the idle {band} radiator curve on {preset}"
+                );
+            }
+        }
+    }
+
+    /// The duty a graph entry holds below its first knee.
+    fn opening_duty(entry: &SetupEntry) -> Duty {
+        match entry {
+            SetupEntry::Graph { curve, .. } => curve[0].1,
+            SetupEntry::Fixed { duty } => *duty,
+        }
     }
 
     /// Goal: a graph entry referencing a function with no table is rejected. Method: rewrite one

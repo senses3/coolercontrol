@@ -27,7 +27,6 @@ import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useToast } from '@/shell/toast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { DeviceType } from '@/models/Device.ts'
 import { getProfileTypeDisplayName, ProfileTempSource } from '@/models/Profile.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import {
@@ -144,7 +143,9 @@ const setFanKind = (row: FanRow, value: string | undefined): void => {
     row.kind = (value as FanKind) ?? null
 }
 
-// Step 2: confirm the key temps. Pre-filled by a best-guess heuristic the user must verify.
+// Step 2: the key temps, all chosen by the user. Nothing is guessed: which temps are involved is
+// a real decision (an iGPU box has no GPU temp worth following, and a simple setup may want the
+// CPU temp alone), and picking a GPU temp is what opts a radiator into its GPU Mix.
 interface TempOption {
     deviceUID: string
     tempName: string
@@ -177,10 +178,6 @@ const fillTemps = (): void => {
                 color: sc?.color ?? '#888888',
             }
             group.temps.push(option)
-            if (cpuTemp.value == null && device.type === DeviceType.CPU) cpuTemp.value = option
-            if (gpuTemp.value == null && device.type === DeviceType.GPU) gpuTemp.value = option
-            if (liquidTemp.value == null && temp.name.toLowerCase().includes('liquid'))
-                liquidTemp.value = option
         }
         if (group.temps.length > 0) tempGroups.value.push(group)
     }

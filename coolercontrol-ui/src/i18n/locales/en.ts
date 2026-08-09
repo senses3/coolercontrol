@@ -1044,7 +1044,7 @@ export default {
                 skip: 'Skip',
                 noFans: 'No controllable fans were detected.',
                 tempsIntro:
-                    'Confirm your key temperatures. These are pre-filled as a best guess: please verify them.',
+                    'Choose the temperatures your setup should follow. Leave one empty to keep it out: a system with integrated graphics needs no GPU temp, and picking one is what involves the GPU in radiator and case fan curves.',
                 cpuTemp: 'CPU temp',
                 gpuTemp: 'GPU temp',
                 liquidTemp: 'Liquid temp',

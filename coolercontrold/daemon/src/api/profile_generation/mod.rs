@@ -514,8 +514,9 @@ impl RadiatorBand {
 /// (created here) when both exist, else the raw liquid temp, else the CPU temp as a fallback.
 /// The liquid and Delta signals are slow-moving, so no EMA smoothing is applied.
 ///
-/// With a GPU temp the result is a Mix(loop, GPU) Max instead: the loop never carries GPU heat,
-/// but radiator fans move the case air that does, so the card's temp has to reach them somehow.
+/// Selecting a GPU temp makes the result a Mix(loop, GPU) Max instead: the loop never carries GPU
+/// heat, but radiator fans move the case air that does. The choice is the user's, made by picking
+/// (or leaving out) a GPU temp, so no system state is consulted to decide it.
 fn add_aio_radiator(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -575,8 +576,10 @@ fn build_radiator_loop(
     ))
 }
 
-/// Mix(loop, GPU) Max for a radiator with a GPU temp. The GPU member is NOT floor-clamped: its
-/// curve opens at 0% so an idle card contributes nothing and the loop member alone drives the fan.
+/// Mix(loop, GPU) Max for a radiator when the user selected a GPU temp. The member reuses the case
+/// airflow curve: a radiator fan answering to a component temp is doing case-fan work, and case
+/// fans already apply that curve to both the CPU and GPU temps. It is NOT floor-clamped, and every
+/// case curve opens no higher than the loop curves, so an idle card cannot lift the fan.
 fn build_radiator_mix(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -587,7 +590,7 @@ fn build_radiator_mix(
     let gpu_uid = build_from_entry(
         proposal,
         context,
-        TUNING.aio_radiator.gpu.get(preset),
+        TUNING.case.member.get(preset),
         gpu_temp,
         &format!("AIO Radiator GPU ({preset})"),
         None,
@@ -1984,13 +1987,15 @@ mod tests {
         assert_eq!(gpu_member.temp_source(), Some(&gpu_temp()));
         assert_eq!(
             gpu_member.speed_profile().expect("has curve").as_slice(),
-            entry_curve(TUNING.aio_radiator.gpu.get(Preset::Balanced))
+            entry_curve(TUNING.case.member.get(Preset::Balanced)),
+            "the GPU member reuses the case airflow curve"
         );
     }
 
-    /// Goal: in the Mix only the loop member carries the channel's minimum-duty floor, so an idle
-    /// GPU adds nothing while Max still can never fall below the floor. Method: generate with a
-    /// 50% minimum and assert the loop member is clamped and the GPU member still opens at 0%.
+    /// Goal: in the Mix only the loop member carries the channel's minimum-duty floor, so Max can
+    /// never fall below it, while the unclamped GPU member stays low enough that an idle card does
+    /// not lift the fan. Method: generate with a 50% minimum and assert the loop member is clamped
+    /// and the GPU member opens no higher than the loop member does.
     #[test]
     fn aio_radiator_mix_clamps_loop_member_only() {
         let key_temps = KeyTemps {
@@ -2015,9 +2020,9 @@ mod tests {
             "the loop member holds the floor for the Max"
         );
         let gpu_member = find_profile(&response.profiles, &mix.member_profile_uids()[1]);
-        assert_eq!(
-            gpu_member.speed_profile().expect("has curve")[0].1,
-            0,
+        assert!(
+            gpu_member.speed_profile().expect("has curve")[0].1
+                <= loop_member.speed_profile().expect("has curve")[0].1,
             "an idle GPU must not lift the fan"
         );
     }
