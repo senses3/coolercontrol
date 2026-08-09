@@ -1933,6 +1933,9 @@ const addScrollEventListeners = (): void => {
     document?.querySelector('.duty-knob-input')?.addEventListener('wheel', dutyScrolled)
 }
 const contextIsVerifiedClean = (): boolean => {
+    // Deleting the Profile leaves this view mounted with nothing left to check.
+    // Dereferencing it here would throw inside the route guard and block the redirect.
+    if (currentProfile.value == null) return true
     // For Profiles, we need deep checks to see what's changed, if anything.
     if (currentProfile.value.p_type === ProfileType.Fixed) {
         return currentProfile.value.speed_fixed === selectedDuty.value
