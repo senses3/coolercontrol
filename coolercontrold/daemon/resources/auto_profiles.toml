@@ -12,7 +12,12 @@
 # those live in the Rust code because they carry safety invariants.
 #
 # Rules the validator enforces:
-#   - Every curve must be non-empty, temps strictly increasing, duties non-decreasing, 0..=100.
+#   - Every curve's temps strictly increase, its duties never decrease, and no duty exceeds 100.
+#   - Every curve needs at least 3 points spanning at least 20C. The UI draws the graph on an axis
+#     spanning the curve's own points, so fewer points or a narrower span render as a cliff across
+#     an empty chart. When a signal's usable range is narrower than 20C (the radiator Delta tops
+#     out near 15C), reach the top duty at the reachable knee and pad the rest of the span with
+#     repeated duties rather than stretching the ramp past what the sensor ever reads.
 #   - Every `function = "name"` must reference a table under [functions].
 #   - Every kind must define all three presets (silent, balanced, performance).
 #
@@ -47,6 +52,15 @@ name = "Auto Fan (Performance)"
 deviance = 1.0
 only_downward = true
 response_delay = 1
+
+# The Silent pump holds shelves rather than tracking the temp: a pump gains little from constant
+# speed changes, so this function makes it climb a step at once and take a real 3C drop before
+# falling back, which stops it flapping across a riser.
+[functions.pump]
+name = "Auto Pump (Silent)"
+deviance = 3.0
+only_downward = true
+response_delay = 5
 
 # Laptops run hot and hold heat, so their functions use a larger deviance and a slower down-ramp
 # to avoid surging. Silent is the slowest.
@@ -109,15 +123,41 @@ curve = [[40.0, 30], [55.0, 65], [70.0, 100]]
 function = "performance"
 
 # ---------------------------------------------------------------------------
-# AIO pump. Tracks the CPU temp (liquid as fallback) since it pulls heat off the die. Silent is a
-# quiet 2-step curve with a 50% floor; Balanced and Performance run the pump at a fixed 100% for
-# maximum flow.
+# AIO pump. Tracks the CPU temp (liquid as fallback) since it pulls heat off the die. A pump gains
+# little from continuous speed changes, so Silent is a 3-speed staircase (50% / 70% / 100%) with
+# flat shelves and short risers rather than a ramp, and Balanced and Performance skip the question
+# entirely by running a fixed 100% for maximum flow.
 # ---------------------------------------------------------------------------
 [aio_pump.silent]
 type = "graph"
-curve = [[50.0, 50], [70.0, 100]]
+curve = [
+  [
+    45.0,
+    50,
+  ],
+  [
+    65.0,
+    50,
+  ],
+  [
+    67.0,
+    70,
+  ],
+  [
+    78.0,
+    70,
+  ],
+  [
+    80.0,
+    100,
+  ],
+  [
+    85.0,
+    100,
+  ],
+]
 smoothing = { ema_window_seconds = 8 }
-function = "identity"
+function = "pump"
 
 [aio_pump.balanced]
 type = "fixed"
@@ -131,35 +171,59 @@ duty = 100
 # AIO radiator. Follows the loop's thermal signal, preferring a liquid-minus-ambient Delta, then the
 # raw liquid temp, then the CPU temp as a fallback (the CPU-fallback curve reuses the cpu_cooler
 # curve in code). The liquid and Delta signals are slow-moving, so no EMA smoothing is applied.
+#
+# The Delta band's usable range ends near 15C, so each Delta curve reaches its top duty there and
+# holds it flat out to the 20C span the UI needs. Liquid idles near 30C and is genuinely hot by
+# 45C, so those curves top out there and hold.
 # ---------------------------------------------------------------------------
 [aio_radiator.delta.silent]
 type = "graph"
-curve = [[5.0, 30], [10.0, 80]]
+curve = [[4.0, 25], [10.0, 55], [16.0, 90], [24.0, 90]]
 function = "identity"
 
 [aio_radiator.delta.balanced]
 type = "graph"
-curve = [[5.0, 40], [10.0, 100]]
+curve = [[3.0, 35], [9.0, 70], [15.0, 100], [23.0, 100]]
 function = "balanced"
 
 [aio_radiator.delta.performance]
 type = "graph"
-curve = [[5.0, 50], [10.0, 100]]
+curve = [[2.0, 45], [8.0, 80], [13.0, 100], [22.0, 100]]
 function = "performance"
 
 [aio_radiator.liquid.silent]
 type = "graph"
-curve = [[28.0, 30], [38.0, 80]]
+curve = [[30.0, 25], [38.0, 55], [46.0, 85], [50.0, 90]]
 function = "identity"
 
 [aio_radiator.liquid.balanced]
 type = "graph"
-curve = [[28.0, 40], [38.0, 100]]
+curve = [[28.0, 35], [36.0, 70], [44.0, 100], [48.0, 100]]
 function = "balanced"
 
 [aio_radiator.liquid.performance]
 type = "graph"
-curve = [[28.0, 50], [38.0, 100]]
+curve = [[26.0, 45], [34.0, 80], [40.0, 100], [46.0, 100]]
+function = "performance"
+
+# The GPU member of the radiator Mix, used in code when a GPU temp is selected: the loop never
+# carries GPU heat, but radiator fans move the case air that does. Each curve opens at 0% so an
+# idle GPU adds nothing and the loop member alone drives the fan; the Max mix lifts it only once
+# the card is genuinely hot. Silent smooths the spiky GPU temp.
+[aio_radiator.gpu.silent]
+type = "graph"
+curve = [[50.0, 0], [65.0, 40], [78.0, 70], [85.0, 70]]
+smoothing = { ema_window_seconds = 8 }
+function = "identity"
+
+[aio_radiator.gpu.balanced]
+type = "graph"
+curve = [[45.0, 0], [60.0, 45], [75.0, 80], [85.0, 100]]
+function = "balanced"
+
+[aio_radiator.gpu.performance]
+type = "graph"
+curve = [[40.0, 0], [55.0, 55], [70.0, 90], [80.0, 100]]
 function = "performance"
 
 # ---------------------------------------------------------------------------

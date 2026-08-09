@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 mod tuning;
 
-use tuning::{SetupEntry, SmoothingSpec, TUNING};
+use tuning::{SetupEntry, SmoothingSpec, MIN_CURVE_POINTS, MIN_CURVE_TEMP_SPREAD, TUNING};
 
 /// The cooling role a fan plays. Assigned explicitly by the user: fan roles cannot be
 /// reliably auto-detected (an AIO pump can be wired to an ordinary motherboard fan header),
@@ -499,9 +499,23 @@ enum RadiatorBand {
     Cpu,
 }
 
+impl RadiatorBand {
+    /// Names the signal in a Mix member's profile name, so the entity list says what it follows.
+    fn label(self) -> &'static str {
+        match self {
+            Self::Delta => "Delta",
+            Self::Liquid => "Liquid",
+            Self::Cpu => "CPU",
+        }
+    }
+}
+
 /// AIO radiator: a Graph off the loop's thermal signal. Prefers a liquid-minus-ambient Delta
 /// (created here) when both exist, else the raw liquid temp, else the CPU temp as a fallback.
 /// The liquid and Delta signals are slow-moving, so no EMA smoothing is applied.
+///
+/// With a GPU temp the result is a Mix(loop, GPU) Max instead: the loop never carries GPU heat,
+/// but radiator fans move the case air that does, so the card's temp has to reach them somehow.
 fn add_aio_radiator(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -509,24 +523,81 @@ fn add_aio_radiator(
     assignment: &FanAssignment,
     preset: Preset,
 ) -> Result<(), CCError> {
+    let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
+    let gpu_temp = key_temps.gpu.as_ref();
+    let loop_uid = build_radiator_loop(
+        proposal,
+        context,
+        key_temps,
+        preset,
+        min_duty,
+        gpu_temp.is_some(),
+    )?;
+    let profile_uid = match gpu_temp {
+        Some(gpu_temp) => build_radiator_mix(proposal, context, gpu_temp, preset, loop_uid),
+        None => loop_uid,
+    };
+    proposal.assign(assignment, profile_uid);
+    Ok(())
+}
+
+/// The loop half of a radiator: the Graph over the resolved Delta/liquid/CPU source. It carries
+/// the channel's minimum-duty floor, so the Mix's Max output can never fall below it whatever the
+/// GPU member contributes. `mixes_gpu` only picks the name: standing alone it is the profile the
+/// fan is assigned, mixed it is a member and says which signal it follows.
+fn build_radiator_loop(
+    proposal: &mut Proposal,
+    context: &DeviceContext,
+    key_temps: &KeyTemps,
+    preset: Preset,
+    min_duty: Duty,
+    mixes_gpu: bool,
+) -> Result<ProfileUID, CCError> {
     let (source, band) = resolve_radiator_source(proposal, context, key_temps)?;
     let entry = match band {
         RadiatorBand::Delta => TUNING.aio_radiator.delta.get(preset),
         RadiatorBand::Liquid => TUNING.aio_radiator.liquid.get(preset),
         RadiatorBand::Cpu => TUNING.cpu_cooler.get(preset),
     };
-    let min_duty = context.min_duty(&assignment.device_uid, &assignment.channel_name);
+    let name = if mixes_gpu {
+        format!("AIO Radiator {} ({preset})", band.label())
+    } else {
+        format!("AIO Radiator ({preset})")
+    };
     // Radiator follows a raw source (liquid and Delta are already slow-moving), so the cpu_cooler
     // fallback's smoothing is intentionally bypassed via build_entry_with_source.
-    let profile_uid = build_entry_with_source(
+    Ok(build_entry_with_source(
         proposal,
         entry,
         source,
-        &format!("AIO Radiator ({preset})"),
+        &name,
         Some(min_duty),
+    ))
+}
+
+/// Mix(loop, GPU) Max for a radiator with a GPU temp. The GPU member is NOT floor-clamped: its
+/// curve opens at 0% so an idle card contributes nothing and the loop member alone drives the fan.
+fn build_radiator_mix(
+    proposal: &mut Proposal,
+    context: &DeviceContext,
+    gpu_temp: &TempSource,
+    preset: Preset,
+    loop_uid: ProfileUID,
+) -> ProfileUID {
+    let gpu_uid = build_from_entry(
+        proposal,
+        context,
+        TUNING.aio_radiator.gpu.get(preset),
+        gpu_temp,
+        &format!("AIO Radiator GPU ({preset})"),
+        None,
     );
-    proposal.assign(assignment, profile_uid);
-    Ok(())
+    let mix = build_mix_profile(
+        &format!("AIO Radiator ({preset})"),
+        vec![loop_uid, gpu_uid],
+        ProfileMixFunctionType::Max,
+    );
+    proposal.intern_profile(mix)
 }
 
 /// Chooses the radiator's temp source and matching curve band. A Delta custom sensor is created
@@ -843,10 +914,21 @@ fn clamp_curve_floor(curve: Vec<(Temp, Duty)>, min_duty: Duty) -> Vec<(Temp, Dut
         .collect()
 }
 
-/// Asserts a generated curve is well-formed: non-empty, temps strictly increasing, duties
-/// non-decreasing.
+/// Asserts a generated curve is well-formed: enough points spanning enough temperature to render
+/// as a curve, temps strictly increasing, duties non-decreasing. Every generated curve descends
+/// from a validated tuning curve and clamping only raises duties, so these cannot fire in a
+/// shipped build; they catch a builder that reshapes a curve on its way through.
 fn assert_valid_curve(curve: &[(Temp, Duty)]) {
-    debug_assert!(curve.is_empty().not(), "curve must have points");
+    debug_assert!(
+        curve.len() >= MIN_CURVE_POINTS,
+        "curve must have at least {MIN_CURVE_POINTS} points"
+    );
+    debug_assert!(
+        curve.last().map(|point| point.0).unwrap_or_default()
+            - curve.first().map(|point| point.0).unwrap_or_default()
+            >= MIN_CURVE_TEMP_SPREAD,
+        "curve must span at least {MIN_CURVE_TEMP_SPREAD}C"
+    );
     debug_assert!(
         curve.windows(2).all(|w| w[0].0 < w[1].0),
         "curve temps must strictly increase"
@@ -857,13 +939,18 @@ fn assert_valid_curve(curve: &[(Temp, Duty)]) {
     );
 }
 
-/// A Graph profile following a single temp source. A fresh UID is assigned.
+/// A Graph profile following a single temp source. A fresh UID is assigned. The axis range is
+/// pinned to the curve's own end points so the UI opens on the curve rather than on a fraction of
+/// the device's full temperature range.
 fn build_graph_profile(
     name: &str,
     temp_source: TempSource,
     function_uid: FunctionUID,
     speed_profile: Vec<(Temp, Duty)>,
 ) -> Profile {
+    let temp_min = speed_profile.first().map(|point| point.0);
+    let temp_max = speed_profile.last().map(|point| point.0);
+    debug_assert!(temp_min < temp_max, "axis range must be non-empty");
     Profile {
         uid: Uuid::new_v4().to_string(),
         name: name.to_string(),
@@ -871,8 +958,8 @@ fn build_graph_profile(
         kind: ProfileKind::Graph {
             speed_profile: Some(speed_profile),
             temp_source: Some(temp_source),
-            temp_min: None,
-            temp_max: None,
+            temp_min,
+            temp_max,
         },
     }
 }
@@ -1523,6 +1610,13 @@ mod tests {
         profiles.iter().filter(|p| &p.p_type() == p_type).count()
     }
 
+    fn find_profile<'a>(profiles: &'a [Profile], uid: &str) -> &'a Profile {
+        profiles
+            .iter()
+            .find(|profile| profile.uid == uid)
+            .expect("proposed profile exists")
+    }
+
     /// The curve of a graph tuning entry, for asserting generated output against the data.
     fn entry_curve(entry: &SetupEntry) -> &[(Temp, Duty)] {
         match entry {
@@ -1724,10 +1818,10 @@ mod tests {
         }
     }
 
-    /// Goal: the Silent pump is a 2-step graph with a 50% floor, smoothed off the CPU temp.
-    /// Method: generate and assert the curve points and that an EMA sensor was created.
+    /// Goal: the Silent pump is a graph off a 50% floor, smoothed off the CPU temp. Method:
+    /// generate and assert the curve points and that an EMA sensor was created.
     #[test]
-    fn aio_pump_silent_is_two_step_graph() {
+    fn aio_pump_silent_is_a_smoothed_graph() {
         let response = generate_proposal(
             &aio_request(FanKind::AioPump, Preset::Silent, cpu_only()),
             &test_context(),
@@ -1785,8 +1879,8 @@ mod tests {
         .is_err());
     }
 
-    /// Goal: with a liquid temp but no ambient, the radiator follows the raw liquid in the 28C to
-    /// 38C band with no Delta sensor. Method: generate and assert the source and band.
+    /// Goal: with a liquid temp but no ambient, the radiator follows the raw liquid band with no
+    /// Delta sensor. Method: generate and assert the source and curve.
     #[test]
     fn aio_radiator_off_liquid_band() {
         let key_temps = KeyTemps {
@@ -1809,8 +1903,8 @@ mod tests {
         assert!(response.custom_sensors.is_empty());
     }
 
-    /// Goal: with both liquid and ambient temps, the radiator follows an auto-created Delta sensor
-    /// in the 5C to 10C band. Method: generate and assert the Delta sensor, source, and band.
+    /// Goal: with both liquid and ambient temps, the radiator follows an auto-created Delta sensor.
+    /// Method: generate and assert the Delta sensor, source, and curve.
     #[test]
     fn aio_radiator_off_delta_creates_sensor() {
         let key_temps = KeyTemps {
@@ -1859,6 +1953,73 @@ mod tests {
             panic!("cpu_cooler entry should be a graph");
         };
         assert_eq!(radiator.speed_profile().unwrap(), curve);
+    }
+
+    /// Goal: with a GPU temp the radiator becomes a Mix(loop, GPU) Max, so the card's heat reaches
+    /// the fans that move the case air carrying it. Method: generate with liquid and GPU temps and
+    /// assert the assigned profile is the Mix and its two members are the liquid and GPU graphs.
+    #[test]
+    fn aio_radiator_mixes_gpu_when_present() {
+        let key_temps = KeyTemps {
+            cpu: None,
+            gpu: Some(gpu_temp()),
+            liquid: Some(liquid_temp()),
+            ambient: None,
+        };
+        let response = generate_proposal(
+            &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
+            &test_context(),
+        )
+        .expect("generates");
+        let assigned_uid = &response.assignments[0].profile_uid;
+        let mix = find_profile(&response.profiles, assigned_uid);
+        assert_eq!(mix.p_type(), ProfileType::Mix);
+        assert_eq!(mix.mix_function_type(), Some(ProfileMixFunctionType::Max));
+        assert_eq!(mix.member_profile_uids().len(), 2);
+        let loop_member = find_profile(&response.profiles, &mix.member_profile_uids()[0]);
+        assert_eq!(loop_member.name, "AIO Radiator Liquid (Balanced)");
+        assert_eq!(loop_member.temp_source(), Some(&liquid_temp()));
+        let gpu_member = find_profile(&response.profiles, &mix.member_profile_uids()[1]);
+        assert_eq!(gpu_member.name, "AIO Radiator GPU (Balanced)");
+        assert_eq!(gpu_member.temp_source(), Some(&gpu_temp()));
+        assert_eq!(
+            gpu_member.speed_profile().expect("has curve").as_slice(),
+            entry_curve(TUNING.aio_radiator.gpu.get(Preset::Balanced))
+        );
+    }
+
+    /// Goal: in the Mix only the loop member carries the channel's minimum-duty floor, so an idle
+    /// GPU adds nothing while Max still can never fall below the floor. Method: generate with a
+    /// 50% minimum and assert the loop member is clamped and the GPU member still opens at 0%.
+    #[test]
+    fn aio_radiator_mix_clamps_loop_member_only() {
+        let key_temps = KeyTemps {
+            cpu: None,
+            gpu: Some(gpu_temp()),
+            liquid: Some(liquid_temp()),
+            ambient: None,
+        };
+        let response = generate_proposal(
+            &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
+            &context_with_min_duty("dev-aio-1", "fan1", 50),
+        )
+        .expect("generates");
+        let mix = find_profile(&response.profiles, &response.assignments[0].profile_uid);
+        let loop_member = find_profile(&response.profiles, &mix.member_profile_uids()[0]);
+        assert!(
+            loop_member
+                .speed_profile()
+                .expect("has curve")
+                .iter()
+                .all(|(_, duty)| *duty >= 50),
+            "the loop member holds the floor for the Max"
+        );
+        let gpu_member = find_profile(&response.profiles, &mix.member_profile_uids()[1]);
+        assert_eq!(
+            gpu_member.speed_profile().expect("has curve")[0].1,
+            0,
+            "an idle GPU must not lift the fan"
+        );
     }
 
     /// Goal: a radiator with no liquid or CPU temp is a user error. Method: omit both and assert
@@ -2025,12 +2186,45 @@ mod tests {
         .is_err());
     }
 
-    /// Goal: a full config covering all seven kinds generates a coherent proposal, and a function
-    /// shared across kinds is de-duplicated rather than copied. Method: build one request with every
-    /// kind at the global Balanced preset, then assert every fan is assigned to an existing profile,
-    /// every profile is named, and the shared Balanced fan function appears exactly once.
+    /// Goal: every generated graph opens on its own curve, so the UI does not draw a short ramp
+    /// across a mostly empty chart. Method: generate a full config and assert each graph's axis
+    /// range equals its curve's end points and spans the minimum the tuning rules guarantee.
     #[test]
-    fn full_config_generates_and_dedups_shared_function() {
+    fn graph_profiles_pin_axis_to_their_curve() {
+        let response = generate_proposal(&full_request(), &test_context()).expect("generates");
+        let graphs = response
+            .profiles
+            .iter()
+            .filter(|profile| profile.p_type() == ProfileType::Graph);
+        let mut checked = 0_usize;
+        for profile in graphs {
+            let ProfileKind::Graph {
+                temp_min, temp_max, ..
+            } = &profile.kind
+            else {
+                panic!("filtered to graphs");
+            };
+            let curve = profile.speed_profile().expect("a graph has a curve");
+            assert_eq!(*temp_min, Some(curve[0].0), "{} axis min", profile.name);
+            assert_eq!(
+                *temp_max,
+                Some(curve[curve.len() - 1].0),
+                "{} axis max",
+                profile.name
+            );
+            assert!(curve.len() >= MIN_CURVE_POINTS, "{} points", profile.name);
+            assert!(
+                curve[curve.len() - 1].0 - curve[0].0 >= MIN_CURVE_TEMP_SPREAD,
+                "{} spread",
+                profile.name
+            );
+            checked += 1;
+        }
+        assert!(checked > 0, "the full config proposes graphs");
+    }
+
+    /// Every fan kind at the global Balanced preset with all four key temps available.
+    fn full_request() -> GenerateProfilesRequest {
         let all_kinds = [
             ("dev-mb-1", "fan1", FanKind::CpuCooler),
             ("dev-mb-1", "fan2", FanKind::GpuFan),
@@ -2040,18 +2234,17 @@ mod tests {
             ("dev-aio-1", "rad", FanKind::AioRadiator),
             ("dev-laptop-1", "fan1", FanKind::LaptopFan),
         ];
-        let assignments = all_kinds
-            .iter()
-            .map(|(device_uid, channel_name, kind)| FanAssignment {
-                device_uid: (*device_uid).to_string(),
-                channel_name: (*channel_name).to_string(),
-                kind: *kind,
-                position: None,
-                laptop_temp_strategy: None,
-            })
-            .collect();
-        let request = GenerateProfilesRequest {
-            assignments,
+        GenerateProfilesRequest {
+            assignments: all_kinds
+                .iter()
+                .map(|(device_uid, channel_name, kind)| FanAssignment {
+                    device_uid: (*device_uid).to_string(),
+                    channel_name: (*channel_name).to_string(),
+                    kind: *kind,
+                    position: None,
+                    laptop_temp_strategy: None,
+                })
+                .collect(),
             key_temps: KeyTemps {
                 cpu: Some(cpu_temp()),
                 gpu: Some(gpu_temp()),
@@ -2060,12 +2253,22 @@ mod tests {
             },
             global_preset: Preset::Balanced,
             preset_overrides: Vec::new(),
-        };
+        }
+    }
+
+    /// Goal: a full config covering all seven kinds generates a coherent proposal, and a function
+    /// shared across kinds is de-duplicated rather than copied. Method: build one request with every
+    /// kind at the global Balanced preset, then assert every fan is assigned to an existing profile,
+    /// every profile is named, and the shared Balanced fan function appears exactly once.
+    #[test]
+    fn full_config_generates_and_dedups_shared_function() {
+        let request = full_request();
+        let fan_count = request.assignments.len();
         let response = generate_proposal(&request, &test_context()).expect("generates");
 
         assert_eq!(
             response.assignments.len(),
-            all_kinds.len(),
+            fan_count,
             "every fan is assigned"
         );
         let profile_uids: HashMap<ProfileUID, ()> = response

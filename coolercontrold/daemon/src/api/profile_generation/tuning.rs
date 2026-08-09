@@ -22,6 +22,14 @@ use std::sync::LazyLock;
 /// string in CI.
 static TUNING_TOML: &str = include_str!("../../../resources/auto_profiles.toml");
 
+/// The shape a generated curve must have to read as a curve in the UI rather than a cliff. The
+/// graph is drawn on an axis spanning the curve's own points, so too few points or too narrow a
+/// span produces a near-vertical line across an empty chart. A band whose signal has a narrower
+/// usable range (the radiator Delta tops out near 15C) pads the span with repeated duties instead
+/// of stretching the ramp past what the sensor reaches.
+pub const MIN_CURVE_POINTS: usize = 3;
+pub const MIN_CURVE_TEMP_SPREAD: Temp = 20.0;
+
 /// The parsed, validated tuning data, built once on first access.
 pub static TUNING: LazyLock<TuningConfig> = LazyLock::new(|| {
     // These `expect`s cannot fire in a shipped build: the tests below parse and validate the same
@@ -115,12 +123,14 @@ pub struct SmoothingSpec {
 }
 
 /// Radiator curves keyed by the available temp signal. The CPU-fallback band reuses the
-/// `cpu_cooler` curve in the parent module, so it has no table here.
+/// `cpu_cooler` curve in the parent module, so it has no table here. `gpu` is not a band: it is
+/// the GPU member the parent module mixes in when a GPU temp exists.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RadiatorBands {
     pub delta: PresetMap,
     pub liquid: PresetMap,
+    pub gpu: PresetMap,
 }
 
 /// Case-fan tuning: the shared Mix member curve plus the positive-pressure parameters.
@@ -145,12 +155,13 @@ impl TuningConfig {
     /// Validates every curve, smoothing window, function reference, and percent field. Returns the
     /// first problem found so a malformed edit surfaces a clear reason.
     pub fn validate(&self) -> Result<(), String> {
-        let labeled: [(&str, &PresetMap); 7] = [
+        let labeled: [(&str, &PresetMap); 8] = [
             ("cpu_cooler", &self.cpu_cooler),
             ("gpu_fan", &self.gpu_fan),
             ("aio_pump", &self.aio_pump),
             ("aio_radiator.delta", &self.aio_radiator.delta),
             ("aio_radiator.liquid", &self.aio_radiator.liquid),
+            ("aio_radiator.gpu", &self.aio_radiator.gpu),
             ("case.member", &self.case.member),
             ("laptop", &self.laptop),
         ];
@@ -202,12 +213,13 @@ impl TuningConfig {
     }
 }
 
-/// A curve must be non-empty, its temps strictly increasing, its duties non-decreasing and no more
-/// than 100%.
+/// A curve must carry at least `MIN_CURVE_POINTS` points spanning `MIN_CURVE_TEMP_SPREAD`, with
+/// temps strictly increasing, duties non-decreasing and no more than 100%.
 fn validate_curve(kind: &str, preset: &str, curve: &[(Temp, Duty)]) -> Result<(), String> {
-    if curve.is_empty() {
+    if curve.len() < MIN_CURVE_POINTS {
         return Err(format!(
-            "{kind}.{preset} curve must have at least one point"
+            "{kind}.{preset} curve must have at least {MIN_CURVE_POINTS} points, got {}",
+            curve.len()
         ));
     }
     for &(_, duty) in curve {
@@ -222,6 +234,13 @@ fn validate_curve(kind: &str, preset: &str, curve: &[(Temp, Duty)]) -> Result<()
     }
     if curve.windows(2).all(|w| w[0].1 <= w[1].1).not() {
         return Err(format!("{kind}.{preset} curve duties must not decrease"));
+    }
+    // Indexing is safe: the length check above guarantees at least MIN_CURVE_POINTS points.
+    let spread = curve[curve.len() - 1].0 - curve[0].0;
+    if spread < MIN_CURVE_TEMP_SPREAD {
+        return Err(format!(
+            "{kind}.{preset} curve must span at least {MIN_CURVE_TEMP_SPREAD}C, got {spread}C"
+        ));
     }
     Ok(())
 }
@@ -287,6 +306,7 @@ mod tests {
             ("aio_pump", &TUNING.aio_pump),
             ("aio_radiator.delta", &TUNING.aio_radiator.delta),
             ("aio_radiator.liquid", &TUNING.aio_radiator.liquid),
+            ("aio_radiator.gpu", &TUNING.aio_radiator.gpu),
             ("case.member", &TUNING.case.member),
             ("laptop", &TUNING.laptop),
         ];
@@ -298,6 +318,30 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Goal: the Silent pump stays a staircase rather than drifting back into a ramp: a pump gains
+    /// little from continuous speed changes. Method: assert its curve holds each speed across a
+    /// flat pair of points, and that its function carries the hysteresis that keeps it from
+    /// flapping across a riser.
+    #[test]
+    fn silent_pump_curve_is_a_staircase() {
+        let SetupEntry::Graph {
+            curve, function, ..
+        } = TUNING.aio_pump.get(Preset::Silent)
+        else {
+            panic!("the Silent pump is a graph");
+        };
+        let shelves = curve.windows(2).filter(|w| w[0].1 == w[1].1).count();
+        assert!(shelves >= 2, "every pump speed is held across a shelf");
+        let spec = TUNING
+            .functions
+            .get(function)
+            .expect("the reference is validated at load");
+        assert!(
+            spec.deviance.is_some(),
+            "a stepped curve needs hysteresis to hold its shelves"
+        );
     }
 
     /// Goal: a graph entry referencing a function with no table is rejected. Method: rewrite one
@@ -316,7 +360,35 @@ mod tests {
     fn rejects_non_monotonic_curve() {
         let bad = TUNING_TOML.replacen(
             "curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]",
-            "curve = [[45.0, 25], [40.0, 40]]",
+            "curve = [[45.0, 25], [40.0, 40], [75.0, 70]]",
+            1,
+        );
+        let config: TuningConfig =
+            toml_edit::de::from_str(&bad).expect("still parses structurally");
+        assert!(config.validate().is_err());
+    }
+
+    /// Goal: a curve with fewer points than the UI needs to draw a curve is rejected. Method:
+    /// collapse a real curve to two points and assert validation fails.
+    #[test]
+    fn rejects_curve_with_too_few_points() {
+        let bad = TUNING_TOML.replacen(
+            "curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]",
+            "curve = [[45.0, 25], [85.0, 100]]",
+            1,
+        );
+        let config: TuningConfig =
+            toml_edit::de::from_str(&bad).expect("still parses structurally");
+        assert!(config.validate().is_err());
+    }
+
+    /// Goal: a curve spanning less than the minimum is rejected, since the UI would draw it as a
+    /// cliff. Method: squeeze a real curve into a 10C span and assert validation fails.
+    #[test]
+    fn rejects_curve_with_narrow_spread() {
+        let bad = TUNING_TOML.replacen(
+            "curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]",
+            "curve = [[45.0, 25], [50.0, 40], [55.0, 100]]",
             1,
         );
         let config: TuningConfig =
