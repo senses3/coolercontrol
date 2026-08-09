@@ -173,6 +173,28 @@ export default {
                 forkForFan: 'Für diesen Lüfter abspalten',
                 notControllable:
                     'Dieser Kanal meldet seine Drehzahl, kann aber von CoolerControl nicht gesteuert werden.',
+                verdictFirmwareOverride:
+                    'CoolerControl hat diesen Kanal auf manuelle Steuerung gesetzt, doch die Firmware hat das zurückgesetzt.',
+                verdictFamilyMayNeedOutOfTree:
+                    'Für diesen Kanal wurde keine schreibbare Lüftersteuerung gefunden. Bei dieser Chipfamilie stellt sie manchmal ein anderer Kernel-Treiber bereit.',
+                verdictNotSupportedByDriver:
+                    'Der verwendete Treiber stellt für diesen Kanal keine Lüftersteuerung bereit.',
+                verdictNoPwm:
+                    'Der geladene Treiber stellt für diesen Kanal keine Lüftersteuerung bereit, nur dessen Drehzahl.',
+                verdictPwmReadOnly:
+                    'Der geladene Treiber stellt für diesen Kanal eine Lüftersteuerung bereit, markiert sie aber als schreibgeschützt.',
+                verdictIgnoresDuty:
+                    'Dieser Kanal hat Leistungsänderungen angenommen, seine gemessene Drehzahl hat aber nie reagiert.',
+                verdictUnverifiable:
+                    'Dieser Kanal hat keinen nutzbaren Drehzahlmesser, daher lässt sich seine Reaktion auf Leistungsänderungen nicht überprüfen.',
+                verdictEvidenceLabel: 'Auf diesem Rechner gemessen:',
+                evidenceNoPwmFile: 'keine Lüftersteuerung vorhanden',
+                evidencePwmNotWritable: 'Lüftersteuerung ist schreibgeschützt',
+                evidenceHasTachometer: 'Drehzahlanzeige verfügbar',
+                evidenceNoTachometer: 'keine Drehzahlanzeige',
+                verdictLearnMore: 'Was kann ich dagegen tun?',
+                verdictFoundSomethingThatWorks:
+                    'Etwas gefunden, das funktioniert? Sagen Sie es uns',
                 activeMode: 'Aktiv',
                 previousMode: 'Vorheriger',
                 activate: 'Aktivieren',
@@ -271,6 +293,7 @@ export default {
             customTheme: {
                 title: 'Benutzerdefiniertes Theme',
                 accent: 'Akzentfarbe',
+                accentGradientTo: 'Akzent-Verlauf Ende',
                 bgOne: 'Hintergrund Primär',
                 bgTwo: 'Hintergrund Sekundär',
                 border: 'Rahmenfarbe',
@@ -519,6 +542,34 @@ export default {
             downloadCurrentLog: 'Aktuelle Logs herunterladen',
             deviceHealth: 'Gerätezustand',
             deviceHealthOk: 'Alle Sensoren und Kanäle sind fehlerfrei.',
+            detection: 'Chip-Erkennung',
+            detectionDescription:
+                'Was die Super-I/O-Chipsuche beim Start des Daemons gefunden hat. Module werden beim Start geladen, daher erklärt dieser Durchlauf einen nicht angebundenen Chip.',
+            detectionButton: 'Chip-Erkennung',
+            detectionNotRun:
+                'Es wurde keine Erkennung ausgeführt, daher ist über Super-I/O-Chips auf diesem Rechner nichts bekannt.',
+            detectionSecureBoot: 'Secure Boot',
+            detectionContainer: 'Container',
+            detectionDevPort: '/dev/port verfügbar',
+            detectionChips: 'Erkannte Chips',
+            detectionNoChips: 'Es wurden keine Super-I/O-Chips erkannt.',
+            detectionBlacklisted: 'Blockierte Treiber',
+            hardwareSupportOk: 'Alle erkannte Hardware wird unterstützt und ist steuerbar.',
+            hardwareReport: 'Hardware-Bericht',
+            hardwareReportDescription:
+                'Eine Übersicht dessen, was CoolerControl auf diesem Rechner sieht, bereit zum Einfügen in einen Support-Kanal. Seriennummern und Kennungen sind ausgenommen.',
+            hardwareReportFull: 'Vollständigen hwmon-Baum einbeziehen',
+            hardwareReportEmpty: 'Der Bericht konnte nicht erstellt werden.',
+            hardwareReportButton: 'Hardware-Bericht',
+            hardwareReportCopy: 'Kopieren',
+            hardwareReportCopied: 'Kopiert',
+            findingNoDriverBound:
+                'Ein Chip wurde erkannt, aber kein geladener Treiber bedient ihn.',
+            findingBlacklisted: 'Dieser Treiber steht auf der Blockliste und wurde nicht geladen.',
+            findingBlockedByEnvironment:
+                'Die Hardware-Erkennung konnte in dieser Umgebung nicht ausgeführt werden.',
+            findingDetectionUnsupported:
+                'Die Hardware-Erkennung wird auf dieser Architektur nicht unterstützt.',
             failsafeActive: 'Failsafe-Werte in Verwendung',
             missingTempSource: 'Fehlende Temperaturquelle',
             staleTempSource: 'Temperaturquelle verwendet Failsafe-Werte',

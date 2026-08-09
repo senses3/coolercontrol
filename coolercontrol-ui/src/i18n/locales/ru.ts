@@ -172,6 +172,27 @@ export default {
                 forkForFan: 'Создать копию для этого вентилятора',
                 notControllable:
                     'Этот канал сообщает свою скорость, но не может управляться CoolerControl.',
+                verdictFirmwareOverride:
+                    'CoolerControl перевёл этот канал в ручное управление, но прошивка вернула прежний режим.',
+                verdictFamilyMayNeedOutOfTree:
+                    'Для этого канала не найдено доступного для записи управления вентилятором. У этого семейства микросхем его иногда предоставляет другой драйвер ядра.',
+                verdictNotSupportedByDriver:
+                    'Используемый драйвер не предоставляет управление вентилятором для этого канала.',
+                verdictNoPwm:
+                    'Загруженный драйвер не предоставляет управление вентилятором для этого канала, только его скорость.',
+                verdictPwmReadOnly:
+                    'Загруженный драйвер предоставляет управление вентилятором для этого канала, но помечает его только для чтения.',
+                verdictIgnoresDuty:
+                    'Этот канал принимал изменения мощности, но измеренная скорость на них не отвечала.',
+                verdictUnverifiable:
+                    'У этого канала нет пригодного тахометра, поэтому его реакцию на изменения мощности проверить нельзя.',
+                verdictEvidenceLabel: 'Измерено на этой машине:',
+                evidenceNoPwmFile: 'управление вентилятором отсутствует',
+                evidencePwmNotWritable: 'управление вентилятором доступно только для чтения',
+                evidenceHasTachometer: 'показания скорости доступны',
+                evidenceNoTachometer: 'показаний скорости нет',
+                verdictLearnMore: 'Что с этим можно сделать?',
+                verdictFoundSomethingThatWorks: 'Нашли рабочее решение? Расскажите нам',
                 activeMode: 'Активный',
                 previousMode: 'Предыдущий',
                 activate: 'Активировать',
@@ -269,6 +290,7 @@ export default {
             customTheme: {
                 title: 'Пользовательская тема',
                 accent: 'Цвет акцента',
+                accentGradientTo: 'Конец градиента акцента',
                 bgOne: 'Основной фон',
                 bgTwo: 'Вторичный фон',
                 border: 'Цвет границы',
@@ -513,6 +535,33 @@ export default {
             downloadCurrentLog: 'Скачать текущий лог',
             deviceHealth: 'Состояние устройств',
             deviceHealthOk: 'Все датчики и каналы работают исправно.',
+            detection: 'Обнаружение микросхем',
+            detectionDescription:
+                'Что обнаружил поиск микросхем Super-I/O при запуске службы. Модули загружаются при старте, поэтому именно этот запуск объясняет микросхему без драйвера.',
+            detectionButton: 'Обнаружение микросхем',
+            detectionNotRun:
+                'Обнаружение не запускалось, поэтому о микросхемах Super-I/O на этой машине ничего не известно.',
+            detectionSecureBoot: 'Безопасная загрузка',
+            detectionContainer: 'Контейнер',
+            detectionDevPort: '/dev/port доступен',
+            detectionChips: 'Обнаруженные микросхемы',
+            detectionNoChips: 'Микросхемы Super-I/O не обнаружены.',
+            detectionBlacklisted: 'Драйверы в чёрном списке',
+            hardwareSupportOk: 'Всё обнаруженное оборудование поддерживается и управляемо.',
+            hardwareReport: 'Отчёт об оборудовании',
+            hardwareReportDescription:
+                'Сводка того, что CoolerControl видит на этой машине, готовая к вставке в канал поддержки. Серийные номера и идентификаторы исключены.',
+            hardwareReportFull: 'Включить полное дерево hwmon',
+            hardwareReportEmpty: 'Не удалось создать отчёт.',
+            hardwareReportButton: 'Отчёт об оборудовании',
+            hardwareReportCopy: 'Копировать',
+            hardwareReportCopied: 'Скопировано',
+            findingNoDriverBound:
+                'Микросхема обнаружена, но ни один загруженный драйвер её не обслуживает.',
+            findingBlacklisted: 'Этот драйвер в чёрном списке и не был загружен.',
+            findingBlockedByEnvironment: 'Обнаружение оборудования не может работать в этой среде.',
+            findingDetectionUnsupported:
+                'Обнаружение оборудования не поддерживается на этой архитектуре.',
             failsafeActive: 'Используются аварийные значения',
             missingTempSource: 'Отсутствует источник температуры',
             staleTempSource: 'Источник температуры использует аварийные значения',

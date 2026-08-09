@@ -169,6 +169,27 @@ export default {
                 forkForFan: 'إنشاء نسخة لهذه المروحة',
                 notControllable:
                     'تُبلّغ هذه القناة عن سرعتها لكن لا يمكن لـ CoolerControl التحكم بها.',
+                verdictFirmwareOverride:
+                    'ضبط CoolerControl هذه القناة على التحكم اليدوي، لكن البرنامج الثابت أعادها كما كانت.',
+                verdictFamilyMayNeedOutOfTree:
+                    'لم يُعثر على تحكم بالمروحة قابل للكتابة لهذه القناة. في عائلة الشرائح هذه، يوفّره أحيانًا برنامج تشغيل نواة آخر.',
+                verdictNotSupportedByDriver:
+                    'برنامج التشغيل المستخدم لا يوفّر تحكمًا بالمروحة لهذه القناة.',
+                verdictNoPwm:
+                    'برنامج التشغيل المحمَّل يوفّر سرعة هذه القناة فقط، دون تحكم بالمروحة.',
+                verdictPwmReadOnly:
+                    'برنامج التشغيل المحمَّل يوفّر تحكمًا بالمروحة لهذه القناة لكنه يضعه للقراءة فقط.',
+                verdictIgnoresDuty:
+                    'قبلت هذه القناة تغييرات الطاقة، لكن سرعتها المقاسة لم تستجب أبدًا.',
+                verdictUnverifiable:
+                    'لا تحتوي هذه القناة على مقياس دوران صالح، لذا لا يمكن التحقق من استجابتها لتغييرات الطاقة.',
+                verdictEvidenceLabel: 'قياسات على هذا الجهاز:',
+                evidenceNoPwmFile: 'لا يوجد تحكم بالمروحة',
+                evidencePwmNotWritable: 'التحكم بالمروحة للقراءة فقط',
+                evidenceHasTachometer: 'قراءة السرعة متاحة',
+                evidenceNoTachometer: 'لا توجد قراءة للسرعة',
+                verdictLearnMore: 'ماذا يمكنني أن أفعل حيال ذلك؟',
+                verdictFoundSomethingThatWorks: 'وجدت حلًا ناجحًا؟ أخبرنا به',
                 activeMode: 'نشط',
                 previousMode: 'السابق',
                 activate: 'تفعيل',
@@ -266,6 +287,7 @@ export default {
             customTheme: {
                 title: 'سمة مخصصة',
                 accent: 'لون التمييز',
+                accentGradientTo: 'نهاية تدرّج اللون المميّز',
                 bgOne: 'الخلفية الأساسية',
                 bgTwo: 'الخلفية الثانوية',
                 border: 'لون الحدود',
@@ -504,6 +526,31 @@ export default {
             downloadCurrentLog: 'تنزيل السجل الحالي',
             deviceHealth: 'سلامة الأجهزة',
             deviceHealthOk: 'جميع المستشعرات والقنوات تعمل بشكل سليم.',
+            detection: 'اكتشاف الشرائح',
+            detectionDescription:
+                'ما وجده فحص شريحة Super-I/O عند بدء الخدمة. تُحمَّل الوحدات عند الإقلاع، لذا يفسّر هذا التشغيل وجود شريحة بلا برنامج تشغيل.',
+            detectionButton: 'اكتشاف الشرائح',
+            detectionNotRun:
+                'لم يُجرَ أي اكتشاف، لذا لا يُعرف شيء عن شرائح Super-I/O في هذا الجهاز.',
+            detectionSecureBoot: 'الإقلاع الآمن',
+            detectionContainer: 'حاوية',
+            detectionDevPort: '‏/dev/port متاح',
+            detectionChips: 'الشرائح المكتشفة',
+            detectionNoChips: 'لم يتم اكتشاف أي شرائح Super-I/O.',
+            detectionBlacklisted: 'برامج تشغيل محظورة',
+            hardwareSupportOk: 'جميع الأجهزة المكتشفة مدعومة وقابلة للتحكم.',
+            hardwareReport: 'تقرير الأجهزة',
+            hardwareReportDescription:
+                'ملخص لما يراه CoolerControl على هذا الجهاز، جاهز للصقه في قناة الدعم. الأرقام التسلسلية والمعرّفات مستثناة.',
+            hardwareReportFull: 'تضمين شجرة hwmon كاملة',
+            hardwareReportEmpty: 'تعذّر إنشاء التقرير.',
+            hardwareReportButton: 'تقرير الأجهزة',
+            hardwareReportCopy: 'نسخ',
+            hardwareReportCopied: 'تم النسخ',
+            findingNoDriverBound: 'تم اكتشاف شريحة، لكن لا يوجد برنامج تشغيل محمَّل يخدمها.',
+            findingBlacklisted: 'برنامج التشغيل هذا محظور ولم يتم تحميله.',
+            findingBlockedByEnvironment: 'تعذّر تشغيل اكتشاف الأجهزة في هذه البيئة.',
+            findingDetectionUnsupported: 'اكتشاف الأجهزة غير مدعوم على هذه البنية.',
             failsafeActive: 'قيم الأمان قيد الاستخدام',
             missingTempSource: 'مصدر درجة الحرارة مفقود',
             staleTempSource: 'مصدر درجة الحرارة يستخدم قيم الأمان',

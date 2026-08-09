@@ -169,6 +169,27 @@ export default {
                 forkForFan: '이 팬용으로 분기',
                 notControllable:
                     '이 채널은 속도를 보고하지만 CoolerControl에서 제어할 수 없습니다.',
+                verdictFirmwareOverride:
+                    'CoolerControl이 이 채널을 수동 제어로 설정했지만 펌웨어가 되돌렸습니다.',
+                verdictFamilyMayNeedOutOfTree:
+                    '이 채널에 쓰기 가능한 팬 제어를 찾지 못했습니다. 이 칩 계열에서는 다른 커널 드라이버가 제공하기도 합니다.',
+                verdictNotSupportedByDriver:
+                    '사용 중인 드라이버는 이 채널의 팬 제어를 제공하지 않습니다.',
+                verdictNoPwm:
+                    '로드된 드라이버는 이 채널의 속도만 제공하고 팬 제어는 제공하지 않습니다.',
+                verdictPwmReadOnly:
+                    '로드된 드라이버가 이 채널의 팬 제어를 제공하지만 읽기 전용으로 표시합니다.',
+                verdictIgnoresDuty:
+                    '이 채널은 듀티 변경을 받아들였지만 측정된 속도는 전혀 반응하지 않았습니다.',
+                verdictUnverifiable:
+                    '이 채널에는 사용할 수 있는 회전 속도계가 없어 듀티 변경에 대한 반응을 확인할 수 없습니다.',
+                verdictEvidenceLabel: '이 컴퓨터에서 측정한 결과:',
+                evidenceNoPwmFile: '팬 제어 없음',
+                evidencePwmNotWritable: '팬 제어가 읽기 전용',
+                evidenceHasTachometer: '속도 읽기 가능',
+                evidenceNoTachometer: '속도 읽기 없음',
+                verdictLearnMore: '어떻게 해결할 수 있나요?',
+                verdictFoundSomethingThatWorks: '동작하는 방법을 찾으셨나요? 알려 주세요',
                 activeMode: '활성',
                 previousMode: '이전',
                 activate: '활성화',
@@ -266,6 +287,7 @@ export default {
             customTheme: {
                 title: '커스텀 테마',
                 accent: '강조색',
+                accentGradientTo: '강조 그라데이션 끝',
                 bgOne: '메인 배경색',
                 bgTwo: '보조 배경색',
                 border: '테두리 색',
@@ -504,6 +526,31 @@ export default {
             downloadCurrentLog: '현재 로그 다운로드',
             deviceHealth: '장치 상태',
             deviceHealthOk: '모든 센서와 채널이 정상입니다.',
+            detection: '칩 감지',
+            detectionDescription:
+                '데몬이 시작될 때 Super-I/O 칩 탐지가 찾아낸 결과입니다. 모듈은 시작 시 로드되므로 이 실행이 드라이버가 연결되지 않은 칩을 설명합니다.',
+            detectionButton: '칩 감지',
+            detectionNotRun:
+                '탐지를 실행하지 않아 이 컴퓨터의 Super-I/O 칩에 대해 알려진 것이 없습니다.',
+            detectionSecureBoot: '보안 부팅',
+            detectionContainer: '컨테이너',
+            detectionDevPort: '/dev/port 사용 가능',
+            detectionChips: '감지된 칩',
+            detectionNoChips: 'Super-I/O 칩이 감지되지 않았습니다.',
+            detectionBlacklisted: '차단 목록 드라이버',
+            hardwareSupportOk: '감지된 모든 하드웨어가 지원되며 제어할 수 있습니다.',
+            hardwareReport: '하드웨어 보고서',
+            hardwareReportDescription:
+                'CoolerControl이 이 컴퓨터에서 인식한 내용의 요약으로, 지원 채널에 바로 붙여넣을 수 있습니다. 일련번호와 식별자는 제외됩니다.',
+            hardwareReportFull: '전체 hwmon 트리 포함',
+            hardwareReportEmpty: '보고서를 생성할 수 없습니다.',
+            hardwareReportButton: '하드웨어 보고서',
+            hardwareReportCopy: '복사',
+            hardwareReportCopied: '복사됨',
+            findingNoDriverBound: '칩이 감지되었지만 이를 처리하는 로드된 드라이버가 없습니다.',
+            findingBlacklisted: '이 드라이버는 차단 목록에 있어 로드되지 않았습니다.',
+            findingBlockedByEnvironment: '이 환경에서는 하드웨어 탐지를 실행할 수 없습니다.',
+            findingDetectionUnsupported: '이 아키텍처에서는 하드웨어 탐지가 지원되지 않습니다.',
             failsafeActive: '페일세이프 값 사용 중',
             missingTempSource: '온도 소스 누락',
             staleTempSource: '온도 소스가 페일세이프 값 사용 중',

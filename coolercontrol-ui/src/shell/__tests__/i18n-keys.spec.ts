@@ -31,6 +31,14 @@ function resolves(root: any, key: string): boolean {
     return typeof node === 'string'
 }
 
+function flatten(node: any, prefix = ''): string[] {
+    return Object.entries(node).flatMap(([key, value]) =>
+        value != null && typeof value === 'object'
+            ? flatten(value, `${prefix}${key}.`)
+            : [`${prefix}${key}`],
+    )
+}
+
 describe('shell i18n keys', () => {
     it('resolves every static key against the english locale', () => {
         const missing: string[] = []
@@ -64,6 +72,38 @@ describe('shell i18n keys', () => {
             }
         }
         expect(missing).toEqual([])
+    })
+
+    // The two checks below are the general form of the hand-listed ones above: any key english
+    // has and a locale does not falls back to english mid-screen, and any key a locale still has
+    // after english dropped it is dead weight a prune missed. A locale added 37 keys behind
+    // english before this existed, all of them invisible because nothing compared the sets.
+    it('has every english key in every locale', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        expect(locales).toHaveLength(LOCALE_COUNT)
+
+        const englishKeys = new Set(flatten(en))
+        expect(englishKeys.size).toBeGreaterThan(500)
+        const missing: string[] = []
+        for (const [path, module] of locales) {
+            const keys = new Set(flatten(module.default))
+            for (const key of englishKeys) {
+                if (!keys.has(key)) missing.push(`${path}: ${key}`)
+            }
+        }
+        expect(missing).toEqual([])
+    })
+
+    it('has no key in a locale that english dropped', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        const englishKeys = new Set(flatten(en))
+        const stale: string[] = []
+        for (const [path, module] of locales) {
+            for (const key of flatten(module.default)) {
+                if (!englishKeys.has(key)) stale.push(`${path}: ${key}`)
+            }
+        }
+        expect(stale).toEqual([])
     })
 
     // The enum labels are picked in a model helper rather than a shell file, so

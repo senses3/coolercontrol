@@ -169,6 +169,28 @@ export default {
                 forkForFan: 'このファン用に複製',
                 notControllable:
                     'このチャンネルは速度を報告しますが、CoolerControlでは制御できません。',
+                verdictFirmwareOverride:
+                    'CoolerControl はこのチャネルを手動制御に設定しましたが、ファームウェアが元に戻しました。',
+                verdictFamilyMayNeedOutOfTree:
+                    'このチャネルには書き込み可能なファン制御が見つかりませんでした。このチップファミリーでは、別のカーネルドライバーが提供する場合があります。',
+                verdictNotSupportedByDriver:
+                    '使用中のドライバーはこのチャネルのファン制御を提供していません。',
+                verdictNoPwm:
+                    '読み込まれたドライバーはこのチャネルの回転数のみを提供し、ファン制御は提供していません。',
+                verdictPwmReadOnly:
+                    '読み込まれたドライバーはこのチャネルのファン制御を提供していますが、読み取り専用としています。',
+                verdictIgnoresDuty:
+                    'このチャネルはデューティの変更を受け付けましたが、実測の回転数は一度も反応しませんでした。',
+                verdictUnverifiable:
+                    'このチャネルには利用可能な回転数センサーがないため、デューティ変更への反応を確認できません。',
+                verdictEvidenceLabel: 'このマシンでの実測:',
+                evidenceNoPwmFile: 'ファン制御なし',
+                evidencePwmNotWritable: 'ファン制御は読み取り専用',
+                evidenceHasTachometer: '回転数の取得が可能',
+                evidenceNoTachometer: '回転数の取得なし',
+                verdictLearnMore: '対処方法はありますか?',
+                verdictFoundSomethingThatWorks:
+                    'うまくいく方法が見つかりましたか? お知らせください',
                 activeMode: 'アクティブ',
                 previousMode: '前回',
                 activate: 'アクティブ化',
@@ -266,6 +288,7 @@ export default {
             customTheme: {
                 title: 'カスタムテーマ',
                 accent: 'アクセントカラー',
+                accentGradientTo: 'アクセントグラデーション終了色',
                 bgOne: '背景プライマリ',
                 bgTwo: '背景セカンダリ',
                 border: 'ボーダーカラー',
@@ -509,6 +532,34 @@ export default {
             downloadCurrentLog: '現在のログをダウンロード',
             deviceHealth: 'デバイスの状態',
             deviceHealthOk: 'すべてのセンサーとチャンネルは正常です。',
+            detection: 'チップ検出',
+            detectionDescription:
+                'デーモン起動時の Super-I/O チップ検出の結果です。モジュールは起動時に読み込まれるため、この実行がドライバー未割り当てのチップを説明します。',
+            detectionButton: 'チップ検出',
+            detectionNotRun:
+                '検出が実行されていないため、このマシンの Super-I/O チップについては何も分かりません。',
+            detectionSecureBoot: 'セキュアブート',
+            detectionContainer: 'コンテナ',
+            detectionDevPort: '/dev/port が利用可能',
+            detectionChips: '検出されたチップ',
+            detectionNoChips: 'Super-I/O チップは検出されませんでした。',
+            detectionBlacklisted: 'ブラックリストのドライバー',
+            hardwareSupportOk: '検出されたすべてのハードウェアがサポートされ、制御可能です。',
+            hardwareReport: 'ハードウェアレポート',
+            hardwareReportDescription:
+                'CoolerControl がこのマシンで認識している内容の要約です。サポートチャンネルにそのまま貼り付けられます。シリアル番号と識別子は含まれません。',
+            hardwareReportFull: 'hwmon ツリー全体を含める',
+            hardwareReportEmpty: 'レポートを生成できませんでした。',
+            hardwareReportButton: 'ハードウェアレポート',
+            hardwareReportCopy: 'コピー',
+            hardwareReportCopied: 'コピーしました',
+            findingNoDriverBound:
+                'チップは検出されましたが、対応する読み込み済みドライバーがありません。',
+            findingBlacklisted:
+                'このドライバーはブラックリストに登録されており、読み込まれませんでした。',
+            findingBlockedByEnvironment: 'この環境ではハードウェア検出を実行できませんでした。',
+            findingDetectionUnsupported:
+                'このアーキテクチャではハードウェア検出はサポートされていません。',
             failsafeActive: 'フェイルセーフ値を使用中',
             missingTempSource: '温度ソースが見つかりません',
             staleTempSource: '温度ソースはフェイルセーフ値を使用中',

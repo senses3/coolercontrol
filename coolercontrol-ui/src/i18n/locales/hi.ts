@@ -170,6 +170,27 @@ export default {
                 forkForFan: 'इस पंखे के लिए फोर्क करें',
                 notControllable:
                     'यह चैनल अपनी गति रिपोर्ट करता है लेकिन CoolerControl द्वारा नियंत्रित नहीं किया जा सकता।',
+                verdictFirmwareOverride:
+                    'CoolerControl ने इस चैनल को मैनुअल नियंत्रण पर सेट किया, लेकिन फ़र्मवेयर ने उसे वापस बदल दिया।',
+                verdictFamilyMayNeedOutOfTree:
+                    'इस चैनल के लिए कोई लिखने योग्य फ़ैन नियंत्रण नहीं मिला। इस चिप श्रेणी पर कभी-कभी कोई अन्य कर्नेल ड्राइवर इसे उपलब्ध कराता है।',
+                verdictNotSupportedByDriver:
+                    'उपयोग में मौजूद ड्राइवर इस चैनल के लिए फ़ैन नियंत्रण उपलब्ध नहीं कराता।',
+                verdictNoPwm:
+                    'लोड किया गया ड्राइवर इस चैनल के लिए केवल गति दिखाता है, फ़ैन नियंत्रण नहीं।',
+                verdictPwmReadOnly:
+                    'लोड किया गया ड्राइवर इस चैनल के लिए फ़ैन नियंत्रण दिखाता है, पर उसे केवल-पढ़ने योग्य चिह्नित करता है।',
+                verdictIgnoresDuty:
+                    'इस चैनल ने ड्यूटी परिवर्तन स्वीकार किए, पर इसकी मापी गई गति ने कभी प्रतिक्रिया नहीं दी।',
+                verdictUnverifiable:
+                    'इस चैनल में कोई उपयोग योग्य टैकोमीटर नहीं है, इसलिए ड्यूटी परिवर्तनों पर इसकी प्रतिक्रिया सत्यापित नहीं की जा सकती।',
+                verdictEvidenceLabel: 'इस मशीन पर मापा गया:',
+                evidenceNoPwmFile: 'कोई फ़ैन नियंत्रण उपलब्ध नहीं',
+                evidencePwmNotWritable: 'फ़ैन नियंत्रण केवल-पढ़ने योग्य है',
+                evidenceHasTachometer: 'गति की रीडिंग उपलब्ध',
+                evidenceNoTachometer: 'गति की कोई रीडिंग नहीं',
+                verdictLearnMore: 'मैं इसके बारे में क्या कर सकता हूँ?',
+                verdictFoundSomethingThatWorks: 'कोई ऐसा तरीका मिला जो काम करता है? हमें बताएं',
                 activeMode: 'सक्रिय',
                 previousMode: 'पिछला',
                 activate: 'सक्रिय करें',
@@ -266,6 +287,7 @@ export default {
             customTheme: {
                 title: 'कस्टम थीम',
                 accent: 'एक्सेंट रंग',
+                accentGradientTo: 'एक्सेंट ग्रेडिएंट अंत',
                 bgOne: 'प्राथमिक पृष्ठभूमि',
                 bgTwo: 'माध्यमिक पृष्ठभूमि',
                 border: 'बॉर्डर रंग',
@@ -506,6 +528,31 @@ export default {
             downloadCurrentLog: 'वर्तमान लॉग डाउनलोड करें',
             deviceHealth: 'डिवाइस स्वास्थ्य',
             deviceHealthOk: 'सभी सेंसर और चैनल सही स्थिति में हैं।',
+            detection: 'चिप पहचान',
+            detectionDescription:
+                'डेमन शुरू होने पर Super-I/O चिप जाँच ने क्या पाया। मॉड्यूल स्टार्टअप पर लोड होते हैं, इसलिए यही रन बताता है कि कोई चिप ड्राइवर से क्यों नहीं जुड़ी।',
+            detectionButton: 'चिप पहचान',
+            detectionNotRun:
+                'कोई पहचान नहीं चलाई गई, इसलिए इस मशीन के Super-I/O चिप्स के बारे में कुछ ज्ञात नहीं है।',
+            detectionSecureBoot: 'सिक्योर बूट',
+            detectionContainer: 'कंटेनर',
+            detectionDevPort: '/dev/port उपलब्ध',
+            detectionChips: 'पहचाने गए चिप्स',
+            detectionNoChips: 'कोई Super-I/O चिप नहीं मिली।',
+            detectionBlacklisted: 'ब्लैकलिस्ट किए गए ड्राइवर',
+            hardwareSupportOk: 'पहचाना गया सारा हार्डवेयर समर्थित और नियंत्रण योग्य है।',
+            hardwareReport: 'हार्डवेयर रिपोर्ट',
+            hardwareReportDescription:
+                'इस मशीन पर CoolerControl को जो दिखता है उसका सारांश, सपोर्ट चैनल में चिपकाने के लिए तैयार। सीरियल नंबर और पहचानकर्ता शामिल नहीं हैं।',
+            hardwareReportFull: 'पूरा hwmon ट्री शामिल करें',
+            hardwareReportEmpty: 'रिपोर्ट तैयार नहीं की जा सकी।',
+            hardwareReportButton: 'हार्डवेयर रिपोर्ट',
+            hardwareReportCopy: 'कॉपी करें',
+            hardwareReportCopied: 'कॉपी हो गया',
+            findingNoDriverBound: 'एक चिप मिली, पर कोई लोड किया गया ड्राइवर उसे नहीं चला रहा।',
+            findingBlacklisted: 'यह ड्राइवर ब्लैकलिस्ट में है और लोड नहीं किया गया।',
+            findingBlockedByEnvironment: 'इस परिवेश में हार्डवेयर पहचान नहीं चल सकी।',
+            findingDetectionUnsupported: 'इस आर्किटेक्चर पर हार्डवेयर पहचान समर्थित नहीं है।',
             failsafeActive: 'फेलसेफ मान उपयोग में हैं',
             missingTempSource: 'तापमान स्रोत गायब है',
             staleTempSource: 'तापमान स्रोत फेलसेफ मान उपयोग कर रहा है',

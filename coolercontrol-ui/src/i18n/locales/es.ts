@@ -172,6 +172,27 @@ export default {
                 forkForFan: 'Bifurcar para este ventilador',
                 notControllable:
                     'Este canal informa su velocidad pero CoolerControl no puede controlarlo.',
+                verdictFirmwareOverride:
+                    'CoolerControl estableció este canal en control manual, pero el firmware lo revirtió.',
+                verdictFamilyMayNeedOutOfTree:
+                    'No se encontró un control de ventilador escribible para este canal. En esta familia de chips, a veces lo proporciona otro controlador del kernel.',
+                verdictNotSupportedByDriver:
+                    'El controlador en uso no expone control de ventilador para este canal.',
+                verdictNoPwm:
+                    'El controlador cargado no expone control de ventilador para este canal, solo su velocidad.',
+                verdictPwmReadOnly:
+                    'El controlador cargado expone un control de ventilador para este canal, pero lo marca como de solo lectura.',
+                verdictIgnoresDuty:
+                    'Este canal aceptó cambios de potencia, pero su velocidad medida nunca respondió.',
+                verdictUnverifiable:
+                    'Este canal no tiene un tacómetro utilizable, por lo que no se puede verificar su respuesta a los cambios de potencia.',
+                verdictEvidenceLabel: 'Medido en esta máquina:',
+                evidenceNoPwmFile: 'sin control de ventilador expuesto',
+                evidencePwmNotWritable: 'el control de ventilador es de solo lectura',
+                evidenceHasTachometer: 'lectura de velocidad disponible',
+                evidenceNoTachometer: 'sin lectura de velocidad',
+                verdictLearnMore: '¿Qué puedo hacer al respecto?',
+                verdictFoundSomethingThatWorks: '¿Encontró algo que funciona? Cuéntenoslo',
                 activeMode: 'Activo',
                 previousMode: 'Anterior',
                 activate: 'Activar',
@@ -269,6 +290,7 @@ export default {
             customTheme: {
                 title: 'Tema Personalizado',
                 accent: 'Color de Acento',
+                accentGradientTo: 'Fin del degradado de acento',
                 bgOne: 'Fondo Primario',
                 bgTwo: 'Fondo Secundario',
                 border: 'Color del Borde',
@@ -513,6 +535,33 @@ export default {
             downloadCurrentLog: 'Descargar Registro Actual',
             deviceHealth: 'Estado de los Dispositivos',
             deviceHealthOk: 'Todos los sensores y canales funcionan correctamente.',
+            detection: 'Detección de chips',
+            detectionDescription:
+                'Lo que encontró el sondeo del chip Super-I/O al iniciarse el demonio. Los módulos se cargan al arrancar, así que esta es la ejecución que explica un chip sin controlador.',
+            detectionButton: 'Detección de chips',
+            detectionNotRun:
+                'No se ejecutó ninguna detección, por lo que no se sabe nada sobre los chips Super-I/O de esta máquina.',
+            detectionSecureBoot: 'Arranque seguro',
+            detectionContainer: 'Contenedor',
+            detectionDevPort: '/dev/port disponible',
+            detectionChips: 'Chips detectados',
+            detectionNoChips: 'No se detectaron chips Super-I/O.',
+            detectionBlacklisted: 'Controladores en lista negra',
+            hardwareSupportOk: 'Todo el hardware detectado es compatible y controlable.',
+            hardwareReport: 'Informe de hardware',
+            hardwareReportDescription:
+                'Un resumen de lo que CoolerControl ve en esta máquina, listo para pegar en un canal de soporte. Se excluyen números de serie e identificadores.',
+            hardwareReportFull: 'Incluir el árbol hwmon completo',
+            hardwareReportEmpty: 'No se pudo generar el informe.',
+            hardwareReportButton: 'Informe de hardware',
+            hardwareReportCopy: 'Copiar',
+            hardwareReportCopied: 'Copiado',
+            findingNoDriverBound: 'Se detectó un chip, pero ningún controlador cargado lo atiende.',
+            findingBlacklisted: 'Este controlador está en la lista negra y no se cargó.',
+            findingBlockedByEnvironment:
+                'La detección de hardware no pudo ejecutarse en este entorno.',
+            findingDetectionUnsupported:
+                'La detección de hardware no es compatible con esta arquitectura.',
             failsafeActive: 'Valores de seguridad en uso',
             missingTempSource: 'Fuente de temperatura faltante',
             staleTempSource: 'La fuente de temperatura usa valores de seguridad',

@@ -174,6 +174,27 @@ export default {
                 forkForFan: 'Dupliquer pour ce ventilateur',
                 notControllable:
                     'Ce canal signale sa vitesse mais ne peut pas être contrôlé par CoolerControl.',
+                verdictFirmwareOverride:
+                    "CoolerControl a réglé ce canal en commande manuelle, mais le firmware l'a rétabli.",
+                verdictFamilyMayNeedOutOfTree:
+                    "Aucune commande de ventilateur inscriptible n'a été trouvée pour ce canal. Sur cette famille de puces, un autre pilote noyau la fournit parfois.",
+                verdictNotSupportedByDriver:
+                    'Le pilote utilisé ne propose aucune commande de ventilateur pour ce canal.',
+                verdictNoPwm:
+                    'Le pilote chargé ne propose aucune commande de ventilateur pour ce canal, seulement sa vitesse.',
+                verdictPwmReadOnly:
+                    'Le pilote chargé propose une commande de ventilateur pour ce canal, mais la marque en lecture seule.',
+                verdictIgnoresDuty:
+                    "Ce canal a accepté les changements de puissance, mais sa vitesse mesurée n'a jamais réagi.",
+                verdictUnverifiable:
+                    "Ce canal n'a pas de tachymètre exploitable, sa réaction aux changements de puissance ne peut donc pas être vérifiée.",
+                verdictEvidenceLabel: 'Mesuré sur cette machine :',
+                evidenceNoPwmFile: 'aucune commande de ventilateur exposée',
+                evidencePwmNotWritable: 'la commande de ventilateur est en lecture seule',
+                evidenceHasTachometer: 'lecture de vitesse disponible',
+                evidenceNoTachometer: 'aucune lecture de vitesse',
+                verdictLearnMore: 'Que puis-je y faire ?',
+                verdictFoundSomethingThatWorks: 'Vous avez trouvé une solution ? Dites-le nous',
                 activeMode: 'Actif',
                 previousMode: 'Précédent',
                 activate: 'Activer',
@@ -276,6 +297,7 @@ export default {
             customTheme: {
                 title: 'Thème Personnalisé',
                 accent: "Couleur d'Accent",
+                accentGradientTo: "Fin du dégradé d'accentuation",
                 bgOne: 'Fond Principal',
                 bgTwo: 'Fond Secondaire',
                 border: 'Couleur de la Bordure',
@@ -524,6 +546,33 @@ export default {
             downloadCurrentLog: 'Télécharger le Journal Actuel',
             deviceHealth: 'État des Périphériques',
             deviceHealthOk: 'Tous les capteurs et canaux fonctionnent correctement.',
+            detection: 'Détection des puces',
+            detectionDescription:
+                "Ce que la détection de puce Super-I/O a trouvé au démarrage du démon. Les modules sont chargés au démarrage, c'est donc cette exécution qui explique une puce non prise en charge.",
+            detectionButton: 'Détection des puces',
+            detectionNotRun:
+                "Aucune détection n'a été exécutée, rien n'est donc connu des puces Super-I/O de cette machine.",
+            detectionSecureBoot: 'Secure Boot',
+            detectionContainer: 'Conteneur',
+            detectionDevPort: '/dev/port disponible',
+            detectionChips: 'Puces détectées',
+            detectionNoChips: "Aucune puce Super-I/O n'a été détectée.",
+            detectionBlacklisted: 'Pilotes sur liste noire',
+            hardwareSupportOk: 'Tout le matériel détecté est pris en charge et contrôlable.',
+            hardwareReport: 'Rapport matériel',
+            hardwareReportDescription:
+                "Un résumé de ce que CoolerControl voit sur cette machine, prêt à coller dans un canal d'assistance. Les numéros de série et identifiants sont exclus.",
+            hardwareReportFull: "Inclure l'arborescence hwmon complète",
+            hardwareReportEmpty: "Le rapport n'a pas pu être généré.",
+            hardwareReportButton: 'Rapport matériel',
+            hardwareReportCopy: 'Copier',
+            hardwareReportCopied: 'Copié',
+            findingNoDriverBound: 'Une puce a été détectée, mais aucun pilote chargé ne la gère.',
+            findingBlacklisted: "Ce pilote est sur liste noire et n'a pas été chargé.",
+            findingBlockedByEnvironment:
+                "La détection matérielle n'a pas pu s'exécuter dans cet environnement.",
+            findingDetectionUnsupported:
+                "La détection matérielle n'est pas prise en charge sur cette architecture.",
             failsafeActive: 'Valeurs de secours utilisées',
             missingTempSource: 'Source de température manquante',
             staleTempSource: 'La source de température utilise des valeurs de secours',
