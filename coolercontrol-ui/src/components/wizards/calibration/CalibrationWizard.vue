@@ -16,6 +16,7 @@ import {
     mdiMinusCircleOutline,
     mdiTuneVerticalVariant,
 } from '@mdi/js'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiCheckbox from '@/shell/ui/UiCheckbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
@@ -128,6 +129,30 @@ const fillFans = (): void => {
     }
 }
 fillFans()
+
+// Channel names repeat across devices (Fan1, Fan2...), so the picker shows them
+// under their device. Rows are already collected device by device.
+interface FanGroup {
+    deviceUID: string
+    deviceName: string
+    rows: Array<FanRow>
+}
+const deviceLabel = (deviceUID: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
+const fanGroups = computed<Array<FanGroup>>(() => {
+    const groups: Array<FanGroup> = []
+    for (const row of fanRows.value) {
+        const current = groups[groups.length - 1]
+        if (current != null && current.deviceUID === row.deviceUID) current.rows.push(row)
+        else
+            groups.push({
+                deviceUID: row.deviceUID,
+                deviceName: deviceLabel(row.deviceUID),
+                rows: [row],
+            })
+    }
+    return groups
+})
 
 // A fan with a currently Active alert cannot be calibrated; the daemon
 // rejects it, so the picker keeps it out of the selection.
@@ -305,57 +330,62 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                                 {{ t('components.wizards.calibration.selectAll') }}
                             </span>
                         </div>
-                        <div
-                            v-for="(row, index) in fanRows"
-                            :key="row.deviceUID + row.channelName"
-                            class="flex items-center gap-x-2 ml-1"
-                        >
-                            <UiCheckbox
-                                v-model="fanRows[index].selected"
-                                :disabled="rowBlockedBy(row) != null"
-                            />
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMinus"
-                                :size="16"
-                                :style="{ color: row.color }"
-                            />
-                            <span class="truncate">{{ row.label }}</span>
-                            <span v-if="rowBlockedBy(row) != null" class="text-xs text-warning">
-                                {{
-                                    t('components.wizards.calibration.blockedByAlert', {
-                                        name: rowBlockedBy(row),
-                                    })
-                                }}
-                            </span>
-                            <span
-                                v-else-if="row.alreadyCalibrated && rowWarnings(row)"
-                                v-tooltip.top="rowWarnings(row)"
-                                class="flex min-w-0 items-center gap-x-1 text-xs text-warning"
+                        <template v-for="group in fanGroups" :key="group.deviceUID">
+                            <PanelHeader :label="group.deviceName" />
+                            <div
+                                v-for="row in group.rows"
+                                :key="row.deviceUID + row.channelName"
+                                class="flex items-center gap-x-2 ml-1"
                             >
+                                <UiCheckbox
+                                    v-model="row.selected"
+                                    :disabled="rowBlockedBy(row) != null"
+                                />
                                 <svg-icon
                                     type="mdi"
-                                    :path="mdiAlertCircleOutline"
-                                    :size="14"
-                                    class="shrink-0"
+                                    :path="mdiMinus"
+                                    :size="16"
+                                    :style="{ color: row.color }"
                                 />
-                                <span class="truncate">{{ rowWarnings(row) }}</span>
-                            </span>
-                            <span v-else-if="row.alreadyCalibrated" class="text-xs text-accent">
-                                {{ t('components.wizards.calibration.calibratedBadge') }}
-                            </span>
-                            <!-- Independent of the badges above: a channel can be
-                                 both calibrated and firmware-controlled. -->
-                            <span
-                                v-if="row.firmwareControlled"
-                                v-tooltip.top="
-                                    t('components.wizards.calibration.firmwareControlledDesc')
-                                "
-                                class="shrink-0 text-xs text-text-color-secondary"
-                            >
-                                {{ t('components.wizards.calibration.firmwareControlledBadge') }}
-                            </span>
-                        </div>
+                                <span class="truncate">{{ row.label }}</span>
+                                <span v-if="rowBlockedBy(row) != null" class="text-xs text-warning">
+                                    {{
+                                        t('components.wizards.calibration.blockedByAlert', {
+                                            name: rowBlockedBy(row),
+                                        })
+                                    }}
+                                </span>
+                                <span
+                                    v-else-if="row.alreadyCalibrated && rowWarnings(row)"
+                                    v-tooltip.top="rowWarnings(row)"
+                                    class="flex min-w-0 items-center gap-x-1 text-xs text-warning"
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiAlertCircleOutline"
+                                        :size="14"
+                                        class="shrink-0"
+                                    />
+                                    <span class="truncate">{{ rowWarnings(row) }}</span>
+                                </span>
+                                <span v-else-if="row.alreadyCalibrated" class="text-xs text-accent">
+                                    {{ t('components.wizards.calibration.calibratedBadge') }}
+                                </span>
+                                <!-- Independent of the badges above: a channel can be
+                                     both calibrated and firmware-controlled. -->
+                                <span
+                                    v-if="row.firmwareControlled"
+                                    v-tooltip.top="
+                                        t('components.wizards.calibration.firmwareControlledDesc')
+                                    "
+                                    class="shrink-0 text-xs text-text-color-secondary"
+                                >
+                                    {{
+                                        t('components.wizards.calibration.firmwareControlledBadge')
+                                    }}
+                                </span>
+                            </div>
+                        </template>
                     </template>
                     <template v-if="fanRows.length > 1">
                         <div class="flex items-center justify-between gap-x-3 ml-1 mt-1">

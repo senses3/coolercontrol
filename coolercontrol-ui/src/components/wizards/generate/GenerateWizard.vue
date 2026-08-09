@@ -13,6 +13,7 @@ import {
     mdiInformationSlabCircleOutline,
     mdiMinus,
 } from '@mdi/js'
+import PanelHeader from '@/shell/PanelHeader.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
@@ -91,6 +92,30 @@ const fillFans = (): void => {
 }
 fillFans()
 
+// Channel names repeat across devices (Fan1, Fan2...), so the roles are assigned
+// under their device. Rows are already collected device by device.
+interface FanGroup {
+    deviceUID: string
+    deviceName: string
+    rows: Array<FanRow>
+}
+const deviceLabel = (deviceUID: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
+const fanGroups = computed<Array<FanGroup>>(() => {
+    const groups: Array<FanGroup> = []
+    for (const row of fanRows.value) {
+        const current = groups[groups.length - 1]
+        if (current != null && current.deviceUID === row.deviceUID) current.rows.push(row)
+        else
+            groups.push({
+                deviceUID: row.deviceUID,
+                deviceName: deviceLabel(row.deviceUID),
+                rows: [row],
+            })
+    }
+    return groups
+})
+
 const kindOptions = [
     FanKind.CpuCooler,
     FanKind.GpuFan,
@@ -115,8 +140,8 @@ const calibrateFansFirst = async (): Promise<void> => {
 }
 
 // The kit select models a plain string; a cleared value (skip) maps back to null.
-const setFanKind = (index: number, value: string | undefined): void => {
-    fanRows.value[index].kind = (value as FanKind) ?? null
+const setFanKind = (row: FanRow, value: string | undefined): void => {
+    row.kind = (value as FanKind) ?? null
 }
 
 // Step 2: confirm the key temps. Pre-filled by a best-guess heuristic the user must verify.
@@ -437,30 +462,33 @@ const createAndApply = async (): Promise<void> => {
                     <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
                         {{ t('components.wizards.generate.noFans') }}
                     </div>
-                    <div
-                        v-for="(row, index) in fanRows"
-                        :key="row.deviceUID + row.channelName"
-                        class="flex items-center justify-between gap-x-3"
-                    >
-                        <div class="flex items-center min-w-0">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMinus"
-                                :size="16"
-                                class="mr-2 ml-1"
-                                :style="{ color: row.color }"
+                    <template v-for="group in fanGroups" :key="group.deviceUID">
+                        <PanelHeader :label="group.deviceName" />
+                        <div
+                            v-for="row in group.rows"
+                            :key="row.deviceUID + row.channelName"
+                            class="flex items-center justify-between gap-x-3"
+                        >
+                            <div class="flex items-center min-w-0">
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiMinus"
+                                    :size="16"
+                                    class="mr-2 ml-1"
+                                    :style="{ color: row.color }"
+                                />
+                                <span class="truncate">{{ row.label }}</span>
+                            </div>
+                            <UiSelect
+                                :model-value="row.kind ?? undefined"
+                                :options="kindOptions"
+                                clearable
+                                :placeholder="t('components.wizards.generate.skip')"
+                                class="w-56"
+                                @update:model-value="setFanKind(row, $event)"
                             />
-                            <span class="truncate">{{ row.label }}</span>
                         </div>
-                        <UiSelect
-                            :model-value="fanRows[index].kind ?? undefined"
-                            :options="kindOptions"
-                            clearable
-                            :placeholder="t('components.wizards.generate.skip')"
-                            class="w-56"
-                            @update:model-value="setFanKind(index, $event)"
-                        />
-                    </div>
+                    </template>
                 </div>
 
                 <!-- Step 2: key temps -->
@@ -576,9 +604,14 @@ const createAndApply = async (): Promise<void> => {
                             :key="assignment.device_uid + assignment.channel_name"
                             class="flex items-start justify-between gap-x-3 ml-1"
                         >
-                            <span class="truncate">{{
-                                fanLabel(assignment.device_uid, assignment.channel_name)
-                            }}</span>
+                            <div class="flex min-w-0 items-baseline gap-x-2">
+                                <span class="truncate">{{
+                                    fanLabel(assignment.device_uid, assignment.channel_name)
+                                }}</span>
+                                <span class="truncate text-sm text-text-color-secondary">{{
+                                    deviceLabel(assignment.device_uid)
+                                }}</span>
+                            </div>
                             <div class="text-right">
                                 <span class="font-bold">{{
                                     profileNameByUid(assignment.profile_uid)
