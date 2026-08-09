@@ -112,7 +112,7 @@ response_delay = 1
 # ---------------------------------------------------------------------------
 [cpu_cooler.silent]
 type = "graph"
-curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]
+curve = [[45.0, 20], [60.0, 40], [75.0, 70], [85.0, 100]]
 smoothing = { ema_window_seconds = 8 }
 function = "identity"
 
@@ -207,12 +207,12 @@ duty = 100
 # ---------------------------------------------------------------------------
 [aio_radiator.delta.silent]
 type = "graph"
-curve = [[4.0, 25], [10.0, 55], [16.0, 90], [24.0, 90]]
+curve = [[4.0, 20], [10.0, 55], [16.0, 90], [24.0, 90]]
 function = "identity"
 
 [aio_radiator.delta.balanced]
 type = "graph"
-curve = [[3.0, 35], [9.0, 70], [15.0, 100], [23.0, 100]]
+curve = [[3.0, 20], [9.0, 70], [15.0, 100], [23.0, 100]]
 function = "balanced"
 
 [aio_radiator.delta.performance]
@@ -222,12 +222,12 @@ function = "performance"
 
 [aio_radiator.liquid.silent]
 type = "graph"
-curve = [[30.0, 25], [38.0, 55], [46.0, 85], [50.0, 90]]
+curve = [[30.0, 20], [38.0, 55], [46.0, 85], [50.0, 90]]
 function = "identity"
 
 [aio_radiator.liquid.balanced]
 type = "graph"
-curve = [[28.0, 35], [36.0, 70], [44.0, 100], [48.0, 100]]
+curve = [[28.0, 20], [36.0, 70], [44.0, 100], [48.0, 100]]
 function = "balanced"
 
 [aio_radiator.liquid.performance]
