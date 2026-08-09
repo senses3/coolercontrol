@@ -6,13 +6,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import {
-    mdiArrowLeft,
-    mdiAutoFix,
-    mdiContentSaveOutline,
-    mdiInformationSlabCircleOutline,
-    mdiMinus,
-} from '@mdi/js'
+import { mdiAlertOutline, mdiArrowLeft, mdiAutoFix, mdiContentSaveOutline, mdiMinus } from '@mdi/js'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
@@ -678,11 +672,13 @@ const createAndApply = async (): Promise<void> => {
                         <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
                             {{ t('components.wizards.generate.willCreateHeader') }}
                         </div>
+                        <!-- A warning, not an aside: a generated setup nearly always needs
+                             tweaking, and the user should know that before creating it. -->
                         <div class="flex items-start gap-x-2 ml-1 mb-1">
                             <svg-icon
                                 type="mdi"
-                                class="shrink-0 mt-0.5"
-                                :path="mdiInformationSlabCircleOutline"
+                                class="shrink-0 mt-0.5 text-warning"
+                                :path="mdiAlertOutline"
                                 :size="deviceStore.getREMSize(1.2)"
                             />
                             <span class="text-sm">
