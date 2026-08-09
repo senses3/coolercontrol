@@ -2238,6 +2238,12 @@ onMounted(async () => {
             contextIsDirty.value = true
         },
     )
+    // Fixed Profiles have no graph points, so the duty is their only edit.
+    // Graph Profiles also set selectedDuty on point selection, which is not an edit.
+    watch(selectedDuty, (duty) => {
+        if (selectedType.value !== ProfileType.Fixed) return
+        if (duty !== currentProfile.value.speed_fixed) contextIsDirty.value = true
+    })
     onBeforeRouteUpdate(checkForUnsavedChanges)
     onBeforeRouteLeave(checkForUnsavedChanges)
 })
