@@ -22,7 +22,7 @@ use axum::extract::State;
 use axum::Json;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Not;
 use strum::{Display, EnumString};
 use uuid::Uuid;
@@ -167,6 +167,9 @@ pub async fn generate(
     State(AppState {
         device_handle,
         calibration_handle,
+        profile_handle,
+        function_handle,
+        custom_sensor_handle,
         ..
     }): State<AppState>,
     Json(request): Json<GenerateProfilesRequest>,
@@ -175,17 +178,22 @@ pub async fn generate(
     let calibration_map = build_calibration_map(&calibration_handle).await;
     apply_effective_speed_options(&mut devices, &calibration_map);
     let context = DeviceContext::from_devices(&devices);
-    generate_proposal(&request, &context).map(Json)
+    let profiles = profile_handle.get_all().await?;
+    let functions = function_handle.get_all().await?;
+    let custom_sensors = custom_sensor_handle.get_all().await?;
+    let existing = Existing::from_entities(&profiles, &functions, &custom_sensors);
+    generate_proposal(&request, &context, &existing).map(Json)
 }
 
-/// Builds the proposed entity set for a request. Pure and synchronous: given the request and a
-/// device snapshot it is fully unit-testable without the daemon's live state.
+/// Builds the proposed entity set for a request. Pure and synchronous: given the request, a device
+/// snapshot and what already exists it is fully unit-testable without the daemon's live state.
 fn generate_proposal(
     request: &GenerateProfilesRequest,
     context: &DeviceContext,
+    existing: &Existing,
 ) -> Result<GenerateProfilesResponse, CCError> {
     validate_case_preset_coupling(request)?;
-    let mut proposal = Proposal::with_capacity(request.assignments.len());
+    let mut proposal = Proposal::with_capacity(request.assignments.len(), existing);
     for assignment in &request.assignments {
         let preset = request.effective_preset(assignment.kind);
         add_assignment(
@@ -1005,10 +1013,71 @@ impl DeviceContext {
     }
 }
 
+/// What the system already has, indexed by the names this generator produces. Every generated name
+/// is deterministic and encodes its kind and preset ("AIO Radiator (Balanced)", "Auto Fan (Silent)",
+/// "Auto EMA Tctl 8s"), so a name match is the same entity from an earlier run and the run reuses
+/// it instead of minting a suffixed copy. Matching on the definition instead would miss any entity
+/// the user has since edited and duplicate it again.
+///
+/// Reuse is read-only: an existing entity is never rewritten, so edits survive a re-run. The cost
+/// is that new tuning does not reach a profile whose name is already taken until the user deletes
+/// it.
+struct Existing<'a> {
+    profile_uid_by_name: HashMap<&'a str, &'a ProfileUID>,
+    profile_uid_by_signature: HashMap<String, &'a ProfileUID>,
+    function_uid_by_name: HashMap<&'a str, &'a FunctionUID>,
+    function_uid_by_signature: HashMap<String, &'a FunctionUID>,
+    custom_sensor_ids: HashSet<&'a str>,
+}
+
+impl<'a> Existing<'a> {
+    fn from_entities(
+        profiles: &'a [Profile],
+        functions: &'a [Function],
+        custom_sensors: &'a [CustomSensor],
+    ) -> Self {
+        Self {
+            profile_uid_by_name: profiles
+                .iter()
+                .map(|profile| (profile.name.as_str(), &profile.uid))
+                .collect(),
+            profile_uid_by_signature: profiles
+                .iter()
+                .map(|profile| (profile_signature(profile), &profile.uid))
+                .collect(),
+            function_uid_by_name: functions
+                .iter()
+                .map(|function| (function.name.as_str(), &function.uid))
+                .collect(),
+            function_uid_by_signature: functions
+                .iter()
+                .map(|function| (function_signature(function), &function.uid))
+                .collect(),
+            custom_sensor_ids: custom_sensors
+                .iter()
+                .map(|sensor| sensor.id.as_str())
+                .collect(),
+        }
+    }
+
+    /// Nothing exists yet, for tests that propose against an empty system.
+    #[cfg(test)]
+    fn empty() -> Self {
+        Self {
+            profile_uid_by_name: HashMap::new(),
+            profile_uid_by_signature: HashMap::new(),
+            function_uid_by_name: HashMap::new(),
+            function_uid_by_signature: HashMap::new(),
+            custom_sensor_ids: HashSet::new(),
+        }
+    }
+}
+
 /// Accumulates the entities a generation run proposes, de-duplicating custom sensors,
 /// functions, and profiles that share an identical definition so the user's lists are not
-/// cluttered with copies.
-struct Proposal {
+/// cluttered with copies. Anything that already exists under the same name is reused rather than
+/// proposed, so re-running the wizard does not duplicate an earlier run's output.
+struct Proposal<'a> {
     custom_sensors: Vec<CustomSensor>,
     functions: Vec<Function>,
     profiles: Vec<Profile>,
@@ -1016,10 +1085,11 @@ struct Proposal {
     custom_sensor_id_by_signature: HashMap<String, TempName>,
     function_uid_by_signature: HashMap<String, FunctionUID>,
     profile_uid_by_signature: HashMap<String, ProfileUID>,
+    existing: &'a Existing<'a>,
 }
 
-impl Proposal {
-    fn with_capacity(fan_count: usize) -> Self {
+impl<'a> Proposal<'a> {
+    fn with_capacity(fan_count: usize, existing: &'a Existing<'a>) -> Self {
         Self {
             custom_sensors: Vec::new(),
             functions: Vec::with_capacity(fan_count),
@@ -1028,12 +1098,16 @@ impl Proposal {
             custom_sensor_id_by_signature: HashMap::new(),
             function_uid_by_signature: HashMap::with_capacity(fan_count),
             profile_uid_by_signature: HashMap::with_capacity(fan_count),
+            existing,
         }
     }
 
-    /// Returns the id of an already-proposed identical custom sensor, or stores this one and
-    /// returns its id.
+    /// Returns the id of an existing or already-proposed identical custom sensor, or stores this
+    /// one and returns its id. A sensor's id is its name, so an existing id is a reuse.
     fn intern_custom_sensor(&mut self, sensor: CustomSensor) -> TempName {
+        if self.existing.custom_sensor_ids.contains(sensor.id.as_str()) {
+            return sensor.id;
+        }
         let signature = custom_sensor_signature(&sensor);
         if let Some(existing_id) = self.custom_sensor_id_by_signature.get(&signature) {
             return existing_id.clone();
@@ -1045,10 +1119,21 @@ impl Proposal {
         id
     }
 
-    /// Returns the UID of an already-proposed identical function, or stores this one and
-    /// returns its UID. The passed function's fresh UID is discarded on a dedup hit.
+    /// Returns the UID of an existing or already-proposed function, or stores this one and returns
+    /// its UID. The passed function's fresh UID is discarded on any hit.
     fn intern_function(&mut self, function: Function) -> FunctionUID {
         let signature = function_signature(&function);
+        if let Some(existing_uid) = self
+            .existing
+            .function_uid_by_name
+            .get(function.name.as_str())
+            .or_else(|| self.existing.function_uid_by_signature.get(&signature))
+        {
+            let uid = (*existing_uid).clone();
+            self.function_uid_by_signature
+                .insert(signature, uid.clone());
+            return uid;
+        }
         if let Some(existing_uid) = self.function_uid_by_signature.get(&signature) {
             return existing_uid.clone();
         }
@@ -1059,10 +1144,24 @@ impl Proposal {
         uid
     }
 
-    /// Returns the UID of an already-proposed identical profile, or stores this one and
-    /// returns its UID. The passed profile's fresh UID is discarded on a dedup hit.
+    /// Returns the UID of an existing or already-proposed profile, or stores this one and returns
+    /// its UID. The passed profile's fresh UID is discarded on any hit. Matching the name catches
+    /// an earlier run's profile even if the user has since edited it; matching the definition
+    /// catches one an earlier run stored under a different name, which happens because identical
+    /// members collapse onto whichever kind was built first. Recording the signature of what would
+    /// have been built lets the rest of this run collapse onto the reused entity too.
     fn intern_profile(&mut self, profile: Profile) -> ProfileUID {
         let signature = profile_signature(&profile);
+        if let Some(existing_uid) = self
+            .existing
+            .profile_uid_by_name
+            .get(profile.name.as_str())
+            .or_else(|| self.existing.profile_uid_by_signature.get(&signature))
+        {
+            let uid = (*existing_uid).clone();
+            self.profile_uid_by_signature.insert(signature, uid.clone());
+            return uid;
+        }
         if let Some(existing_uid) = self.profile_uid_by_signature.get(&signature) {
             return existing_uid.clone();
         }
@@ -1303,7 +1402,7 @@ mod tests {
     /// profile shape, and that the assignment points at the produced profile.
     #[test]
     fn generates_cpu_cooler_profile_and_function() {
-        let response = generate_proposal(
+        let response = propose(
             &cpu_cooler_request(&["fan1"], Preset::Balanced),
             &test_context(),
         )
@@ -1329,7 +1428,7 @@ mod tests {
     /// and assert the dedup leaves one profile/function but two assignments to the same UID.
     #[test]
     fn dedups_identical_cpu_coolers() {
-        let response = generate_proposal(
+        let response = propose(
             &cpu_cooler_request(&["fan1", "fan2"], Preset::Balanced),
             &test_context(),
         )
@@ -1353,7 +1452,7 @@ mod tests {
     fn cpu_cooler_without_cpu_temp_errors() {
         let mut request = cpu_cooler_request(&["fan1"], Preset::Balanced);
         request.key_temps.cpu = None;
-        assert!(generate_proposal(&request, &test_context()).is_err());
+        assert!(propose(&request, &test_context()).is_err());
     }
 
     /// Goal: per-kind overrides win over the global preset, and unlisted kinds fall back to
@@ -1384,7 +1483,7 @@ mod tests {
             global_preset: Preset::Silent,
             preset_overrides: Vec::new(),
         };
-        let response = generate_proposal(&request, &test_context()).expect("generates");
+        let response = propose(&request, &test_context()).expect("generates");
         assert!(response.profiles.is_empty());
         assert!(response.functions.is_empty());
         assert!(response.custom_sensors.is_empty());
@@ -1396,7 +1495,7 @@ mod tests {
     /// profile's source is that sensor on the custom-sensors device.
     #[test]
     fn cpu_cooler_silent_wraps_source_in_ema_sensor() {
-        let response = generate_proposal(
+        let response = propose(
             &cpu_cooler_request(&["fan1"], Preset::Silent),
             &test_context(),
         )
@@ -1418,7 +1517,7 @@ mod tests {
     /// Balanced CPU cooler and assert no custom sensors and the raw CPU source.
     #[test]
     fn cpu_cooler_balanced_uses_raw_temp() {
-        let response = generate_proposal(
+        let response = propose(
             &cpu_cooler_request(&["fan1"], Preset::Balanced),
             &test_context(),
         )
@@ -1432,8 +1531,8 @@ mod tests {
     #[test]
     fn cpu_cooler_curve_floor_clamped_to_min_duty() {
         let context = context_with_min_duty("dev-mb-1", "fan1", 40);
-        let response = generate_proposal(&cpu_cooler_request(&["fan1"], Preset::Silent), &context)
-            .expect("generates");
+        let response =
+            propose(&cpu_cooler_request(&["fan1"], Preset::Silent), &context).expect("generates");
         let curve = response.profiles[0].speed_profile().expect("has curve");
         assert!(curve.iter().all(|(_, duty)| *duty >= 40));
     }
@@ -1443,7 +1542,7 @@ mod tests {
     #[test]
     fn aio_pump_silent_floor_clamped_to_min_duty() {
         let context = context_with_min_duty("dev-aio-1", "fan1", 70);
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioPump, Preset::Silent, cpu_only()),
             &context,
         )
@@ -1464,7 +1563,7 @@ mod tests {
             ambient: None,
         };
         let context = context_with_min_duty("dev-aio-1", "fan1", 50);
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioRadiator, Preset::Silent, key_temps),
             &context,
         )
@@ -1477,7 +1576,7 @@ mod tests {
     /// Performance and assert no EMA sensor was created and the source is the raw CPU temp.
     #[test]
     fn laptop_performance_uses_raw_temp() {
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(Preset::Performance, None, cpu_only()),
             &test_context(),
         )
@@ -1492,7 +1591,7 @@ mod tests {
     #[test]
     fn laptop_performance_floor_clamped_to_min_duty() {
         let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(Preset::Performance, None, cpu_only()),
             &context,
         )
@@ -1508,8 +1607,8 @@ mod tests {
     fn laptop_quiet_presets_keep_zero_idle() {
         for preset in [Preset::Silent, Preset::Balanced] {
             let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
-            let response = generate_proposal(&laptop_request(preset, None, cpu_only()), &context)
-                .expect("generates");
+            let response =
+                propose(&laptop_request(preset, None, cpu_only()), &context).expect("generates");
             let curve = response.profiles[0].speed_profile().expect("has curve");
             assert!(
                 curve.iter().any(|(_, duty)| *duty == 0),
@@ -1531,7 +1630,7 @@ mod tests {
         };
         let member_curves = |preset| {
             let context = context_with_min_duty("dev-laptop-1", "fan1", 50);
-            let response = generate_proposal(
+            let response = propose(
                 &laptop_request(preset, Some(LaptopTempStrategy::MixCpuGpu), key_temps()),
                 &context,
             )
@@ -1562,8 +1661,8 @@ mod tests {
     #[test]
     fn gpu_fan_preserves_zero_rpm_idle() {
         let context = context_with_min_duty("dev-mb-1", "fan1", 30);
-        let response = generate_proposal(&gpu_request(&["fan1"], Preset::Silent), &context)
-            .expect("generates");
+        let response =
+            propose(&gpu_request(&["fan1"], Preset::Silent), &context).expect("generates");
         let curve = response.profiles[0].speed_profile().expect("has curve");
         assert!(
             curve.iter().any(|(_, duty)| *duty == 0),
@@ -1577,7 +1676,7 @@ mod tests {
     fn gpu_fan_without_gpu_temp_errors() {
         let mut request = gpu_request(&["fan1"], Preset::Balanced);
         request.key_temps.gpu = None;
-        assert!(generate_proposal(&request, &test_context()).is_err());
+        assert!(propose(&request, &test_context()).is_err());
     }
 
     fn case_request(preset: Preset, with_gpu: bool) -> GenerateProfilesRequest {
@@ -1609,6 +1708,14 @@ mod tests {
         }
     }
 
+    /// Proposes against an empty system: nothing exists yet, so nothing is reused.
+    fn propose(
+        request: &GenerateProfilesRequest,
+        context: &DeviceContext,
+    ) -> Result<GenerateProfilesResponse, CCError> {
+        generate_proposal(request, context, &Existing::empty())
+    }
+
     fn count_p_type(profiles: &[Profile], p_type: &ProfileType) -> usize {
         profiles.iter().filter(|p| &p.p_type() == p_type).count()
     }
@@ -1633,8 +1740,8 @@ mod tests {
     /// counts and the assignment count.
     #[test]
     fn case_fans_build_mix_base_and_two_overlays() {
-        let response = generate_proposal(&case_request(Preset::Balanced, true), &test_context())
-            .expect("generates");
+        let response =
+            propose(&case_request(Preset::Balanced, true), &test_context()).expect("generates");
         assert_eq!(count_p_type(&response.profiles, &ProfileType::Graph), 2);
         assert_eq!(count_p_type(&response.profiles, &ProfileType::Mix), 1);
         assert_eq!(count_p_type(&response.profiles, &ProfileType::Overlay), 2);
@@ -1646,8 +1753,8 @@ mod tests {
     /// reference the Mix and check the offset signs.
     #[test]
     fn case_intake_and_exhaust_share_base_with_pressure_bias() {
-        let response = generate_proposal(&case_request(Preset::Balanced, true), &test_context())
-            .expect("generates");
+        let response =
+            propose(&case_request(Preset::Balanced, true), &test_context()).expect("generates");
         let mix = response
             .profiles
             .iter()
@@ -1692,8 +1799,8 @@ mod tests {
     /// overlays referencing it. Method: generate without a GPU temp and assert the shape.
     #[test]
     fn case_fans_degrade_to_cpu_graph_without_gpu() {
-        let response = generate_proposal(&case_request(Preset::Balanced, false), &test_context())
-            .expect("generates");
+        let response =
+            propose(&case_request(Preset::Balanced, false), &test_context()).expect("generates");
         assert_eq!(
             count_p_type(&response.profiles, &ProfileType::Mix),
             0,
@@ -1727,7 +1834,7 @@ mod tests {
     fn case_fans_without_cpu_temp_errors() {
         let mut request = case_request(Preset::Balanced, true);
         request.key_temps.cpu = None;
-        assert!(generate_proposal(&request, &test_context()).is_err());
+        assert!(propose(&request, &test_context()).is_err());
     }
 
     /// Goal: case intake and exhaust must share a preset. Method: override them to different
@@ -1745,15 +1852,15 @@ mod tests {
                 preset: Preset::Performance,
             },
         ];
-        assert!(generate_proposal(&request, &test_context()).is_err());
+        assert!(propose(&request, &test_context()).is_err());
     }
 
     /// Goal: Silent case fans smooth both members, creating one EMA sensor per temp. Method:
     /// generate Silent with CPU and GPU temps and assert two EMA sensors.
     #[test]
     fn case_fans_silent_create_ema_per_member() {
-        let response = generate_proposal(&case_request(Preset::Silent, true), &test_context())
-            .expect("generates");
+        let response =
+            propose(&case_request(Preset::Silent, true), &test_context()).expect("generates");
         assert_eq!(
             response.custom_sensors.len(),
             2,
@@ -1808,7 +1915,7 @@ mod tests {
     #[test]
     fn aio_pump_balanced_and_performance_are_fixed_full() {
         for preset in [Preset::Balanced, Preset::Performance] {
-            let response = generate_proposal(
+            let response = propose(
                 &aio_request(FanKind::AioPump, preset, cpu_only()),
                 &test_context(),
             )
@@ -1825,7 +1932,7 @@ mod tests {
     /// generate and assert the curve points and that an EMA sensor was created.
     #[test]
     fn aio_pump_silent_is_a_smoothed_graph() {
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioPump, Preset::Silent, cpu_only()),
             &test_context(),
         )
@@ -1853,7 +1960,7 @@ mod tests {
             liquid: Some(liquid_temp()),
             ambient: None,
         };
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioPump, Preset::Silent, key_temps),
             &test_context(),
         )
@@ -1875,7 +1982,7 @@ mod tests {
             liquid: None,
             ambient: None,
         };
-        assert!(generate_proposal(
+        assert!(propose(
             &aio_request(FanKind::AioPump, Preset::Silent, empty),
             &test_context()
         )
@@ -1892,7 +1999,7 @@ mod tests {
             liquid: Some(liquid_temp()),
             ambient: None,
         };
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
             &test_context(),
         )
@@ -1916,7 +2023,7 @@ mod tests {
             liquid: Some(liquid_temp()),
             ambient: Some(ambient_temp()),
         };
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
             &test_context(),
         )
@@ -1944,7 +2051,7 @@ mod tests {
     /// generate and assert the source is the CPU temp and the curve matches the CPU band.
     #[test]
     fn aio_radiator_falls_back_to_cpu() {
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioRadiator, Preset::Balanced, cpu_only()),
             &test_context(),
         )
@@ -1969,7 +2076,7 @@ mod tests {
             liquid: Some(liquid_temp()),
             ambient: None,
         };
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
             &test_context(),
         )
@@ -2004,7 +2111,7 @@ mod tests {
             liquid: Some(liquid_temp()),
             ambient: None,
         };
-        let response = generate_proposal(
+        let response = propose(
             &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
             &context_with_min_duty("dev-aio-1", "fan1", 50),
         )
@@ -2037,7 +2144,7 @@ mod tests {
             liquid: None,
             ambient: None,
         };
-        assert!(generate_proposal(
+        assert!(propose(
             &aio_request(FanKind::AioRadiator, Preset::Balanced, empty),
             &test_context()
         )
@@ -2068,7 +2175,7 @@ mod tests {
     /// `only_downward`.
     #[test]
     fn laptop_default_uses_ema_cpu() {
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(Preset::Balanced, None, cpu_only()),
             &test_context(),
         )
@@ -2091,7 +2198,7 @@ mod tests {
     /// generate with that strategy and assert no custom sensors and the raw CPU source.
     #[test]
     fn laptop_thinkpad_sensor_uses_raw_cpu() {
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(
                 Preset::Balanced,
                 Some(LaptopTempStrategy::ThinkpadSensor),
@@ -2108,7 +2215,7 @@ mod tests {
     /// ramping. Method: generate Silent and assert the window exceeds the default Silent window.
     #[test]
     fn laptop_silent_uses_long_ema_window() {
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(Preset::Silent, None, cpu_only()),
             &test_context(),
         )
@@ -2144,7 +2251,7 @@ mod tests {
             liquid: None,
             ambient: None,
         };
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(
                 Preset::Balanced,
                 Some(LaptopTempStrategy::MixCpuGpu),
@@ -2162,7 +2269,7 @@ mod tests {
     /// generate the Mix strategy with only a CPU temp and assert no Mix profile.
     #[test]
     fn laptop_mix_strategy_degrades_without_gpu() {
-        let response = generate_proposal(
+        let response = propose(
             &laptop_request(
                 Preset::Balanced,
                 Some(LaptopTempStrategy::MixCpuGpu),
@@ -2184,11 +2291,131 @@ mod tests {
             liquid: None,
             ambient: None,
         };
-        assert!(generate_proposal(
+        assert!(propose(
             &laptop_request(Preset::Balanced, None, empty),
             &test_context()
         )
         .is_err());
+    }
+
+    /// Goal: re-running the wizard reuses what the first run created instead of minting a suffixed
+    /// copy of every profile, function and sensor. Method: propose once against an empty system,
+    /// feed that output back as the existing entities, propose again, and assert the second run
+    /// creates nothing and assigns the same profiles.
+    #[test]
+    fn rerunning_reuses_the_first_runs_entities() {
+        let request = full_request();
+        let first = propose(&request, &test_context()).expect("generates");
+        let existing =
+            Existing::from_entities(&first.profiles, &first.functions, &first.custom_sensors);
+        let second =
+            generate_proposal(&request, &test_context(), &existing).expect("generates again");
+
+        assert!(
+            second.profiles.is_empty(),
+            "no duplicate profiles, got {:?}",
+            second
+                .profiles
+                .iter()
+                .map(|profile| profile.name.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(second.functions.is_empty(), "no duplicate functions");
+        assert!(second.custom_sensors.is_empty(), "no duplicate sensors");
+        assert_eq!(second.assignments.len(), first.assignments.len());
+        for (before, after) in first.assignments.iter().zip(&second.assignments) {
+            assert_eq!(
+                before.profile_uid, after.profile_uid,
+                "{} keeps its profile",
+                after.channel_name
+            );
+        }
+    }
+
+    /// Goal: reuse is by name and read-only, so a profile the user edited after generating it is
+    /// reused as it stands rather than duplicated or rewritten. Method: propose, edit a proposed
+    /// profile's curve, feed it back as existing, and assert the re-run creates nothing and points
+    /// at the edited profile.
+    #[test]
+    fn reuse_keeps_a_user_edited_profile() {
+        let request = cpu_cooler_request(&["fan1"], Preset::Balanced);
+        let mut first = propose(&request, &test_context()).expect("generates");
+        let edited_uid = first.profiles[0].uid.clone();
+        let ProfileKind::Graph { speed_profile, .. } = &mut first.profiles[0].kind else {
+            panic!("a CPU cooler is a graph");
+        };
+        *speed_profile = Some(vec![(20.0, 10), (50.0, 50), (80.0, 90)]);
+
+        let existing =
+            Existing::from_entities(&first.profiles, &first.functions, &first.custom_sensors);
+        let second = generate_proposal(&request, &test_context(), &existing).expect("generates");
+
+        assert!(second.profiles.is_empty(), "the edited profile is reused");
+        assert_eq!(second.assignments[0].profile_uid, edited_uid);
+    }
+
+    /// Goal: a fan added in a later run joins the profiles the earlier run created, so a
+    /// single-fan run behaves like part of the whole-system one. Method: propose for one fan, feed
+    /// it back, propose for a second fan of the same kind and preset, and assert it is assigned the
+    /// first fan's profile with nothing new created.
+    #[test]
+    fn a_later_fan_joins_the_existing_profile() {
+        let first = propose(
+            &cpu_cooler_request(&["fan1"], Preset::Balanced),
+            &test_context(),
+        )
+        .expect("generates");
+        let existing =
+            Existing::from_entities(&first.profiles, &first.functions, &first.custom_sensors);
+        let second = generate_proposal(
+            &cpu_cooler_request(&["fan2"], Preset::Balanced),
+            &test_context(),
+            &existing,
+        )
+        .expect("generates");
+
+        assert!(second.profiles.is_empty());
+        assert_eq!(
+            second.assignments[0].profile_uid, first.assignments[0].profile_uid,
+            "both fans share one profile"
+        );
+    }
+
+    /// Goal: the single-fan wizard run creates nothing after a whole-system run, which is the
+    /// reason reuse matches definitions and not only names: the full run stored the radiator's GPU
+    /// member under the case fan's name, because identical members collapse onto whichever kind was
+    /// built first. Method: propose the full system, feed it back, then propose the radiator fan
+    /// alone and assert nothing new is proposed.
+    #[test]
+    fn a_single_fan_rerun_after_a_full_run_creates_nothing() {
+        let full = propose(&full_request(), &test_context()).expect("generates");
+        let existing =
+            Existing::from_entities(&full.profiles, &full.functions, &full.custom_sensors);
+        let key_temps = KeyTemps {
+            cpu: Some(cpu_temp()),
+            gpu: Some(gpu_temp()),
+            liquid: Some(liquid_temp()),
+            ambient: Some(ambient_temp()),
+        };
+        let single = generate_proposal(
+            &aio_request(FanKind::AioRadiator, Preset::Balanced, key_temps),
+            &test_context(),
+            &existing,
+        )
+        .expect("generates");
+
+        assert!(
+            single.profiles.is_empty(),
+            "no duplicate profiles, got {:?}",
+            single
+                .profiles
+                .iter()
+                .map(|profile| profile.name.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(single.functions.is_empty(), "no duplicate functions");
+        assert!(single.custom_sensors.is_empty(), "no duplicate sensors");
+        assert_eq!(single.assignments.len(), 1, "the fan is still assigned");
     }
 
     /// Goal: every generated graph opens on its own curve, so the UI does not draw a short ramp
@@ -2196,7 +2423,7 @@ mod tests {
     /// range equals its curve's end points and spans the minimum the tuning rules guarantee.
     #[test]
     fn graph_profiles_pin_axis_to_their_curve() {
-        let response = generate_proposal(&full_request(), &test_context()).expect("generates");
+        let response = propose(&full_request(), &test_context()).expect("generates");
         let graphs = response
             .profiles
             .iter()
@@ -2269,7 +2496,7 @@ mod tests {
     fn full_config_generates_and_dedups_shared_function() {
         let request = full_request();
         let fan_count = request.assignments.len();
-        let response = generate_proposal(&request, &test_context()).expect("generates");
+        let response = propose(&request, &test_context()).expect("generates");
 
         assert_eq!(
             response.assignments.len(),

@@ -327,7 +327,28 @@ const buildPreview = async (): Promise<void> => {
 }
 
 const profileNameByUid = (uid: string): string =>
-    proposal.value?.profiles.find((profile) => profile.uid === uid)?.name ?? uid
+    proposal.value?.profiles.find((profile) => profile.uid === uid)?.name ??
+    settingsStore.profiles.find((profile) => profile.uid === uid)?.name ??
+    uid
+
+// The daemon reuses an existing profile instead of proposing a copy, so an assignment can point at
+// something already saved. Those are worth naming: on a re-run the created list is empty and this
+// is all the preview has to show.
+const reusedProfileNames = computed<string[]>(() => {
+    const proposed = new Set((proposal.value?.profiles ?? []).map((profile) => profile.uid))
+    const names = new Set<string>()
+    for (const assignment of proposal.value?.assignments ?? []) {
+        if (proposed.has(assignment.profile_uid)) continue
+        names.add(profileNameByUid(assignment.profile_uid))
+    }
+    return [...names]
+})
+const anyEntityCreated = computed<boolean>(
+    () =>
+        (proposal.value?.profiles.length ?? 0) > 0 ||
+        (proposal.value?.functions.length ?? 0) > 0 ||
+        (proposal.value?.custom_sensors.length ?? 0) > 0,
+)
 
 const fanLabel = (deviceUID: string, channelName: string): string =>
     fanRows.value.find((row) => row.deviceUID === deviceUID && row.channelName === channelName)
@@ -635,8 +656,25 @@ const createAndApply = async (): Promise<void> => {
                         </div>
                     </div>
 
+                    <!-- Reused: already exists, so nothing is created for it -->
+                    <div v-if="reusedProfileNames.length > 0" class="flex flex-col gap-y-1">
+                        <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
+                            {{ t('components.wizards.generate.reusedHeader') }}
+                        </div>
+                        <div
+                            v-for="name in reusedProfileNames"
+                            :key="name"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ name }}</span>
+                            <span class="shrink-0 text-text-color-secondary">
+                                {{ t('components.wizards.generate.reused') }}
+                            </span>
+                        </div>
+                    </div>
+
                     <!-- Will be created -->
-                    <div class="flex flex-col gap-y-1">
+                    <div v-if="anyEntityCreated" class="flex flex-col gap-y-1">
                         <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
                             {{ t('components.wizards.generate.willCreateHeader') }}
                         </div>

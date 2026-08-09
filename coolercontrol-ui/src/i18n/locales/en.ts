@@ -1057,6 +1057,8 @@ export default {
                 previewIntro:
                     'Review what will be created and applied. Nothing is saved until you confirm.',
                 previewAssignments: 'Fan assignments',
+                reusedHeader: 'Already exists',
+                reused: 'reused',
                 willCreateHeader: 'Will be created',
                 startingPointNote:
                     "An easy starting point instead of building from scratch. These won't be perfect for every system, so verify, test, and tweak them after creating.",
