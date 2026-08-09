@@ -381,22 +381,22 @@ mod tests {
         );
     }
 
-    /// Goal: the case member reused as a radiator Mix member can never lift the fan on its own, so
-    /// an idle GPU leaves the loop curve in charge. Method: for every preset, assert the case
-    /// member's opening duty is no higher than the opening duty of each radiator band it is mixed
-    /// with.
+    /// Goal: the GPU curve reused as a radiator Mix member can never lift the fan on its own, so
+    /// an idle card leaves the loop curve in charge. Method: for every preset, assert the GPU
+    /// curve's opening duty is no higher than the opening duty of each radiator band it is mixed
+    /// with. Lowering a radiator curve's opening below the GPU curve's breaks this.
     #[test]
-    fn case_member_never_outbids_an_idle_radiator() {
+    fn the_gpu_member_never_outbids_an_idle_radiator() {
         for preset in [Preset::Silent, Preset::Balanced, Preset::Performance] {
-            let case_floor = opening_duty(TUNING.case.member.get(preset));
+            let gpu_floor = opening_duty(TUNING.gpu_fan.get(preset));
             for (band, presets) in [
                 ("delta", &TUNING.aio_radiator.delta),
                 ("liquid", &TUNING.aio_radiator.liquid),
                 ("cpu", &TUNING.cpu_cooler),
             ] {
                 assert!(
-                    case_floor <= opening_duty(presets.get(preset)),
-                    "case member outbids the idle {band} radiator curve on {preset}"
+                    gpu_floor <= opening_duty(presets.get(preset)),
+                    "the GPU member outbids the idle {band} radiator curve on {preset}"
                 );
             }
         }
@@ -445,13 +445,35 @@ mod tests {
     #[test]
     fn rejects_a_full_dead_zone() {
         let bad = TUNING_TOML.replacen(
-            "nominal_dead_zone_percent = 25",
+            &format!(
+                "nominal_dead_zone_percent = {}",
+                TUNING.scale.nominal_dead_zone_percent
+            ),
             "nominal_dead_zone_percent = 100",
             1,
         );
         let config: TuningConfig =
             toml_edit::de::from_str(&bad).expect("still parses structurally");
         assert!(config.validate().is_err());
+    }
+
+    /// Rewrites the file's first curve, so the rejection tests below stay honest when a curve is
+    /// retuned. A first curve spread over several lines would leave broken TOML here, which fails
+    /// loudly at the parse step rather than passing for the wrong reason.
+    fn with_first_curve_replaced(replacement: &str) -> String {
+        let start = TUNING_TOML
+            .find("\ncurve = [")
+            .expect("the file has a curve at the start of a line")
+            + 1;
+        let end = start
+            + TUNING_TOML[start..]
+                .find('\n')
+                .expect("the curve line ends");
+        format!(
+            "{}{replacement}{}",
+            &TUNING_TOML[..start],
+            &TUNING_TOML[end..]
+        )
     }
 
     /// Goal: a graph entry referencing a function with no table is rejected. Method: rewrite one
@@ -468,11 +490,7 @@ mod tests {
     /// cooler curve with a backwards one and assert validation fails.
     #[test]
     fn rejects_non_monotonic_curve() {
-        let bad = TUNING_TOML.replacen(
-            "curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]",
-            "curve = [[45.0, 25], [40.0, 40], [75.0, 70]]",
-            1,
-        );
+        let bad = with_first_curve_replaced("curve = [[45.0, 25], [40.0, 40], [75.0, 70]]");
         let config: TuningConfig =
             toml_edit::de::from_str(&bad).expect("still parses structurally");
         assert!(config.validate().is_err());
@@ -482,11 +500,7 @@ mod tests {
     /// collapse a real curve to two points and assert validation fails.
     #[test]
     fn rejects_curve_with_too_few_points() {
-        let bad = TUNING_TOML.replacen(
-            "curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]",
-            "curve = [[45.0, 25], [85.0, 100]]",
-            1,
-        );
+        let bad = with_first_curve_replaced("curve = [[45.0, 25], [85.0, 100]]");
         let config: TuningConfig =
             toml_edit::de::from_str(&bad).expect("still parses structurally");
         assert!(config.validate().is_err());
@@ -496,11 +510,7 @@ mod tests {
     /// cliff. Method: squeeze a real curve into a 10C span and assert validation fails.
     #[test]
     fn rejects_curve_with_narrow_spread() {
-        let bad = TUNING_TOML.replacen(
-            "curve = [[45.0, 25], [60.0, 40], [75.0, 70], [85.0, 100]]",
-            "curve = [[45.0, 25], [50.0, 40], [55.0, 100]]",
-            1,
-        );
+        let bad = with_first_curve_replaced("curve = [[45.0, 25], [50.0, 40], [55.0, 100]]");
         let config: TuningConfig =
             toml_edit::de::from_str(&bad).expect("still parses structurally");
         assert!(config.validate().is_err());
@@ -510,7 +520,7 @@ mod tests {
     /// validation fails.
     #[test]
     fn rejects_duty_over_one_hundred() {
-        let bad = TUNING_TOML.replacen("[85.0, 100]", "[85.0, 150]", 1);
+        let bad = with_first_curve_replaced("curve = [[45.0, 25], [60.0, 40], [85.0, 150]]");
         let config: TuningConfig =
             toml_edit::de::from_str(&bad).expect("still parses structurally");
         assert!(config.validate().is_err());

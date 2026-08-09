@@ -128,17 +128,25 @@ function = "performance"
 
 # ---------------------------------------------------------------------------
 # GPU fan. Follows the GPU temp. The low-temp 0% entries preserve the card's zero-RPM idle, so the
-# floor is NOT clamped to the channel minimum in code.
+# floor is NOT clamped to the channel minimum in code. Silent and Balanced repeat that 0% right up
+# to the knee so the fans stay stopped until it: interpolating up from a single 0% point trickles
+# duty in well below the knee, which spins a card designed to sit still until it is under load, and
+# lands a card that has a minimum duty floor on that floor. Performance has no 0% entry and keeps
+# its fans turning from idle.
+#
+# These curves are also the GPU member of a radiator Mix, which is why the 0% opening matters
+# twice: as a Mix member the curve must be able to contribute nothing, or an idle card would hold
+# the radiator fans above the speed the loop curve asks for.
 # ---------------------------------------------------------------------------
 [gpu_fan.silent]
 type = "graph"
-curve = [[45.0, 0], [55.0, 30], [70.0, 60], [83.0, 90]]
+curve = [[45.0, 0], [54.0, 0], [55.0, 30], [70.0, 60], [83.0, 90]]
 smoothing = { ema_window_seconds = 8 }
 function = "identity"
 
 [gpu_fan.balanced]
 type = "graph"
-curve = [[45.0, 0], [60.0, 40], [75.0, 80], [85.0, 100]]
+curve = [[45.0, 0], [59.0, 0], [60.0, 40], [75.0, 80], [85.0, 100]]
 function = "balanced"
 
 [gpu_fan.performance]
@@ -196,14 +204,13 @@ duty = 100
 # raw liquid temp, then the CPU temp as a fallback (the CPU-fallback curve reuses the cpu_cooler
 # curve in code). The liquid and Delta signals are slow-moving, so no EMA smoothing is applied.
 #
-# The Delta band's usable range ends near 15C, so each Delta curve reaches its top duty there and
-# holds it flat out to the 20C span the UI needs. Liquid idles near 30C and is genuinely hot by
-# 45C, so those curves top out there and hold.
+# A loop's usable range is narrow at both bands, so each curve reaches its top duty where the
+# signal really tops out and then holds it flat out to the 20C span the UI needs. A running loop
+# sits between 24C and 35C, so the liquid curves are at full speed by 35C; Delta ends near 15C.
 #
-# Selecting a GPU temp mixes one in: radiator fans move the case air the card heats even though the
-# loop never carries that heat. That member reuses the [case.member] curve below, since a radiator
-# fan answering to a component temp is doing case-fan work. Every case member opens no higher than
-# the loop curves above it, so an idle GPU never lifts the fan; a test pins that.
+# Selecting a GPU temp mixes one in, reusing the [gpu_fan] curves above: radiator fans move the
+# case air the card heats even though the loop never carries that heat. Those curves open at 0%, so
+# an idle card leaves the loop curve in charge; a test pins that against every band here.
 # ---------------------------------------------------------------------------
 [aio_radiator.delta.silent]
 type = "graph"
@@ -222,17 +229,17 @@ function = "performance"
 
 [aio_radiator.liquid.silent]
 type = "graph"
-curve = [[30.0, 20], [38.0, 55], [46.0, 85], [50.0, 90]]
+curve = [[26.0, 20], [31.0, 60], [35.0, 100], [46.0, 100]]
 function = "identity"
 
 [aio_radiator.liquid.balanced]
 type = "graph"
-curve = [[28.0, 20], [36.0, 70], [44.0, 100], [48.0, 100]]
+curve = [[24.0, 20], [30.0, 65], [35.0, 100], [44.0, 100]]
 function = "balanced"
 
 [aio_radiator.liquid.performance]
 type = "graph"
-curve = [[26.0, 45], [34.0, 80], [40.0, 100], [46.0, 100]]
+curve = [[24.0, 45], [29.0, 80], [35.0, 100], [44.0, 100]]
 function = "performance"
 
 # ---------------------------------------------------------------------------

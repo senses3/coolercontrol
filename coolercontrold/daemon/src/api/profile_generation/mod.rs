@@ -604,10 +604,10 @@ fn build_radiator_loop(
     ))
 }
 
-/// Mix(loop, GPU) Max for a radiator when the user selected a GPU temp. The member reuses the case
-/// airflow curve: a radiator fan answering to a component temp is doing case-fan work, and case
-/// fans already apply that curve to both the CPU and GPU temps. It is NOT floor-clamped, and every
-/// case curve opens no higher than the loop curves, so an idle card cannot lift the fan.
+/// Mix(loop, GPU) Max for a radiator when the user selected a GPU temp. The member reuses the
+/// `gpu_fan` curve, which is the one shaped to contribute nothing until the card is genuinely hot:
+/// it opens at 0%, so an idle card leaves the loop curve in charge of the fan. It is NOT
+/// floor-clamped, which would defeat that.
 fn build_radiator_mix(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -624,7 +624,7 @@ fn build_radiator_mix(
     let gpu_uid = build_from_entry(
         proposal,
         context,
-        TUNING.case.member.get(preset),
+        TUNING.gpu_fan.get(preset),
         gpu_temp,
         &profile_name("AIO Radiator GPU", preset, member_duty),
         member_duty,
@@ -2167,8 +2167,8 @@ mod tests {
         assert_eq!(gpu_member.temp_source(), Some(&gpu_temp()));
         assert_eq!(
             gpu_member.speed_profile().expect("has curve").as_slice(),
-            entry_curve(TUNING.case.member.get(Preset::Balanced)),
-            "the GPU member reuses the case airflow curve"
+            entry_curve(TUNING.gpu_fan.get(Preset::Balanced)),
+            "the GPU member reuses the GPU fan curve"
         );
     }
 
