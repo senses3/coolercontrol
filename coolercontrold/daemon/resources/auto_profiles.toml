@@ -60,7 +60,7 @@ response_delay = 1
 name = "Auto Pump (Silent)"
 deviance = 3.0
 only_downward = true
-response_delay = 5
+response_delay = 20
 
 # Laptops run hot and hold heat, so their functions use a larger deviance and a slower down-ramp
 # to avoid surging. Silent is the slowest.
