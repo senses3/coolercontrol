@@ -1061,7 +1061,7 @@ export default {
                 reused: 'reused',
                 willCreateHeader: 'Will be created',
                 startingPointNote:
-                    "An easy starting point instead of building from scratch. These won't be perfect for every system, so verify, test, and tweak them after creating.",
+                    'A general starting point for your fan setup, meant to be tweaked rather than left as-is.',
                 replaces: 'replaces {name}',
                 generated: 'Generated {count} profiles.',
                 generateError: 'Could not generate profiles.',
