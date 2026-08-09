@@ -229,17 +229,17 @@ function = "performance"
 
 [aio_radiator.liquid.silent]
 type = "graph"
-curve = [[26.0, 20], [31.0, 60], [35.0, 100], [46.0, 100]]
+curve = [[26.0, 20], [31.0, 40], [36.0, 100], [46.0, 100]]
 function = "identity"
 
 [aio_radiator.liquid.balanced]
 type = "graph"
-curve = [[24.0, 20], [30.0, 65], [35.0, 100], [44.0, 100]]
+curve = [[24.0, 20], [30.0, 50], [36.0, 100], [44.0, 100]]
 function = "balanced"
 
 [aio_radiator.liquid.performance]
 type = "graph"
-curve = [[24.0, 45], [29.0, 80], [35.0, 100], [44.0, 100]]
+curve = [[24.0, 45], [29.0, 80], [36.0, 100], [44.0, 100]]
 function = "performance"
 
 # ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ function = "identity"
 
 [case.member.balanced]
 type = "graph"
-curve = [[45.0, 30], [65.0, 70], [78.0, 100]]
+curve = [[45.0, 20], [65.0, 70], [78.0, 100]]
 function = "balanced"
 
 [case.member.performance]
