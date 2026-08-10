@@ -350,3 +350,24 @@ impl LcdImageGenerator {
             .draw(image);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Goal: reusing the returned template must produce byte-identical PNG output to a
+    /// from-scratch generation, since the template now round-trips through the daemon's
+    /// blocking pool between generations. Method: generate once without a template, again
+    /// with the returned one, and compare the encoded bytes.
+    #[test]
+    fn template_reuse_produces_identical_png() {
+        let generator = LcdImageGenerator::new();
+        let (png_fresh, template) = generator
+            .generate_single_temp_image(45.6, "CPU", None)
+            .unwrap();
+        let (png_reused, _) = generator
+            .generate_single_temp_image(45.6, "CPU", Some(template))
+            .unwrap();
+        assert_eq!(png_fresh, png_reused);
+    }
+}
