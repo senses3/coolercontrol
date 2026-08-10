@@ -710,11 +710,12 @@ const deletePointFromLine = (params: any) => {
 // Minimum duty separation between points (1%)
 const MIN_DUTY_SEPARATION = 1
 
-// Points table position, persisted so the corner the user last chose is the one every
-// graph editor opens in.
+// Points table position, persisted per profile: where the table sits out of the way depends on
+// the shape of that profile's curve.
 const tablePosition = computed({
-    get: () => settingsStore.pointsOverlayTablePosition,
-    set: (position: TablePosition) => (settingsStore.pointsOverlayTablePosition = position),
+    get: () => settingsStore.pointsTablePosition(props.profileUID),
+    set: (position: TablePosition) =>
+        settingsStore.setPointsTablePosition(props.profileUID, position),
 })
 
 const cycleTablePosition = () => {

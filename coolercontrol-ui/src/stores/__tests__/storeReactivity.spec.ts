@@ -4,7 +4,17 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, defineStore, setActivePinia, storeToRefs } from 'pinia'
-import { computed, defineComponent, h, nextTick, shallowRef, triggerRef, watchEffect } from 'vue'
+import {
+    computed,
+    defineComponent,
+    h,
+    nextTick,
+    ref,
+    shallowRef,
+    triggerRef,
+    watch,
+    watchEffect,
+} from 'vue'
 
 // Locks the contract DeviceStore.currentDeviceStatus depends on: a Map mutated in place
 // and published with triggerRef must reach components reading it through storeToRefs.
@@ -22,7 +32,48 @@ const useStatusStore = defineStore('test-status', () => {
     return { currentDeviceStatus, publish }
 })
 
+// Locks the contract the settings saver depends on for array-valued settings. Its watch list has
+// no deep: true, so a source passed as a ref is only seen when the ref is given a new value. A
+// setter that pushed into the existing array instead would change the setting on screen and never
+// persist it, which is invisible until a restart.
+const usePositionStore = defineStore('test-positions', () => {
+    const positions = ref<Array<[string, string]>>([])
+
+    function setReplacing(key: string, value: string): void {
+        positions.value = [...positions.value.filter(([k]) => k !== key), [key, value]]
+    }
+
+    function setInPlace(key: string, value: string): void {
+        positions.value.push([key, value])
+    }
+
+    return { positions, setReplacing, setInPlace }
+})
+
 describe('store reactivity', () => {
+    it('reaches a non-deep watcher only when an array setting is replaced', async () => {
+        setActivePinia(createPinia())
+        const store = usePositionStore()
+        // The store's own ref, as the saver sees it from inside the store setup. Reading
+        // store.positions instead hands back the unwrapped array and watches the wrong thing.
+        const { positions } = storeToRefs(store)
+
+        let saves = 0
+        watch(positions, () => (saves += 1))
+
+        store.setReplacing('profile-1', 'top-left')
+        await nextTick()
+        expect(saves).toBe(1)
+
+        store.setReplacing('profile-1', 'bottom-right')
+        await nextTick()
+        expect(saves).toBe(2)
+
+        store.setInPlace('profile-2', 'top-left')
+        await nextTick()
+        expect(saves).toBe(2)
+    })
+
     it('propagates in-place shallowRef updates through storeToRefs', async () => {
         setActivePinia(createPinia())
         const store = useStatusStore()

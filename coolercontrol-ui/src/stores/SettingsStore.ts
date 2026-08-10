@@ -211,8 +211,18 @@ export const useSettingsStore = defineStore('settings', () => {
     const customTheme: CustomThemeSettings = reactive({ ...defaultCustomTheme })
     const entityColors: Ref<Array<[string, string]>> = ref([])
     const eyeCandy: Ref<boolean> = ref(false)
-    // The corner the points overlay table was last moved to, shared by every graph editor.
-    const pointsOverlayTablePosition: Ref<TablePosition> = ref('bottom-right')
+    // The corner each profile's points overlay table was last moved to, by profile UID.
+    const pointsOverlayTablePositions: Ref<Array<[UID, TablePosition]>> = ref([])
+    const pointsTablePosition = (profileUID: UID): TablePosition =>
+        pointsOverlayTablePositions.value.find(([uid]) => uid === profileUID)?.[1] ?? 'bottom-right'
+    // Replaces the array rather than mutating it: the settings saver watches this ref without
+    // deep: true, so only a new value reaches it.
+    const setPointsTablePosition = (profileUID: UID, position: TablePosition): void => {
+        pointsOverlayTablePositions.value = [
+            ...pointsOverlayTablePositions.value.filter(([uid]) => uid !== profileUID),
+            [profileUID, position],
+        ]
+    }
     const interfaceFont: Ref<InterfaceFont> = ref(InterfaceFont.BUNDLED)
     // Persisted as the tour version the user has finished. Callers only ask the
     // yes/no question, so they read the computed below and call
@@ -342,7 +352,7 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         entityColors.value = uiSettings.entityColors
         eyeCandy.value = uiSettings.eyeCandy
-        pointsOverlayTablePosition.value = uiSettings.pointsOverlayTablePosition ?? 'bottom-right'
+        pointsOverlayTablePositions.value = uiSettings.pointsOverlayTablePositions ?? []
         interfaceFont.value = uiSettings.interfaceFont ?? InterfaceFont.BUNDLED
         applyInterfaceFont()
         // Legacy configs stored a boolean here: false once the old tour was
@@ -1231,7 +1241,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 customTheme,
                 entityColors.value,
                 eyeCandy,
-                pointsOverlayTablePosition,
+                pointsOverlayTablePositions,
                 interfaceFont,
                 onboardingSeenVersion,
                 cpuStressBackend,
@@ -1289,7 +1299,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     }
                     uiSettings.entityColors = entityColors.value
                     uiSettings.eyeCandy = eyeCandy.value
-                    uiSettings.pointsOverlayTablePosition = pointsOverlayTablePosition.value
+                    uiSettings.pointsOverlayTablePositions = pointsOverlayTablePositions.value
                     uiSettings.interfaceFont = interfaceFont.value
                     uiSettings.showOnboarding = onboardingSeenVersion.value
                     uiSettings.cpuStressBackend = cpuStressBackend.value
@@ -1661,7 +1671,8 @@ export const useSettingsStore = defineStore('settings', () => {
         customTheme,
         entityColors,
         eyeCandy,
-        pointsOverlayTablePosition,
+        pointsTablePosition,
+        setPointsTablePosition,
         interfaceFont,
         showOnboarding,
         completeOnboarding,

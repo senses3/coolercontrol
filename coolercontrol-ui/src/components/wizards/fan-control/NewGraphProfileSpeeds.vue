@@ -1127,12 +1127,9 @@ const deletePointFromLine = (params: any) => {
 // Points Table Overlay
 
 // Points table position (local state, not persisted)
-// Points table position, persisted so the corner the user last chose is the one every
-// graph editor opens in.
-const tablePosition = computed({
-    get: () => settingsStore.pointsOverlayTablePosition,
-    set: (position: TablePosition) => (settingsStore.pointsOverlayTablePosition = position),
-})
+// The wizard's profile has no UID yet, so its table position cannot be keyed to one: it opens at
+// the default and a move lasts for this wizard run.
+const tablePosition: Ref<TablePosition> = ref('bottom-right')
 
 const tablePositionClasses = computed(() => ({
     'top-16 left-[5.5rem]': tablePosition.value === 'top-left',

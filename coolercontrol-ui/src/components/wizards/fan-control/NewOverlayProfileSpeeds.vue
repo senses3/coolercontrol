@@ -18,7 +18,6 @@ import {
 import { Profile, ProfileType } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import type { TablePosition } from '@/models/UISettings.ts'
 import * as echarts from 'echarts/core'
 import {
@@ -66,7 +65,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
-const settingsStore = useSettingsStore()
 const colors = useThemeColorsStore()
 
 const currentProfile: Ref<Profile> = ref(new Profile(props.name, ProfileType.Overlay))
@@ -711,12 +709,9 @@ const deletePointFromLine = (params: any) => {
 const MIN_DUTY_SEPARATION = 1
 
 // Points table position (local state, not persisted)
-// Points table position, persisted so the corner the user last chose is the one every
-// graph editor opens in.
-const tablePosition = computed({
-    get: () => settingsStore.pointsOverlayTablePosition,
-    set: (position: TablePosition) => (settingsStore.pointsOverlayTablePosition = position),
-})
+// The wizard's profile has no UID yet, so its table position cannot be keyed to one: it opens at
+// the default and a move lasts for this wizard run.
+const tablePosition: Ref<TablePosition> = ref('bottom-right')
 
 const tablePositionClasses = computed(() => ({
     'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',
