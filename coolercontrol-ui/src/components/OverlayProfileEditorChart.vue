@@ -426,14 +426,13 @@ const controlPointMotionForOffsetY = (posY: number, selectedPointIndex: number):
 //----------------------------------------------------------------------------------------------------------------------
 // ----- live Base / Target / Actual duties -----
 //
-// Every one of these is a duty, and this chart's x-axis IS duty, so they are vertical lines on it
-// rather than the horizontal ones the Mix chart draws. The gap between Base and Target is the
-// offset this curve is currently applying.
+// Both of these are duties, and this chart's x-axis IS duty, so they are vertical lines on it
+// rather than the horizontal ones the Mix chart draws. The base duty is not drawn: it is the
+// input this curve reads, and a third line made the chart too busy to read.
 
 interface LineValue {
     value: Array<number>
 }
-const baseDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
 const targetDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
 const actualDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
 
@@ -447,7 +446,8 @@ const tempOf = (tempSource?: { device_uid: string; temp_name: string }): number 
     return temp != null ? Number(temp) : undefined
 }
 
-// What the profile this overlay sits on top of is asking for right now.
+// What the profile this overlay sits on top of is asking for right now: the input to the curve,
+// and half of the Target below.
 const liveBaseDuty = (): number | undefined => {
     const baseUID = currentProfile.value?.member_profile_uids[0]
     if (baseUID == null) return undefined
@@ -497,10 +497,17 @@ const setVerticalLine = (line: [LineValue, LineValue], duty: number | undefined)
 const markData = (duty: number | undefined, offset: number): Array<object> =>
     duty == null ? [] : [{ coord: [duty, offset], value: duty }]
 
+// Where each label is anchored on the offset axis: mirrored near the two ends, far enough in that
+// the text clears the axis lines, far enough out that neither crowds the curve around zero.
+const TARGET_LABEL_OFFSET = 80
+const ACTUAL_LABEL_OFFSET = -80
+
 const dutyLabel = (key: string) => ({
     position: 'top' as const,
-    align: 'center' as const,
-    fontSize: deviceStore.getREMSize(0.9),
+    fontSize: deviceStore.getREMSize(1.0),
+    // Rotated to read up the line it belongs to, like the temp label on a graph profile.
+    rotate: 90,
+    offset: [0, -2],
     formatter: (params: any): string =>
         params.value == null ? '' : `${t(key)} ${Number(params.value).toFixed(0)}%`,
     shadowColor: colors.themeColors.bg_one,
@@ -510,51 +517,35 @@ const dutyLabel = (key: string) => ({
 // Recomputes all three lines. Called on every status tick and after any edit to the curve; the
 // series read the same arrays, so a full setOption elsewhere redraws the current values.
 const updateLiveLines = (): void => {
-    const baseDuty = liveBaseDuty()
-    const targetDuty = liveTargetDuty(baseDuty)
+    const targetDuty = liveTargetDuty(liveBaseDuty())
     const actualDuty = liveActualDuty()
-    setVerticalLine(baseDutyLineData, baseDuty)
     setVerticalLine(targetDutyLineData, targetDuty)
     setVerticalLine(actualDutyLineData, actualDuty)
     controlGraph.value?.setOption({
         series: [
             {
-                id: 'baseDutyLine',
-                data: baseDutyLineData,
-                markPoint: { data: markData(baseDuty, offsetMax) },
-            },
-            {
                 id: 'targetDutyLine',
                 data: targetDutyLineData,
-                markPoint: { data: markData(targetDuty, offsetMax) },
+                markPoint: { data: markData(targetDuty, TARGET_LABEL_OFFSET) },
             },
             {
                 id: 'actualDutyLine',
                 data: actualDutyLineData,
-                markPoint: { data: markData(actualDuty, offsetMin) },
+                markPoint: { data: markData(actualDuty, ACTUAL_LABEL_OFFSET) },
             },
         ],
     })
 }
 
-// The three live series. Base is faint and solid (it is the input), Target dashed in the accent
-// (what this profile asks for, before the channel's Function), Actual in the channel's own color.
+// The two live series: Target dashed in the accent (what this profile asks for, before the
+// channel's Function), Actual in the channel's own color.
 for (const line of [
-    {
-        id: 'baseDutyLine',
-        data: baseDutyLineData,
-        color: colors.themeColors.text_color_secondary,
-        type: 'solid' as const,
-        labelKey: 'views.profiles.baseDuty',
-        labelOffset: offsetMax,
-    },
     {
         id: 'targetDutyLine',
         data: targetDutyLineData,
         color: colors.themeColors.accent,
         type: 'dashed' as const,
         labelKey: 'views.profiles.targetDuty',
-        labelOffset: offsetMax,
     },
     {
         id: 'actualDutyLine',
@@ -562,7 +553,6 @@ for (const line of [
         color: actualDutyColor(),
         type: 'dotted' as const,
         labelKey: 'views.profiles.actualDuty',
-        labelOffset: offsetMin,
     },
 ]) {
     // The option literal types its series from the editor's own point series, so a live line

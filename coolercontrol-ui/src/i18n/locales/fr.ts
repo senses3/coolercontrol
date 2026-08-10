@@ -666,7 +666,6 @@ export default {
                 "Activer l'arrêt du système lorsque l'alerte est déclenchée.\nL'arrêt du système commencera une minute après le déclenchement de l'alerte\net sera annulé si l'alerte récupère.",
         },
         profiles: {
-            baseDuty: 'Base',
             targetDuty: 'Cible',
             actualDuty: 'Réel',
             targetHint:

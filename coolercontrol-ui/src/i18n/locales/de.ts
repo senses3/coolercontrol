@@ -663,7 +663,6 @@ export default {
                 'System-Herunterfahren aktivieren, wenn die Warnung ausgelöst wird.\nDas System wird eine Minute nach Auslösung der Warnung heruntergefahren\nund abgebrochen, wenn die Warnung wiederhergestellt wird.',
         },
         profiles: {
-            baseDuty: 'Basis',
             targetDuty: 'Ziel',
             actualDuty: 'Ist',
             targetHint:
