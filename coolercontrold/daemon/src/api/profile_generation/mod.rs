@@ -346,10 +346,10 @@ enum CaseRole {
     Exhaust,
 }
 
-/// Case fan: an Overlay on the shared case base (Mix(CPU, GPU) Max, or a CPU graph when there is
-/// no GPU temp). Intake follows the base; exhaust runs below it (the `[case.pressure]` bias) for
-/// positive pressure. Both keep the configured floor so the fan stays addressable at idle. Intake
-/// and exhaust share one base via de-duplication.
+/// Case fan: the shared case base (Mix(CPU, GPU) Max, or a CPU graph when there is no GPU temp).
+/// Intake is assigned that base directly; exhaust gets an Overlay running below it (the
+/// `[case.pressure]` bias) for positive pressure, with the configured floor so it stays
+/// addressable at idle. Both roles resolve to the same base via de-duplication.
 fn add_case_fan(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -358,22 +358,24 @@ fn add_case_fan(
     preset: Preset,
     role: CaseRole,
 ) -> Result<(), CCError> {
-    // Case members idle near stop, so the floor is the overlay's, not the channel's.
+    // Case members idle near stop, so the floor is the exhaust overlay's, not the channel's.
     let duty = context.duty_for(assignment, false);
     let base_uid = build_case_base(proposal, context, key_temps, preset, duty)?;
-    let pressure = &TUNING.case.pressure;
-    let (name, offset_profile) = match role {
-        CaseRole::Intake => (
-            profile_name("Case Intake", preset, duty),
-            intake_offset_profile(pressure.floor_percent),
-        ),
-        CaseRole::Exhaust => (
-            profile_name("Case Exhaust", preset, duty),
-            exhaust_offset_profile(pressure.floor_percent, pressure.exhaust_bias_percent),
-        ),
+    let profile_uid = match role {
+        // Intake IS the shared airflow demand, so it takes the base as it stands. Wrapping it in
+        // an overlay that only lifted a 0% base would add an entity the user has to look through
+        // to reach the curve, for a floor the member curves already sit well above.
+        CaseRole::Intake => base_uid,
+        CaseRole::Exhaust => {
+            let pressure = &TUNING.case.pressure;
+            let overlay = build_overlay_profile(
+                &profile_name("Case Exhaust", preset, duty),
+                base_uid,
+                exhaust_offset_profile(pressure.floor_percent, pressure.exhaust_bias_percent),
+            );
+            proposal.intern_profile(overlay)
+        }
     };
-    let overlay = build_overlay_profile(&name, base_uid, offset_profile);
-    let profile_uid = proposal.intern_profile(overlay);
     proposal.assign(assignment, profile_uid);
     Ok(())
 }
@@ -424,17 +426,6 @@ fn build_case_member(
         &profile_name(&format!("Case {label}"), preset, duty),
         duty,
     )
-}
-
-/// Intake overlay offset: output = max(base, floor%). Keeps the fan addressable at idle without
-/// reducing the airflow the thermal curve asks for. The offset encoding is derived from the tuning
-/// data's `floor_percent`.
-fn intake_offset_profile(floor: Duty) -> Vec<(Duty, Offset)> {
-    if floor == 0 {
-        return vec![(0, 0), (100, 0)];
-    }
-    let floor_offset = Offset::try_from(floor).expect("floor_percent is validated <= 100, fits i8");
-    vec![(0, floor_offset), (floor, 0), (100, 0)]
 }
 
 /// Exhaust overlay offset: output = max(base - bias%, floor%). Running `bias` below the shared
@@ -1808,24 +1799,24 @@ mod tests {
         }
     }
 
-    /// Goal: with a GPU temp, case fans produce two member graphs, one Max Mix base, and two
-    /// Overlays, and each fan is assigned. Method: generate and assert the per-type profile
+    /// Goal: with a GPU temp, case fans produce two member graphs, one Max Mix base and a single
+    /// Overlay, since only exhaust needs one. Method: generate and assert the per-type profile
     /// counts and the assignment count.
     #[test]
-    fn case_fans_build_mix_base_and_two_overlays() {
+    fn case_fans_build_mix_base_and_one_exhaust_overlay() {
         let response =
             propose(&case_request(Preset::Balanced, true), &test_context()).expect("generates");
         assert_eq!(count_p_type(&response.profiles, &ProfileType::Graph), 2);
         assert_eq!(count_p_type(&response.profiles, &ProfileType::Mix), 1);
-        assert_eq!(count_p_type(&response.profiles, &ProfileType::Overlay), 2);
+        assert_eq!(count_p_type(&response.profiles, &ProfileType::Overlay), 1);
         assert_eq!(response.assignments.len(), 2);
     }
 
-    /// Goal: intake and exhaust overlay the SAME base, and exhaust carries a negative offset for
-    /// positive pressure while intake never does. Method: generate, then assert both overlays
-    /// reference the Mix and check the offset signs.
+    /// Goal: intake is given the shared base as it stands, and exhaust overlays that same base
+    /// with a negative offset for positive pressure. Method: generate, then assert the intake fan
+    /// is assigned the Mix itself while the exhaust Overlay references it and carries the bias.
     #[test]
-    fn case_intake_and_exhaust_share_base_with_pressure_bias() {
+    fn case_intake_takes_the_base_and_exhaust_overlays_it() {
         let response =
             propose(&case_request(Preset::Balanced, true), &test_context()).expect("generates");
         let mix = response
@@ -1854,21 +1845,17 @@ mod tests {
             "exhaust runs below the base for positive pressure"
         );
         let intake = response
-            .profiles
+            .assignments
             .iter()
-            .find(|p| p.name.contains("Intake"))
-            .expect("has intake");
-        assert!(
-            intake
-                .offset_profile()
-                .unwrap()
-                .iter()
-                .all(|(_, off)| *off >= 0),
-            "intake never runs below the base"
+            .find(|assignment| assignment.channel_name == "fan2")
+            .expect("the intake fan is assigned");
+        assert_eq!(
+            intake.profile_uid, mix.uid,
+            "intake follows the airflow demand itself, with nothing wrapped around it"
         );
     }
 
-    /// Goal: without a GPU temp, the base degrades to a single CPU graph (no Mix), still with two
+    /// Goal: without a GPU temp, the base degrades to a single CPU graph (no Mix), still with one
     /// overlays referencing it. Method: generate without a GPU temp and assert the shape.
     #[test]
     fn case_fans_degrade_to_cpu_graph_without_gpu() {
@@ -1884,20 +1871,26 @@ mod tests {
             1,
             "single CPU base graph"
         );
-        assert_eq!(count_p_type(&response.profiles, &ProfileType::Overlay), 2);
+        assert_eq!(count_p_type(&response.profiles, &ProfileType::Overlay), 1);
         let graph = response
             .profiles
             .iter()
             .find(|p| p.p_type() == ProfileType::Graph)
             .expect("has the base graph");
-        for overlay in response
+        let exhaust = response
             .profiles
             .iter()
-            .filter(|p| p.p_type() == ProfileType::Overlay)
-        {
-            assert_eq!(
-                overlay.member_profile_uids(),
-                [graph.uid.clone()].as_slice()
+            .find(|p| p.p_type() == ProfileType::Overlay)
+            .expect("has the exhaust overlay");
+        assert_eq!(
+            exhaust.member_profile_uids(),
+            [graph.uid.clone()].as_slice()
+        );
+        for assignment in &response.assignments {
+            let uid = &assignment.profile_uid;
+            assert!(
+                *uid == graph.uid || *uid == exhaust.uid,
+                "both fans resolve to the one base"
             );
         }
     }

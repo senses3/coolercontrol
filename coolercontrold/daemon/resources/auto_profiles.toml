@@ -244,10 +244,11 @@ function = "performance"
 
 # ---------------------------------------------------------------------------
 # Case fans. Both intake and exhaust share one base built from the member curve below (a Mix of the
-# CPU and GPU members when a GPU temp exists, else the CPU member alone). Intake follows the base;
-# exhaust runs `exhaust_bias_percent` below it for positive case pressure. Both keep the
-# `floor_percent` floor so the fan stays addressable at idle. The offset encoding is derived in code
-# from these two numbers.
+# CPU and GPU members when a GPU temp exists, else the CPU member alone). Intake is given that base
+# as it stands, since it is the airflow demand; only exhaust gets an overlay, running
+# `exhaust_bias_percent` below the base for positive case pressure, with `floor_percent` keeping it
+# addressable where the bias would otherwise drive it to a stop. The offset encoding is derived in
+# code from these two numbers.
 # ---------------------------------------------------------------------------
 [case.member.silent]
 type = "graph"
