@@ -7,7 +7,12 @@
 // a faint base; Mix profiles draw one line per member, since members with
 // different temp sources cannot reduce to a single duty-vs-temp curve.
 
-import { Profile, ProfileType, type ProfileTempSource } from '@/models/Profile.ts'
+import {
+    Profile,
+    ProfileMixFunctionType,
+    ProfileType,
+    type ProfileTempSource,
+} from '@/models/Profile.ts'
 
 // A mini stays readable with only a few lines; larger mixes draw the first
 // MAX_MINI_CURVES members in order.
@@ -62,6 +67,70 @@ export function interpolateOffsetProfile(
 }
 
 const clampDuty = (duty: number): number => Math.min(100, Math.max(0, duty))
+
+// Reduces a mix's member duties the way the daemon's mix functions do.
+export function applyMixFunction(
+    duties: Array<number>,
+    functionType: ProfileMixFunctionType,
+): number {
+    if (duties.length === 0) return 0
+    switch (functionType) {
+        case ProfileMixFunctionType.Avg:
+            return duties.reduce((sum, duty) => sum + duty, 0) / duties.length
+        case ProfileMixFunctionType.Max:
+            return Math.max(...duties)
+        case ProfileMixFunctionType.Min:
+            return Math.min(...duties)
+        case ProfileMixFunctionType.Diff:
+            return clampDuty(duties.reduce((diff, duty) => diff - duty))
+        case ProfileMixFunctionType.Sum:
+            return clampDuty(duties.reduce((sum, duty) => sum + duty, 0))
+    }
+}
+
+// The duty a profile is asking for right now, from live temps and before the channel's Function
+// shapes it: what a chart labels Target. Recursive, so a Mix or Overlay resolves through its
+// members the way the daemon evaluates them. `tempOf` supplies the live temp for a source, which
+// keeps this module free of the stores. `seen` is per branch rather than shared, so a profile used
+// by two members still counts twice while a cycle still terminates.
+export function currentProfileDuty(
+    profile: Profile,
+    allProfiles: Array<Profile>,
+    tempOf: (tempSource?: ProfileTempSource) => number | undefined,
+    seen: Set<string> = new Set(),
+): number {
+    if (seen.has(profile.uid)) return 0
+    seen.add(profile.uid)
+    const membersOf = (): Array<Profile> =>
+        profile.member_profile_uids
+            .map((uid) => allProfiles.find((candidate) => candidate.uid === uid))
+            .filter((member): member is Profile => member != null)
+    switch (profile.p_type) {
+        case ProfileType.Fixed:
+            return clampDuty(profile.speed_fixed ?? 0)
+        case ProfileType.Graph: {
+            if (profile.speed_profile.length === 0) return 0
+            const temp = tempOf(profile.temp_source)
+            if (temp == null) return 0
+            return clampDuty(interpolateProfile(profile.speed_profile, temp))
+        }
+        case ProfileType.Mix: {
+            if (profile.mix_function_type == null) return 0
+            const duties = membersOf().map((member) =>
+                currentProfileDuty(member, allProfiles, tempOf, new Set(seen)),
+            )
+            return clampDuty(applyMixFunction(duties, profile.mix_function_type))
+        }
+        case ProfileType.Overlay: {
+            const base = membersOf()[0]
+            if (base == null || profile.offset_profile.length === 0) return 0
+            const baseDuty = currentProfileDuty(base, allProfiles, tempOf, new Set(seen))
+            return clampDuty(baseDuty + interpolateOffsetProfile(profile.offset_profile, baseDuty))
+        }
+        default:
+            return 0
+    }
+}
 
 // Graph profiles that actually supply a drawable line for a mix/overlay,
 // flattening nested Mix members. Cycles are guarded by the seen set.

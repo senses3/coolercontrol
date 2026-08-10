@@ -2760,6 +2760,8 @@ defineExpose({ saveProfileState, contextIsDirty })
         <OverlayProfileEditorChart
             v-else-if="showOverlayChart"
             :profile-u-i-d="currentProfile.uid"
+            :channel-device-u-i-d="props.channelDeviceUID"
+            :channel-name="props.channelName"
             @changed="(points) => (selectedGraphOffset = points)"
         />
     </div>

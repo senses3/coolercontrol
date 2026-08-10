@@ -643,6 +643,7 @@ export default {
                 '경고가 발생하면 시스템을 종료합니다.\n시스템 종료는 경고 발생 후 1분 후에 시작되며,\n경고가 복구되면 취소됩니다.',
         },
         profiles: {
+            baseDuty: '기준',
             targetDuty: '목표',
             actualDuty: '실제',
             targetHint:

@@ -648,6 +648,7 @@ export default {
                 'Enable system shutdown when the alert is triggered.\nSystem shutdown will commence one minute after the alert is triggered\nand will be cancelled if the alert recovers.',
         },
         profiles: {
+            baseDuty: 'Base',
             targetDuty: 'Target',
             actualDuty: 'Actual',
             targetHint:

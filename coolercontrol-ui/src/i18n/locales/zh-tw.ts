@@ -620,6 +620,7 @@ export default {
                 '當警報觸發時啟用系統關機。\n系統將在警報觸發一分鐘後開始關機，\n如果警報恢復則取消關機。',
         },
         profiles: {
+            baseDuty: '基礎',
             targetDuty: '目標',
             actualDuty: '實際',
             targetHint:

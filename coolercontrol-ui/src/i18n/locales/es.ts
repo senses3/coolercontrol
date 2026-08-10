@@ -655,6 +655,7 @@ export default {
                 'Habilitar el apagado del sistema cuando se active la alerta.\nEl apagado del sistema comenzará un minuto después de que se active la alerta\ny se cancelará si la alerta se recupera.',
         },
         profiles: {
+            baseDuty: 'Base',
             targetDuty: 'Objetivo',
             actualDuty: 'Real',
             targetHint:

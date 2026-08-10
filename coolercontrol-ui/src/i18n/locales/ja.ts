@@ -653,6 +653,7 @@ export default {
                 'アラートがトリガーされたときにシステムシャットダウンを有効にします。\nシステムシャットダウンはアラートがトリガーされてから1分後に開始され、\nアラートが回復した場合はキャンセルされます。',
         },
         profiles: {
+            baseDuty: 'ベース',
             targetDuty: 'ターゲット',
             actualDuty: '実際',
             targetHint:

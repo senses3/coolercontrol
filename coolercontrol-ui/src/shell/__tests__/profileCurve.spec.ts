@@ -7,12 +7,14 @@ import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { Profile, ProfileTempSource, ProfileType } from '@/models/Profile.ts'
 import {
+    currentProfileDuty,
     interpolateProfile,
     MAX_MINI_CURVES,
     MIN_DUTY_SPAN,
     resolveMiniCurves,
     sparklineRange,
 } from '@/shell/cooling/profileCurve.ts'
+import { ProfileMixFunctionType } from '@/models/Profile.ts'
 
 const source = new ProfileTempSource('CPU Temp', 'device-1')
 const graph = (name: string, points: Array<[number, number]>): Profile =>
@@ -141,5 +143,93 @@ describe('sparklineRange', () => {
     it('shifts the span inside 0..100 at the edges', () => {
         expect(sparklineRange([0, 2])).toEqual([0, MIN_DUTY_SPAN])
         expect(sparklineRange([99, 100])).toEqual([100 - MIN_DUTY_SPAN, 100])
+    })
+})
+
+// The Target a chart draws: what a profile is asking for right now, whatever it is built from.
+describe('currentProfileDuty', () => {
+    const at = (temp: number | undefined) => () => temp
+
+    it('reads a graph profile off its temp source', () => {
+        const profile = graph('cpu', [
+            [20, 10],
+            [80, 100],
+        ])
+        expect(currentProfileDuty(profile, [profile], at(50))).toBe(55)
+    })
+
+    it('is zero when the temp source has no reading yet', () => {
+        const profile = graph('cpu', [
+            [20, 10],
+            [80, 100],
+        ])
+        expect(currentProfileDuty(profile, [profile], at(undefined))).toBe(0)
+    })
+
+    it('takes a fixed profile at its duty', () => {
+        const fixed = new Profile('fixed', ProfileType.Fixed)
+        fixed.speed_fixed = 42
+        expect(currentProfileDuty(fixed, [fixed], at(50))).toBe(42)
+    })
+
+    it('reduces a mix through its function', () => {
+        const cool = graph('cool', [
+            [20, 20],
+            [80, 20],
+        ])
+        const hot = graph('hot', [
+            [20, 70],
+            [80, 70],
+        ])
+        const mix = new Profile('mix', ProfileType.Mix)
+        mix.member_profile_uids = [cool.uid, hot.uid]
+        mix.mix_function_type = ProfileMixFunctionType.Max
+        expect(currentProfileDuty(mix, [cool, hot, mix], at(50))).toBe(70)
+        mix.mix_function_type = ProfileMixFunctionType.Avg
+        expect(currentProfileDuty(mix, [cool, hot, mix], at(50))).toBe(45)
+    })
+
+    it('applies an overlay offset to its base', () => {
+        const base = graph('base', [
+            [20, 40],
+            [80, 40],
+        ])
+        const overlay = new Profile('overlay', ProfileType.Overlay)
+        overlay.member_profile_uids = [base.uid]
+        overlay.offset_profile = [
+            [0, 10],
+            [100, 10],
+        ]
+        expect(currentProfileDuty(overlay, [base, overlay], at(50))).toBe(50)
+    })
+
+    it('clamps an overlay that would push past full speed', () => {
+        const base = graph('base', [
+            [20, 95],
+            [80, 95],
+        ])
+        const overlay = new Profile('overlay', ProfileType.Overlay)
+        overlay.member_profile_uids = [base.uid]
+        overlay.offset_profile = [
+            [0, 20],
+            [100, 20],
+        ]
+        expect(currentProfileDuty(overlay, [base, overlay], at(50))).toBe(100)
+    })
+
+    it('counts a profile used by two members twice, but terminates on a cycle', () => {
+        const member = graph('member', [
+            [20, 30],
+            [80, 30],
+        ])
+        const sum = new Profile('sum', ProfileType.Mix)
+        sum.member_profile_uids = [member.uid, member.uid]
+        sum.mix_function_type = ProfileMixFunctionType.Sum
+        expect(currentProfileDuty(sum, [member, sum], at(50))).toBe(60)
+
+        const cycle = new Profile('cycle', ProfileType.Mix)
+        cycle.member_profile_uids = [cycle.uid]
+        cycle.mix_function_type = ProfileMixFunctionType.Max
+        expect(currentProfileDuty(cycle, [cycle], at(50))).toBe(0)
     })
 })

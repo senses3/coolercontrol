@@ -654,6 +654,7 @@ export default {
                 'Ativar o desligamento do sistema quando o alerta for acionado.\nO desligamento do sistema começará um minuto após o alerta ser acionado\ne será cancelado se o alerta for recuperado.',
         },
         profiles: {
+            baseDuty: 'Base',
             targetDuty: 'Alvo',
             actualDuty: 'Atual',
             targetHint:

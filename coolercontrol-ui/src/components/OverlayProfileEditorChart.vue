@@ -16,7 +16,7 @@ import {
     mdiPlusCircleOutline,
 } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
-import { computed, onMounted, onUnmounted, ref, Ref, watch, type WatchStopHandle } from 'vue'
+import { computed, onMounted, onUnmounted, ref, Ref, toRaw, watch, type WatchStopHandle } from 'vue'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -31,6 +31,7 @@ import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import { UniversalTransition } from 'echarts/features'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { currentProfileDuty, interpolateOffsetProfile } from '@/shell/cooling/profileCurve.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useI18n } from 'vue-i18n'
 import type { GraphicComponentLooseOption } from 'echarts/types/dist/shared'
@@ -54,12 +55,19 @@ echarts.use([
 
 const props = defineProps<{
     profileUID: UID
+    // Optional channel context (set when embedded in a channel page): adds the live Actual duty
+    // line, so the fan's real output can be compared with what this overlay is asking for.
+    channelDeviceUID?: string
+    channelName?: string
 }>()
 const emit = defineEmits<{
     (e: 'changed', points: Array<[number, number]>): void
 }>()
 
 const deviceStore = useDeviceStore()
+// The raw state, as the other live charts do: the pinia proxy does not react to the shallowRef
+// the status stream publishes with triggerRef.
+const rawStore = toRaw(deviceStore.$state)
 const settingsStore = useSettingsStore()
 const colors = useThemeColorsStore()
 const { t } = useI18n()
@@ -416,6 +424,168 @@ const controlPointMotionForOffsetY = (posY: number, selectedPointIndex: number):
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// ----- live Base / Target / Actual duties -----
+//
+// Every one of these is a duty, and this chart's x-axis IS duty, so they are vertical lines on it
+// rather than the horizontal ones the Mix chart draws. The gap between Base and Target is the
+// offset this curve is currently applying.
+
+interface LineValue {
+    value: Array<number>
+}
+const baseDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
+const targetDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
+const actualDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
+
+const hasChannelContext = props.channelDeviceUID != null && props.channelName != null
+
+const tempOf = (tempSource?: { device_uid: string; temp_name: string }): number | undefined => {
+    if (tempSource == null) return undefined
+    const temp = deviceStore.currentDeviceStatus
+        .get(tempSource.device_uid)
+        ?.get(tempSource.temp_name)?.temp
+    return temp != null ? Number(temp) : undefined
+}
+
+// What the profile this overlay sits on top of is asking for right now.
+const liveBaseDuty = (): number | undefined => {
+    const baseUID = currentProfile.value?.member_profile_uids[0]
+    if (baseUID == null) return undefined
+    const base = settingsStore.profiles.find((profile) => profile.uid === baseUID)
+    if (base == null) return undefined
+    return currentProfileDuty(base, settingsStore.profiles, tempOf)
+}
+
+// The overlay's own output: the base duty plus the offset the edited curve applies to it. Read
+// from the chart's points rather than the saved profile, so the line follows an unsaved edit.
+const liveTargetDuty = (baseDuty: number | undefined): number | undefined => {
+    if (baseDuty == null) return undefined
+    const offsetPoints = data.map((point): [number, number] => [point.value[0], point.value[1]])
+    if (offsetPoints.length === 0) return undefined
+    const offset = interpolateOffsetProfile(offsetPoints, baseDuty)
+    return Math.min(dutyMax, Math.max(dutyMin, baseDuty + offset))
+}
+
+const liveActualDuty = (): number | undefined => {
+    if (!hasChannelContext) return undefined
+    const duty = deviceStore.currentDeviceStatus
+        .get(props.channelDeviceUID!)
+        ?.get(props.channelName!)?.duty
+    if (duty == null) return undefined
+    const value = Number.parseFloat(String(duty))
+    return Number.isNaN(value) ? undefined : value
+}
+
+const actualDutyColor = (): string =>
+    (hasChannelContext
+        ? settingsStore.allUIDeviceSettings
+              .get(props.channelDeviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.color
+        : undefined) || colors.themeColors.text_color
+
+// A vertical line spanning the offset axis, or empty when the duty is unknown.
+const setVerticalLine = (line: [LineValue, LineValue], duty: number | undefined): void => {
+    if (duty == null) {
+        line[0].value = []
+        line[1].value = []
+        return
+    }
+    line[0].value = [duty, offsetMin]
+    line[1].value = [duty, offsetMax]
+}
+
+const markData = (duty: number | undefined, offset: number): Array<object> =>
+    duty == null ? [] : [{ coord: [duty, offset], value: duty }]
+
+const dutyLabel = (key: string) => ({
+    position: 'top' as const,
+    align: 'center' as const,
+    fontSize: deviceStore.getREMSize(0.9),
+    formatter: (params: any): string =>
+        params.value == null ? '' : `${t(key)} ${Number(params.value).toFixed(0)}%`,
+    shadowColor: colors.themeColors.bg_one,
+    shadowBlur: 10,
+})
+
+// Recomputes all three lines. Called on every status tick and after any edit to the curve; the
+// series read the same arrays, so a full setOption elsewhere redraws the current values.
+const updateLiveLines = (): void => {
+    const baseDuty = liveBaseDuty()
+    const targetDuty = liveTargetDuty(baseDuty)
+    const actualDuty = liveActualDuty()
+    setVerticalLine(baseDutyLineData, baseDuty)
+    setVerticalLine(targetDutyLineData, targetDuty)
+    setVerticalLine(actualDutyLineData, actualDuty)
+    controlGraph.value?.setOption({
+        series: [
+            {
+                id: 'baseDutyLine',
+                data: baseDutyLineData,
+                markPoint: { data: markData(baseDuty, offsetMax) },
+            },
+            {
+                id: 'targetDutyLine',
+                data: targetDutyLineData,
+                markPoint: { data: markData(targetDuty, offsetMax) },
+            },
+            {
+                id: 'actualDutyLine',
+                data: actualDutyLineData,
+                markPoint: { data: markData(actualDuty, offsetMin) },
+            },
+        ],
+    })
+}
+
+// The three live series. Base is faint and solid (it is the input), Target dashed in the accent
+// (what this profile asks for, before the channel's Function), Actual in the channel's own color.
+for (const line of [
+    {
+        id: 'baseDutyLine',
+        data: baseDutyLineData,
+        color: colors.themeColors.text_color_secondary,
+        type: 'solid' as const,
+        labelKey: 'views.profiles.baseDuty',
+        labelOffset: offsetMax,
+    },
+    {
+        id: 'targetDutyLine',
+        data: targetDutyLineData,
+        color: colors.themeColors.accent,
+        type: 'dashed' as const,
+        labelKey: 'views.profiles.targetDuty',
+        labelOffset: offsetMax,
+    },
+    {
+        id: 'actualDutyLine',
+        data: actualDutyLineData,
+        color: actualDutyColor(),
+        type: 'dotted' as const,
+        labelKey: 'views.profiles.actualDuty',
+        labelOffset: offsetMin,
+    },
+]) {
+    // The option literal types its series from the editor's own point series, so a live line
+    // pushed here does not fit that shape.
+    ;(option.series as Array<any>).push({
+        id: line.id,
+        type: 'line',
+        smooth: false,
+        symbol: 'none',
+        lineStyle: { color: line.color, width: 2, type: line.type },
+        emphasis: { disabled: true },
+        data: line.data,
+        markPoint: {
+            symbolSize: 0,
+            label: { ...dutyLabel(line.labelKey), color: line.color },
+            data: [],
+        },
+        z: 100,
+        silent: true,
+    })
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 const controlGraph = ref<InstanceType<typeof VChart> | null>(null)
 
 const setDutyAndOffsetValues = (dataIndex: number): void => {
@@ -451,6 +621,7 @@ const afterPointDragging = (dataIndex: number, posXY: [number, number]): void =>
             position: controlGraph.value?.convertToPixel('grid', item.value),
         })),
     })
+    updateLiveLines()
     tableDataKey.value++
 }
 
@@ -493,6 +664,7 @@ const createWatcherOfDutyOffsetText = (): WatchStopHandle =>
                 ],
                 graphic: graphicData,
             })
+            updateLiveLines()
         },
         { flush: 'post' },
     )
@@ -648,6 +820,7 @@ const addPointToLine = (params: any) => {
     // this needs a bit of time for the graph to refresh before being set correctly:
     setTimeout(() => (selectedPointIndex.value = indexToInsertAt), 50)
     setTimeout(() => showTooltip(indexToInsertAt), 350) // wait until point animation is complete before showing tooltip
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -700,6 +873,7 @@ const deletePointFromLine = (params: any) => {
         true,
     )
     controlGraph.value?.setOption(option, { replaceMerge: ['series', 'graphic'], silent: true })
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -758,6 +932,7 @@ const refreshGraphAfterTableEdit = (): void => {
         ],
         graphic: graphicData,
     })
+    updateLiveLines()
     tableDataKey.value++
 }
 
@@ -917,6 +1092,7 @@ const addPointFromTable = (afterIdx: number): void => {
 
     selectedPointIndex.value = afterIdx + 1
     setDutyAndOffsetValues(afterIdx + 1)
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -935,6 +1111,7 @@ const removePointFromTable = (idx: number): void => {
     // @ts-ignore
     option.graphic = graphicData
     controlGraph.value?.setOption(option, { replaceMerge: ['series', 'graphic'], silent: true })
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -1082,6 +1259,11 @@ let resizeObserver: ResizeObserver | null = null
 let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
+    // The live lines follow the status stream: Base moves with its temp source, Actual with the
+    // fan. Drawn once here too, so they are there before the first tick.
+    updateLiveLines()
+    watch(rawStore.currentDeviceStatus, () => updateLiveLines())
+
     // Make sure on selected Point change, that there is only one.
     watch(selectedPointIndex, (dataIndex) => {
         for (const [index, pointData] of data.entries()) {
