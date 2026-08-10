@@ -18,6 +18,8 @@ import {
 import { Profile, ProfileType } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import type { TablePosition } from '@/models/UISettings.ts'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -64,6 +66,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
+const settingsStore = useSettingsStore()
 const colors = useThemeColorsStore()
 
 const currentProfile: Ref<Profile> = ref(new Profile(props.name, ProfileType.Overlay))
@@ -708,8 +711,12 @@ const deletePointFromLine = (params: any) => {
 const MIN_DUTY_SEPARATION = 1
 
 // Points table position (local state, not persisted)
-type TablePosition = 'top-left' | 'bottom-right'
-const tablePosition: Ref<TablePosition> = ref('top-left')
+// Points table position, persisted so the corner the user last chose is the one every
+// graph editor opens in.
+const tablePosition = computed({
+    get: () => settingsStore.pointsOverlayTablePosition,
+    set: (position: TablePosition) => (settingsStore.pointsOverlayTablePosition = position),
+})
 
 const tablePositionClasses = computed(() => ({
     'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',

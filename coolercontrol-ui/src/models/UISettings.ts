@@ -220,6 +220,10 @@ export const ONBOARDING_TOUR_VERSION = 2
  * The Class-Transformer has issues with Maps, so we have to use Arrays to
  * store that data and do the transformation.
  */
+// Which corner the points overlay table sits in on a graph editor. Persisted so the corner the
+// user last moved it to is where they find it on every profile, rather than a per-editor default.
+export type TablePosition = 'top-left' | 'bottom-right'
+
 export class UISettingsDTO {
     devices?: Array<UID> = []
 
@@ -241,6 +245,7 @@ export class UISettingsDTO {
     customTheme: CustomThemeSettings = { ...defaultCustomTheme }
     entityColors: Array<[string, string]> = []
     eyeCandy: boolean = false
+    pointsOverlayTablePosition: TablePosition = 'bottom-right'
     interfaceFont: InterfaceFont = InterfaceFont.BUNDLED
     // The tour version the user has completed; below ONBOARDING_TOUR_VERSION
     // means it runs again. Legacy configs hold a boolean here, which coerces

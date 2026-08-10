@@ -17,6 +17,7 @@ import {
     SensorAndChannelSettings,
     StartupPage,
     TagSettings,
+    type TablePosition,
     ThemeMode,
     UISettingsDTO,
 } from '@/models/UISettings'
@@ -210,6 +211,8 @@ export const useSettingsStore = defineStore('settings', () => {
     const customTheme: CustomThemeSettings = reactive({ ...defaultCustomTheme })
     const entityColors: Ref<Array<[string, string]>> = ref([])
     const eyeCandy: Ref<boolean> = ref(false)
+    // The corner the points overlay table was last moved to, shared by every graph editor.
+    const pointsOverlayTablePosition: Ref<TablePosition> = ref('bottom-right')
     const interfaceFont: Ref<InterfaceFont> = ref(InterfaceFont.BUNDLED)
     // Persisted as the tour version the user has finished. Callers only ask the
     // yes/no question, so they read the computed below and call
@@ -339,6 +342,7 @@ export const useSettingsStore = defineStore('settings', () => {
         }
         entityColors.value = uiSettings.entityColors
         eyeCandy.value = uiSettings.eyeCandy
+        pointsOverlayTablePosition.value = uiSettings.pointsOverlayTablePosition ?? 'bottom-right'
         interfaceFont.value = uiSettings.interfaceFont ?? InterfaceFont.BUNDLED
         applyInterfaceFont()
         // Legacy configs stored a boolean here: false once the old tour was
@@ -1227,6 +1231,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 customTheme,
                 entityColors.value,
                 eyeCandy,
+                pointsOverlayTablePosition,
                 interfaceFont,
                 onboardingSeenVersion,
                 cpuStressBackend,
@@ -1284,6 +1289,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     }
                     uiSettings.entityColors = entityColors.value
                     uiSettings.eyeCandy = eyeCandy.value
+                    uiSettings.pointsOverlayTablePosition = pointsOverlayTablePosition.value
                     uiSettings.interfaceFont = interfaceFont.value
                     uiSettings.showOnboarding = onboardingSeenVersion.value
                     uiSettings.cpuStressBackend = cpuStressBackend.value
@@ -1655,6 +1661,7 @@ export const useSettingsStore = defineStore('settings', () => {
         customTheme,
         entityColors,
         eyeCandy,
+        pointsOverlayTablePosition,
         interfaceFont,
         showOnboarding,
         completeOnboarding,

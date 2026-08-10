@@ -21,6 +21,7 @@ import {
     mdiPlusCircleOutline,
 } from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import type { TablePosition } from '@/models/UISettings.ts'
 import {
     Function,
     FunctionType,
@@ -63,7 +64,6 @@ import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useToast } from '@/shell/toast'
 import { $enum } from 'ts-enum-util'
 import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
-import { pointsTableClearPosition } from '@/components/pointsTablePlacement.ts'
 import {
     onBeforeRouteLeave,
     onBeforeRouteUpdate,
@@ -1362,37 +1362,21 @@ const deletePointFromLine = (params: any) => {
 
 //--------------------------------------------------------------------------------------------------
 
-// Points table position (local state, not persisted)
-type TablePosition = 'top-left' | 'bottom-right'
-const tablePosition: Ref<TablePosition> = ref('top-left')
-
-const tablePositionClasses = computed(() => ({
-    'top-16 left-[5.5rem]': tablePosition.value === 'top-left',
-    'bottom-16 right-[7rem]': tablePosition.value === 'bottom-right',
-}))
+// Points table position, persisted so the corner the user last chose is the one every
+// graph editor opens in.
+const tablePosition = computed({
+    get: () => settingsStore.pointsOverlayTablePosition,
+    set: (position: TablePosition) => (settingsStore.pointsOverlayTablePosition = position),
+})
 
 const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
 }
 
-// On the initial draw, place the table in whichever corner is clearer so it
-// doesn't cover the curve points. During editing the user relocates it with the
-// manual swap button; re-evaluating on every chart change was too costly.
-const pointsTable = ref<HTMLElement | null>(null)
-const pickBestTablePosition = (): void => {
-    tablePosition.value = pointsTableClearPosition(
-        controlGraph.value,
-        pointsTable.value,
-        tablePosition.value,
-        data,
-        deviceStore.getREMSize(1),
-    )
-}
-let placementTimer: ReturnType<typeof setTimeout> | undefined
-const scheduleTablePlacement = (): void => {
-    if (placementTimer != null) clearTimeout(placementTimer)
-    placementTimer = setTimeout(pickBestTablePosition, 200)
-}
+const tablePositionClasses = computed(() => ({
+    'top-16 left-[5.5rem]': tablePosition.value === 'top-left',
+    'bottom-16 right-[7rem]': tablePosition.value === 'bottom-right',
+}))
 
 const selectPointFromTable = (idx: number) => {
     tempDutyTextWatchStopper()
@@ -2158,7 +2142,6 @@ onMounted(async () => {
     setTimeout(() => {
         updateResponsiveGraphHeight()
         graphReady.value = true
-        scheduleTablePlacement()
     })
 
     // handle the graphics on graph resize & zoom
@@ -2543,7 +2526,6 @@ defineExpose({ saveProfileState, contextIsDirty })
             />
             <!-- Points Table Overlay -->
             <div
-                ref="pointsTable"
                 class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
                 :class="tablePositionClasses"
             >

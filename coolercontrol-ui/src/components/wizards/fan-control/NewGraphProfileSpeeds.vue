@@ -25,6 +25,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import type { TablePosition } from '@/models/UISettings.ts'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -1126,8 +1127,12 @@ const deletePointFromLine = (params: any) => {
 // Points Table Overlay
 
 // Points table position (local state, not persisted)
-type TablePosition = 'top-left' | 'bottom-right'
-const tablePosition: Ref<TablePosition> = ref('top-left')
+// Points table position, persisted so the corner the user last chose is the one every
+// graph editor opens in.
+const tablePosition = computed({
+    get: () => settingsStore.pointsOverlayTablePosition,
+    set: (position: TablePosition) => (settingsStore.pointsOverlayTablePosition = position),
+})
 
 const tablePositionClasses = computed(() => ({
     'top-16 left-[5.5rem]': tablePosition.value === 'top-left',
