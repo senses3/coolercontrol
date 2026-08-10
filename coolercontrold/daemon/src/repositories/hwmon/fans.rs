@@ -360,10 +360,12 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     });
                     let fan_pwm_mode_task = channel_scope.spawn(async {
                         if channel.caps.has_pwm_mode() {
-                            cc_fs::read_sysfs(driver.path.join(format_pwm_mode!(channel.number)))
-                                .await
-                                .and_then(check_parsing_8)
-                                .ok()
+                            cc_fs::read_sysfs_value(
+                                driver.path.join(format_pwm_mode!(channel.number)),
+                            )
+                            .await
+                            .and_then(check_parsing_8)
+                            .ok()
                         } else {
                             None
                         }
@@ -397,7 +399,7 @@ async fn get_pwm_duty(
         Some(path) => path,
         None => &base_path.join(format_pwm!(channel_number)),
     };
-    match cc_fs::read_sysfs(pwm_path)
+    match cc_fs::read_sysfs_value(pwm_path)
         .await
         .and_then(check_parsing_8)
         .map(pwm_value_to_duty)
@@ -446,7 +448,7 @@ pub async fn get_fan_rpm(
         Some(path) => path,
         None => &base_path.join(format_fan_input!(channel_number)),
     };
-    cc_fs::read_sysfs(fan_input_path)
+    cc_fs::read_sysfs_value(fan_input_path)
         .await
         .and_then(check_parsing_32)
         // Edge case where on spin-up the output is max value until it begins moving
@@ -475,7 +477,7 @@ pub async fn get_fan_rpm(
 /// means there is no auto mode to hand control back to.
 async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> {
     let pwm_enable_path = base_path.join(format_pwm_enable!(channel_number));
-    let current_pwm_enable = cc_fs::read_sysfs(&pwm_enable_path)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&pwm_enable_path)
         .await
         .and_then(check_parsing_8)
         .ok();
@@ -489,19 +491,13 @@ async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> 
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn check_parsing_8(content: String) -> Result<u8> {
-    match content.trim().parse::<u8>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+pub fn check_parsing_8(value: cc_fs::SysfsValue) -> Result<u8> {
+    value.parse()
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn check_parsing_32(content: String) -> Result<u32> {
-    match content.trim().parse::<u32>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+pub fn check_parsing_32(value: cc_fs::SysfsValue) -> Result<u32> {
+    value.parse()
 }
 
 /// If a `HWMon` driver has not set the writable bit on the sysfs file, then that
@@ -600,7 +596,7 @@ pub async fn set_pwm_enable_to_default_or_auto(
         return Ok(());
     };
     let path_pwm_enable = base_path.join(format_pwm_enable!(channel_info.number));
-    let current_pwm_enable = cc_fs::read_sysfs(&path_pwm_enable)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&path_pwm_enable)
         .await
         .and_then(check_parsing_8)?;
     if current_pwm_enable < PWM_ENABLE_AUTO_VALUE && current_pwm_enable != default_value {
@@ -649,7 +645,7 @@ pub async fn set_pwm_enable_if_not_already(
         return Ok(());
     }
     let path_pwm_enable = base_path.join(format_pwm_enable!(channel_info.number));
-    let current_pwm_enable = cc_fs::read_sysfs(&path_pwm_enable)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&path_pwm_enable)
         .await
         .and_then(check_parsing_8)?;
     if current_pwm_enable == pwm_enable_value {
@@ -1111,7 +1107,7 @@ mod tests {
             let result = set_pwm_duty(test_base_path, &channel_info, 50).await;
 
             // then:
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -1149,7 +1145,7 @@ mod tests {
             let result = set_pwm_duty(test_base_path, &channel_info, 50).await;
 
             // then:
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -1187,7 +1183,7 @@ mod tests {
             let result = set_pwm_duty(test_base_path, &channel_info, 50).await;
 
             // then:
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)

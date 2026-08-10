@@ -47,7 +47,7 @@ pub async fn set_to_full_speed(base_path: &Path, channel_info: &HwmonChannelInfo
     // (the driver doesn't automatically set the duty to 100% in full-speed mode)
     set_pwm_duty(base_path, channel_info, 100).await?;
     let path_pwm_enable = base_path.join(format_pwm_enable!(channel_info.number));
-    let current_pwm_enable = cc_fs::read_sysfs(&path_pwm_enable)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&path_pwm_enable)
         .await
         .and_then(check_parsing_8)?;
     if current_pwm_enable != PWM_ENABLE_THINKPAD_FULL_SPEED {
@@ -147,7 +147,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -206,7 +206,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -268,7 +268,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -316,7 +316,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)

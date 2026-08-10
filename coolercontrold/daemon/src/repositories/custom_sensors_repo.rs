@@ -825,7 +825,7 @@ impl CustomSensorsRepo {
     }
 
     async fn get_custom_sensor_file_temp(file_path: &Path) -> Result<f64> {
-        cc_fs::read_sysfs(file_path)
+        cc_fs::read_sysfs_value(file_path)
             .await
             .map_err(Self::verify_file_exists)
             .and_then(Self::verify_file_size)
@@ -847,29 +847,34 @@ impl CustomSensorsRepo {
         err
     }
 
-    fn verify_file_size(content: String) -> Result<String> {
-        if content.len() > MAX_CUSTOM_SENSOR_FILE_SIZE_BYTES {
+    fn verify_file_size(value: cc_fs::SysfsValue) -> Result<cc_fs::SysfsValue> {
+        // A file beyond the read buffer reports the buffer length here, not its true
+        // size. Same error class; the limit is far below the buffer.
+        if value.len() > MAX_CUSTOM_SENSOR_FILE_SIZE_BYTES {
             Err(CCError::UserError {
                 msg: format!(
                     "File size too large: {:?} bytes. Max allowed: {:?} bytes",
-                    content.len(),
+                    value.len(),
                     MAX_CUSTOM_SENSOR_FILE_SIZE_BYTES
                 ),
             }
             .into())
         } else {
-            Ok(content)
+            Ok(value)
         }
     }
 
     #[allow(clippy::needless_pass_by_value)]
-    fn verify_i32(content: String) -> Result<i32> {
-        content.trim().parse::<i32>().map_err(|err| {
-            CCError::UserError {
-                msg: format!("{err}"),
-            }
-            .into()
-        })
+    fn verify_i32(value: cc_fs::SysfsValue) -> Result<i32> {
+        let user_error = |msg: String| CCError::UserError { msg }.into();
+        value
+            .trimmed_str()
+            .map_err(|err| user_error(format!("{err}")))
+            .and_then(|content| {
+                content
+                    .parse::<i32>()
+                    .map_err(|err| user_error(format!("{err}")))
+            })
     }
 
     fn verify_temp_value(temp: i32) -> Result<f64> {

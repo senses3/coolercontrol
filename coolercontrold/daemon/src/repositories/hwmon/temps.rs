@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::ops::Not;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -104,7 +104,7 @@ pub async fn read_one_temp_status(
         Some(path) => path,
         None => &driver.path.join(format_temp_input!(channel.number)),
     };
-    match cc_fs::read_sysfs(temp_path)
+    match cc_fs::read_sysfs_value(temp_path)
         .await
         .and_then(check_parsing_32)
         // hwmon temps are in millidegrees:
@@ -163,7 +163,7 @@ pub async fn extract_temp_statuses_concurrently(
             }
             let temp_task = scope.spawn(async {
                 let result =
-                    cc_fs::read_sysfs(driver.path.join(format_temp_input!(channel.number)))
+                    cc_fs::read_sysfs_value(driver.path.join(format_temp_input!(channel.number)))
                         .await
                         .and_then(check_parsing_32)
                         // hwmon temps are in millidegrees:
@@ -198,7 +198,7 @@ fn temps_used_by_another_repo(device_name: &str) -> bool {
 /// Note: temp sensor readings come in millidegrees by default, i.e. 35.0C == 35000
 async fn sensor_is_usable(base_path: &Path, channel_number: &u8, driver_name: &str) -> bool {
     let temp_path = base_path.join(format_temp_input!(channel_number));
-    match cc_fs::read_sysfs(&temp_path)
+    match cc_fs::read_sysfs_value(&temp_path)
         .await
         .and_then(check_parsing_32)
         .map(|degrees| f64::from(degrees) / 1000.0f64)
@@ -273,11 +273,8 @@ fn log_thinkpad_gpu_powerdown_once(
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn check_parsing_32(content: String) -> Result<i32> {
-    match content.trim().parse::<i32>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+fn check_parsing_32(value: cc_fs::SysfsValue) -> Result<i32> {
+    value.parse()
 }
 
 /// Reads the contents of the temp?_label file specified by `base_path` and
@@ -730,7 +727,8 @@ mod tests {
         // Verifies a non-OS error (e.g. the InvalidData produced by
         // check_parsing_32 on garbage) is not mistaken for ENXIO. Those
         // errors carry no raw_os_error.
-        let parse_err = check_parsing_32("not a number".to_string()).unwrap_err();
+        let parse_err =
+            check_parsing_32(cc_fs::SysfsValue::from_bytes(b"not a number")).unwrap_err();
         assert!(is_thinkpad_gpu_powerdown(devices::DEVICE_NAME_THINK_PAD, &parse_err).not());
     }
 

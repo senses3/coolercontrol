@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use futures_util::future::join_all;
 use log::{info, trace};
 use regex::Regex;
-use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 
 const PATTERN_FREQ_INPUT_NUMBER: &str = r"^freq(?P<number>\d+)_input$";
@@ -64,10 +63,11 @@ pub async fn extract_freq_statuses(driver: &HwmonDriverInfo) -> Vec<ChannelStatu
         if channel.hwmon_type != HwmonChannelType::Freq {
             continue;
         }
-        let result = cc_fs::read_sysfs(driver.path.join(format!("freq{}_input", channel.number)))
-            .await
-            .and_then(check_parsing_64)
-            .map(hertz_to_megahertz);
+        let result =
+            cc_fs::read_sysfs_value(driver.path.join(format!("freq{}_input", channel.number)))
+                .await
+                .and_then(check_parsing_64)
+                .map(hertz_to_megahertz);
         if let Ok(freq) = result {
             freqs.push(ChannelStatus {
                 name: channel.name.clone(),
@@ -88,11 +88,12 @@ pub async fn extract_freq_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec
                 continue;
             }
             let freq_task = scope.spawn(async {
-                let result =
-                    cc_fs::read_sysfs(driver.path.join(format!("freq{}_input", channel.number)))
-                        .await
-                        .and_then(check_parsing_64)
-                        .map(hertz_to_megahertz);
+                let result = cc_fs::read_sysfs_value(
+                    driver.path.join(format!("freq{}_input", channel.number)),
+                )
+                .await
+                .and_then(check_parsing_64)
+                .map(hertz_to_megahertz);
                 result.map(|freq| ChannelStatus {
                     name: channel.name.clone(),
                     freq: Some(freq),
@@ -110,7 +111,7 @@ pub async fn extract_freq_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec
 }
 
 async fn sensor_is_usable(base_path: &Path, channel_number: &u8) -> bool {
-    cc_fs::read_sysfs(base_path.join(format!("freq{channel_number}_input")))
+    cc_fs::read_sysfs_value(base_path.join(format!("freq{channel_number}_input")))
         .await
         .and_then(check_parsing_64)
         .map(hertz_to_megahertz)
@@ -129,11 +130,8 @@ fn hertz_to_megahertz(hertz: u64) -> Mhz {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn check_parsing_64(content: String) -> Result<u64> {
-    match content.trim().parse::<u64>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+fn check_parsing_64(value: cc_fs::SysfsValue) -> Result<u64> {
+    value.parse()
 }
 
 async fn get_freq_channel_label(base_path: &Path, channel_number: &u8) -> Option<String> {
