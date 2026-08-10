@@ -1061,7 +1061,9 @@ const updatePosition = (): void => {
 // rem-scaled fonts and paddings).
 const tablePositionClasses = computed(() => ({
     'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',
-    'bottom-[6rem] right-[5.5rem]': tablePosition.value === 'bottom-right',
+    // Clears the x-axis name and the last duty label, which sit below and right of the plot area:
+    // the graph editors' 7rem right offset, and enough bottom to stay off the axis line.
+    'bottom-[7rem] right-[7rem]': tablePosition.value === 'bottom-right',
 }))
 
 //----------------------------------------------------------------------------------------------------------------------
