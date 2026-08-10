@@ -174,14 +174,12 @@ pub struct CaseTuning {
     pub pressure: CasePressure,
 }
 
-/// Positive-pressure parameters. Exhaust runs `exhaust_bias_percent` below the shared thermal
-/// demand; both intake and exhaust keep a `floor_percent` floor so the fan stays addressable at
-/// idle. The parent module derives the overlay offset encoding from these two numbers.
+/// Positive-pressure parameter: exhaust runs `exhaust_bias_percent` below the shared thermal
+/// demand, which the parent module turns into a static overlay offset.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CasePressure {
     pub exhaust_bias_percent: Duty,
-    pub floor_percent: Duty,
 }
 
 impl TuningConfig {
@@ -208,10 +206,6 @@ impl TuningConfig {
         validate_percent(
             "case.pressure.exhaust_bias_percent",
             self.case.pressure.exhaust_bias_percent,
-        )?;
-        validate_percent(
-            "case.pressure.floor_percent",
-            self.case.pressure.floor_percent,
         )?;
         if self.scale.nominal_dead_zone_percent >= 100 {
             return Err(format!(

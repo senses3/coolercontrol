@@ -347,9 +347,9 @@ enum CaseRole {
 }
 
 /// Case fan: the shared case base (Mix(CPU, GPU) Max, or a CPU graph when there is no GPU temp).
-/// Intake is assigned that base directly; exhaust gets an Overlay running below it (the
-/// `[case.pressure]` bias) for positive pressure, with the configured floor so it stays
-/// addressable at idle. Both roles resolve to the same base via de-duplication.
+/// Intake is assigned that base directly; exhaust gets an Overlay running a static
+/// `[case.pressure]` bias below it, for positive pressure. Both roles resolve to the same base via
+/// de-duplication.
 fn add_case_fan(
     proposal: &mut Proposal,
     context: &DeviceContext,
@@ -371,7 +371,7 @@ fn add_case_fan(
             let overlay = build_overlay_profile(
                 &profile_name("Case Exhaust", preset, duty),
                 base_uid,
-                exhaust_offset_profile(pressure.floor_percent, pressure.exhaust_bias_percent),
+                exhaust_offset_profile(pressure.exhaust_bias_percent),
             );
             proposal.intern_profile(overlay)
         }
@@ -428,21 +428,21 @@ fn build_case_member(
     )
 }
 
-/// Exhaust overlay offset: output = max(base - bias%, floor%). Running `bias` below the shared
-/// thermal demand biases the case toward positive pressure (more intake than exhaust). The
-/// breakpoint at `floor + bias` is where base minus bias meets the floor. Both numbers come from
-/// the tuning data's `[case.pressure]`.
-fn exhaust_offset_profile(floor: Duty, bias: Duty) -> Vec<(Duty, Offset)> {
-    let floor_offset = Offset::try_from(floor).expect("floor_percent is validated <= 100, fits i8");
+/// Exhaust overlay offset: output = base - bias%. Running `bias` below the shared thermal demand
+/// biases the case toward positive pressure (more intake than exhaust). A single pair is the
+/// static-offset encoding: the engine returns that offset for any duty, and the editor shows it as
+/// one knob rather than a curve to decode. The engine clamps the sum, so a base below the bias
+/// stops the fan rather than going negative.
+fn exhaust_offset_profile(bias: Duty) -> Vec<(Duty, Offset)> {
     let bias_offset =
         Offset::try_from(bias).expect("exhaust_bias_percent is validated <= 100, fits i8");
-    let breakpoint = floor.saturating_add(bias);
-    vec![
-        (0, floor_offset),
-        (breakpoint, -bias_offset),
-        (100, -bias_offset),
-    ]
+    vec![(STATIC_OFFSET_DUTY, -bias_offset)]
 }
+
+/// The duty coordinate a static overlay offset is stored at. Any value works, since a one-pair
+/// profile returns its offset for every duty; the UI writes 50, so generated profiles match what
+/// the editor produces.
+const STATIC_OFFSET_DUTY: Duty = 50;
 
 /// A Mix profile combining member profiles with the given function. Its own function is the
 /// default identity: the members already carry their curves and smoothing.
@@ -1836,13 +1836,16 @@ mod tests {
             .iter()
             .find(|p| p.name.contains("Exhaust"))
             .expect("has exhaust");
-        assert!(
-            exhaust
-                .offset_profile()
-                .unwrap()
-                .iter()
-                .any(|(_, off)| *off < 0),
-            "exhaust runs below the base for positive pressure"
+        let offsets = exhaust.offset_profile().expect("has an offset");
+        assert_eq!(
+            offsets.len(),
+            1,
+            "a static offset, not a curve the user has to decode"
+        );
+        assert_eq!(
+            offsets[0].1,
+            -Offset::try_from(TUNING.case.pressure.exhaust_bias_percent).expect("fits"),
+            "exhaust runs the configured bias below the base for positive pressure"
         );
         let intake = response
             .assignments
