@@ -55,6 +55,10 @@ from liquidctl.driver.kraken3 import KrakenZ3
 from liquidctl.driver.smart_device import SmartDevice, SmartDevice2
 from PIL import Image
 
+_ORIGINAL_KRAKENZ3_CONNECT = KrakenZ3.connect
+_ORIGINAL_SWITCH_BUCKET = KrakenZ3._switch_bucket
+_ORIGINAL_SEND_DATA = KrakenZ3._send_data
+
 #####################################################################
 # Basic Setup
 #####################################################################
@@ -82,6 +86,138 @@ SHUTDOWN_DEADLINE_SECS: float = 4.0
 # LCD liquidctl supports, with all three channels distinct so a swapped channel or a
 # wrong rotation cannot pass unnoticed.
 _PACKING_PROBE_SIZE: int = 8
+
+
+# A Kraken LCD frame is written to a "bucket" of device memory, then displayed by switching
+# to it.  liquidctl caps each bulk transfer at 512 bytes for the Z-series (every 2023/2024
+# model already uses 2 MB), so a 320x320 frame becomes 800 synchronous USB transfers, and it
+# rescans all 16 buckets on every frame.  That is where an LCD update's 1.2-2.0 s goes.
+# KrakenZPlayground drives the same device (0x1e71:0x3008) at 30 fps by writing the frame in
+# one transfer and alternating between two pinned buckets.
+_LCD_BULK_TRANSFER_BYTES: int = 2 * 1024 * 1024
+# Prefix of the first bulk message, copied from liquidctl's `_send_data`.
+_LCD_BULK_HEADER: tuple = (
+    0x12,
+    0xFA,
+    0x01,
+    0xE8,
+    0xAB,
+    0xCD,
+    0xEF,
+    0x98,
+    0x76,
+    0x54,
+    0x32,
+    0x10,
+)
+# Bucket memory is accounted in 1 KiB slots.
+_LCD_BUCKET_SLOT_BYTES: int = 1024
+
+
+def _connect_with_whole_frame_transfers(self, **kwargs):
+    """Raises the bulk transfer cap so a frame is written in one transfer, not 800."""
+    result = _ORIGINAL_KRAKENZ3_CONNECT(self, **kwargs)
+    if (
+        getattr(self, "bulk_buffer_size", _LCD_BULK_TRANSFER_BYTES)
+        < _LCD_BULK_TRANSFER_BYTES
+    ):
+        self.bulk_buffer_size = _LCD_BULK_TRANSFER_BYTES
+    return result
+
+
+def _switch_bucket_tracking_active(self, *args, **kwargs):
+    """Records the displayed bucket and the pair we rotate between.
+
+    The pair is learned from whatever liquidctl allocates rather than assumed to be 0 and 1:
+    a device with buckets already in use, or a differently sized upload (a gif among the
+    per-tick images), sends liquidctl's allocator somewhere else entirely, and the rotation
+    has to follow it instead of switching itself off.
+    """
+    switched = _ORIGINAL_SWITCH_BUCKET(self, *args, **kwargs)
+    if switched.__bool__() is False or args.__len__() == 0:
+        return switched
+    bucket = args[0]
+    pair = getattr(self, "_cc_bucket_pair", ())
+    if bucket not in pair:
+        pair = (pair[-1], bucket) if pair else (bucket,)
+    self._cc_bucket_pair = pair
+    self._cc_active_bucket = bucket
+    return switched
+
+
+def _send_frame_to_spare_bucket(self, data, bulk_info):
+    """Writes a frame to the bucket that is not on screen, reusing its existing allocation.
+
+    liquidctl's own path queries all 16 buckets and allocates a fresh one per frame, which
+    costs ~16 HID round trips and, once all 16 are occupied, settles on rewriting whichever
+    bucket is on screen.  Once two buckets hold a frame of this size, each update needs one
+    query, then delete, setup, write.
+
+    Every value on the wire here is either produced by liquidctl's own helpers or reported by
+    the device (the memory offset is read back from the bucket, never computed), so no wire
+    format is re-derived.  Anything unexpected, including the first frames before the buckets
+    exist, falls back to `_send_data` unchanged.
+    """
+    pair = getattr(self, "_cc_bucket_pair", ())
+    active_bucket = getattr(self, "_cc_active_bucket", None)
+    if len(pair) < 2 or active_bucket not in pair:
+        # Not rotating between two known buckets yet: let liquidctl allocate, and learn the
+        # bucket it picks. Two such frames are enough to establish the rotation.
+        return _ORIGINAL_SEND_DATA(self, data, bulk_info)
+
+    target_bucket = pair[0] if pair[1] == active_bucket else pair[1]
+    header = list(_LCD_BULK_HEADER) + bulk_info
+    slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
+
+    bucket = self._write_then_read([0x30, 0x04, target_bucket])
+    occupied = any(bucket[15:])
+    capacity = int.from_bytes([bucket[19], bucket[20]], "little")
+    if not occupied or capacity < slots_needed:
+        # First use of this bucket, or the frame outgrew it.
+        return _ORIGINAL_SEND_DATA(self, data, bulk_info)
+
+    memory_start = [bucket[17], bucket[18]]
+    self._write_then_read([0x36, 0x03])
+    self._delete_bucket(target_bucket)
+    if not self._setup_bucket(
+        target_bucket,
+        target_bucket + 1,
+        memory_start,
+        list(slots_needed.to_bytes(2, "little")),
+    ):
+        log.error("Failed to setup bucket for LCD data transfer")
+    self._write_then_read([0x36, 0x01, target_bucket])
+    self._bulk_write(header)
+    self._bulk_write(data)  # one transfer for the whole frame
+    self._write([0x36, 0x02])
+    if not self._switch_bucket(target_bucket):
+        log.error("Failed to switch active LCD bucket")
+
+
+def patch_kraken_lcd_transfer() -> bool:
+    """Installs the whole-frame transfer and the two-bucket rotation.
+
+    Returns whether both were installed.  These change how the device is driven rather than
+    what bytes it receives, so unlike the packing replacement they cannot be verified against
+    a reference here; they degrade to liquidctl's own path whenever their preconditions do
+    not hold.
+    """
+    required = (
+        "_send_data",
+        "_switch_bucket",
+        "_delete_bucket",
+        "_setup_bucket",
+        "_bulk_write",
+    )
+    missing = [name for name in required if hasattr(KrakenZ3, name) is False]
+    if missing:
+        log.warning("liquidctl KrakenZ3 is missing %s; LCD transfer unpatched", missing)
+        return False
+    KrakenZ3.connect = _connect_with_whole_frame_transfers
+    KrakenZ3._switch_bucket = _switch_bucket_tracking_active
+    KrakenZ3._send_data = _send_frame_to_spare_bucket
+    log.debug("LCD transfer patched to whole-frame writes with a two-bucket rotation")
+    return True
 
 
 def _packed_static_file(self, path, rotation):
@@ -1819,6 +1955,7 @@ def main() -> None:
         f.write("coolercontrol-liqctld")
     log.info("liqctld service starting...")
     patch_kraken_lcd_packing()
+    patch_kraken_lcd_transfer()
     device_service = DeviceService()
     # We call liquidctl to find all devices, so that we can adjust the number of threads needed
     #  for parallel device communication.
