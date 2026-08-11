@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use log::{debug, log_enabled, trace, warn};
 use regex::Regex;
 use std::collections::HashMap;
-use std::io::{Error, ErrorKind};
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 
@@ -123,7 +122,7 @@ pub async fn read_one_power_status(
     debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Power);
     // In the Power case, channel.name is the real name of the sysfs file.
     let power_path = driver.path.join(&channel.name);
-    cc_fs::read_sysfs(&power_path)
+    cc_fs::read_sysfs_value(&power_path)
         .await
         .and_then(check_parsing_64)
         .map(convert_micro_watts_to_watts)
@@ -159,7 +158,7 @@ pub async fn extract_power_status(driver: &HwmonDriverInfo) -> (Vec<ChannelStatu
 
 /// Check if the power channel is usable
 async fn sensor_is_not_usable(base_path: &Path, file_name: &str) -> bool {
-    cc_fs::read_sysfs(base_path.join(file_name))
+    cc_fs::read_sysfs_value(base_path.join(file_name))
         .await
         .and_then(check_parsing_64)
         .map(convert_micro_watts_to_watts)
@@ -179,11 +178,8 @@ fn convert_micro_watts_to_watts(micro_watts: f64) -> Watts {
 
 #[allow(clippy::needless_pass_by_value)]
 /// Check and parse the content to f64
-fn check_parsing_64(content: String) -> Result<f64> {
-    match content.trim().parse::<f64>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+fn check_parsing_64(value: cc_fs::SysfsValue) -> Result<f64> {
+    value.parse()
 }
 
 /// Read the power label

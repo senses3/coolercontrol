@@ -11,19 +11,44 @@
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use crate::{ENV_CONFIG_DIR, ENV_DATA_DIR, ENV_PLUGINS_DIR};
+use crate::ENV_PLUGINS_DIR;
+#[cfg(not(test))]
+use crate::{ENV_CONFIG_DIR, ENV_DATA_DIR};
 
 // -- config dir (independent of data_dir) --
 const DEFAULT_CONFIG_DIR: &str = "/etc/coolercontrol";
+#[cfg(not(test))]
 static CONFIG_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     PathBuf::from(std::env::var(ENV_CONFIG_DIR).unwrap_or_else(|_| DEFAULT_CONFIG_DIR.to_string()))
 });
+// Test builds must never resolve to /etc: `cargo test` runs every test in one process,
+// any test may initialize this static (freezing it process-wide), and package builds may
+// run the suite as root. The env override is ignored so tests stay hermetic.
+#[cfg(test)]
+static CONFIG_DIR: LazyLock<PathBuf> = LazyLock::new(|| test_sandbox_dir("config"));
 
 // -- data dir (runtime state, independent of config_dir) --
 const DEFAULT_DATA_DIR: &str = "/var/lib/coolercontrol";
+#[cfg(not(test))]
 static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     PathBuf::from(std::env::var(ENV_DATA_DIR).unwrap_or_else(|_| DEFAULT_DATA_DIR.to_string()))
 });
+// Same sandbox rule as CONFIG_DIR: never /var/lib in test builds.
+#[cfg(test)]
+static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| test_sandbox_dir("data"));
+
+/// One writable per-process sandbox directory under the system temp dir. The pid keeps
+/// parallel test processes (workspace crates, reruns) from sharing state.
+#[cfg(test)]
+fn test_sandbox_dir(kind: &str) -> PathBuf {
+    let dir =
+        std::env::temp_dir().join(format!("coolercontrol-test-{kind}-{}", std::process::id()));
+    // A recycled pid must not hand this process an old run's files (or a planted link).
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_file(&dir);
+    std::fs::create_dir_all(&dir).expect("test sandbox dir must be creatable");
+    dir
+}
 
 // -- plugins (defaults under data_dir; overridable via CC_PLUGINS_DIR) --
 static PLUGINS_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -322,9 +347,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_config_dir_is_etc_coolercontrol() {
-        if std::env::var(ENV_CONFIG_DIR).is_err() {
-            assert_eq!(config_dir(), Path::new("/etc/coolercontrol"));
+    fn production_defaults_are_unchanged() {
+        // Guards the production constants; the runtime statics are sandboxed in test
+        // builds, so the defaults can only be asserted as constants here.
+        assert_eq!(DEFAULT_CONFIG_DIR, "/etc/coolercontrol");
+        assert_eq!(DEFAULT_DATA_DIR, "/var/lib/coolercontrol");
+    }
+
+    #[test]
+    fn test_build_dirs_are_sandboxed_and_writable() {
+        // Test builds must never point at system directories: any test may freeze these
+        // statics process-wide, and a package build may run the suite as root. Both dirs
+        // must live under the system temp dir and accept writes.
+        let temp_base = std::env::temp_dir();
+        for dir in [config_dir(), data_dir()] {
+            assert!(
+                dir.starts_with(&temp_base),
+                "{} escapes the test sandbox",
+                dir.display()
+            );
+            let probe = dir.join(".write_probe");
+            std::fs::write(&probe, b"ok").unwrap();
+            std::fs::remove_file(&probe).unwrap();
         }
     }
 
@@ -352,13 +396,6 @@ mod tests {
     }
 
     #[test]
-    fn data_dir_defaults_to_var_lib() {
-        if std::env::var(ENV_DATA_DIR).is_err() {
-            assert_eq!(data_dir(), Path::new("/var/lib/coolercontrol"));
-        }
-    }
-
-    #[test]
     fn derived_paths_have_expected_file_names() {
         assert_eq!(config_file().file_name().unwrap(), "config.toml");
         assert_eq!(ui_config_file().file_name().unwrap(), "config-ui.json");
@@ -377,13 +414,6 @@ mod tests {
         assert_eq!(plugins_dir().file_name().unwrap(), "plugins");
         assert_eq!(detect_override_file().file_name().unwrap(), "detect.toml");
         assert_eq!(overrides_file().file_name().unwrap(), "overrides.toml");
-    }
-
-    #[test]
-    fn plugins_dir_defaults_to_var_lib() {
-        if std::env::var(ENV_PLUGINS_DIR).is_err() && std::env::var(ENV_DATA_DIR).is_err() {
-            assert_eq!(plugins_dir(), Path::new("/var/lib/coolercontrol/plugins"));
-        }
     }
 
     #[test]

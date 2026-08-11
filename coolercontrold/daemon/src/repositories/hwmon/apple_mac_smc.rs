@@ -455,7 +455,7 @@ impl AppleMacSMC {
 
     async fn get_fan_min(base_path: &Path, channel_number: u8, log_error: bool) -> Option<RPM> {
         let fan_min_path = base_path.join(format_fan_min!(channel_number));
-        cc_fs::read_sysfs(&fan_min_path)
+        cc_fs::read_sysfs_value(&fan_min_path)
             .await
             .and_then(fans::check_parsing_32)
             // Edge case where on spin-up the output is max value until it begins moving
@@ -473,7 +473,7 @@ impl AppleMacSMC {
 
     async fn get_fan_max(base_path: &Path, channel_number: u8, log_error: bool) -> Option<RPM> {
         let fan_max_path = base_path.join(format_fan_max!(channel_number));
-        cc_fs::read_sysfs(&fan_max_path)
+        cc_fs::read_sysfs_value(&fan_max_path)
             .await
             .and_then(fans::check_parsing_32)
             // Edge case where on spin-up the output is max value until it begins moving

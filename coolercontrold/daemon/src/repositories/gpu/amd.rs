@@ -219,7 +219,7 @@ impl GpuAMD {
 
     async fn init_load(device_path: &Path) -> Option<HwmonChannelInfo> {
         let load_path = device_path.join("gpu_busy_percent");
-        match cc_fs::read_sysfs(&load_path).await {
+        match cc_fs::read_sysfs_value(&load_path).await {
             Ok(load) => match fans::check_parsing_8(load) {
                 Ok(_) => Some(HwmonChannelInfo {
                     hwmon_type: HwmonChannelType::Load,
@@ -733,7 +733,7 @@ impl GpuAMD {
             if channel.hwmon_type != HwmonChannelType::Load {
                 continue;
             }
-            let result = cc_fs::read_sysfs(driver.device_path.join("gpu_busy_percent"))
+            let result = cc_fs::read_sysfs_value(driver.device_path.join("gpu_busy_percent"))
                 .await
                 .and_then(fans::check_parsing_8);
             if let Ok(load) = result {

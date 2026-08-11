@@ -218,9 +218,9 @@ async fn fire_snapshots_and_processes<'s>(
 }
 
 /// This function will fire off the LCD Update job which often takes a long time (>1.0s, <2.0s)
-/// due to device communication time currently needed. It runs in its own task, and internally CPU
-/// bound work runs on its own thread to not affect the other jobs in the main loop, but will also
-/// time out to avoid jobs from pilling up.
+/// due to device communication time currently needed. It runs in its own task; the CPU-bound
+/// image generation and PNG write run on the blocking pool via `rt::spawn_blocking` so they do
+/// not stall the other jobs in the main loop, and the whole job times out to avoid piling up.
 ///
 /// Due to the long-running time of this function, it will be called every other loop tick.
 fn fire_lcd_update<'s>(
