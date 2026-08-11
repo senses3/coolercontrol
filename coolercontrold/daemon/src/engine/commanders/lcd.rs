@@ -276,15 +276,17 @@ impl LcdCommander {
             return;
         }
         let start = Instant::now();
-        let image_template = self
+        // A settings change can clear this channel between scheduling and this task
+        // running; bail out instead of panicking on a missing entry.
+        let Some(image_template) = self
             .scheduled_settings_metadata
             .borrow()
             .get(&device_uid)
-            .unwrap()
-            .get(&channel_name)
-            .unwrap()
-            .image_template
-            .clone();
+            .and_then(|channels| channels.get(&channel_name))
+            .map(|metadata| metadata.image_template.clone())
+        else {
+            return;
+        };
         let image_path =
             paths::config_dir().join(single_temp_image_filename(&device_uid, &channel_name));
         let generate_result = Self::generate_single_temp_image_file(
@@ -309,14 +311,17 @@ impl LcdCommander {
         else {
             return;
         };
-        let lcd_settings = self.build_image_settings_and_update_metadata(
+        let Some(lcd_settings) = self.build_image_settings_and_update_metadata(
             &device_uid,
             &channel_name,
             &lcd_settings,
             temp_data_to_display.temp,
             image_template,
             image_path_str,
-        );
+        ) else {
+            debug!("LCD channel {channel_name} was unscheduled mid-render; dropping image");
+            return;
+        };
         let device_type = self.all_devices[&device_uid].borrow().d_type;
         trace!("Time to generate LCD image: {:?}", start.elapsed());
         debug!("Applying scheduled LCD setting. Device: {device_uid}, Setting: {lcd_settings:?}");
@@ -364,7 +369,9 @@ impl LcdCommander {
 
     /// Records the generated image in the channel metadata and builds the Image-mode
     /// settings to apply. Brightness and orientation are only sent on the first
-    /// application; afterwards the device already has them.
+    /// application; afterwards the device already has them. Returns `None` when the
+    /// channel was unscheduled while the image rendered on the blocking pool; the
+    /// caller drops the result.
     fn build_image_settings_and_update_metadata(
         &self,
         device_uid: &UID,
@@ -373,13 +380,11 @@ impl LcdCommander {
         displayed_temp: Temp,
         image_template: ImageTemplate,
         image_path_str: String,
-    ) -> LcdSettings {
+    ) -> Option<LcdSettings> {
         let mut metadata_lock = self.scheduled_settings_metadata.borrow_mut();
         let metadata = metadata_lock
             .get_mut(device_uid)
-            .unwrap()
-            .get_mut(channel_name)
-            .unwrap();
+            .and_then(|channels| channels.get_mut(channel_name))?;
         let brightness = if metadata.is_first_application {
             scheduled_settings.brightness
         } else {
@@ -393,14 +398,14 @@ impl LcdCommander {
         metadata.last_temp_set = displayed_temp;
         metadata.image_template = Some(image_template);
         metadata.is_first_application = false;
-        LcdSettings {
+        Some(LcdSettings {
             brightness,
             orientation,
             colors: Vec::new(),
             mode: LcdModeKind::Image {
                 image_file_processed: Some(image_path_str),
             },
-        }
+        })
     }
 
     /// Applies all Carousel scheduled settings
@@ -682,14 +687,16 @@ mod tests {
         let (_, template) = IMAGE_GENERATOR
             .generate_single_temp_image(45.6, "CPU", None)
             .unwrap();
-        let first = commander.build_image_settings_and_update_metadata(
-            &uid,
-            "lcd1",
-            &scheduled,
-            45.6,
-            template,
-            "/tmp/single_temp.png".to_string(),
-        );
+        let first = commander
+            .build_image_settings_and_update_metadata(
+                &uid,
+                "lcd1",
+                &scheduled,
+                45.6,
+                template,
+                "/tmp/single_temp.png".to_string(),
+            )
+            .unwrap();
         assert_eq!(first.brightness, Some(80));
         assert_eq!(first.orientation, Some(90));
         assert_eq!(first.mode_name(), LcdModeName::Image);
@@ -703,15 +710,43 @@ mod tests {
         let (_, template) = IMAGE_GENERATOR
             .generate_single_temp_image(46.1, "CPU", None)
             .unwrap();
-        let second = commander.build_image_settings_and_update_metadata(
+        let second = commander
+            .build_image_settings_and_update_metadata(
+                &uid,
+                "lcd1",
+                &scheduled,
+                46.1,
+                template,
+                "/tmp/single_temp.png".to_string(),
+            )
+            .unwrap();
+        assert_eq!(second.brightness, None);
+        assert_eq!(second.orientation, None);
+    }
+
+    /// Goal: a channel unscheduled while its image rendered must be dropped, not panic
+    /// the daemon: the metadata entry is gone when the blocking task returns. Method:
+    /// schedule, clear the channel, then record; expect None and no metadata entry.
+    #[test]
+    fn cleared_channel_mid_render_drops_result_without_panic() {
+        let (uid, all_devices) = make_lcd_device(45.6);
+        let commander = LcdCommander::new(all_devices, HashMap::new());
+        let scheduled = temp_lcd_settings(&uid);
+        commander
+            .schedule_single_temp(&uid, "lcd1", &scheduled)
+            .unwrap();
+        commander.clear_channel_setting(&uid, "lcd1");
+        let (_, template) = IMAGE_GENERATOR
+            .generate_single_temp_image(45.6, "CPU", None)
+            .unwrap();
+        let result = commander.build_image_settings_and_update_metadata(
             &uid,
             "lcd1",
             &scheduled,
-            46.1,
+            45.6,
             template,
             "/tmp/single_temp.png".to_string(),
         );
-        assert_eq!(second.brightness, None);
-        assert_eq!(second.orientation, None);
+        assert!(result.is_none());
     }
 }
