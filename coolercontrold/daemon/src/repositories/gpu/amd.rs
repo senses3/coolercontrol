@@ -733,7 +733,10 @@ impl GpuAMD {
             if channel.hwmon_type != HwmonChannelType::Load {
                 continue;
             }
-            let result = cc_fs::read_sysfs_value(driver.device_path.join("gpu_busy_percent"))
+            let result = driver
+                .hwmon
+                .fds
+                .read_value(&driver.device_path.join("gpu_busy_percent"))
                 .await
                 .and_then(fans::check_parsing_8);
             if let Ok(load) = result {

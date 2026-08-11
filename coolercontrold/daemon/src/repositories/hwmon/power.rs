@@ -122,7 +122,9 @@ pub async fn read_one_power_status(
     debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Power);
     // In the Power case, channel.name is the real name of the sysfs file.
     let power_path = driver.path.join(&channel.name);
-    cc_fs::read_sysfs_value(&power_path)
+    driver
+        .fds
+        .read_value(&power_path)
         .await
         .and_then(check_parsing_64)
         .map(convert_micro_watts_to_watts)

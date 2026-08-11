@@ -292,6 +292,11 @@ pub struct HwmonDriverInfo {
     #[serde(flatten)]
     pub drivetemp: DrivetempState,
     pub apple_smc: AppleMacSMC,
+    /// Descriptors held open for this device's per-tick attributes. Lives here so it shares the
+    /// driver's lifetime: dropping the driver info closes them, and the channel set detected with
+    /// it bounds how many there can be.
+    #[serde(skip)]
+    pub fds: cc_fs::SysfsFdCache,
 }
 
 /// Sized to fit a typical hwmon fan-channel set (1-8) without growth.
@@ -1748,6 +1753,7 @@ impl Repository for HwmonRepo {
                 channels,
                 drivetemp,
                 apple_smc,
+                fds: cc_fs::SysfsFdCache::default(),
             };
             hwmon_drivers.push(hwmon_driver_info);
         }
@@ -2150,6 +2156,12 @@ impl Repository for HwmonRepo {
     }
 
     async fn prepare_for_sleep(&self) {
+        // Devices can be gone or renumbered on resume. A held descriptor would fail with ENODEV
+        // and recover on its own, but dropping them here means the first tick back never spends a
+        // read finding that out.
+        for (_device_lock, hwmon_driver) in self.devices.values() {
+            hwmon_driver.fds.clear();
+        }
         // Tight systemd-sleep window (1-3 s). No permit taken:
         // ThinkPad EC tolerates concurrent ops with preload, and
         // waiting could blow the suspend budget.
@@ -2273,6 +2285,7 @@ mod preload_tests {
             channels,
             drivetemp: DrivetempState::default(),
             apple_smc: AppleMacSMC::default(),
+            fds: cc_fs::SysfsFdCache::default(),
         })
     }
 
@@ -2411,9 +2424,13 @@ mod preload_tests {
             seed_failsafe(&repo, TEST_TYPE_INDEX, &[seed_status], &[]);
             repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
 
-            // when: remove pwm1 so every subsequent preload fails, and
+            // when: empty pwm1 so every subsequent preload fails, and
             // drive the counter above MISSING_STATUS_THRESHOLD.
-            cc_fs::remove_file(base.join("pwm1")).await.unwrap();
+            // Emptying rather than unlinking: an unlinked inode is still
+            // readable through the descriptor the fd cache holds, while a
+            // removed device is not (its kernfs node returns ENODEV). An
+            // unparsable value fails the read on both paths.
+            cc_fs::write(base.join("pwm1"), Vec::new()).await.unwrap();
             for _ in 0..=MISSING_STATUS_THRESHOLD {
                 repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
             }
@@ -2459,7 +2476,8 @@ mod preload_tests {
             };
             seed_failsafe(&repo, TEST_TYPE_INDEX, &[seed_status], &[]);
             repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
-            cc_fs::remove_file(base.join("pwm1")).await.unwrap();
+            // Emptied, not unlinked: see the note in the failsafe threshold test.
+            cc_fs::write(base.join("pwm1"), Vec::new()).await.unwrap();
             for _ in 0..=MISSING_STATUS_THRESHOLD {
                 repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
             }
@@ -2474,7 +2492,7 @@ mod preload_tests {
                 assert!(fan1_state.is_failsafed);
             }
 
-            // when: pwm1 comes back and preload succeeds.
+            // when: pwm1 reads a real value again and preload succeeds.
             cc_fs::write(base.join("pwm1"), b"200".to_vec())
                 .await
                 .unwrap();
