@@ -145,6 +145,20 @@ def _switch_bucket_tracking_active(self, *args, **kwargs):
     return switched
 
 
+def _send_data_with_clean_slate(self, data, bulk_info):
+    """liquidctl's own frame upload, preceded by the re-initialization it needs.
+
+    This path can rewrite the bucket that is on screen, so it keeps the artifact clearing that
+    CoolerControl used to do before every apply. A failed initialize is logged and the upload
+    still runs: a possible artifact beats no image at all.
+    """
+    try:
+        self.initialize()
+    except Exception as err:  # noqa: BLE001
+        log.warning("Could not re-initialize before an LCD frame upload: %s", err)
+    return _ORIGINAL_SEND_DATA(self, data, bulk_info)
+
+
 def _send_frame_to_spare_bucket(self, data, bulk_info):
     """Writes a frame to the bucket that is not on screen, reusing its existing allocation.
 
@@ -157,13 +171,19 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     the device (the memory offset is read back from the bucket, never computed), so no wire
     format is re-derived.  Anything unexpected, including the first frames before the buckets
     exist, falls back to `_send_data` unchanged.
+
+    The fallback re-initializes the device first.  liquidctl's upload cycles through all 16
+    buckets and, once they are all occupied, rewrites whichever one is on screen; that is what
+    produced occasional image artifacts, and re-initializing is what CoolerControl used to do
+    before every apply to clear them.  The rotation below does not touch the displayed bucket,
+    so it needs none of that, which is what makes dropping the per-apply initialize safe.
     """
     pair = getattr(self, "_cc_bucket_pair", ())
     active_bucket = getattr(self, "_cc_active_bucket", None)
     if len(pair) < 2 or active_bucket not in pair:
         # Not rotating between two known buckets yet: let liquidctl allocate, and learn the
         # bucket it picks. Two such frames are enough to establish the rotation.
-        return _ORIGINAL_SEND_DATA(self, data, bulk_info)
+        return _send_data_with_clean_slate(self, data, bulk_info)
 
     target_bucket = pair[0] if pair[1] == active_bucket else pair[1]
     header = list(_LCD_BULK_HEADER) + bulk_info
@@ -174,7 +194,7 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     capacity = int.from_bytes([bucket[19], bucket[20]], "little")
     if not occupied or capacity < slots_needed:
         # First use of this bucket, or the frame outgrew it.
-        return _ORIGINAL_SEND_DATA(self, data, bulk_info)
+        return _send_data_with_clean_slate(self, data, bulk_info)
 
     memory_start = [bucket[17], bucket[18]]
     self._write_then_read([0x36, 0x03])

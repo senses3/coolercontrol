@@ -902,21 +902,20 @@ impl LiquidctlRepo {
             .acquire()
             .await
             .expect("device permit never closed");
-        // We set several settings at once for lcd/screen settings
-        // We first start with re-initializing the device, as this helps clear LCD related settings
-        // and gives more consistent results when applying images.
+        // We set several settings at once for lcd/screen settings.
+        //
+        // This used to re-initialize the device first, which cost ~800 ms of a ~950 ms apply
+        // (initialize waits on the device's next lighting-info report). It was added to clear the
+        // occasional image artifacts, back when the Krakens were the only screens liquidctl
+        // supported. Those artifacts come from liquidctl's frame upload cycling through all 16
+        // device buckets and, once they are all occupied, rewriting whichever one is on screen.
+        // liqctld now writes each frame to the bucket that is NOT displayed, and re-initializes
+        // itself whenever it falls back to liquidctl's own upload, so the cause is handled where
+        // it happens instead of by re-initializing every device on every frame. Screens with an
+        // unrelated protocol (Lian Li GA II LCD, MSI Coreliquid) have no bucket allocator, so the
+        // artifacts were never theirs; if one of them ever needs it, restore it for that driver
+        // rather than for everything.
         let start_lcd_settings_apply = Instant::now();
-        self.liqctld_client
-            .initialize_device(&device_data.type_index, None)
-            .await
-            .map(|_| ()) // ignore successful result
-            .map_err(|err| {
-                anyhow!(
-                    "Error on LCD initialization for LIQUIDCTL Device #{}: {} - {err}",
-                    device_data.type_index,
-                    device_data.uid
-                )
-            })?;
         if let Some(brightness) = lcd_settings.brightness {
             if let Err(err) = self
                 .send_screen_request(

@@ -57,6 +57,9 @@ class FakeKraken:
         self.calls = []
         self.bulk_writes = []
 
+    def initialize(self):
+        self.calls.append(("initialize",))
+
     def _write_then_read(self, data):
         data = list(data)
         self.calls.append(("write_then_read", data))
@@ -261,6 +264,61 @@ class TestFallsBackToLiquidctl(unittest.TestCase):
 
         self.assertEqual(result, "delegated")
         self.assertEqual(device.bulk_writes, [])
+
+
+class TestFallbackClearsArtifacts(unittest.TestCase):
+    """The fallback can rewrite the displayed bucket, so it keeps the artifact clearing."""
+
+    def test_fallback_initializes_first(self):
+        """Goal: liquidctl's upload eventually rewrites the bucket on screen, which is what
+        produced image artifacts, so the fallback must re-initialize as CoolerControl used
+        to. Method: take the fallback and check initialize ran before the upload."""
+        order = []
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(False)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        device.initialize = lambda: order.append("initialize")
+
+        with mock.patch.object(
+            main, "_ORIGINAL_SEND_DATA", side_effect=lambda *a: order.append("upload")
+        ):
+            main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(order, ["initialize", "upload"])
+
+    def test_fast_path_does_not_initialize(self):
+        """Goal: the rotation never touches the displayed bucket, so paying ~800 ms to
+        re-initialize on every frame is exactly what this removes. Method: run the fast
+        path with an initialize that would record itself."""
+        called = []
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(True)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        device.initialize = lambda: called.append("initialize")
+
+        main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(called, [])
+
+    def test_a_failed_initialize_still_uploads(self):
+        """Goal: a possible artifact beats a blank screen, so a failing initialize must not
+        abort the frame. Method: raise from initialize and check the upload still ran.
+        """
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(False)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+
+        def boom():
+            raise RuntimeError("device busy")
+
+        device.initialize = boom
+        with mock.patch.object(
+            main, "_ORIGINAL_SEND_DATA", return_value="delegated"
+        ) as upload:
+            result = main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(result, "delegated")
+        upload.assert_called_once()
 
 
 class TestSupportingPatches(unittest.TestCase):
