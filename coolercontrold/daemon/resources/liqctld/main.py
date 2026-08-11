@@ -58,6 +58,7 @@ from PIL import Image
 _ORIGINAL_KRAKENZ3_CONNECT = KrakenZ3.connect
 _ORIGINAL_SWITCH_BUCKET = KrakenZ3._switch_bucket
 _ORIGINAL_SEND_DATA = KrakenZ3._send_data
+_ORIGINAL_SET_SCREEN = KrakenZ3.set_screen
 
 #####################################################################
 # Basic Setup
@@ -147,6 +148,23 @@ def _switch_bucket_tracking_active(self, *args, **kwargs):
     return switched
 
 
+def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
+    """Drains queued reports before liquidctl reads the screen's brightness and orientation.
+
+    `set_screen` opens with `_write([0x30, 0x01])` and a `_read_until` for the [0x31, 0x01] reply,
+    which gives up after twelve reports with "missing messages (attempts=12, missing=1)". The device
+    streams a status report roughly every half second, armed by the [0x70, 0x02, ...] write in
+    `initialize`, and nothing consumes them while a frame is prepared and uploaded. That backlog
+    outlives the apply that produced it, so it accumulates across applies until this read starves.
+
+    The drain inside `_send_frame_to_spare_bucket` cannot cover this: it runs after the read above,
+    on the frame liquidctl has already prepared. Re-initializing before every apply used to drain
+    the queue at this point, which is why the starvation only appeared once that was dropped.
+    """
+    self.device.clear_enqueued_reports()
+    return _ORIGINAL_SET_SCREEN(self, channel, mode, value, **kwargs)
+
+
 def _send_data_with_clean_slate(self, data, bulk_info):
     """liquidctl's own frame upload, preceded by the re-initialization it needs.
 
@@ -191,12 +209,17 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     header = list(_LCD_BULK_HEADER) + bulk_info
     slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
 
-    # Drain stale reports first. liquidctl's `_write_then_read` returns the next report
-    # without checking that it answers the command just sent, so anything already queued
-    # (the device's own periodic status reports, or a reply nobody consumed) is handed back
-    # as if it were the answer, and every read after it is off by one. That is what produces
-    # "missing messages (attempts=12, missing=1)". Draining is the cheap half of what
-    # `initialize()` did before every apply: it discards, it never waits for a reply.
+    # Drain again. `set_screen` drained on entry, but preparing the frame between there and
+    # here decodes, resizes and rotates the image, and the device keeps streaming status
+    # reports throughout. What that backlog costs depends on which read meets it:
+    # `_write_then_read` returns the next report without checking that it answers the command
+    # just sent, so a leftover is taken as the answer and every read after it is off by one,
+    # silently, which is what the reply-prefix check below guards. `_delete_bucket` instead
+    # spends its twelve `_read_until_first_match` attempts on the backlog and raises.
+    #
+    # This path also leaves a report behind on every frame: the end-of-transfer
+    # `_write([0x36, 0x02])` below never reads its reply. The next apply's entry drain is what
+    # clears it.
     self.device.clear_enqueued_reports()
 
     bucket = self._write_then_read([0x30, 0x04, target_bucket])
@@ -249,6 +272,7 @@ def patch_kraken_lcd_transfer() -> bool:
         "_delete_bucket",
         "_setup_bucket",
         "_bulk_write",
+        "set_screen",
     )
     missing = [name for name in required if hasattr(KrakenZ3, name) is False]
     if missing:
@@ -257,6 +281,7 @@ def patch_kraken_lcd_transfer() -> bool:
     KrakenZ3.connect = _connect_with_whole_frame_transfers
     KrakenZ3._switch_bucket = _switch_bucket_tracking_active
     KrakenZ3._send_data = _send_frame_to_spare_bucket
+    KrakenZ3.set_screen = _set_screen_with_drained_queue
     log.debug("LCD transfer patched to whole-frame writes with a two-bucket rotation")
     return True
 

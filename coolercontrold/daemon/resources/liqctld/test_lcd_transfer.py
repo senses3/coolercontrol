@@ -429,5 +429,59 @@ class TestSupportingPatches(unittest.TestCase):
             self.assertEqual(large.bulk_buffer_size, main._LCD_BULK_TRANSFER_BYTES * 2)
 
 
+class TestScreenEntryDrain(unittest.TestCase):
+    """`set_screen` reads the screen's brightness and orientation before it hands the frame to
+    the transfer path, so the queue has to be clear by then, not by the time the frame moves.
+    """
+
+    def test_the_queue_is_drained_before_liquidctls_set_screen_runs(self):
+        """Goal: the read that starves is `set_screen`'s own, so a drain that happens later
+        cannot save it. Method: record both and check the order."""
+        calls = []
+        device = FakeKraken({})
+        device.device = _FakeHid(calls)
+
+        def original(self, channel, mode, value, **kwargs):
+            calls.append(("set_screen", channel, mode, value))
+            return "screen set"
+
+        with mock.patch.object(main, "_ORIGINAL_SET_SCREEN", original):
+            result = main._set_screen_with_drained_queue(
+                device, "lcd", "gif", "/tmp/a.gif"
+            )
+
+        self.assertEqual(result, "screen set")
+        self.assertEqual(
+            [c[0] for c in calls],
+            ["clear_enqueued_reports", "set_screen"],
+            "the queue must be drained before liquidctl reads the LCD info",
+        )
+
+    def test_arguments_reach_liquidctl_unchanged(self):
+        """Goal: the wrapper only drains, so every mode and value must pass through as given.
+        Method: send a keyword argument along with the positional ones."""
+        device = FakeKraken({})
+        device.device = _FakeHid([])
+        seen = {}
+
+        def original(self, channel, mode, value, **kwargs):
+            seen.update(channel=channel, mode=mode, value=value, kwargs=kwargs)
+
+        with mock.patch.object(main, "_ORIGINAL_SET_SCREEN", original):
+            main._set_screen_with_drained_queue(
+                device, "lcd", "brightness", "50", direct_access=True
+            )
+
+        self.assertEqual(
+            seen,
+            {
+                "channel": "lcd",
+                "mode": "brightness",
+                "value": "50",
+                "kwargs": {"direct_access": True},
+            },
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
