@@ -19,8 +19,14 @@ use crate::paths;
 use crate::setting::{LcdModeKind, LcdModeName, LcdSettings};
 use crate::AllDevices;
 
-const IMAGE_FILENAME_SINGLE_TEMP: &str = "single_temp.png";
 pub const DEFAULT_LCD_SHUTDOWN_IMAGE: &[u8] = cc_image::DEFAULT_LCD_SHUTDOWN_IMAGE;
+
+/// Each channel renders to its own file: concurrent blocking-pool renders for different
+/// channels must never interleave create/write on one shared path (torn image), and a
+/// channel's device must never read another channel's temp.
+fn single_temp_image_filename(device_uid: &UID, channel_name: &str) -> String {
+    format!("single_temp_{device_uid}_{channel_name}.png")
+}
 
 /// Stateless and `Send + Sync` (the `static` enforces both at compile time), so the
 /// blocking closures borrow it instead of moving fonts across threads per generation.
@@ -279,7 +285,8 @@ impl LcdCommander {
             .unwrap()
             .image_template
             .clone();
-        let image_path = paths::config_dir().join(IMAGE_FILENAME_SINGLE_TEMP);
+        let image_path =
+            paths::config_dir().join(single_temp_image_filename(&device_uid, &channel_name));
         let generate_result = Self::generate_single_temp_image_file(
             temp_data_to_display.temp,
             temp_data_to_display.label.clone(),
@@ -582,6 +589,23 @@ mod tests {
         }
     }
 
+    /// Goal: distinct channels must never share an image file; sharing one path lets
+    /// concurrent blocking-pool renders tear each other's writes. Method: assert the
+    /// filename differs across devices and channels.
+    #[test]
+    fn single_temp_image_filenames_are_per_channel() {
+        let uid_a = "a".repeat(64);
+        let uid_b = "b".repeat(64);
+        assert_ne!(
+            single_temp_image_filename(&uid_a, "lcd1"),
+            single_temp_image_filename(&uid_b, "lcd1")
+        );
+        assert_ne!(
+            single_temp_image_filename(&uid_a, "lcd1"),
+            single_temp_image_filename(&uid_a, "lcd2")
+        );
+    }
+
     /// Goal: an unchanged rounded temp must be filtered out before any task or blocking
     /// spawn is paid; the early-out lives upstream of the thread hop. Method: schedule a
     /// Temp setting, assert one display entry, then mark the current rounded temp as
@@ -615,7 +639,9 @@ mod tests {
     fn single_temp_image_generated_on_blocking_pool() {
         cc_fs::test_runtime(async {
             let tmp_dir = tempfile::tempdir().unwrap();
-            let image_path = tmp_dir.path().join(IMAGE_FILENAME_SINGLE_TEMP);
+            let image_path = tmp_dir
+                .path()
+                .join(single_temp_image_filename(&"uid1".to_string(), "lcd1"));
             let template = LcdCommander::generate_single_temp_image_file(
                 45.6,
                 "CPU".to_string(),
