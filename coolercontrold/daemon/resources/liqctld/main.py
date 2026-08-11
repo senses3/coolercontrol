@@ -5,6 +5,7 @@
 
 import concurrent
 import importlib.metadata
+import io
 import json
 import logging
 import logging as log
@@ -52,6 +53,7 @@ from liquidctl.driver.hydro_platinum import HydroPlatinum
 from liquidctl.driver.kraken2 import Kraken2
 from liquidctl.driver.kraken3 import KrakenZ3
 from liquidctl.driver.smart_device import SmartDevice, SmartDevice2
+from PIL import Image
 
 #####################################################################
 # Basic Setup
@@ -71,6 +73,91 @@ MAX_CONNECT_LIQUIDCTL_RETRIES: int = 5
 # unconditionally so a device wedged in an uninterruptible USB read can never stall systemd past its
 # TimeoutStopSec.
 SHUTDOWN_DEADLINE_SECS: float = 4.0
+
+#####################################################################
+# liquidctl patches
+#####################################################################
+
+# Probe used to validate a packing replacement against the original. Square, like every
+# LCD liquidctl supports, with all three channels distinct so a swapped channel or a
+# wrong rotation cannot pass unnoticed.
+_PACKING_PROBE_SIZE: int = 8
+
+
+def _packed_static_file(self, path, rotation):
+    """Drop-in for `KrakenZ3._prepare_static_file` that packs the framebuffer in C.
+
+    liquidctl builds it with a per-pixel python loop: 409,600 `list.append` calls for a
+    320x320 screen, about 12 ms of CPU per image. Pillow emits the same RGBX bytes in one
+    call; only its padding byte differs (0xFF where the loop writes 0x00), so this zeroes
+    it. `_send_data` consumes the result with `len()` and slicing, which a bytearray
+    supports, so the transfer path is unchanged.
+    """
+    image = (
+        Image.open(path)
+        .resize(self.lcd_resolution)
+        .rotate(rotation * -90)
+        .convert("RGB")
+    )
+    packed = bytearray(image.tobytes("raw", "RGBX"))
+    packed[3::4] = b"\x00" * (len(packed) // 4)
+    return packed
+
+
+def _packing_matches(original, candidate) -> bool:
+    """Whether `candidate` reproduces `original` byte for byte, at every rotation.
+
+    Run before installing a replacement so an unexpected Pillow build cannot put wrong
+    bytes on someone's screen: a mismatch keeps liquidctl's own implementation.
+    """
+
+    class _Probe:
+        lcd_resolution = (_PACKING_PROBE_SIZE, _PACKING_PROBE_SIZE)
+
+    image = Image.new("RGB", (_PACKING_PROBE_SIZE, _PACKING_PROBE_SIZE))
+    pixels = image.load()
+    for y in range(_PACKING_PROBE_SIZE):
+        for x in range(_PACKING_PROBE_SIZE):
+            pixels[x, y] = (x * 31, y * 31, 255 - x * 31)
+    encoded = io.BytesIO()
+    image.save(encoded, format="PNG")
+    probe = _Probe()
+    for rotation in (0, 1, 2, 3):
+        encoded.seek(0)
+        expected = bytes(original(probe, encoded, rotation))
+        encoded.seek(0)
+        try:
+            actual = bytes(candidate(probe, encoded, rotation))
+        except Exception:  # noqa: BLE001 - any failure means keep the original
+            return False
+        if actual != expected:
+            return False
+    return True
+
+
+def patch_kraken_lcd_packing() -> bool:
+    """Installs the C-level framebuffer packing, if it matches liquidctl's output.
+
+    The LCD image push is the most expensive thing this service does, and nearly all of
+    that cost is the packing loop rather than the USB transfer. Returns whether the
+    replacement was installed.
+    """
+    original = getattr(KrakenZ3, "_prepare_static_file", None)
+    if original is None:
+        log.warning(
+            "liquidctl has no KrakenZ3._prepare_static_file; LCD packing unpatched"
+        )
+        return False
+    if not _packing_matches(original, _packed_static_file):
+        log.warning(
+            "LCD framebuffer packing differs from liquidctl's; keeping liquidctl's "
+            "implementation. LCD updates will use more CPU."
+        )
+        return False
+    KrakenZ3._prepare_static_file = _packed_static_file
+    log.debug("LCD framebuffer packing patched to Pillow's C path")
+    return True
+
 
 #####################################################################
 # Models
@@ -1731,6 +1818,7 @@ def main() -> None:
     with open("/proc/self/comm", "w") as f:
         f.write("coolercontrol-liqctld")
     log.info("liqctld service starting...")
+    patch_kraken_lcd_packing()
     device_service = DeviceService()
     # We call liquidctl to find all devices, so that we can adjust the number of threads needed
     #  for parallel device communication.
