@@ -9,6 +9,8 @@
 //! `compio-rt` feature. Directory and metadata helpers fall back to `std` where appropriate and
 //! should be used sparingly.
 
+mod fd_cache;
+pub use self::fd_cache::*;
 mod metadata;
 pub use self::metadata::*;
 mod read;

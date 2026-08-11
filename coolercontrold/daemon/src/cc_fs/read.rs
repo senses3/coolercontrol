@@ -71,6 +71,13 @@ impl SysfsValue {
         self.len == 0
     }
 
+    /// Wraps a filled read buffer. `len` is the byte count the read reported.
+    #[must_use]
+    pub fn from_read(buf: [u8; SYSFS_VALUE_MAX_BYTES], len: usize) -> Self {
+        assert!(len <= SYSFS_VALUE_MAX_BYTES);
+        Self { buf, len }
+    }
+
     /// Test-only constructor so pure parsing tests need no file round-trip.
     #[cfg(test)]
     #[must_use]

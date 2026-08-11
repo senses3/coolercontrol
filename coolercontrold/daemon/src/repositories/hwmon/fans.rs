@@ -121,9 +121,16 @@ async fn detect_pwm(
         .context("Number Group should exist")?
         .as_str()
         .parse()?;
-    if get_pwm_duty(base_path, &channel_number, None, true)
-        .await
-        .is_none()
+    // Detection reads each attribute once, so this cache closes with the probe.
+    if get_pwm_duty(
+        &cc_fs::SysfsFdCache::default(),
+        base_path,
+        &channel_number,
+        None,
+        true,
+    )
+    .await
+    .is_none()
     {
         return Ok(()); // skip if pwm file isn't readable
     }
@@ -153,9 +160,16 @@ pub async fn detect_rpm(
         .context("Number Group should exist")?
         .as_str()
         .parse()?;
-    if get_fan_rpm(base_path, &channel_number, None, true)
-        .await
-        .is_none()
+    // Detection reads each attribute once, so this cache closes with the probe.
+    if get_fan_rpm(
+        &cc_fs::SysfsFdCache::default(),
+        base_path,
+        &channel_number,
+        None,
+        true,
+    )
+    .await
+    .is_none()
     {
         return Ok(()); // skip if rpm file isn't readable
     }
@@ -250,6 +264,7 @@ pub async fn read_one_fan_status(
     debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
     let fan_duty = if channel.caps.has_pwm() {
         get_pwm_duty(
+            &driver.fds,
             &driver.path,
             &channel.number,
             channel.pwm_path.as_ref(),
@@ -261,6 +276,7 @@ pub async fn read_one_fan_status(
     };
     let fan_rpm = if channel.caps.has_rpm() {
         get_fan_rpm(
+            &driver.fds,
             &driver.path,
             &channel.number,
             channel.rpm_path.as_ref(),
@@ -299,6 +315,7 @@ pub async fn read_one_fan_rpm_only(
         return Some(None);
     }
     let fan_rpm = get_fan_rpm(
+        &driver.fds,
         &driver.path,
         &channel.number,
         channel.rpm_path.as_ref(),
@@ -335,6 +352,7 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     let fan_rpm_task = channel_scope.spawn(async {
                         if channel.caps.has_rpm() {
                             get_fan_rpm(
+                                &driver.fds,
                                 &driver.path,
                                 &channel.number,
                                 channel.rpm_path.as_ref(),
@@ -348,6 +366,7 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     let fan_duty_task = channel_scope.spawn(async {
                         if channel.caps.has_pwm() {
                             get_pwm_duty(
+                                &driver.fds,
                                 &driver.path,
                                 &channel.number,
                                 channel.pwm_path.as_ref(),
@@ -360,12 +379,12 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     });
                     let fan_pwm_mode_task = channel_scope.spawn(async {
                         if channel.caps.has_pwm_mode() {
-                            cc_fs::read_sysfs_value(
-                                driver.path.join(format_pwm_mode!(channel.number)),
-                            )
-                            .await
-                            .and_then(check_parsing_8)
-                            .ok()
+                            driver
+                                .fds
+                                .read_value(&driver.path.join(format_pwm_mode!(channel.number)))
+                                .await
+                                .and_then(check_parsing_8)
+                                .ok()
                         } else {
                             None
                         }
@@ -390,6 +409,7 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
 }
 
 async fn get_pwm_duty(
+    fds: &cc_fs::SysfsFdCache,
     base_path: &Path,
     channel_number: &u8,
     pwm_path: Option<&PathBuf>,
@@ -399,7 +419,8 @@ async fn get_pwm_duty(
         Some(path) => path,
         None => &base_path.join(format_pwm!(channel_number)),
     };
-    match cc_fs::read_sysfs_value(pwm_path)
+    match fds
+        .read_value(pwm_path)
         .await
         .and_then(check_parsing_8)
         .map(pwm_value_to_duty)
@@ -439,6 +460,7 @@ async fn get_pwm_duty(
 }
 
 pub async fn get_fan_rpm(
+    fds: &cc_fs::SysfsFdCache,
     base_path: &Path,
     channel_number: &u8,
     rpm_path: Option<&PathBuf>,
@@ -448,7 +470,7 @@ pub async fn get_fan_rpm(
         Some(path) => path,
         None => &base_path.join(format_fan_input!(channel_number)),
     };
-    cc_fs::read_sysfs_value(fan_input_path)
+    fds.read_value(fan_input_path)
         .await
         .and_then(check_parsing_32)
         // Edge case where on spin-up the output is max value until it begins moving
@@ -1207,7 +1229,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, true).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                true,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1225,7 +1254,14 @@ mod tests {
             // given: no pwm1 file exists
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1246,7 +1282,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1270,7 +1313,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: normal read succeeds, no fallback needed
             teardown(&ctx).await;
@@ -1291,7 +1341,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: ENOENT is not a kernel refusal — must return None
             teardown(&ctx).await;
@@ -1308,7 +1365,14 @@ mod tests {
             // given: no pwm1 file, no pwm1_enable file
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1332,7 +1396,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: parse error has no raw_os_error — must return None
             teardown(&ctx).await;
@@ -1355,7 +1426,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: parse error + manual mode = no fallback
             teardown(&ctx).await;
@@ -1374,6 +1452,7 @@ mod tests {
             channels,
             drivetemp: drivetemp::DrivetempState::default(),
             apple_smc: crate::repositories::hwmon::apple_mac_smc::AppleMacSMC::default(),
+            fds: cc_fs::SysfsFdCache::default(),
         }
     }
 

@@ -584,7 +584,7 @@ impl CpuRepo {
                     // so the next successful read's delta is not wildly
                     // skewed by a one-tick gap.
                     let Some(joule_count) =
-                        power_cap::extract_power_joule_counter(channel.number).await
+                        power_cap::extract_power_joule_counter(&driver.fds, channel.number).await
                     else {
                         continue;
                     };
@@ -834,9 +834,10 @@ impl Repository for CpuRepo {
                 // Fill initial joule_count with a real count (needed before
                 // request_status). If the initial read fails, seed with 0 so the
                 // next successful read still produces a valid forward delta.
-                let joule_count = power_cap::extract_power_joule_counter(channel.number)
-                    .await
-                    .unwrap_or(0.0);
+                let joule_count =
+                    power_cap::extract_power_joule_counter(&driver.fds, channel.number)
+                        .await
+                        .unwrap_or(0.0);
                 self.energy_counters
                     .insert(physical_id, Cell::new(joule_count));
             }

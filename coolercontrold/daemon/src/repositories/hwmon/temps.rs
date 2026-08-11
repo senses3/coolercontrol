@@ -104,7 +104,9 @@ pub async fn read_one_temp_status(
         Some(path) => path,
         None => &driver.path.join(format_temp_input!(channel.number)),
     };
-    match cc_fs::read_sysfs_value(temp_path)
+    match driver
+        .fds
+        .read_value(temp_path)
         .await
         .and_then(check_parsing_32)
         // hwmon temps are in millidegrees:
@@ -162,12 +164,13 @@ pub async fn extract_temp_statuses_concurrently(
                 continue;
             }
             let temp_task = scope.spawn(async {
-                let result =
-                    cc_fs::read_sysfs_value(driver.path.join(format_temp_input!(channel.number)))
-                        .await
-                        .and_then(check_parsing_32)
-                        // hwmon temps are in millidegrees:
-                        .map(|degrees| f64::from(degrees) / 1000.0f64);
+                let result = driver
+                    .fds
+                    .read_value(&driver.path.join(format_temp_input!(channel.number)))
+                    .await
+                    .and_then(check_parsing_32)
+                    // hwmon temps are in millidegrees:
+                    .map(|degrees| f64::from(degrees) / 1000.0f64);
                 result.map(|temp| TempStatus {
                     name: channel.name.clone(),
                     temp,
@@ -453,6 +456,63 @@ mod tests {
             assert!((temps[0].temp - 35.0).abs() < f64::EPSILON);
             assert_eq!(temps[1].name, "temp2");
             assert!((temps[1].temp - 42.0).abs() < f64::EPSILON);
+        });
+    }
+
+    /// Goal: the tick path must read through the driver's descriptor cache, so repeated ticks
+    /// stop paying for a reopen, and must still report the current value. Method: extract twice
+    /// over two channels, asserting one held descriptor per channel and no growth on the second
+    /// pass, then rewrite both files and extract again to confirm the values are live.
+    #[test]
+    #[serial]
+    fn extract_temp_reuses_descriptors_across_ticks() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let test_base_path = &ctx.test_base_path;
+            cc_fs::write(test_base_path.join("temp1_input"), b"35000".to_vec())
+                .await
+                .unwrap();
+            cc_fs::write(test_base_path.join("temp2_input"), b"42000".to_vec())
+                .await
+                .unwrap();
+            let driver_info = HwmonDriverInfo {
+                path: test_base_path.to_owned(),
+                channels: vec![
+                    HwmonChannelInfo {
+                        hwmon_type: HwmonChannelType::Temp,
+                        number: 1,
+                        name: "temp1".to_string(),
+                        ..Default::default()
+                    },
+                    HwmonChannelInfo {
+                        hwmon_type: HwmonChannelType::Temp,
+                        number: 2,
+                        name: "temp2".to_string(),
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            };
+
+            let (first_temps, _) = extract_temp_statuses(&driver_info).await;
+            let held_after_first_tick = driver_info.fds.len();
+            let (second_temps, _) = extract_temp_statuses(&driver_info).await;
+            cc_fs::write(test_base_path.join("temp1_input"), b"55000".to_vec())
+                .await
+                .unwrap();
+            cc_fs::write(test_base_path.join("temp2_input"), b"60000".to_vec())
+                .await
+                .unwrap();
+            let (third_temps, _) = extract_temp_statuses(&driver_info).await;
+
+            teardown(&ctx).await;
+            let expected_held = if cfg!(feature = "compio-rt") { 2 } else { 0 };
+            assert_eq!(held_after_first_tick, expected_held);
+            assert_eq!(driver_info.fds.len(), expected_held, "descriptors grew");
+            assert!((first_temps[0].temp - 35.0).abs() < f64::EPSILON);
+            assert!((second_temps[1].temp - 42.0).abs() < f64::EPSILON);
+            assert!((third_temps[0].temp - 55.0).abs() < f64::EPSILON);
+            assert!((third_temps[1].temp - 60.0).abs() < f64::EPSILON);
         });
     }
 

@@ -63,11 +63,12 @@ pub async fn extract_freq_statuses(driver: &HwmonDriverInfo) -> Vec<ChannelStatu
         if channel.hwmon_type != HwmonChannelType::Freq {
             continue;
         }
-        let result =
-            cc_fs::read_sysfs_value(driver.path.join(format!("freq{}_input", channel.number)))
-                .await
-                .and_then(check_parsing_64)
-                .map(hertz_to_megahertz);
+        let result = driver
+            .fds
+            .read_value(&driver.path.join(format!("freq{}_input", channel.number)))
+            .await
+            .and_then(check_parsing_64)
+            .map(hertz_to_megahertz);
         if let Ok(freq) = result {
             freqs.push(ChannelStatus {
                 name: channel.name.clone(),
@@ -88,12 +89,12 @@ pub async fn extract_freq_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec
                 continue;
             }
             let freq_task = scope.spawn(async {
-                let result = cc_fs::read_sysfs_value(
-                    driver.path.join(format!("freq{}_input", channel.number)),
-                )
-                .await
-                .and_then(check_parsing_64)
-                .map(hertz_to_megahertz);
+                let result = driver
+                    .fds
+                    .read_value(&driver.path.join(format!("freq{}_input", channel.number)))
+                    .await
+                    .and_then(check_parsing_64)
+                    .map(hertz_to_megahertz);
                 result.map(|freq| ChannelStatus {
                     name: channel.name.clone(),
                     freq: Some(freq),
