@@ -43,6 +43,9 @@ static DATA_DIR: LazyLock<PathBuf> = LazyLock::new(|| test_sandbox_dir("data"));
 fn test_sandbox_dir(kind: &str) -> PathBuf {
     let dir =
         std::env::temp_dir().join(format!("coolercontrol-test-{kind}-{}", std::process::id()));
+    // A recycled pid must not hand this process an old run's files (or a planted link).
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_file(&dir);
     std::fs::create_dir_all(&dir).expect("test sandbox dir must be creatable");
     dir
 }
