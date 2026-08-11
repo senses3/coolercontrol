@@ -110,6 +110,8 @@ _LCD_BULK_HEADER: tuple = (
     0x32,
     0x10,
 )
+# Reply prefix for a bucket query, checked before trusting the offsets it carries.
+_LCD_BUCKET_REPLY_PREFIX: list = [0x31, 0x04]
 # Bucket memory is accounted in 1 KiB slots.
 _LCD_BUCKET_SLOT_BYTES: int = 1024
 
@@ -189,7 +191,22 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     header = list(_LCD_BULK_HEADER) + bulk_info
     slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
 
+    # Drain stale reports first. liquidctl's `_write_then_read` returns the next report
+    # without checking that it answers the command just sent, so anything already queued
+    # (the device's own periodic status reports, or a reply nobody consumed) is handed back
+    # as if it were the answer, and every read after it is off by one. That is what produces
+    # "missing messages (attempts=12, missing=1)". Draining is the cheap half of what
+    # `initialize()` did before every apply: it discards, it never waits for a reply.
+    self.device.clear_enqueued_reports()
+
     bucket = self._write_then_read([0x30, 0x04, target_bucket])
+    if list(bucket[0:2]) != _LCD_BUCKET_REPLY_PREFIX:
+        # Not the bucket's reply, so its bytes mean nothing: reading an offset out of an
+        # unrelated report and handing it to _setup_bucket would place a frame anywhere.
+        log.debug(
+            "Unexpected reply to an LCD bucket query; using liquidctl's own upload"
+        )
+        return _send_data_with_clean_slate(self, data, bulk_info)
     occupied = any(bucket[15:])
     capacity = int.from_bytes([bucket[19], bucket[20]], "little")
     if not occupied or capacity < slots_needed:
@@ -210,8 +227,12 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     self._bulk_write(header)
     self._bulk_write(data)  # one transfer for the whole frame
     self._write([0x36, 0x02])
-    if not self._switch_bucket(target_bucket):
-        log.error("Failed to switch active LCD bucket")
+    self._switch_bucket(target_bucket)
+    # Record what we asked for rather than what the switch reported. liquidctl never reads
+    # the end-of-transfer reply above, so `_switch_bucket`'s success flag is taken from that
+    # stale message instead of its own; believing a false negative would leave the rotation
+    # pointed at the bucket that is now on screen, and the next frame would overwrite it.
+    self._cc_active_bucket = target_bucket
 
 
 def patch_kraken_lcd_transfer() -> bool:

@@ -38,15 +38,26 @@ FRAME = bytes(range(256)) * 1600  # 409,600 bytes, one 320x320 frame
 BULK_INFO = [0x02, 0x0, 0x0, 0x0, 0x00, 0x40, 0x06, 0x00]
 
 
-def bucket_response(occupied, offset=0x0140, slots=401):
+def bucket_response(occupied, offset=0x0140, slots=401, prefix=(0x31, 0x04)):
     """A bucket query reply shaped like the device's: offset at 17:19, size at 19:21."""
     reply = bytearray(64)
+    reply[0], reply[1] = prefix
     if occupied:
         reply[15] = 1
         reply[16] = 2
         reply[17], reply[18] = offset & 0xFF, offset >> 8
         reply[19], reply[20] = slots & 0xFF, slots >> 8
     return reply
+
+
+class _FakeHid:
+    """Stands in for the HID handle, which the transfer path drains before it reads."""
+
+    def __init__(self, calls):
+        self._calls = calls
+
+    def clear_enqueued_reports(self):
+        self._calls.append(("clear_enqueued_reports",))
 
 
 class FakeKraken:
@@ -56,6 +67,7 @@ class FakeKraken:
         self.buckets = buckets  # index -> bucket_response(...)
         self.calls = []
         self.bulk_writes = []
+        self.device = _FakeHid(self.calls)
 
     def initialize(self):
         self.calls.append(("initialize",))
@@ -264,6 +276,67 @@ class TestFallsBackToLiquidctl(unittest.TestCase):
 
         self.assertEqual(result, "delegated")
         self.assertEqual(device.bulk_writes, [])
+
+
+class TestSurvivesReportDesync(unittest.TestCase):
+    """liquidctl reads the next report as if it answered the last command, so a stale one
+    desyncs everything after it. These pin the guards against that."""
+
+    def test_queued_reports_are_drained_before_reading(self):
+        """Goal: a report left over from an earlier command, or one the device sent on its
+        own, would be returned as the bucket's reply. Method: check the drain happens, and
+        happens before the query."""
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(True)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+
+        main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        names = [c[0] for c in device.calls]
+        self.assertIn("clear_enqueued_reports", names)
+        self.assertLess(
+            names.index("clear_enqueued_reports"),
+            names.index("write_then_read"),
+            "the queue must be drained before the first read",
+        )
+
+    def test_a_reply_that_is_not_the_bucket_query_delegates(self):
+        """Goal: the offsets in an unrelated report are meaningless, and handing one to
+        _setup_bucket would place a frame at an arbitrary address. Method: answer the query
+        with a report carrying someone else's prefix."""
+        wrong = bucket_response(True, prefix=(0x75, 0x02))  # a periodic status report
+        device = FakeKraken({0: bucket_response(True), 1: wrong})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+
+        with mock.patch.object(
+            main, "_ORIGINAL_SEND_DATA", return_value="delegated"
+        ) as upload:
+            result = main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(result, "delegated")
+        self.assertEqual(
+            device.bulk_writes, [], "nothing may be written on a bad reply"
+        )
+        upload.assert_called_once()
+        self.assertNotIn("setup_bucket", [c[0] for c in device.calls])
+
+    def test_the_rotation_advances_even_if_the_switch_reports_failure(self):
+        """Goal: the switch's success flag is read from the previous command's reply, so a
+        false negative must not strand the rotation on the displayed bucket. Method: make
+        the switch report failure and check what the next frame would target."""
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(True)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        device._switch_bucket = lambda index, *args: (
+            device.calls.append(("switch_bucket", index)) or False
+        )
+
+        main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(
+            device._cc_active_bucket, 1, "the next frame would rewrite the screen"
+        )
 
 
 class TestFallbackClearsArtifacts(unittest.TestCase):
