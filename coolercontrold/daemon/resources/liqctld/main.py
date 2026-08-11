@@ -240,6 +240,15 @@ def patch_kraken_lcd_transfer() -> bool:
     return True
 
 
+# Channel-to-bit-position maps for the RGB565 frame buffer the Kraken 2023 firmware 2.x wants,
+# applied with bytes.translate. Each places a channel's bits where they belong in one of the two
+# output bytes; the ranges never overlap, so the halves combine with a plain OR.
+_RGB565_RED_HIGH: bytes = bytes(value & 0xF8 for value in range(256))
+_RGB565_GREEN_HIGH: bytes = bytes(value >> 5 for value in range(256))
+_RGB565_GREEN_LOW: bytes = bytes((value & 0x1C) << 3 for value in range(256))
+_RGB565_BLUE_LOW: bytes = bytes(value >> 3 for value in range(256))
+
+
 def _packed_static_file(self, path, rotation):
     """Drop-in for `KrakenZ3._prepare_static_file` that packs the framebuffer in C.
 
@@ -258,6 +267,36 @@ def _packed_static_file(self, path, rotation):
     packed = bytearray(image.tobytes("raw", "RGBX"))
     packed[3::4] = b"\x00" * (len(packed) // 4)
     return packed
+
+
+def _packed_static_file_rgb16(self, path, rotation):
+    """Drop-in for `KrakenZ3._prepare_static_file_rgb16`, the Kraken 2023 firmware 2.x path.
+
+    Same per-pixel loop problem as the RGBX packing, but this one emits RGB565, high byte
+    first: RRRRRGGG GGGBBBBB. Pillow has no encoder for that layout, so the channels are
+    combined here instead: translate moves each channel's bits into place, and the two halves
+    are OR-ed as whole buffers (their bit ranges are disjoint, so nothing carries). Everything
+    stays in C, which is what makes it cheap.
+    """
+    image = (
+        Image.open(path)
+        .resize(self.lcd_resolution)
+        .rotate(rotation * -90)
+        .convert("RGB")
+    )
+    pixels = image.tobytes("raw", "RGB")
+    red, green, blue = pixels[0::3], pixels[1::3], pixels[2::3]
+    pixel_count = len(red)
+    high = int.from_bytes(red.translate(_RGB565_RED_HIGH), "big") | int.from_bytes(
+        green.translate(_RGB565_GREEN_HIGH), "big"
+    )
+    low = int.from_bytes(green.translate(_RGB565_GREEN_LOW), "big") | int.from_bytes(
+        blue.translate(_RGB565_BLUE_LOW), "big"
+    )
+    frame_buffer = bytearray(pixel_count * 2)
+    frame_buffer[0::2] = high.to_bytes(pixel_count, "big")
+    frame_buffer[1::2] = low.to_bytes(pixel_count, "big")
+    return frame_buffer
 
 
 def _packing_matches(original, candidate) -> bool:
@@ -292,27 +331,36 @@ def _packing_matches(original, candidate) -> bool:
 
 
 def patch_kraken_lcd_packing() -> bool:
-    """Installs the C-level framebuffer packing, if it matches liquidctl's output.
+    """Installs the C-level framebuffer packing, where it matches liquidctl's output.
 
-    The LCD image push is the most expensive thing this service does, and nearly all of
-    that cost is the packing loop rather than the USB transfer. Returns whether the
-    replacement was installed.
+    Two layouts: RGBX for every Kraken with a screen, and RGB565 for the Kraken 2023 on
+    firmware 2.x. Each is checked against liquidctl's own implementation before being
+    installed, so a mismatch costs CPU rather than putting wrong bytes on a screen.
+    Returns whether both were installed.
     """
-    original = getattr(KrakenZ3, "_prepare_static_file", None)
-    if original is None:
-        log.warning(
-            "liquidctl has no KrakenZ3._prepare_static_file; LCD packing unpatched"
-        )
-        return False
-    if not _packing_matches(original, _packed_static_file):
-        log.warning(
-            "LCD framebuffer packing differs from liquidctl's; keeping liquidctl's "
-            "implementation. LCD updates will use more CPU."
-        )
-        return False
-    KrakenZ3._prepare_static_file = _packed_static_file
-    log.debug("LCD framebuffer packing patched to Pillow's C path")
-    return True
+    replacements = (
+        ("_prepare_static_file", _packed_static_file),
+        ("_prepare_static_file_rgb16", _packed_static_file_rgb16),
+    )
+    installed = 0
+    for name, replacement in replacements:
+        original = getattr(KrakenZ3, name, None)
+        if original is None:
+            log.warning(
+                "liquidctl has no KrakenZ3.%s; that LCD packing is unpatched", name
+            )
+            continue
+        if not _packing_matches(original, replacement):
+            log.warning(
+                "LCD framebuffer packing for %s differs from liquidctl's; keeping "
+                "liquidctl's implementation. LCD updates will use more CPU.",
+                name,
+            )
+            continue
+        setattr(KrakenZ3, name, replacement)
+        installed += 1
+    log.debug("LCD framebuffer packing patched to Pillow's C path (%d of 2)", installed)
+    return installed == len(replacements)
 
 
 #####################################################################

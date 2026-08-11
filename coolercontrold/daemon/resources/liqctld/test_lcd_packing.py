@@ -34,8 +34,9 @@ import main  # noqa: E402
 from liquidctl.driver.kraken3 import KrakenZ3  # noqa: E402
 from PIL import Image  # noqa: E402
 
-# liquidctl's implementation, captured before any test installs the replacement.
+# liquidctl's implementations, captured before any test installs a replacement.
 ORIGINAL_PACKING = KrakenZ3._prepare_static_file
+ORIGINAL_PACKING_RGB16 = KrakenZ3._prepare_static_file_rgb16
 
 
 class _Screen:
@@ -104,6 +105,51 @@ class TestLcdPacking(unittest.TestCase):
             actual = bytes(main._packed_static_file(screen, source, 0))
             self.assertEqual(actual, expected, f"packing differs for a {mode} source")
 
+    def test_rgb16_matches_liquidctl_byte_for_byte(self):
+        """Goal: the Kraken 2023 firmware 2.x path packs RGB565 rather than RGBX, and it has
+        no device here to catch a mistake, so it must be indistinguishable from liquidctl's
+        loop. Method: pack the same image both ways at every rotation and resolution."""
+        for size in (240, 320, 640):
+            for rotation in (0, 1, 2, 3):
+                screen = _Screen(size)
+                source = encoded_image(size)
+                source.seek(0)
+                expected = bytes(ORIGINAL_PACKING_RGB16(screen, source, rotation))
+                source.seek(0)
+                actual = bytes(main._packed_static_file_rgb16(screen, source, rotation))
+                self.assertEqual(
+                    actual,
+                    expected,
+                    f"rgb16 packing differs at {size}x{size} rotation {rotation * 90}deg",
+                )
+
+    def test_rgb16_packs_saturated_colors_into_the_right_bits(self):
+        """Goal: pin the bit layout against hand-computed bytes, not only against a copy of
+        the same loop, which could share a bug. Method: pack pure red, green, blue and white
+        and compare with RGB565 worked out by hand, high byte first."""
+        screen = _Screen(2)
+        image = Image.new("RGB", (2, 2))
+        pixels = image.load()
+        pixels[0, 0] = (255, 0, 0)
+        pixels[1, 0] = (0, 255, 0)
+        pixels[0, 1] = (0, 0, 255)
+        pixels[1, 1] = (255, 255, 255)
+        source = io.BytesIO()
+        image.save(source, format="PNG")
+
+        packed = main._packed_static_file_rgb16(screen, source, 0)
+
+        self.assertEqual(
+            bytes(packed), bytes([0xF8, 0x00, 0x07, 0xE0, 0x00, 0x1F, 0xFF, 0xFF])
+        )
+
+    def test_rgb16_output_is_two_bytes_per_pixel(self):
+        """Goal: RGB565 is half the size of the RGBX buffer, which is what the device expects
+        and what the transfer is sized from. Method: check the length."""
+        screen = _Screen(240)
+        packed = main._packed_static_file_rgb16(screen, encoded_image(240), 0)
+        self.assertEqual(len(packed), 240 * 240 * 2)
+
     def test_verification_accepts_the_replacement(self):
         """Goal: the guard that runs before patching must accept the real replacement,
         otherwise the patch silently never installs. Method: run the guard."""
@@ -145,10 +191,14 @@ class TestLcdPacking(unittest.TestCase):
         try:
             self.assertTrue(main.patch_kraken_lcd_packing())
             self.assertIs(KrakenZ3._prepare_static_file, main._packed_static_file)
+            self.assertIs(
+                KrakenZ3._prepare_static_file_rgb16, main._packed_static_file_rgb16
+            )
             self.assertTrue(main.patch_kraken_lcd_packing())
             self.assertIs(KrakenZ3._prepare_static_file, main._packed_static_file)
         finally:
             KrakenZ3._prepare_static_file = ORIGINAL_PACKING
+            KrakenZ3._prepare_static_file_rgb16 = ORIGINAL_PACKING_RGB16
 
 
 if __name__ == "__main__":
