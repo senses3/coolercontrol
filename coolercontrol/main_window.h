@@ -50,6 +50,8 @@ class MainWindow final : public QMainWindow {
 
   void tryDaemonConnection();
 
+  void confirmDaemonLoss() const;
+
   void startWatchingSSE() const;
 
   void setZoomFactor(double zoomFactor) const;
@@ -136,6 +138,8 @@ class MainWindow final : public QMainWindow {
   // Delays the discard so a quick hide/show toggle never pays a page reload.
   QTimer* m_discardTimer;
   QTimer* m_sensorPollTimer;
+  // Holds the disconnect notification back until the outage outlives a blip.
+  QTimer* m_disconnectNotifyTimer;
   mutable int m_sensorPollTicks{0};
   bool m_discardEnabled{true};
   // Set when the daemon reconnects while hidden. A discarded page reloads on its own
