@@ -31,7 +31,7 @@ help:
 	@printf '    make build-qt         Build the Qt desktop app\n\n'
 	@printf '  \033[1mTest & check\033[0m\n'
 	@printf '    make test             Run all tests (UI + daemon + Qt)\n'
-	@printf '    make test-daemon      Run daemon (Rust) tests\n'
+	@printf '    make test-daemon      Run daemon tests (Rust and liqctld)\n'
 	@printf '    make test-ui          Run UI (Vitest) tests\n'
 	@printf '    make pr-check         Pre-PR gate: lint diff, tests, clippy, Qt build\n'
 	@printf '    make ci-local         Reproduce the CI pipeline locally (full clean, slow)\n\n'
