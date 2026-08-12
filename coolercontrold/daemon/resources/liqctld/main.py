@@ -63,9 +63,6 @@ _ORIGINAL_SET_SCREEN = KrakenZ3.set_screen
 _ORIGINAL_SEND_2023_FW2 = getattr(KrakenZ3, "_send_2023_data_fw2", None)
 # Which packing layouts the C path replaced, reported per device by the profile line.
 _LCD_PACKING_PATCHED: set = set()
-# Product id whose firmware 2.x uses the RGB565 double-send path instead of the bucket
-# rotation. liquidctl gates that on this id alone; every other Kraken takes `_send_data`.
-_LCD_FW2_PRODUCT_ID: int = 0x300E
 
 #####################################################################
 # Basic Setup
