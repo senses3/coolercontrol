@@ -481,15 +481,19 @@ mod tests {
     }
 
     #[test]
-    fn map_device_duties_to_true_lifts_a_sub_sustain_duty_to_one() {
-        // Goal: document the one lossy edge of the inverse. A duty under
-        // the sustain floor used to stall the fan; its pre-image is 1,
-        // so after conversion that point runs at fan minimum instead.
-        // Method: map a duty below min_sustain_duty.
+    fn map_device_duties_to_true_keeps_a_sub_sustain_duty_off() {
+        // Goal: a duty under the sustain floor stalls the fan, so the
+        // conversion has to keep it stopped. Mapping it to the floor
+        // instead would silently start a fan the user had set to idle.
+        // Method: map a duty below min_sustain_duty, and the floor duty
+        // itself, which does spin and so must stay on.
         let calibration = smooth_calibration();
         assert!(calibration.min_sustain_duty > 3);
         let mapped = map_device_duties_to_true(&calibration, &[3]).expect("smooth maps");
-        assert_eq!(mapped[0], 1);
+        assert_eq!(mapped[0], 0);
+        let at_floor = map_device_duties_to_true(&calibration, &[calibration.min_sustain_duty])
+            .expect("smooth maps");
+        assert_eq!(at_floor[0], 1);
     }
 
     #[test]
