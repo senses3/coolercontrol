@@ -8,7 +8,11 @@ import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import defaultHealthCheck, { type HealthCheck } from '@/models/HealthCheck.ts'
-import { formatDisconnectedFor, isConnectionLost } from '@/shell/connectionWatchdog.ts'
+import {
+    connectionLostThresholdMs,
+    formatDisconnectedFor,
+    isConnectionLost,
+} from '@/shell/connectionWatchdog.ts'
 
 export enum DaemonStatus {
     OK = 'Ok',
@@ -75,9 +79,13 @@ export const useDaemonState = defineStore('daemonState', () => {
         // Boot can outrun the grace period on a slow system, and the clock should
         // measure the stream, not how long startup took.
         noteStatusReceived()
+        const settingsStore = useSettingsStore()
         watchdog = setInterval(() => {
+            // Read per tick, not captured: the poll rate is a live setting and the
+            // threshold has to follow it without a restart.
+            const threshold = connectionLostThresholdMs(settingsStore.ccSettings.poll_rate)
             const elapsed = Date.now() - lastStatusAt.value
-            connectionLost.value = isConnectionLost(elapsed)
+            connectionLost.value = isConnectionLost(elapsed, threshold)
             if (connectionLost.value) disconnectedFor.value = formatDisconnectedFor(elapsed)
         }, 1_000)
     }

@@ -1,13 +1,27 @@
 // SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Status ticks arrive once a second, so this is roughly ten missed ones: long
-// enough to ride out a mobile connection blip, short enough that stale readings
-// are not mistaken for live ones.
-export const CONNECTION_LOST_GRACE_MS = 10_000
+// Never below this, whatever the poll rate: a mobile connection drops for a
+// second or two routinely, and those must stay invisible.
+export const CONNECTION_LOST_FLOOR_MS = 10_000
+// Missing this many status ticks in a row is not jitter.
+export const CONNECTION_LOST_MISSED_TICKS = 3
+// The daemon clamps poll_rate to this range (api/settings.rs), so the threshold
+// lands between 10s and 15s no matter what a stale or hand-edited config holds.
+export const POLL_RATE_MIN_SECONDS = 0.5
+export const POLL_RATE_MAX_SECONDS = 5
 
-export function isConnectionLost(elapsedMs: number): boolean {
-    return elapsedMs > CONNECTION_LOST_GRACE_MS
+export function connectionLostThresholdMs(pollRateSeconds: number): number {
+    if (!Number.isFinite(pollRateSeconds)) return CONNECTION_LOST_FLOOR_MS
+    const pollRate = Math.min(
+        Math.max(pollRateSeconds, POLL_RATE_MIN_SECONDS),
+        POLL_RATE_MAX_SECONDS,
+    )
+    return Math.max(CONNECTION_LOST_FLOOR_MS, CONNECTION_LOST_MISSED_TICKS * pollRate * 1_000)
+}
+
+export function isConnectionLost(elapsedMs: number, thresholdMs: number): boolean {
+    return elapsedMs > thresholdMs
 }
 
 /** Digits only (h:mm:ss past an hour), so no unit words need translating. */

@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-    CONNECTION_LOST_GRACE_MS,
+    CONNECTION_LOST_FLOOR_MS,
+    connectionLostThresholdMs,
     formatDisconnectedFor,
     isConnectionLost,
 } from '@/shell/connectionWatchdog.ts'
@@ -14,16 +15,49 @@ const deviceStoreSource = import.meta.glob('../../stores/DeviceStore.ts', {
     eager: true,
 }) as Record<string, string>
 
-describe('isConnectionLost', () => {
-    it('holds through a drop shorter than the grace period', () => {
-        expect(isConnectionLost(0)).toBe(false)
-        expect(isConnectionLost(CONNECTION_LOST_GRACE_MS - 1)).toBe(false)
-        expect(isConnectionLost(CONNECTION_LOST_GRACE_MS)).toBe(false)
+describe('connectionLostThresholdMs', () => {
+    it('holds the floor while three ticks are shorter than it', () => {
+        expect(connectionLostThresholdMs(0.5)).toBe(CONNECTION_LOST_FLOOR_MS)
+        expect(connectionLostThresholdMs(1)).toBe(CONNECTION_LOST_FLOOR_MS)
+        expect(connectionLostThresholdMs(3)).toBe(CONNECTION_LOST_FLOOR_MS)
     })
 
-    it('trips once the grace period is exceeded', () => {
-        expect(isConnectionLost(CONNECTION_LOST_GRACE_MS + 1)).toBe(true)
-        expect(isConnectionLost(60_000)).toBe(true)
+    it('follows three ticks once they outgrow the floor', () => {
+        expect(connectionLostThresholdMs(4)).toBe(12_000)
+        expect(connectionLostThresholdMs(5)).toBe(15_000)
+    })
+
+    it('clamps to the poll rate range the daemon accepts', () => {
+        // 15s is the ceiling: a hand-edited config cannot stretch the wait further.
+        expect(connectionLostThresholdMs(60)).toBe(15_000)
+        expect(connectionLostThresholdMs(0)).toBe(CONNECTION_LOST_FLOOR_MS)
+        expect(connectionLostThresholdMs(-1)).toBe(CONNECTION_LOST_FLOOR_MS)
+    })
+
+    it('falls back to the floor when the setting has not loaded', () => {
+        expect(connectionLostThresholdMs(Number.NaN)).toBe(CONNECTION_LOST_FLOOR_MS)
+        expect(connectionLostThresholdMs(undefined as unknown as number)).toBe(
+            CONNECTION_LOST_FLOOR_MS,
+        )
+    })
+})
+
+describe('isConnectionLost', () => {
+    it('holds through a drop shorter than the threshold', () => {
+        expect(isConnectionLost(0, 10_000)).toBe(false)
+        expect(isConnectionLost(9_999, 10_000)).toBe(false)
+        expect(isConnectionLost(10_000, 10_000)).toBe(false)
+    })
+
+    it('trips once the threshold is exceeded', () => {
+        expect(isConnectionLost(10_001, 10_000)).toBe(true)
+        expect(isConnectionLost(60_000, 10_000)).toBe(true)
+    })
+
+    it('waits longer at the slowest poll rate', () => {
+        const slowest = connectionLostThresholdMs(5)
+        expect(isConnectionLost(12_000, slowest)).toBe(false)
+        expect(isConnectionLost(16_000, slowest)).toBe(true)
     })
 })
 
