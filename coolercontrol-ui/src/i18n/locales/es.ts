@@ -82,6 +82,10 @@ export default {
             access: 'Acceso',
             power: 'Energía',
             noModes: 'No hay modos guardados',
+            supportWizards: {
+                summary: '¡Magos del soporte activados!',
+                detail: 'Gracias a los voluntarios que ayudan a nuestros usuarios a hacer funcionar su hardware y sus controladores.',
+            },
             coolingPanel: {
                 pinned: 'Fijado',
                 pin: 'Fijar',

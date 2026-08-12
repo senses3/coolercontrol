@@ -80,6 +80,10 @@ export default {
             access: 'アクセス',
             power: '電源',
             noModes: '保存されたモードがありません',
+            supportWizards: {
+                summary: 'サポートの魔法使いを召喚！',
+                detail: 'ハードウェアとドライバーを動かす手助けをしてくれるボランティアの皆さんに感謝します。',
+            },
             coolingPanel: {
                 pinned: 'ピン留め済み',
                 pin: 'ピン留め',

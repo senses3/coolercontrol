@@ -80,6 +80,10 @@ export default {
             access: '액세스',
             power: '전원',
             noModes: '저장된 모드 없음',
+            supportWizards: {
+                summary: '지원 마법사 활성화!',
+                detail: '사용자의 하드웨어와 드라이버가 동작하도록 도와주는 자원봉사자들에게 감사드립니다.',
+            },
             coolingPanel: {
                 pinned: '고정됨',
                 pin: '고정',

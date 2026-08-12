@@ -80,6 +80,10 @@ export default {
             access: 'Access',
             power: 'Power',
             noModes: 'No modes saved',
+            supportWizards: {
+                summary: 'Support Wizards Activated!',
+                detail: 'With thanks to the volunteers who help our users get their hardware and drivers working.',
+            },
             coolingPanel: {
                 pinned: 'Pinned',
                 pin: 'Pin',

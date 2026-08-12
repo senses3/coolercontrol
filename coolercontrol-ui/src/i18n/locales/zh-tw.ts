@@ -80,6 +80,10 @@ export default {
             access: '存取',
             power: '電源',
             noModes: '尚未儲存模式',
+            supportWizards: {
+                summary: '支援魔法師已啟動！',
+                detail: '感謝幫助我們的使用者讓硬體與驅動程式正常運作的志工們。',
+            },
             coolingPanel: {
                 pinned: '已釘選',
                 pin: '釘選',
