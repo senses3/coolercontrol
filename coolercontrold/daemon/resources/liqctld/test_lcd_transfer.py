@@ -761,9 +761,7 @@ class TestScreenEntryDrain(unittest.TestCase):
             return "screen set"
 
         with mock.patch.object(main, "_ORIGINAL_SET_SCREEN", original):
-            result = main._set_screen_with_drained_queue(
-                device, "lcd", "gif", "/tmp/a.gif"
-            )
+            result = main._set_screen_with_drained_queue(device, "lcd", "gif", "a.gif")
 
         self.assertEqual(result, "screen set")
         self.assertEqual(
@@ -910,7 +908,7 @@ class TestGifUnsupportedIsExplained(unittest.TestCase):
                 for _ in range(3):
                     with self.assertRaises(main.NotSupportedByDriver):
                         main._set_screen_with_drained_queue(
-                            device, "lcd", "gif", "/tmp/a.gif"
+                            device, "lcd", "gif", "a.gif"
                         )
 
         explained = [m for m in captured.output if "does not support LCD gifs" in m]
@@ -928,7 +926,7 @@ class TestGifUnsupportedIsExplained(unittest.TestCase):
             with self.assertRaises(main.NotSupportedByDriver):
                 with mock.patch.object(main.log, "warning") as warned:
                     main._set_screen_with_drained_queue(
-                        device, "lcd", "static", "/tmp/a.png"
+                        device, "lcd", "static", "a.png"
                     )
             warned.assert_not_called()
 
