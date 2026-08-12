@@ -178,6 +178,12 @@ export default {
                 notShared: 'Nur dieser Lüfter',
                 notSharedTooltip: 'Dieses Profil steuert nur diesen Kanal.',
                 forkForFan: 'Für diesen Lüfter abspalten',
+                fork: {
+                    confirmHeader: 'Für diesen Lüfter abspalten',
+                    confirmMessage:
+                        "Eine Kopie von '{profile}' für {channel} erstellen und diesem Lüfter zuweisen. '{profile}' und alle anderen Lüfter, die es nutzen, bleiben unverändert, Änderungen hier betreffen also nur {channel}.",
+                    accept: 'Abspalten',
+                },
                 convert: {
                     button: 'Für Kalibrierung umrechnen',
                     tooltip:

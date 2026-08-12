@@ -177,6 +177,12 @@ export default {
                 notShared: 'Apenas esta ventoinha',
                 notSharedTooltip: 'Este perfil controla apenas este canal.',
                 forkForFan: 'Bifurcar para este ventilador',
+                fork: {
+                    confirmHeader: 'Bifurcar para este ventilador',
+                    confirmMessage:
+                        "Criar uma cópia de '{profile}' para {channel} e atribuí-la a esta ventoinha. '{profile}' e as outras ventoinhas que o usam ficam intactos, por isso as alterações aqui só afetarão {channel}.",
+                    accept: 'Bifurcar',
+                },
                 convert: {
                     button: 'Converter para a calibração',
                     tooltip:

@@ -174,6 +174,12 @@ export default {
                 notShared: 'هذه المروحة فقط',
                 notSharedTooltip: 'يشغّل هذا الملف الشخصي هذه القناة فقط.',
                 forkForFan: 'إنشاء نسخة لهذه المروحة',
+                fork: {
+                    confirmHeader: 'إنشاء نسخة لهذه المروحة',
+                    confirmMessage:
+                        "إنشاء نسخة من '{profile}' للقناة {channel} وتعيينها لهذه المروحة. يبقى '{profile}' وأي مراوح أخرى تستخدمه دون تغيير، لذا لن تؤثر التغييرات هنا إلا على {channel}.",
+                    accept: 'إنشاء نسخة',
+                },
                 convert: {
                     button: 'تحويل للمعايرة',
                     tooltip:

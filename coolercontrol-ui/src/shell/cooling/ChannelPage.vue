@@ -314,10 +314,36 @@ const apply = async (): Promise<void> => {
     }
 }
 
+const confirmAction = async (
+    header: string,
+    message: string,
+    acceptLabel: string,
+): Promise<boolean> =>
+    new Promise<boolean>((resolve) => {
+        confirm.require({
+            header,
+            message,
+            acceptLabel,
+            rejectLabel: t('common.cancel'),
+            defaultFocus: 'reject',
+            accept: () => resolve(true),
+            reject: () => resolve(false),
+        })
+    })
+
 // Clones the shared profile so edits below only affect this fan.
 const forkProfile = async (): Promise<void> => {
     const source = selectedProfile.value
     if (source == null || applying.value) return
+    const confirmed = await confirmAction(
+        t('layout.shell.coolingPage.fork.confirmHeader'),
+        t('layout.shell.coolingPage.fork.confirmMessage', {
+            profile: source.name,
+            channel: channelLabel.value,
+        }),
+        t('layout.shell.coolingPage.fork.accept'),
+    )
+    if (!confirmed) return
     applying.value = true
     try {
         const forked = await conversion.forkProfile(source)
@@ -342,17 +368,11 @@ const canConvert = computed<boolean>(() => {
 })
 
 const confirmConvert = async (message: string): Promise<boolean> =>
-    new Promise<boolean>((resolve) => {
-        confirm.require({
-            header: t('layout.shell.coolingPage.convert.confirmHeader'),
-            message,
-            acceptLabel: t('layout.shell.coolingPage.convert.accept'),
-            rejectLabel: t('common.cancel'),
-            defaultFocus: 'reject',
-            accept: () => resolve(true),
-            reject: () => resolve(false),
-        })
-    })
+    confirmAction(
+        t('layout.shell.coolingPage.convert.confirmHeader'),
+        message,
+        t('layout.shell.coolingPage.convert.accept'),
+    )
 
 /**
  * Converting is only correct once, so it always confirms first. The original

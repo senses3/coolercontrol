@@ -174,6 +174,12 @@ export default {
                 notShared: 'Only this fan',
                 notSharedTooltip: 'This profile drives only this channel.',
                 forkForFan: 'Fork for this fan',
+                fork: {
+                    confirmHeader: 'Fork for this fan',
+                    confirmMessage:
+                        "Create a copy of '{profile}' for {channel} and assign it to this fan. '{profile}' and any other fans using it are left untouched, so changes here will only affect {channel}.",
+                    accept: 'Fork',
+                },
                 convert: {
                     button: 'Convert for calibration',
                     tooltip:

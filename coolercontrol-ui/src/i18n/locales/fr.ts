@@ -179,6 +179,12 @@ export default {
                 notShared: 'Ce ventilateur uniquement',
                 notSharedTooltip: 'Ce profil ne pilote que ce canal.',
                 forkForFan: 'Dupliquer pour ce ventilateur',
+                fork: {
+                    confirmHeader: 'Dupliquer pour ce ventilateur',
+                    confirmMessage:
+                        "Créer une copie de « {profile} » pour {channel} et l'affecter à ce ventilateur. « {profile} » et les autres ventilateurs qui l'utilisent restent intacts : les modifications ici n'affecteront que {channel}.",
+                    accept: 'Dupliquer',
+                },
                 convert: {
                     button: 'Convertir pour la calibration',
                     tooltip:

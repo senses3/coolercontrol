@@ -174,6 +174,12 @@ export default {
                 notShared: '이 팬만',
                 notSharedTooltip: '이 프로필은 이 채널만 제어합니다.',
                 forkForFan: '이 팬용으로 분기',
+                fork: {
+                    confirmHeader: '이 팬용으로 분기',
+                    confirmMessage:
+                        "'{profile}'의 사본을 {channel}용으로 만들어 이 팬에 할당합니다. '{profile}'과(와) 이를 사용하는 다른 팬은 그대로 유지되므로 여기서의 변경은 {channel}에만 적용됩니다.",
+                    accept: '분기',
+                },
                 convert: {
                     button: '보정용으로 변환',
                     tooltip:

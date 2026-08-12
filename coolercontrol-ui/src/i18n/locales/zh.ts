@@ -173,6 +173,12 @@ export default {
                 notShared: '仅此风扇',
                 notSharedTooltip: '此配置文件仅控制此通道。',
                 forkForFan: '为此风扇创建副本',
+                fork: {
+                    confirmHeader: '为此风扇创建副本',
+                    confirmMessage:
+                        '为 {channel} 创建“{profile}”的副本并分配给此风扇。“{profile}”以及使用它的其他风扇保持不变，因此这里的更改只会影响 {channel}。',
+                    accept: '创建副本',
+                },
                 convert: {
                     button: '转换以适配校准',
                     tooltip:

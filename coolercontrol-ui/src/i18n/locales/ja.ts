@@ -174,6 +174,12 @@ export default {
                 notShared: 'このファンのみ',
                 notSharedTooltip: 'このプロファイルはこのチャンネルのみを制御します。',
                 forkForFan: 'このファン用に複製',
+                fork: {
+                    confirmHeader: 'このファン用に複製',
+                    confirmMessage:
+                        '「{profile}」のコピーを{channel}用に作成し、このファンに割り当てます。「{profile}」とそれを使用する他のファンはそのまま残るため、ここでの変更は{channel}にのみ影響します。',
+                    accept: '複製',
+                },
                 convert: {
                     button: 'キャリブレーション用に変換',
                     tooltip:
