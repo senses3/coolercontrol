@@ -902,19 +902,12 @@ impl LiquidctlRepo {
             .acquire()
             .await
             .expect("device permit never closed");
-        // We set several settings at once for lcd/screen settings.
-        //
-        // This used to re-initialize the device first, which cost ~800 ms of a ~950 ms apply
-        // (initialize waits on the device's next lighting-info report). It was added to clear the
-        // occasional image artifacts, back when the Krakens were the only screens liquidctl
-        // supported. Those artifacts come from liquidctl's frame upload cycling through all 16
-        // device buckets and, once they are all occupied, rewriting whichever one is on screen.
-        // liqctld now writes each frame to the bucket that is NOT displayed, and re-initializes
-        // itself whenever it falls back to liquidctl's own upload, so the cause is handled where
-        // it happens instead of by re-initializing every device on every frame. Screens with an
-        // unrelated protocol (Lian Li GA II LCD, MSI Coreliquid) have no bucket allocator, so the
-        // artifacts were never theirs; if one of them ever needs it, restore it for that driver
-        // rather than for everything.
+        // This used to re-initialize the device first: ~800 ms of a ~950 ms apply, spent waiting
+        // on the device's next lighting-info report. It cleared the image artifacts liquidctl's
+        // bucket allocator causes by rewriting the displayed bucket, which liqctld now avoids at
+        // the source and re-initializes itself on the fallback that cannot. Screens with an
+        // unrelated protocol (Lian Li GA II LCD, MSI Coreliquid) have no allocator and never had
+        // the artifacts; if one ever needs this, restore it for that driver, not for everything.
         let start_lcd_settings_apply = Instant::now();
         if let Some(brightness) = lcd_settings.brightness {
             if let Err(err) = self
