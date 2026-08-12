@@ -176,7 +176,36 @@ export default {
                 selectProfile: 'Sélectionner un profil',
                 sharedWith: 'Partagé avec {count} autres',
                 sharedTooltip: "Ce profil pilote également d'autres canaux.",
+                notShared: 'Ce ventilateur uniquement',
+                notSharedTooltip: 'Ce profil ne pilote que ce canal.',
                 forkForFan: 'Dupliquer pour ce ventilateur',
+                fork: {
+                    confirmHeader: 'Dupliquer pour ce ventilateur',
+                    confirmMessage:
+                        "Copier le profil « {profile} » vers un nouveau profil « {copy} » et l'affecter à {channel}.\n\nL'original reste intact : les modifications ici n'affecteront que {channel}.",
+                    accept: 'Créer une copie',
+                },
+                convert: {
+                    button: 'Convertir pour la calibration',
+                    tooltip:
+                        'Ce ventilateur est calibré : ses vitesses enregistrées sont désormais lues comme des vitesses réelles et reconverties à chaque écriture. Convertissez-les pour que le ventilateur se comporte comme avant la calibration.',
+                    confirmHeader: 'Convertir pour le ventilateur calibré',
+                    confirmProfile:
+                        "Copier le profil « {profile} » vers un nouveau profil « {copy} », convertir ses vitesses et l'affecter à {channel}.\n\nNe convertissez que des vitesses définies avant la calibration de ce ventilateur. Une double conversion fait tourner le ventilateur à la mauvaise vitesse. L'original reste intact.",
+                    confirmManual:
+                        "Convertir le rapport cyclique manuel de {channel} pour que le ventilateur conserve la vitesse qu'il avait avant la calibration.\n\nNe convertissez qu'une valeur définie avant la calibration de ce ventilateur. Une double conversion fait tourner le ventilateur à la mauvaise vitesse.",
+                    accept: 'Convertir',
+                    successProfile:
+                        '« {profile} » a été affecté à {channel} avec les vitesses converties.',
+                    successManual: 'Rapport cyclique manuel converti à {duty} %.',
+                    error: 'Impossible de convertir les vitesses de ce ventilateur.',
+                    floorHeading: 'Certains points sont passés à 0 %',
+                    floorNotice:
+                        '{count} point(s) se situaient sous la vitesse la plus basse réglable sur {channel} après la calibration : ils sont passés à 0 %. Vérifiez la nouvelle courbe avant de vous y fier.',
+                    modesHeading: "Les modes utilisent toujours l'original",
+                    modesReminder:
+                        "Ces modes affectent encore le profil d'origine à {channel} : {modes}. Mettez-les à jour pour utiliser la copie convertie.",
+                },
                 notControllable:
                     'Ce canal signale sa vitesse mais ne peut pas être contrôlé par CoolerControl.',
                 verdictFirmwareOverride:

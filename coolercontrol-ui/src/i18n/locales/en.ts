@@ -171,7 +171,35 @@ export default {
                 selectProfile: 'Select a profile',
                 sharedWith: 'Shared with {count} more',
                 sharedTooltip: 'This profile also drives other channels.',
+                notShared: 'Only this fan',
+                notSharedTooltip: 'This profile drives only this channel.',
                 forkForFan: 'Fork for this fan',
+                fork: {
+                    confirmHeader: 'Fork for this fan',
+                    confirmMessage:
+                        "Copy the profile '{profile}' to a new profile '{copy}' and assign it to {channel}.\n\nThe original is left untouched, so changes here only affect {channel}.",
+                    accept: 'Create copy',
+                },
+                convert: {
+                    button: 'Convert for calibration',
+                    tooltip:
+                        'This fan is calibrated, so its stored speeds are now read as true speeds and remapped on every write. Convert them so the fan behaves as it did before calibration.',
+                    confirmHeader: 'Convert for the calibrated fan',
+                    confirmProfile:
+                        "Copy the profile '{profile}' to a new profile '{copy}', convert its speeds, and assign it to {channel}.\n\nOnly convert speeds you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed. The original is left untouched.",
+                    confirmManual:
+                        'Convert the manual duty for {channel} so the fan holds the speed it did before calibration.\n\nOnly convert a duty you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed.',
+                    accept: 'Convert',
+                    successProfile: "Assigned '{profile}' to {channel} with converted speeds.",
+                    successManual: 'Manual duty converted to {duty}%.',
+                    error: 'Could not convert the speeds for this fan.',
+                    floorHeading: 'Some points converted to 0%',
+                    floorNotice:
+                        '{count} point(s) sat below the slowest speed {channel} can be set to once calibrated, so they converted to 0%. Check the new curve before relying on it.',
+                    modesHeading: 'Modes still use the original',
+                    modesReminder:
+                        'These modes still assign the original profile to {channel}: {modes}. Update them to use the converted copy.',
+                },
                 notControllable:
                     'This channel reports its speed but cannot be controlled by CoolerControl.',
                 verdictFirmwareOverride:

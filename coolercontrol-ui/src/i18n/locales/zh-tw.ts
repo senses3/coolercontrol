@@ -170,7 +170,35 @@ export default {
                 selectProfile: '選擇設定檔',
                 sharedWith: '與另外 {count} 個共用',
                 sharedTooltip: '此設定檔也驅動其他通道。',
+                notShared: '僅此風扇',
+                notSharedTooltip: '此設定檔僅控制此通道。',
                 forkForFan: '為此風扇建立副本',
+                fork: {
+                    confirmHeader: '為此風扇建立副本',
+                    confirmMessage:
+                        '將設定檔「{profile}」複製為新的設定檔「{copy}」，並指派給 {channel}。\n\n原設定檔維持不變，因此這裡的變更只會影響 {channel}。',
+                    accept: '建立副本',
+                },
+                convert: {
+                    button: '轉換以配合校準',
+                    tooltip:
+                        '此風扇已校準，因此其儲存的轉速現在會被視為實際轉速，並在每次寫入時重新對應。轉換後，風扇將恢復校準前的表現。',
+                    confirmHeader: '為已校準的風扇轉換',
+                    confirmProfile:
+                        '將設定檔「{profile}」複製為新的設定檔「{copy}」，轉換其轉速，並指派給 {channel}。\n\n僅轉換本風扇校準之前設定的轉速。重複轉換會使風扇以錯誤的轉速運轉。原設定檔維持不變。',
+                    confirmManual:
+                        '轉換 {channel} 的手動工作週期，使風扇維持校準前的轉速。\n\n僅轉換本風扇校準之前設定的數值。重複轉換會使風扇以錯誤的轉速運轉。',
+                    accept: '轉換',
+                    successProfile: '已將「{profile}」以轉換後的轉速指派給 {channel}。',
+                    successManual: '手動工作週期已轉換為 {duty}%。',
+                    error: '無法轉換此風扇的轉速。',
+                    floorHeading: '部分點已轉換為 0%',
+                    floorNotice:
+                        '有 {count} 個點低於校準後 {channel} 可設定的最低轉速，因此轉換為 0%。在依賴新曲線之前請先檢查。',
+                    modesHeading: '模式仍在使用原始設定檔',
+                    modesReminder:
+                        '以下模式仍將原始設定檔指派給 {channel}：{modes}。請更新為使用轉換後的副本。',
+                },
                 notControllable: '此通道會回報其速度，但無法由 CoolerControl 控制。',
                 verdictFirmwareOverride:
                     'CoolerControl 已將此通道設為手動控制，但韌體將其改了回去。',

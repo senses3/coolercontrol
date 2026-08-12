@@ -171,7 +171,35 @@ export default {
                 selectProfile: '프로파일 선택',
                 sharedWith: '다른 {count}개와 공유됨',
                 sharedTooltip: '이 프로파일은 다른 채널도 구동합니다.',
+                notShared: '이 팬만',
+                notSharedTooltip: '이 프로필은 이 채널만 제어합니다.',
                 forkForFan: '이 팬용으로 분기',
+                fork: {
+                    confirmHeader: '이 팬용으로 분기',
+                    confirmMessage:
+                        "프로필 '{profile}'을(를) 새 프로필 '{copy}'(으)로 복사하고 {channel}에 할당합니다.\n\n원본은 그대로 유지되므로 여기서의 변경은 {channel}에만 적용됩니다.",
+                    accept: '사본 만들기',
+                },
+                convert: {
+                    button: '보정용으로 변환',
+                    tooltip:
+                        '이 팬은 보정되어 있어 저장된 속도가 이제 실제 속도로 해석되며 기록할 때마다 다시 매핑됩니다. 변환하면 보정 전과 동일하게 동작합니다.',
+                    confirmHeader: '보정된 팬에 맞게 변환',
+                    confirmProfile:
+                        "프로필 '{profile}'을(를) 새 프로필 '{copy}'(으)로 복사하고 속도를 변환하여 {channel}에 할당합니다.\n\n이 팬을 보정하기 전에 설정한 속도만 변환하세요. 두 번 변환하면 팬이 잘못된 속도로 동작합니다. 원본은 그대로 유지됩니다.",
+                    confirmManual:
+                        '{channel}의 수동 듀티를 변환하여 팬이 보정 전과 같은 속도를 유지하도록 합니다.\n\n이 팬을 보정하기 전에 설정한 값만 변환하세요. 두 번 변환하면 팬이 잘못된 속도로 동작합니다.',
+                    accept: '변환',
+                    successProfile: "변환된 속도로 '{profile}'을(를) {channel}에 할당했습니다.",
+                    successManual: '수동 듀티를 {duty}%로 변환했습니다.',
+                    error: '이 팬의 속도를 변환하지 못했습니다.',
+                    floorHeading: '일부 지점이 0%로 변환되었습니다',
+                    floorNotice:
+                        '보정 후 {channel}에 설정할 수 있는 가장 낮은 속도보다 {count}개 지점이 아래에 있어 0%로 변환되었습니다. 사용하기 전에 새 곡선을 확인하세요.',
+                    modesHeading: '모드가 여전히 원본을 사용 중입니다',
+                    modesReminder:
+                        '다음 모드가 여전히 {channel}에 원본 프로필을 할당합니다: {modes}. 변환된 사본을 사용하도록 업데이트하세요.',
+                },
                 notControllable:
                     '이 채널은 속도를 보고하지만 CoolerControl에서 제어할 수 없습니다.',
                 verdictFirmwareOverride:

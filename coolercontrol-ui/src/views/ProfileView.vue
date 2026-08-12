@@ -568,6 +568,51 @@ const setTempSourceTemp = (): void => {
 }
 setTempSourceTemp()
 
+// ----- live Actual duty (channel context only) -----
+// The Mix and Overlay editors already draw this line; the Graph editor is
+// the same chart with the same channel context, so it draws it too. Only
+// the actual is shown: the target is the curve itself.
+const hasChannelContext = props.channelDeviceUID != null && props.channelName != null
+
+const actualDutyLineData: [{ value: number[] }, { value: number[] }] = [
+    { value: [] },
+    { value: [] },
+]
+
+const actualDutyColor = (): string =>
+    (hasChannelContext
+        ? settingsStore.allUIDeviceSettings
+              .get(props.channelDeviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.color
+        : undefined) || colors.themeColors.text_color
+
+const getActualDuty = (): number | undefined => {
+    if (!hasChannelContext) return undefined
+    const duty = deviceStore.currentDeviceStatus
+        .get(props.channelDeviceUID!)
+        ?.get(props.channelName!)?.duty
+    if (duty == null) return undefined
+    const value = Number.parseFloat(duty)
+    return Number.isNaN(value) ? undefined : value
+}
+
+const setActualDutyLine = (): number | undefined => {
+    const duty = getActualDuty()
+    if (duty == null) {
+        actualDutyLineData[0].value = []
+        actualDutyLineData[1].value = []
+        return undefined
+    }
+    actualDutyLineData[0].value = [axisXTempMin.value, duty]
+    actualDutyLineData[1].value = [axisXTempMax.value, duty]
+    return duty
+}
+
+const actualDutyMarkData = (duty: number | undefined): Array<object> =>
+    duty == null ? [] : [{ coord: [axisXTempMax.value - 5, duty], value: duty }]
+
+const getDutyPosition = (duty: number): string => (duty < 91 ? 'top' : 'bottom')
+
 const option = {
     title: {
         show: false,
@@ -805,6 +850,45 @@ const option = {
     animationDurationUpdate: 200,
 }
 
+if (hasChannelContext) {
+    const initialActualDuty = setActualDutyLine()
+    option.series.push({
+        id: 'actualDutyLine',
+        type: 'line',
+        smooth: false,
+        symbol: 'none',
+        lineStyle: {
+            color: actualDutyColor(),
+            width: 2,
+            type: 'solid',
+        },
+        emphasis: {
+            disabled: true,
+        },
+        data: actualDutyLineData,
+        markPoint: {
+            symbolSize: 0,
+            label: {
+                position: getDutyPosition(initialActualDuty ?? 0),
+                align: 'right',
+                fontSize: deviceStore.getREMSize(1.0),
+                color: actualDutyColor(),
+                formatter: (params: any): string => {
+                    if (params.value == null) return ''
+                    return (
+                        t('views.profiles.actualDuty') + ' ' + Number(params.value).toFixed(0) + '%'
+                    )
+                },
+                shadowColor: colors.themeColors.bg_one,
+                shadowBlur: 10,
+            },
+            data: actualDutyMarkData(initialActualDuty),
+        },
+        z: 101,
+        silent: true,
+    } as any)
+}
+
 const setGraphData = () => {
     if (selectedTempSource == null) {
         return
@@ -949,6 +1033,19 @@ watch(chosenFunction, () => {
 
 watch(rawStore.currentDeviceStatus, () => {
     updateTemps()
+    if (hasChannelContext) {
+        const actualDuty = setActualDutyLine()
+        controlGraph.value?.setOption({
+            series: {
+                id: 'actualDutyLine',
+                data: actualDutyLineData,
+                markPoint: {
+                    data: actualDutyMarkData(actualDuty),
+                    label: { position: getDutyPosition(actualDuty ?? 0) },
+                },
+            },
+        })
+    }
     if (selectedTempSource == null) {
         return
     }

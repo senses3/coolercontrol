@@ -174,7 +174,36 @@ export default {
                 selectProfile: 'Seleccionar un perfil',
                 sharedWith: 'Compartido con {count} más',
                 sharedTooltip: 'Este perfil también controla otros canales.',
+                notShared: 'Solo este ventilador',
+                notSharedTooltip: 'Este perfil solo controla este canal.',
                 forkForFan: 'Bifurcar para este ventilador',
+                fork: {
+                    confirmHeader: 'Bifurcar para este ventilador',
+                    confirmMessage:
+                        "Copiar el perfil '{profile}' a un nuevo perfil '{copy}' y asignarlo a {channel}.\n\nEl original queda intacto, así que los cambios aquí solo afectarán a {channel}.",
+                    accept: 'Crear copia',
+                },
+                convert: {
+                    button: 'Convertir para la calibración',
+                    tooltip:
+                        'Este ventilador está calibrado, así que sus velocidades guardadas ahora se leen como velocidades reales y se reasignan en cada escritura. Conviértelas para que el ventilador se comporte como antes de la calibración.',
+                    confirmHeader: 'Convertir para el ventilador calibrado',
+                    confirmProfile:
+                        "Copiar el perfil '{profile}' a un nuevo perfil '{copy}', convertir sus velocidades y asignarlo a {channel}.\n\nConvierte solo velocidades que definiste antes de calibrar este ventilador. Convertir dos veces hace que el ventilador gire a una velocidad incorrecta. El original queda intacto.",
+                    confirmManual:
+                        'Convertir el ciclo manual de {channel} para que el ventilador mantenga la velocidad que tenía antes de la calibración.\n\nConvierte solo un valor que definiste antes de calibrar este ventilador. Convertirlo dos veces hace que el ventilador gire a una velocidad incorrecta.',
+                    accept: 'Convertir',
+                    successProfile:
+                        "Se asignó '{profile}' a {channel} con las velocidades convertidas.",
+                    successManual: 'Ciclo manual convertido a {duty}%.',
+                    error: 'No se pudieron convertir las velocidades de este ventilador.',
+                    floorHeading: 'Algunos puntos se convirtieron a 0%',
+                    floorNotice:
+                        '{count} punto(s) estaban por debajo de la velocidad mínima que se puede fijar en {channel} tras la calibración, así que se convirtieron a 0%. Revisa la nueva curva antes de confiar en ella.',
+                    modesHeading: 'Los modos siguen usando el original',
+                    modesReminder:
+                        'Estos modos siguen asignando el perfil original a {channel}: {modes}. Actualízalos para usar la copia convertida.',
+                },
                 notControllable:
                     'Este canal informa su velocidad pero CoolerControl no puede controlarlo.',
                 verdictFirmwareOverride:

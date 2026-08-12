@@ -274,6 +274,12 @@ impl Calibration {
         if dut == 0 {
             return Some(0);
         }
+        // Mirror the forward `true_duty == 100 -> device 100` special case:
+        // full is full regardless of where the down-curve tops out, which
+        // sits below `rpm_max` whenever the peak was seen on the up-curve.
+        if dut == 100 {
+            return Some(100);
+        }
         assert!(self.rpm_max > 0);
         // Skip kick-artifact samples below the sustain floor: the
         // firmware-kick dense region has non-monotonic rpms that would
@@ -281,17 +287,19 @@ impl Calibration {
         let down_above = curve_above(&self.down_curve, self.min_sustain_duty);
         let rpm_low = rpm_at_device_duty(down_above, dut);
         let rpm_floor = self.rpm_floor();
-        // At or below the calibrated floor: fan at minimum, display 1%
-        // (distinguished from rpm=0 fan-off).
+        // Under the sustain floor the fan stalls, so the honest inverse is
+        // off. Reporting the floor instead would turn a stopped fan into a
+        // spinning one. `rpm_to_true_duty` still answers 1 below the floor
+        // because a non-zero rpm proves the fan is actually turning.
+        if dut < self.min_sustain_duty {
+            return Some(0);
+        }
+        // At the floor: fan at minimum, 1% (distinguished from fan-off).
         if rpm_low <= rpm_floor {
             return Some(1);
         }
-        let rpm_high = if dut < 100 {
-            rpm_at_device_duty(down_above, dut + 1)
-        } else {
-            self.rpm_max
-        }
-        .max(rpm_low);
+        debug_assert!(dut < 100);
+        let rpm_high = rpm_at_device_duty(down_above, dut + 1).max(rpm_low);
         let rpm_mid = RPM::midpoint(rpm_low, rpm_high);
         if rpm_mid >= self.rpm_max {
             return Some(100);
@@ -550,13 +558,16 @@ fn lowest_mean_floor_duty<'a>(
         if down.rpm < threshold {
             continue;
         }
-        let Some(up) = up_curve.iter().find(|u| u.duty == down.duty) else {
-            continue;
-        };
-        if up.rpm < threshold {
+        // Interpolate rather than require an exact duty match: the two
+        // sweeps step on different grids in the dense region, so exact
+        // matches can vanish below the sparse step and drag the floor up
+        // to it. A coasting down-sample is still rejected here, because
+        // the up-curve reads 0 where the fan was actually stopped.
+        let up_rpm = rpm_at_device_duty(up_curve, down.duty);
+        if up_rpm < threshold {
             continue;
         }
-        let mean = u32::midpoint(up.rpm, down.rpm);
+        let mean = u32::midpoint(up_rpm, down.rpm);
         match best {
             None => best = Some((down, mean)),
             Some((_, prev)) if mean < prev => best = Some((down, mean)),
@@ -1312,6 +1323,39 @@ mod tests {
     }
 
     #[test]
+    fn device_to_true_duty_hundred_returns_full_when_max_lands_at_lower_duty() {
+        // The inverse of the forward `true_duty == 100 -> device 100`
+        // case. When rpm_max was seen on the up-curve, the down-curve's
+        // top sample sits below it, and the midpoint math would hand
+        // back less than 100 for a fan already commanded to full.
+        let mut cal = artifact_calibration();
+        let len = cal.down_curve.len();
+        cal.down_curve[len - 2] = DutySample {
+            duty: 95,
+            rpm: 1930,
+        };
+        cal.down_curve[len - 1] = DutySample {
+            duty: 100,
+            rpm: 1922,
+        };
+        // Peak seen on the up-sweep, above everything the down-curve holds.
+        cal.rpm_max = 1985;
+        // Without the pin the midpoint math lands near 98 here.
+        assert_eq!(cal.device_to_true_duty(100), Some(100));
+    }
+
+    #[test]
+    fn device_to_true_duty_under_the_floor_is_off_not_minimum() {
+        // A device duty below min_sustain_duty leaves the fan stalled,
+        // so its true-duty is off. The floor duty itself does sustain
+        // the fan and stays at 1, which is what separates the two.
+        let cal = artifact_calibration();
+        assert!(cal.min_sustain_duty > 1);
+        assert_eq!(cal.device_to_true_duty(cal.min_sustain_duty - 1), Some(0));
+        assert_eq!(cal.device_to_true_duty(cal.min_sustain_duty), Some(1));
+    }
+
+    #[test]
     fn device_to_true_duty_round_trips_within_tolerance() {
         // Stable-display path used by the status pipeline. With
         // midpoint-of-preimage the round-trip on a clean linear curve
@@ -1719,6 +1763,66 @@ mod tests {
         assert_eq!(rpm_at_device_duty(&curve, 14), 280);
         // Above the highest sample: clamps to that sample's RPM.
         assert_eq!(rpm_at_device_duty(&curve, 100), 2000);
+    }
+
+    #[test]
+    fn derive_scalars_finds_the_floor_when_sweep_grids_do_not_align() {
+        // Regression: the up-sweep steps on even duties while the
+        // down-sweep enters its dense region on odd ones, so the two
+        // curves share no low-duty sample. Requiring an exact duty match
+        // found nothing below the sparse step and pinned the sustain
+        // floor to 30, which made every duty under it unreachable once
+        // calibrated. Modelled on a real PSU fan that also coasts: its
+        // down-sweep reads a stale 372 rpm all the way to duty 0, which
+        // the up-curve must veto since the fan is stopped there.
+        let mut up = vec![DutySample { duty: 0, rpm: 0 }];
+        for duty in (2..=14).step_by(2) {
+            up.push(DutySample { duty, rpm: 0 });
+        }
+        for (duty, rpm) in [
+            (16, 372),
+            (18, 400),
+            (20, 452),
+            (24, 600),
+            (28, 684),
+            (30, 744),
+        ] {
+            up.push(DutySample { duty, rpm });
+        }
+        for duty in (35..=100).step_by(5) {
+            let rpm = 744 + u32::from(duty - 30) * 17;
+            up.push(DutySample { duty, rpm });
+        }
+        let mut down = vec![DutySample { duty: 0, rpm: 372 }];
+        for duty in (1..=15).step_by(2) {
+            // Coast-down: the fan has not actually stopped spinning yet.
+            down.push(DutySample { duty, rpm: 372 });
+        }
+        for (duty, rpm) in [(17, 392), (19, 488), (21, 524), (23, 588), (25, 628)] {
+            down.push(DutySample { duty, rpm });
+        }
+        for duty in (30..=100).step_by(5) {
+            let rpm = 760 + u32::from(duty - 30) * 17;
+            down.push(DutySample { duty, rpm });
+        }
+        let shared_low = up
+            .iter()
+            .filter(|u| u.duty > 0 && u.duty < 30)
+            .any(|u| down.iter().any(|d| d.duty == u.duty));
+        assert!(
+            shared_low.not(),
+            "fixture must have no shared low-duty sample"
+        );
+
+        let scalars = derive_scalars(&up, &down).expect("derives");
+        assert_eq!(scalars.min_start_duty, 16);
+        // The floor must land where the fan actually runs, not on the
+        // first duty the two sparse grids happen to share.
+        assert!(
+            scalars.min_sustain_duty < 20,
+            "sustain floor pinned to the sparse grid: {}",
+            scalars.min_sustain_duty
+        );
     }
 
     #[test]

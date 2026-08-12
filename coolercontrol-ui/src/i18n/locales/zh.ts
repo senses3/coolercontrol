@@ -170,7 +170,35 @@ export default {
                 selectProfile: '选择配置文件',
                 sharedWith: '另与 {count} 个共享',
                 sharedTooltip: '此配置文件还驱动其他通道。',
+                notShared: '仅此风扇',
+                notSharedTooltip: '此配置文件仅控制此通道。',
                 forkForFan: '为此风扇创建副本',
+                fork: {
+                    confirmHeader: '为此风扇创建副本',
+                    confirmMessage:
+                        '将配置文件“{profile}”复制为新的配置文件“{copy}”，并分配给 {channel}。\n\n原配置文件保持不变，因此这里的更改只会影响 {channel}。',
+                    accept: '创建副本',
+                },
+                convert: {
+                    button: '转换以适配校准',
+                    tooltip:
+                        '此风扇已校准，因此其保存的转速现在会被视为真实转速，并在每次写入时重新映射。转换后，风扇将恢复校准前的表现。',
+                    confirmHeader: '为已校准的风扇转换',
+                    confirmProfile:
+                        '将配置文件“{profile}”复制为新的配置文件“{copy}”，转换其转速，并分配给 {channel}。\n\n仅转换本风扇校准之前设置的转速。重复转换会使风扇以错误的转速运行。原配置文件保持不变。',
+                    confirmManual:
+                        '转换 {channel} 的手动占空比，使风扇保持校准前的转速。\n\n仅转换本风扇校准之前设置的数值。重复转换会使风扇以错误的转速运行。',
+                    accept: '转换',
+                    successProfile: '已将“{profile}”以转换后的转速分配给 {channel}。',
+                    successManual: '手动占空比已转换为 {duty}%。',
+                    error: '无法转换此风扇的转速。',
+                    floorHeading: '部分点已转换为 0%',
+                    floorNotice:
+                        '有 {count} 个点低于校准后 {channel} 可设置的最低转速，因此转换为 0%。在依赖新曲线之前请先检查。',
+                    modesHeading: '模式仍在使用原始配置',
+                    modesReminder:
+                        '以下模式仍将原始配置文件分配给 {channel}：{modes}。请更新为使用转换后的副本。',
+                },
                 notControllable: '此通道报告其速度，但无法由 CoolerControl 控制。',
                 verdictFirmwareOverride:
                     'CoolerControl 已将此通道设为手动控制，但固件将其改了回去。',
