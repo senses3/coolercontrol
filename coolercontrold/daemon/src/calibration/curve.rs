@@ -558,13 +558,16 @@ fn lowest_mean_floor_duty<'a>(
         if down.rpm < threshold {
             continue;
         }
-        let Some(up) = up_curve.iter().find(|u| u.duty == down.duty) else {
-            continue;
-        };
-        if up.rpm < threshold {
+        // Interpolate rather than require an exact duty match: the two
+        // sweeps step on different grids in the dense region, so exact
+        // matches can vanish below the sparse step and drag the floor up
+        // to it. A coasting down-sample is still rejected here, because
+        // the up-curve reads 0 where the fan was actually stopped.
+        let up_rpm = rpm_at_device_duty(up_curve, down.duty);
+        if up_rpm < threshold {
             continue;
         }
-        let mean = u32::midpoint(up.rpm, down.rpm);
+        let mean = u32::midpoint(up_rpm, down.rpm);
         match best {
             None => best = Some((down, mean)),
             Some((_, prev)) if mean < prev => best = Some((down, mean)),
@@ -1760,6 +1763,66 @@ mod tests {
         assert_eq!(rpm_at_device_duty(&curve, 14), 280);
         // Above the highest sample: clamps to that sample's RPM.
         assert_eq!(rpm_at_device_duty(&curve, 100), 2000);
+    }
+
+    #[test]
+    fn derive_scalars_finds_the_floor_when_sweep_grids_do_not_align() {
+        // Regression: the up-sweep steps on even duties while the
+        // down-sweep enters its dense region on odd ones, so the two
+        // curves share no low-duty sample. Requiring an exact duty match
+        // found nothing below the sparse step and pinned the sustain
+        // floor to 30, which made every duty under it unreachable once
+        // calibrated. Modelled on a real PSU fan that also coasts: its
+        // down-sweep reads a stale 372 rpm all the way to duty 0, which
+        // the up-curve must veto since the fan is stopped there.
+        let mut up = vec![DutySample { duty: 0, rpm: 0 }];
+        for duty in (2..=14).step_by(2) {
+            up.push(DutySample { duty, rpm: 0 });
+        }
+        for (duty, rpm) in [
+            (16, 372),
+            (18, 400),
+            (20, 452),
+            (24, 600),
+            (28, 684),
+            (30, 744),
+        ] {
+            up.push(DutySample { duty, rpm });
+        }
+        for duty in (35..=100).step_by(5) {
+            let rpm = 744 + u32::from(duty - 30) * 17;
+            up.push(DutySample { duty, rpm });
+        }
+        let mut down = vec![DutySample { duty: 0, rpm: 372 }];
+        for duty in (1..=15).step_by(2) {
+            // Coast-down: the fan has not actually stopped spinning yet.
+            down.push(DutySample { duty, rpm: 372 });
+        }
+        for (duty, rpm) in [(17, 392), (19, 488), (21, 524), (23, 588), (25, 628)] {
+            down.push(DutySample { duty, rpm });
+        }
+        for duty in (30..=100).step_by(5) {
+            let rpm = 760 + u32::from(duty - 30) * 17;
+            down.push(DutySample { duty, rpm });
+        }
+        let shared_low = up
+            .iter()
+            .filter(|u| u.duty > 0 && u.duty < 30)
+            .any(|u| down.iter().any(|d| d.duty == u.duty));
+        assert!(
+            shared_low.not(),
+            "fixture must have no shared low-duty sample"
+        );
+
+        let scalars = derive_scalars(&up, &down).expect("derives");
+        assert_eq!(scalars.min_start_duty, 16);
+        // The floor must land where the fan actually runs, not on the
+        // first duty the two sparse grids happen to share.
+        assert!(
+            scalars.min_sustain_duty < 20,
+            "sustain floor pinned to the sparse grid: {}",
+            scalars.min_sustain_duty
+        );
     }
 
     #[test]
