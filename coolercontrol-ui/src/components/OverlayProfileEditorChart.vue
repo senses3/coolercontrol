@@ -514,13 +514,19 @@ const dutyLabel = (key: string) => ({
     shadowBlur: 10,
 })
 
-// Recomputes all three lines. Called on every status tick and after any edit to the curve; the
-// series read the same arrays, so a full setOption elsewhere redraws the current values.
+// Recomputes both lines into their shared arrays and hands back the duties the labels need.
+const currentLiveDuties = (): { target: number | undefined; actual: number | undefined } => {
+    const target = liveTargetDuty(liveBaseDuty())
+    const actual = liveActualDuty()
+    setVerticalLine(targetDutyLineData, target)
+    setVerticalLine(actualDutyLineData, actual)
+    return { target, actual }
+}
+
+// Called on every status tick and after any edit to the curve; the series read the same arrays,
+// so a full setOption elsewhere redraws the current values.
 const updateLiveLines = (): void => {
-    const targetDuty = liveTargetDuty(liveBaseDuty())
-    const actualDuty = liveActualDuty()
-    setVerticalLine(targetDutyLineData, targetDuty)
-    setVerticalLine(actualDutyLineData, actualDuty)
+    const { target: targetDuty, actual: actualDuty } = currentLiveDuties()
     controlGraph.value?.setOption({
         series: [
             {
@@ -538,7 +544,10 @@ const updateLiveLines = (): void => {
 }
 
 // The two live series: Target dashed in the accent (what this profile asks for, before the
-// channel's Function), Actual in the channel's own color.
+// channel's Function), Actual in the channel's own color. Seeded with the current duties so the
+// lines are there on the first paint: the chart has no option to merge into until vue-echarts
+// commits this one, so a setOption before then has no series to find.
+const initialDuties = currentLiveDuties()
 for (const line of [
     {
         id: 'targetDutyLine',
@@ -546,6 +555,8 @@ for (const line of [
         color: colors.themeColors.accent,
         type: 'dashed' as const,
         labelKey: 'views.profiles.targetDuty',
+        duty: initialDuties.target,
+        labelOffset: TARGET_LABEL_OFFSET,
     },
     {
         id: 'actualDutyLine',
@@ -553,6 +564,8 @@ for (const line of [
         color: actualDutyColor(),
         type: 'dotted' as const,
         labelKey: 'views.profiles.actualDuty',
+        duty: initialDuties.actual,
+        labelOffset: ACTUAL_LABEL_OFFSET,
     },
 ]) {
     // The option literal types its series from the editor's own point series, so a live line
@@ -568,7 +581,7 @@ for (const line of [
         markPoint: {
             symbolSize: 0,
             label: { ...dutyLabel(line.labelKey), color: line.color },
-            data: [],
+            data: markData(line.duty, line.labelOffset),
         },
         z: 100,
         silent: true,
@@ -1250,8 +1263,7 @@ let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
     // The live lines follow the status stream: Base moves with its temp source, Actual with the
-    // fan. Drawn once here too, so they are there before the first tick.
-    updateLiveLines()
+    // fan. Their first values are already in the option, so nothing is drawn here.
     watch(rawStore.currentDeviceStatus, () => updateLiveLines())
 
     // Make sure on selected Point change, that there is only one.
