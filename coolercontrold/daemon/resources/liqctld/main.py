@@ -393,7 +393,10 @@ def patch_kraken_lcd_transfer() -> bool:
         "_delete_bucket",
         "_setup_bucket",
         "_bulk_write",
+        "_write_then_read",
+        "_write",
         "set_screen",
+        "initialize",
     )
     missing = [name for name in required if hasattr(KrakenZ3, name) is False]
     if missing:

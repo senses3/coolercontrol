@@ -634,6 +634,64 @@ class TestSupportingPatches(unittest.TestCase):
             self.assertFalse(hasattr(large, "_cc_stock_bulk_size"))
 
 
+class TestCapabilityGuard(unittest.TestCase):
+    """The replacements drive liquidctl's private API, so the guard exists to leave that API
+    alone once it moves. A method it forgets to check is one that raises mid-frame instead.
+    """
+
+    NAMES = (
+        "_send_data",
+        "_switch_bucket",
+        "_delete_bucket",
+        "_setup_bucket",
+        "_bulk_write",
+        "_write_then_read",
+        "_write",
+        "set_screen",
+        "initialize",
+    )
+
+    def _stub_driver(self, missing=None):
+        return type(
+            "StubKrakenZ3",
+            (),
+            {
+                name: (lambda self, *a, **kw: None)
+                for name in self.NAMES
+                if name != missing
+            },
+        )
+
+    def test_a_complete_driver_is_patched(self):
+        """Goal: the guard must not be so strict that it turns the patch off on a driver
+        that has everything. Method: patch a stub carrying every method."""
+        stub = self._stub_driver()
+
+        with mock.patch.object(main, "KrakenZ3", stub):
+            installed = main.patch_kraken_lcd_transfer()
+
+        self.assertTrue(installed)
+        self.assertIs(stub._send_data, main._send_frame_to_spare_bucket)
+        self.assertIs(stub._switch_bucket, main._switch_bucket_tracking_active)
+
+    def test_every_method_the_replacements_call_is_checked(self):
+        """Goal: this is the whole point of the guard, and the methods the fallback and the
+        drain call are as load-bearing as the transfer's own. Method: remove each in turn
+        and check the patch declines."""
+        for name in self.NAMES:
+            stub = self._stub_driver(missing=name)
+
+            with mock.patch.object(main, "KrakenZ3", stub):
+                with self.assertLogs(level="WARNING") as captured:
+                    installed = main.patch_kraken_lcd_transfer()
+
+            self.assertFalse(installed, f"a driver without {name} must stay unpatched")
+            self.assertIsNot(
+                getattr(stub, "_send_data", None), main._send_frame_to_spare_bucket
+            )
+            self.assertTrue([m for m in captured.output if name in m], captured.output)
+
+
 class TestEveryFallbackReportsWhy(unittest.TestCase):
     """A fallback costs the full re-initialize, so which gate turned the frame away has to be
     in the log. Warm-up and permanently stuck look identical from the timing alone."""
