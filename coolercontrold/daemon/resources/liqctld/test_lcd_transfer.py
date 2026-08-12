@@ -562,6 +562,42 @@ class TestSupportingPatches(unittest.TestCase):
                 main._switch_bucket_tracking_active(device, 1)
             self.assertEqual(getattr(device, "_cc_active_bucket", None), expected)
 
+    def test_a_mode_switch_is_not_recorded_as_a_displayed_bucket(self):
+        """Goal: `_switch_bucket(0, 2)` selects liquid mode and its bucket index means
+        nothing, so learning it would rotate the next frames into a bucket that holds no
+        frame. Method: learn a pair, then switch modes positionally and by keyword."""
+
+        class Device:
+            pass
+
+        for switch_mode in (
+            lambda device: main._switch_bucket_tracking_active(device, 0, 2),
+            lambda device: main._switch_bucket_tracking_active(device, 0, mode=2),
+        ):
+            device = Device()
+            with mock.patch.object(main, "_ORIGINAL_SWITCH_BUCKET", return_value=True):
+                main._switch_bucket_tracking_active(device, 2)
+                main._switch_bucket_tracking_active(device, 3)
+                switch_mode(device)
+
+            self.assertEqual(device._cc_bucket_pair, (2, 3))
+            self.assertEqual(device._cc_active_bucket, 3)
+
+    def test_an_explicit_display_switch_is_still_recorded(self):
+        """Goal: the mode gate must not swallow the switches the rotation depends on.
+        Method: pass the display mode explicitly, as liquidctl's default does."""
+
+        class Device:
+            pass
+
+        device = Device()
+        with mock.patch.object(main, "_ORIGINAL_SWITCH_BUCKET", return_value=True):
+            main._switch_bucket_tracking_active(
+                device, 5, main._LCD_SWITCH_DISPLAY_MODE
+            )
+
+        self.assertEqual(device._cc_active_bucket, 5)
+
     def test_connect_raises_the_transfer_cap(self):
         """Goal: the 512 byte cap is what splits a frame into 800 transfers, and a model
         that already uses a larger one must not be lowered. Method: connect with each.

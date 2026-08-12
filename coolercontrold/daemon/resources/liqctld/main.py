@@ -122,6 +122,9 @@ _LCD_BULK_HEADER: tuple = (
 _LCD_BUCKET_REPLY_PREFIX: list = [0x31, 0x04]
 # Bucket memory is accounted in 1 KiB slots.
 _LCD_BUCKET_SLOT_BYTES: int = 1024
+# `_switch_bucket`'s mode for displaying a bucket. Its other caller passes 0x2, which selects
+# liquid mode and carries a bucket index of 0 that means nothing.
+_LCD_SWITCH_DISPLAY_MODE: int = 0x4
 
 
 def _connect_with_whole_frame_transfers(self, **kwargs):
@@ -146,6 +149,13 @@ def _switch_bucket_tracking_active(self, *args, **kwargs):
     """
     switched = _ORIGINAL_SWITCH_BUCKET(self, *args, **kwargs)
     if switched.__bool__() is False or args.__len__() == 0:
+        return switched
+    mode = kwargs.get(
+        "mode", args[1] if args.__len__() > 1 else _LCD_SWITCH_DISPLAY_MODE
+    )
+    if mode != _LCD_SWITCH_DISPLAY_MODE:
+        # `set_screen(.., "liquid")` and `_delete_all_buckets` both switch mode with bucket 0.
+        # Learning that pair would rotate the next frames into a bucket holding no frame.
         return switched
     bucket = args[0]
     pair = getattr(self, "_cc_bucket_pair", ())
