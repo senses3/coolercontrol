@@ -21,6 +21,8 @@ import {
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
 import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
+import { registerLogoTap } from '@/shell/supportWizards.ts'
+import { useToast } from '@/shell/toast'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -39,6 +41,20 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
 const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.startupPage) }))
+
+// Hidden tribute: a run of taps here turns every fan glyph into a wizard hat.
+// The navigation the link already does is left alone, so a user who never finds
+// this only ever sees the logo behave the way it always has.
+const toast = useToast()
+const onLogoTap = (): void => {
+    if (!registerLogoTap()) return
+    toast.add({
+        severity: 'info',
+        summary: t('layout.shell.supportWizards.summary'),
+        detail: t('layout.shell.supportWizards.detail'),
+        life: 8000,
+    })
+}
 </script>
 
 <template>
@@ -47,6 +63,7 @@ const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.sta
             id="logo"
             :to="startupTarget"
             class="group rounded-lg p-1 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            @click="onLogoTap"
         >
             <!-- The glyph is a single gradient path, so cycling the hue on the
                  image matches what the old animated variant did to the path.

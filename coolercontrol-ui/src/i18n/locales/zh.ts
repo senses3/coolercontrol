@@ -80,6 +80,10 @@ export default {
             access: '访问',
             power: '电源',
             noModes: '尚未保存模式',
+            supportWizards: {
+                summary: '支持魔法师已激活！',
+                detail: '感谢帮助我们的用户让硬件和驱动正常工作的志愿者们。',
+            },
             coolingPanel: {
                 pinned: '已固定',
                 pin: '固定',

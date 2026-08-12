@@ -83,6 +83,10 @@ export default {
             access: 'Zugriff',
             power: 'Ein/Aus',
             noModes: 'Keine Modi gespeichert',
+            supportWizards: {
+                summary: 'Support-Zauberer aktiviert!',
+                detail: 'Mit Dank an die Freiwilligen, die unseren Nutzern helfen, Hardware und Treiber zum Laufen zu bringen.',
+            },
             coolingPanel: {
                 pinned: 'Angeheftet',
                 pin: 'Anheften',

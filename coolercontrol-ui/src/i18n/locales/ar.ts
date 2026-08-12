@@ -80,6 +80,10 @@ export default {
             access: 'الوصول',
             power: 'الطاقة',
             noModes: 'لا توجد أوضاع محفوظة',
+            supportWizards: {
+                summary: 'تم تفعيل سحرة الدعم!',
+                detail: 'شكرًا للمتطوعين الذين يساعدون مستخدمينا على تشغيل أجهزتهم وبرامج التشغيل الخاصة بها.',
+            },
             coolingPanel: {
                 pinned: 'مثبت',
                 pin: 'تثبيت',

@@ -83,6 +83,10 @@ export default {
             access: 'Accès',
             power: 'Alimentation',
             noModes: 'Aucun mode enregistré',
+            supportWizards: {
+                summary: 'Magiciens du support activés !',
+                detail: 'Merci aux bénévoles qui aident nos utilisateurs à faire fonctionner leur matériel et leurs pilotes.',
+            },
             coolingPanel: {
                 pinned: 'Épinglé',
                 pin: 'Épingler',
