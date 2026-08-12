@@ -437,6 +437,8 @@ export default {
                 'デーモンに接続できません。デーモンが実行されているか確認してください。',
             connectionRestored: '接続が復元されました',
             connectionRestoredMessage: 'デーモンへの接続が復元されました。',
+            reconnecting: '再接続しています…',
+            disconnectedFor: '切断してから {time}',
         },
         speed: {
             applySetting: '設定を適用',

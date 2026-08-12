@@ -433,6 +433,8 @@ export default {
                 'डेमॉन से कनेक्ट करने में असमर्थ। कृपया जांचें कि डेमॉन चल रहा है या नहीं।',
             connectionRestored: 'कनेक्शन पुनर्स्थापित',
             connectionRestoredMessage: 'डेमॉन से कनेक्शन पुनर्स्थापित कर दिया गया है।',
+            reconnecting: 'पुनः कनेक्ट किया जा रहा है…',
+            disconnectedFor: '{time} से डिस्कनेक्ट है',
         },
         speed: {
             applySetting: 'सेटिंग लागू करें',

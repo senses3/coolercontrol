@@ -416,6 +416,8 @@ export default {
             daemonDisconnectedDetail: '無法連接到後台服務。請檢查後台服務是否正在運行。',
             connectionRestored: '連接已恢復',
             connectionRestoredMessage: '與後台服務的連接已恢復。',
+            reconnecting: '正在重新連接…',
+            disconnectedFor: '已斷開連接 {time}',
         },
         speed: {
             applySetting: '應用設置',

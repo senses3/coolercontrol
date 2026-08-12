@@ -447,6 +447,8 @@ export default {
                 "Impossible de se connecter au daemon. Veuillez vérifier si le daemon est en cours d'exécution.",
             connectionRestored: 'Connexion Rétablie',
             connectionRestoredMessage: 'La connexion au daemon a été rétablie.',
+            reconnecting: 'Reconnexion en cours…',
+            disconnectedFor: 'Déconnecté depuis {time}',
         },
         speed: {
             applySetting: 'Appliquer le Paramètre',

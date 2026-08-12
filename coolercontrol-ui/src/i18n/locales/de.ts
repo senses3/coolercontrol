@@ -443,6 +443,8 @@ export default {
                 'Verbindung zum Daemon nicht möglich. Bitte überprüfen Sie, ob der Daemon läuft.',
             connectionRestored: 'Verbindung wiederhergestellt',
             connectionRestoredMessage: 'Die Verbindung zum Daemon wurde wiederhergestellt.',
+            reconnecting: 'Verbindung wird wiederhergestellt …',
+            disconnectedFor: 'Getrennt seit {time}',
         },
         speed: {
             applySetting: 'Einstellung anwenden',

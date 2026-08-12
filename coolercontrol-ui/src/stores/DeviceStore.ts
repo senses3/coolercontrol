@@ -883,6 +883,7 @@ export const useDeviceStore = defineStore('device', () => {
         async function handleStatus(data: string): Promise<void> {
             const dto = plainToInstance(StatusResponseDTO, JSON.parse(data) as object)
             await thisStore.updateStatus(dto)
+            daemonState.noteStatusReceived()
             await daemonState.setConnected(true)
             chromeNetworkErrorCount = 0
         }

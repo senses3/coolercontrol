@@ -21,6 +21,7 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiToast from '@/shell/ui/UiToast.vue'
+import ConnectionLostOverlay from '@/shell/ConnectionLostOverlay.vue'
 import UiConfirmDialog from '@/shell/ui/UiConfirmDialog.vue'
 import UiModal from '@/shell/ui/UiModal.vue'
 import UiDynamicDialog from '@/shell/ui/UiDynamicDialog.vue'
@@ -314,6 +315,7 @@ onMounted(async () => {
 
 <template>
     <RouterView v-if="loaded" />
+    <ConnectionLostOverlay />
     <UiToast />
     <UiDynamicDialog />
     <UiConfirmDialog />
