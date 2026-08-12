@@ -29,16 +29,31 @@ See the [coolercontrold](../../README.md) installation instructions.
 
 ## Testing
 
+### Unit tests
+
+Run with the daemon's own suite, `make test` in `coolercontrold/`, or on their own:
+
+```bash
+python3 -m unittest discover -s daemon/resources/liqctld -t daemon/resources/liqctld
+```
+
+They need `liquidctl` and `Pillow` installed, since they compare against liquidctl's own
+implementations. Building the daemon never requires them: without them the suite says so and skips.
+The `test_all` pipeline job installs the current liquidctl and sets `LIQCTLD_TESTS_REQUIRED`, which
+makes that skip an error, so a liquidctl release that moves what these patch is caught there.
+
+### Endpoint testing
+
 Changes to these files are embedded in the `coolercontrold` daemon at build time, and are largely
 tested as part of that process. For specific endpoint testing:
 
-### Prerequisites
+#### Prerequisites
 
 - `coolercontrold` and `liqctld` services are running
 - `curl` is installed
 - `sudo` is installed
 
-### Endpoint Testing
+#### Endpoints
 
 Tests are run using `curl` to the `liqctld` UDS API.
 

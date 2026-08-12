@@ -902,21 +902,13 @@ impl LiquidctlRepo {
             .acquire()
             .await
             .expect("device permit never closed");
-        // We set several settings at once for lcd/screen settings
-        // We first start with re-initializing the device, as this helps clear LCD related settings
-        // and gives more consistent results when applying images.
+        // This used to re-initialize the device first: ~800 ms of a ~950 ms apply, spent waiting
+        // on the device's next lighting-info report. It cleared the image artifacts liquidctl's
+        // bucket allocator causes by rewriting the displayed bucket, which liqctld now avoids at
+        // the source and re-initializes itself on the fallback that cannot. Screens with an
+        // unrelated protocol (Lian Li GA II LCD, MSI Coreliquid) have no allocator and never had
+        // the artifacts; if one ever needs this, restore it for that driver, not for everything.
         let start_lcd_settings_apply = Instant::now();
-        self.liqctld_client
-            .initialize_device(&device_data.type_index, None)
-            .await
-            .map(|_| ()) // ignore successful result
-            .map_err(|err| {
-                anyhow!(
-                    "Error on LCD initialization for LIQUIDCTL Device #{}: {} - {err}",
-                    device_data.type_index,
-                    device_data.uid
-                )
-            })?;
         if let Some(brightness) = lcd_settings.brightness {
             if let Err(err) = self
                 .send_screen_request(
