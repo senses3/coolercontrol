@@ -5,7 +5,7 @@ use crate::api::actor::{CalibrationBatchStatus, CalibrationStatus};
 use crate::api::devices::DeviceChannelPath;
 use crate::api::{AppState, CCError};
 use crate::calibration::{Calibration, CalibrationEntry};
-use crate::device::{ChannelName, DeviceUID};
+use crate::device::{ChannelName, DeviceUID, Duty};
 use aide::NoApi;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -281,5 +281,259 @@ pub async fn delete(
         Err(CCError::NotFound {
             msg: "no calibration stored for this channel".to_string(),
         })
+    }
+}
+
+/// Cap on one map request. A speed profile holds far fewer points than
+/// this; the bound exists so an arbitrary body cannot size an allocation.
+pub const MAX_MAP_DUTIES: usize = 256;
+
+// A curve may hold one point per whole duty, so the cap must clear a
+// full 0..=100 sweep or a legitimate profile would be rejected.
+const _: () = assert!(MAX_MAP_DUTIES >= 101);
+
+/// Body for the duty map. Device duties as authored before the channel
+/// was calibrated.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct MapDutiesRequest {
+    pub device_duties: Vec<Duty>,
+}
+
+/// True duties, one per request entry, in the same order.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct MapDutiesResponse {
+    pub true_duties: Vec<Duty>,
+}
+
+/// Rejects rather than clamps: a duty over 100 is a client bug, and
+/// clamping would hand back a mapping the caller never asked for.
+fn validate_map_request(device_duties: &[Duty]) -> Result<(), CCError> {
+    if device_duties.is_empty() {
+        return Err(CCError::UserError {
+            msg: "device_duties must not be empty".to_string(),
+        });
+    }
+    if device_duties.len() > MAX_MAP_DUTIES {
+        return Err(CCError::UserError {
+            msg: format!("device_duties is limited to {MAX_MAP_DUTIES} entries"),
+        });
+    }
+    if let Some(duty) = device_duties.iter().copied().find(|duty| *duty > 100) {
+        return Err(CCError::UserError {
+            msg: format!("device duty {duty} is over 100"),
+        });
+    }
+    Ok(())
+}
+
+/// Applies the stable inverse to each entry, preserving order.
+fn map_device_duties_to_true(
+    calibration: &Calibration,
+    device_duties: &[Duty],
+) -> Result<Vec<Duty>, CCError> {
+    let mut true_duties = Vec::with_capacity(device_duties.len());
+    for &device_duty in device_duties {
+        let Some(true_duty) = calibration.device_to_true_duty(device_duty) else {
+            return Err(CCError::Conflict {
+                msg: "stepped calibration is passthrough; nothing to convert".to_string(),
+            });
+        };
+        true_duties.push(true_duty);
+    }
+    debug_assert_eq!(true_duties.len(), device_duties.len());
+    debug_assert!(true_duties.iter().all(|duty| *duty <= 100));
+    Ok(true_duties)
+}
+
+/// Map device duties to the true duties that reproduce them.
+///
+/// A calibrated channel reinterprets every stored duty as true-duty and
+/// runs it back through `true_to_device` on write, so a curve authored
+/// before calibration changes meaning. Feeding its points through here
+/// yields the pre-image: writing those values makes the fan behave as it
+/// did before. Pure computation, so this mutates nothing.
+pub async fn map_duties(
+    Path(path): Path<DeviceChannelPath>,
+    State(AppState {
+        calibration_handle, ..
+    }): State<AppState>,
+    Json(request): Json<MapDutiesRequest>,
+) -> Result<Json<MapDutiesResponse>, CCError> {
+    validate_map_request(&request.device_duties)?;
+    let calibration = calibration_handle
+        .get(path.device_uid, path.channel_name)
+        .await
+        .ok_or(CCError::NotFound {
+            msg: "no calibration stored for this channel".to_string(),
+        })?;
+    let true_duties = map_device_duties_to_true(&calibration, &request.device_duties)?;
+    Ok(Json(MapDutiesResponse { true_duties }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::calibration::{CurveKind, DutySample};
+    use chrono::Local;
+
+    /// Uniform 5%-step curve, up == down, top sample at `rpm_max`.
+    /// Mirrors the store's fixture so the inverse saturates at 100.
+    fn smooth_calibration() -> Calibration {
+        let up: Vec<DutySample> = (0..21usize)
+            .map(|i| DutySample {
+                duty: u8::try_from(i).expect("fits in u8") * 5,
+                rpm: 100 * u32::try_from(i).expect("fits in u32"),
+            })
+            .collect();
+        let down = up.clone();
+        Calibration {
+            up_curve: up,
+            down_curve: down,
+            kick_duration_ms: 750,
+            min_start_duty: 5,
+            min_sustain_duty: 5,
+            min_stable_duty: 5,
+            max_eff_duty: 95,
+            rpm_max: 2000,
+            curve_kind: CurveKind::Smooth,
+            warnings: Vec::new(),
+            was_rpm_only: false,
+            kick_boost_override: None,
+            kick_duration_override_ms: None,
+            walk_after_kick_override: None,
+            timestamp: Local::now(),
+        }
+    }
+
+    fn stepped_calibration() -> Calibration {
+        Calibration {
+            curve_kind: CurveKind::Stepped,
+            ..smooth_calibration()
+        }
+    }
+
+    fn user_error_message(error: CCError) -> String {
+        match error {
+            CCError::UserError { msg } => msg,
+            other => panic!("expected UserError, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_map_request_rejects_an_empty_list() {
+        // Goal: an empty body is a client bug, not an empty-response case.
+        // Method: validate an empty slice and read the rejection reason.
+        let msg = user_error_message(validate_map_request(&[]).expect_err("empty is rejected"));
+        assert!(msg.contains("empty"), "unexpected message: {msg}");
+    }
+
+    #[test]
+    fn validate_map_request_rejects_over_the_cap() {
+        // Goal: the cap must actually bound the allocation the handler
+        // makes. Method: one entry past MAX_MAP_DUTIES must be refused
+        // while exactly MAX_MAP_DUTIES passes.
+        let at_cap = vec![50; MAX_MAP_DUTIES];
+        validate_map_request(&at_cap).expect("the cap itself is accepted");
+        let over_cap = vec![50; MAX_MAP_DUTIES + 1];
+        let msg =
+            user_error_message(validate_map_request(&over_cap).expect_err("over cap is rejected"));
+        assert!(msg.contains("limited"), "unexpected message: {msg}");
+    }
+
+    #[test]
+    fn validate_map_request_rejects_a_duty_over_one_hundred() {
+        // Goal: reject rather than clamp, so a caller never receives a
+        // mapping for a duty it did not send. Method: 101 in an
+        // otherwise valid list, and confirm the bounds 0 and 100 pass.
+        let msg =
+            user_error_message(validate_map_request(&[0, 101, 50]).expect_err("101 is rejected"));
+        assert!(msg.contains("101"), "unexpected message: {msg}");
+        validate_map_request(&[0, 100]).expect("the bounds are accepted");
+    }
+
+    #[test]
+    fn map_device_duties_to_true_preserves_order_and_length() {
+        // Goal: the UI zips the response back onto its curve points by
+        // index, so any reorder or drop would silently corrupt a profile.
+        // Method: map a deliberately unsorted list and re-map each entry
+        // on its own, expecting the same values in the same slots.
+        let calibration = smooth_calibration();
+        let device_duties = [80, 20, 55, 5];
+        let mapped = map_device_duties_to_true(&calibration, &device_duties).expect("smooth maps");
+        assert_eq!(mapped.len(), device_duties.len());
+        for (index, &device_duty) in device_duties.iter().enumerate() {
+            let expected = calibration
+                .device_to_true_duty(device_duty)
+                .expect("smooth maps");
+            assert_eq!(mapped[index], expected, "slot {index} drifted");
+        }
+    }
+
+    #[test]
+    fn map_device_duties_to_true_keeps_zero_and_full_at_the_bounds() {
+        // Goal: off must stay off (zero-RPM fans depend on it) and a
+        // saturated point must not lose headroom. Method: map both
+        // bounds on a fixture whose down-curve tops out at rpm_max.
+        let calibration = smooth_calibration();
+        let mapped = map_device_duties_to_true(&calibration, &[0, 100]).expect("smooth maps");
+        assert_eq!(mapped[0], 0);
+        assert_eq!(mapped[1], 100);
+    }
+
+    #[test]
+    fn map_device_duties_to_true_lifts_a_sub_sustain_duty_to_one() {
+        // Goal: document the one lossy edge of the inverse. A duty under
+        // the sustain floor used to stall the fan; its pre-image is 1,
+        // so after conversion that point runs at fan minimum instead.
+        // Method: map a duty below min_sustain_duty.
+        let calibration = smooth_calibration();
+        assert!(calibration.min_sustain_duty > 3);
+        let mapped = map_device_duties_to_true(&calibration, &[3]).expect("smooth maps");
+        assert_eq!(mapped[0], 1);
+    }
+
+    #[test]
+    fn map_device_duties_to_true_stays_monotonic() {
+        // Goal: a rising curve must stay rising after conversion, or a
+        // converted profile would fight itself as temperature climbs.
+        // Method: map every duty 0..=100 and check the output never dips.
+        let calibration = smooth_calibration();
+        let device_duties: Vec<Duty> = (0..=100).collect();
+        let mapped = map_device_duties_to_true(&calibration, &device_duties).expect("smooth maps");
+        for pair in mapped.windows(2) {
+            assert!(pair[1] >= pair[0], "dipped from {} to {}", pair[0], pair[1]);
+        }
+    }
+
+    #[test]
+    fn map_device_duties_to_true_conflicts_on_a_stepped_calibration() {
+        // Goal: a stepped channel is written through unmapped, so there
+        // is nothing to convert and converting anyway would change the
+        // fan's behavior. Method: map against a stepped calibration.
+        let calibration = stepped_calibration();
+        let error = map_device_duties_to_true(&calibration, &[50]).expect_err("stepped conflicts");
+        match error {
+            CCError::Conflict { msg } => assert!(msg.contains("stepped"), "unexpected: {msg}"),
+            other => panic!("expected Conflict, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_duties_dtos_round_trip_through_json() {
+        // Goal: the request and response are the wire contract with the
+        // UI. Method: serialize both, parse back, compare the payloads.
+        let request = MapDutiesRequest {
+            device_duties: vec![0, 40, 100],
+        };
+        let encoded = serde_json::to_string(&request).expect("request serializes");
+        let decoded: MapDutiesRequest = serde_json::from_str(&encoded).expect("request parses");
+        assert_eq!(decoded.device_duties, request.device_duties);
+
+        let response = MapDutiesResponse {
+            true_duties: vec![0, 38, 100],
+        };
+        let encoded = serde_json::to_string(&response).expect("response serializes");
+        let decoded: MapDutiesResponse = serde_json::from_str(&encoded).expect("response parses");
+        assert_eq!(decoded.true_duties, response.true_duties);
     }
 }

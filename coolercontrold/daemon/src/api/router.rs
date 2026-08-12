@@ -49,6 +49,7 @@ pub fn documented_routes() -> ApiRouter<AppState> {
         .merge(alert_routes())
         .merge(calibration_routes())
         .merge(calibration_batch_routes())
+        .merge(calibration_map_routes())
         .merge(detect_routes())
         .merge(hardware_report_routes())
         .merge(stress_test_routes())
@@ -1289,6 +1290,35 @@ fn calibration_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
         )
+}
+
+/// The calibration duty map. Split from `calibration_routes` so neither
+/// registration function exceeds the line budget.
+fn calibration_map_routes() -> ApiRouter<AppState> {
+    ApiRouter::new().api_route(
+        "/calibrations/{device_uid}/channels/{channel_name}/map",
+        // Read auth: this computes and stores nothing, and exposes no
+        // more than GET on the same calibration already does.
+        post_with(calibration::map_duties, |o| {
+            o.summary("Map device duties to true duties")
+                .description(
+                    "Runs each device duty through the calibration's stable inverse and \
+                     returns the true duties that reproduce it, in the same order. A \
+                     calibrated channel reinterprets stored duties as true-duty, so a \
+                     curve authored before calibration behaves differently; feeding its \
+                     points through here yields values that restore the old behavior. \
+                     Computes nothing else and stores nothing. Returns 404 when the \
+                     channel has no stored calibration, and 409 for a stepped \
+                     calibration, which is written through unmapped and so has nothing \
+                     to convert. Rejects an empty list, more than 256 entries, or any \
+                     duty over 100.",
+                )
+                .tag("calibration")
+                .security_requirement("CookieAuth")
+                .security_requirement("BearerAuth")
+        })
+        .layer(axum::middleware::from_fn(auth::auth_middleware)),
+    )
 }
 
 fn detect_routes() -> ApiRouter<AppState> {

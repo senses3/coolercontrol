@@ -5397,6 +5397,87 @@
         ]
       }
     },
+    "/calibrations/{device_uid}/channels/{channel_name}/map": {
+      "post": {
+        "tags": [
+          "calibration"
+        ],
+        "summary": "Map device duties to true duties",
+        "description": "Runs each device duty through the calibration's stable inverse and returns the true duties that reproduce it, in the same order. A calibrated channel reinterprets stored duties as true-duty, so a curve authored before calibration behaves differently; feeding its points through here yields values that restore the old behavior. Computes nothing else and stores nothing. Returns 404 when the channel has no stored calibration, and 409 for a stepped calibration, which is written through unmapped and so has nothing to convert. Rejects an empty list, more than 256 entries, or any duty over 100.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          },
+          {
+            "in": "path",
+            "name": "device_uid",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "style": "simple"
+          }
+        ],
+        "requestBody": {
+          "description": "Body for the duty map. Device duties as authored before the channel\n was calibrated.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapDutiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "True duties, one per request entry, in the same order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapDutiesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/detect": {
       "get": {
         "tags": [
@@ -9448,6 +9529,42 @@
         "required": [
           "mode",
           "colors"
+        ]
+      },
+      "MapDutiesRequest": {
+        "description": "Body for the duty map. Device duties as authored before the channel\n was calibrated.",
+        "type": "object",
+        "properties": {
+          "device_duties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            }
+          }
+        },
+        "required": [
+          "device_duties"
+        ]
+      },
+      "MapDutiesResponse": {
+        "description": "True duties, one per request entry, in the same order.",
+        "type": "object",
+        "properties": {
+          "true_duties": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0
+            }
+          }
+        },
+        "required": [
+          "true_duties"
         ]
       },
       "ModeDto": {
