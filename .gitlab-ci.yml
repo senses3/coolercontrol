@@ -195,11 +195,11 @@ test_all:
     - python3 --version
     # liqctld's tests call liquidctl's own implementations. Unpinned on purpose: a release that
     # moves what they patch should turn this job red when it lands, not whenever someone gets
-    # around to bumping a pin. --no-deps leaves out smbus, which needs i2c headers to build and
-    # which liquidctl imports behind a try/except; pyusb and pillow are what liqctld imports.
-    - pip3 install --no-deps --upgrade liquidctl pyusb pillow
-    # not `liquidctl --version`: its cli entry point needs docopt, which --no-deps leaves out
-    - python3 -c 'import liquidctl; print("liquidctl", liquidctl.__version__)'
+    # around to bumping a pin. Full deps, not --no-deps: on Linux liquidctl imports smbus,
+    # hidapi and crcmod at module scope, so skipping them breaks `import liquidctl` outright.
+    # The image's build-essential and python3-dev are all the smbus sdist needs to build.
+    - pip3 install --upgrade liquidctl
+    - liquidctl --version
     - cargo --version
     - rustc --version
     - npm --version
