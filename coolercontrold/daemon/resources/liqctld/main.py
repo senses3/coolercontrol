@@ -300,14 +300,28 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
 
     memory_start = [bucket[17], bucket[18]]
     self._write_then_read([0x36, 0x03])
-    self._delete_bucket(target_bucket)
+    # One delete, though liquidctl's `_prepare_bucket` deletes twice when it reuses a bucket
+    # that holds data. It reaches that only with all 16 occupied, and this device answers one
+    # delete here: a redundant one costs a round trip per frame, and if the device does not
+    # reply to it `_read_until_first_match` burns twelve reads and then asserts mid-frame.
+    # An incomplete free is caught by the setup below instead.
+    if not self._delete_bucket(target_bucket):
+        # The device refused (0x9, in use). liquidctl answers that by moving to another
+        # bucket, which is the allocation this rotation exists to avoid doing itself.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"bucket {target_bucket} delete refused"
+        )
     if not self._setup_bucket(
         target_bucket,
         target_bucket + 1,
         memory_start,
         list(slots_needed.to_bytes(2, "little")),
     ):
-        log.error("Failed to setup bucket for LCD data transfer")
+        # The allocation was never re-established, so writing now puts a torn frame in
+        # memory and the switch below would then display it.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"bucket {target_bucket} setup refused"
+        )
     self._write_then_read([0x36, 0x01, target_bucket])
     self._bulk_write(header)
     self._bulk_write(data)  # one transfer for the whole frame

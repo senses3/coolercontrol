@@ -63,11 +63,14 @@ class _FakeHid:
 class FakeKraken:
     """Records the calls the transfer path makes, and answers bucket queries."""
 
-    def __init__(self, buckets):
+    def __init__(self, buckets, delete_results=(), setup_result=True):
         self.buckets = buckets  # index -> bucket_response(...)
         self.calls = []
         self.bulk_writes = []
         self.device = _FakeHid(self.calls)
+        # Consumed in order; a shorter list than there are deletes reports success after it.
+        self.delete_results = list(delete_results)
+        self.setup_result = setup_result
 
     def initialize(self):
         self.calls.append(("initialize",))
@@ -84,7 +87,7 @@ class FakeKraken:
 
     def _delete_bucket(self, index):
         self.calls.append(("delete_bucket", index))
-        return True
+        return self.delete_results.pop(0) if self.delete_results else True
 
     def _setup_bucket(self, start_index, end_index, memory_start, memory_size):
         self.calls.append(
@@ -96,7 +99,7 @@ class FakeKraken:
                 list(memory_size),
             )
         )
-        return True
+        return self.setup_result
 
     def _bulk_write(self, data):
         self.bulk_writes.append(bytes(data))
@@ -276,6 +279,71 @@ class TestFallsBackToLiquidctl(unittest.TestCase):
 
         self.assertEqual(result, "delegated")
         self.assertEqual(device.bulk_writes, [])
+
+
+class TestTheBucketIsFreedBeforeItIsReused(unittest.TestCase):
+    """Reusing an allocation still means freeing it first, and the device answers every step.
+    One delete is what this device answers, so an incomplete free shows up as a failed setup
+    rather than as a second delete; a refusal means the bucket cannot be reused at all.
+    """
+
+    def setUp(self):
+        self.original = mock.Mock(return_value="delegated")
+        patcher = mock.patch.object(main, "_ORIGINAL_SEND_DATA", self.original)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def _rotating(self, **kwargs):
+        device = FakeKraken(
+            {0: bucket_response(True), 1: bucket_response(True)}, **kwargs
+        )
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        return device
+
+    def test_the_bucket_is_deleted_once(self):
+        """Goal: liquidctl deletes a filled bucket twice, but only where it reuses one with
+        all 16 occupied, and this rotation runs on hardware with a single delete. A second
+        one costs a round trip per frame and asserts if the device does not answer it.
+        Method: run a frame and count the deletes."""
+        device = self._rotating()
+
+        main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        deletes = [c for c in device.calls if c[0] == "delete_bucket"]
+        self.assertEqual(deletes, [("delete_bucket", 1)])
+        self.assertEqual(len(device.bulk_writes), 2, "the frame must still go out")
+
+    def test_a_refused_delete_delegates_without_retrying_it(self):
+        """Goal: a refusal (0x9) means the bucket is in use, which liquidctl answers by
+        allocating elsewhere. Method: refuse the first delete."""
+        device = self._rotating(delete_results=[False])
+
+        result = main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(result, "delegated")
+        self.assertEqual(len([c for c in device.calls if c[0] == "delete_bucket"]), 1)
+        self.assertNotIn("setup_bucket", [c[0] for c in device.calls])
+        self.assertEqual(device.bulk_writes, [])
+
+    def test_a_failed_setup_never_writes_or_switches(self):
+        """Goal: this is what catches a free that did not complete, which is why the second
+        delete liquidctl issues is not needed here: the allocation was never re-established,
+        so writing into it and then displaying it puts a torn frame on screen. Method: fail
+        the setup and check nothing was written or switched to."""
+        device = self._rotating(setup_result=False)
+
+        with self.assertLogs(level="DEBUG") as captured:
+            result = main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(result, "delegated")
+        self.assertEqual(device.bulk_writes, [])
+        self.assertNotIn("switch_bucket", [c[0] for c in device.calls])
+        self.assertEqual(
+            device._cc_active_bucket, 0, "the screen still shows the other bucket"
+        )
+        reasons = [m for m in captured.output if "setup refused" in m]
+        self.assertEqual(len(reasons), 1, captured.output)
 
 
 class TestSurvivesReportDesync(unittest.TestCase):
