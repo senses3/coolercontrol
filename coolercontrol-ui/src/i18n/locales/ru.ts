@@ -12,6 +12,7 @@ export default {
         error: 'Ошибка',
         success: 'Успешно',
         loading: 'Загрузка...',
+        restarting: 'Перезапуск...',
         retry: 'Повторить',
         saveAndRefresh: 'Сохранить и обновить',
         reset: 'Сбросить',
@@ -439,6 +440,8 @@ export default {
                 'Не удается подключиться к демону. Пожалуйста, проверьте, запущен ли демон.',
             connectionRestored: 'Соединение восстановлено',
             connectionRestoredMessage: 'Соединение с демоном было восстановлено.',
+            reconnecting: 'Переподключение...',
+            disconnectedFor: 'Нет соединения уже {time}',
         },
         speed: {
             applySetting: 'Применить настройку',

@@ -12,6 +12,7 @@ export default {
         error: '오류',
         success: '성공',
         loading: '로딩 중...',
+        restarting: '다시 시작하는 중...',
         retry: '재시도',
         saveAndRefresh: '저장 및 새로 고침',
         reset: '재설정',
@@ -432,6 +433,8 @@ export default {
             daemonDisconnectedDetail: '데몬에 연결할 수 없습니다. 데몬이 실행 중인지 확인하세요.',
             connectionRestored: '연결 복원됨',
             connectionRestoredMessage: '데몬 연결이 복원되었습니다.',
+            reconnecting: '다시 연결하는 중...',
+            disconnectedFor: '연결 끊김 {time} 경과',
         },
         speed: {
             applySetting: '설성 적용',

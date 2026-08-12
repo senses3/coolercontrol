@@ -12,6 +12,7 @@ export default {
         error: 'خطأ',
         success: 'نجاح',
         loading: 'جاري التحميل...',
+        restarting: 'جارٍ إعادة التشغيل...',
         retry: 'إعادة المحاولة',
         saveAndRefresh: 'حفظ وتحديث',
         reset: 'إعادة ضبط',
@@ -432,6 +433,8 @@ export default {
                 'غير قادر على الاتصال بالخدمة. يرجى التحقق مما إذا كانت الخدمة قيد التشغيل.',
             connectionRestored: 'تم استعادة الاتصال',
             connectionRestoredMessage: 'تم استعادة الاتصال بالخدمة.',
+            reconnecting: 'جارٍ إعادة الاتصال...',
+            disconnectedFor: 'غير متصل منذ {time}',
         },
         speed: {
             applySetting: 'تطبيق الإعداد',

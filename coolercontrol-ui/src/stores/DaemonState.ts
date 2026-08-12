@@ -8,6 +8,11 @@ import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import defaultHealthCheck, { type HealthCheck } from '@/models/HealthCheck.ts'
+import {
+    connectionLostThresholdMs,
+    formatDisconnectedFor,
+    isConnectionLost,
+} from '@/shell/connectionWatchdog.ts'
 
 export enum DaemonStatus {
     OK = 'Ok',
@@ -29,10 +34,18 @@ export const useDaemonState = defineStore('daemonState', () => {
     // Kept here so views render it without their own blocking fetch. Falls back to
     // defaultHealthCheck's empty values until the first refresh lands.
     const healthCheck: Ref<HealthCheck> = ref(defaultHealthCheck())
+    // Connection liveness is measured from the last status tick rather than from
+    // the SSE error edge: a stream that stays open but stops delivering leaves
+    // `connected` true while the readings go stale.
+    const lastStatusAt: Ref<number> = ref(Date.now())
+    const connectionLost: Ref<boolean> = ref(false)
+    const disconnectedFor: Ref<string> = ref('')
+    let watchdog: ReturnType<typeof setInterval> | undefined
 
     async function init(): Promise<void> {
         await refreshHealth()
         connected.value = true
+        startWatchdog()
         if (errors.value > 0) {
             await setStatus(DaemonStatus.ERROR)
         } else if (warnings.value > 0) {
@@ -50,6 +63,31 @@ export const useDaemonState = defineStore('daemonState', () => {
         systemName.value = healthCheck.value.system.name
         warnings.value = healthCheck.value.details.warnings
         errors.value = healthCheck.value.details.errors
+    }
+
+    function noteStatusReceived(): void {
+        lastStatusAt.value = Date.now()
+        // Cleared here rather than left to the next tick so the overlay never
+        // outlives the frame that ended the outage.
+        connectionLost.value = false
+    }
+
+    // Started from init() so importing the store never spawns a timer, and so the
+    // boot path stays with the connection-error modal that already owns it.
+    function startWatchdog(): void {
+        if (watchdog != null) return
+        // Boot can outrun the grace period on a slow system, and the clock should
+        // measure the stream, not how long startup took.
+        noteStatusReceived()
+        const settingsStore = useSettingsStore()
+        watchdog = setInterval(() => {
+            // Read per tick, not captured: the poll rate is a live setting and the
+            // threshold has to follow it without a restart.
+            const threshold = connectionLostThresholdMs(settingsStore.ccSettings.poll_rate)
+            const elapsed = Date.now() - lastStatusAt.value
+            connectionLost.value = isConnectionLost(elapsed, threshold)
+            if (connectionLost.value) disconnectedFor.value = formatDisconnectedFor(elapsed)
+        }, 1_000)
     }
 
     async function setStatus(newStatus: DaemonStatus) {
@@ -91,15 +129,11 @@ export const useDaemonState = defineStore('daemonState', () => {
             // await deviceStore.loadLogs()
             // re-check if the session is valid, in case the daemon has restarted
             // await deviceStore.login()
+            return
         }
-        // else disconnected
+        // else disconnected. No toast: a drop that resolves within the watchdog's
+        // grace period is invisible on purpose, and a lasting one gets the overlay.
         preDisconnectedStatus.value = status.value
-        toast.add({
-            severity: 'error',
-            summary: t('views.daemon.daemonDisconnected'),
-            detail: t('views.daemon.daemonDisconnectedDetail'),
-            life: 4000,
-        })
         status.value = DaemonStatus.ERROR
     }
 
@@ -121,6 +155,7 @@ export const useDaemonState = defineStore('daemonState', () => {
         refreshHealth,
         setStatus,
         setConnected,
+        noteStatusReceived,
         acknowledgeLogIssues,
         healthCheck,
         systemName,
@@ -128,5 +163,7 @@ export const useDaemonState = defineStore('daemonState', () => {
         errors,
         status,
         connected,
+        connectionLost,
+        disconnectedFor,
     }
 })

@@ -1086,6 +1086,7 @@ void MainWindow::resetPerDaemonState() {
   m_uiAlertsActive = false;
   applyTrayIconNotificationBadge();
   m_disconnectNotified = false;
+  m_disconnectedFor.invalidate();
   m_sseRetryDelayMs = 0;
   m_loginWindowShown = false;
   m_uiLoadRetryCount = 0;
@@ -1606,12 +1607,12 @@ void MainWindow::watchDaemonEvents() const {
     // on error or dropped connection will be re-connected once connection is re-established.
     // Reconnection is unconditional: gating it could strand the app offline. Only the
     // notification is gated, so a second stream closing cannot report the same loss twice.
-    if (!m_disconnectNotified) {
-      m_disconnectNotified = true;
-      clearTraySensorReadings();
-      notifyDaemonDisconnected();
-      applyTrayIconNotificationBadge(true);
-      qInfo() << "Connection to the Daemon Lost";
+    // Starting the clock rather than notifying here is what keeps a mobile blip quiet: the
+    // reconnect below still starts immediately, and nothing is reported until a health
+    // probe has failed with the clock past the grace period. isValid() keeps a second
+    // stream closing from restarting it and pushing the notification further out.
+    if (!m_disconnectNotified && !m_disconnectedFor.isValid()) {
+      m_disconnectedFor.start();
     }
     emit daemonConnectionLost();
     sseReply->deleteLater();
@@ -1628,6 +1629,32 @@ void MainWindow::handleLogEvent(const QString& log) const {
       logContainsWarnings && !m_daemonHasWarnings) {
     m_daemonHasWarnings = true;
   }
+}
+
+/*
+  The outage outlived the grace period, so tell the user.
+
+  Only ever called from a health probe that just failed. A free-running timer was tried
+  first and raced the recovery it was waiting on: a daemon taking about the grace period
+  to come back produced the timeout and the successful probe in the same instant, so a
+  restart fired "disconnected" and "restored" together. Deciding from a failed probe
+  means a recovery in flight always wins.
+
+  Everything the drop used to do immediately happens here instead: the tray readings are
+  blanked at the same moment, because a reading that is stale by this long is the same
+  problem the notification reports, and clearing it on every brief drop only made the
+  tray flicker.
+*/
+void MainWindow::confirmDaemonLossIfOverdue() const {
+  if (m_disconnectNotified || !m_disconnectedFor.isValid() ||
+      !m_disconnectedFor.hasExpired(DAEMON_DISCONNECT_NOTIFY_DELAY_MS)) {
+    return;
+  }
+  m_disconnectNotified = true;
+  clearTraySensorReadings();
+  notifyDaemonDisconnected();
+  applyTrayIconNotificationBadge(true);
+  qInfo() << "Connection to the Daemon Lost";
 }
 
 void MainWindow::reestablishDaemonConnection() const {
@@ -1673,11 +1700,16 @@ void MainWindow::tryDaemonConnection() {
       // connection that never came up.
       m_lastConnectionError = describeReplyError(healthReply);
       qDebug() << "Daemon connection attempt failed:" << m_lastConnectionError;
+      confirmDaemonLossIfOverdue();
       healthReply->deleteLater();
       return;
     }
     m_lastConnectionError.clear();
     m_retryTimer->stop();
+    // Recovered inside the grace period: the user is never told anything happened.
+    // notifyDaemonConnectionRestored below is already paired to m_disconnectNotified,
+    // so an unreported outage cannot leave a lone "restored" notification behind.
+    m_disconnectedFor.invalidate();
     provisionAccessToken();  // no-op once we hold one
     if (m_startup) {
       requestDaemonErrors();

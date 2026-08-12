@@ -12,6 +12,7 @@ export default {
         error: 'Erro',
         success: 'Sucesso',
         loading: 'Carregando...',
+        restarting: 'Reiniciando...',
         retry: 'Tentar novamente',
         saveAndRefresh: 'Salvar e atualizar',
         reset: 'Redefinir',
@@ -438,6 +439,8 @@ export default {
                 'Não foi possível conectar ao daemon. Por favor, verifique se o daemon está em execução.',
             connectionRestored: 'Conexão Restaurada',
             connectionRestoredMessage: 'A conexão com o daemon foi restaurada.',
+            reconnecting: 'Reconectando...',
+            disconnectedFor: 'Desconectado há {time}',
         },
         speed: {
             applySetting: 'Aplicar Configuração',

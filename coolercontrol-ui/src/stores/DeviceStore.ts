@@ -98,7 +98,7 @@ export const useDeviceStore = defineStore('device', () => {
     }
 
     async function waitAndReload(wait_secs: number = 3): Promise<void> {
-        showLoadingOverlay({ text: 'Restarting...' })
+        showLoadingOverlay({ text: t('common.restarting') })
         let s = 0
         const daemonState = useDaemonState()
         while (s < 30) {
@@ -883,6 +883,7 @@ export const useDeviceStore = defineStore('device', () => {
         async function handleStatus(data: string): Promise<void> {
             const dto = plainToInstance(StatusResponseDTO, JSON.parse(data) as object)
             await thisStore.updateStatus(dto)
+            daemonState.noteStatusReceived()
             await daemonState.setConnected(true)
             chromeNetworkErrorCount = 0
         }
