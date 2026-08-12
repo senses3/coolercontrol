@@ -12,6 +12,7 @@ export default {
         error: 'Error',
         success: 'Success',
         loading: 'Loading...',
+        restarting: 'Restarting...',
         retry: 'Retry',
         saveAndRefresh: 'Save and Refresh',
         reset: 'Reset',

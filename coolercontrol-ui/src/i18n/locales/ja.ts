@@ -12,6 +12,7 @@ export default {
         error: 'エラー',
         success: '成功',
         loading: '読み込み中...',
+        restarting: '再起動しています...',
         retry: '再試行',
         saveAndRefresh: '保存して更新',
         reset: 'リセット',
@@ -437,7 +438,7 @@ export default {
                 'デーモンに接続できません。デーモンが実行されているか確認してください。',
             connectionRestored: '接続が復元されました',
             connectionRestoredMessage: 'デーモンへの接続が復元されました。',
-            reconnecting: '再接続しています…',
+            reconnecting: '再接続しています...',
             disconnectedFor: '切断してから {time}',
         },
         speed: {

@@ -12,6 +12,7 @@ export default {
         error: 'त्रुटि',
         success: 'सफलता',
         loading: 'लोड हो रहा है...',
+        restarting: 'पुनः आरंभ किया जा रहा है...',
         retry: 'पुनः प्रयास करें',
         saveAndRefresh: 'सहेजें और रिफ्रेश करें',
         reset: 'रीसेट करें',
@@ -433,7 +434,7 @@ export default {
                 'डेमॉन से कनेक्ट करने में असमर्थ। कृपया जांचें कि डेमॉन चल रहा है या नहीं।',
             connectionRestored: 'कनेक्शन पुनर्स्थापित',
             connectionRestoredMessage: 'डेमॉन से कनेक्शन पुनर्स्थापित कर दिया गया है।',
-            reconnecting: 'पुनः कनेक्ट किया जा रहा है…',
+            reconnecting: 'पुनः कनेक्ट किया जा रहा है...',
             disconnectedFor: '{time} से डिस्कनेक्ट है',
         },
         speed: {

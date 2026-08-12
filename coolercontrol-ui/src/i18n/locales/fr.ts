@@ -12,6 +12,7 @@ export default {
         error: 'Erreur',
         success: 'Succès',
         loading: 'Chargement...',
+        restarting: 'Redémarrage...',
         retry: 'Réessayer',
         saveAndRefresh: 'Enregistrer et actualiser',
         reset: 'Réinitialiser',
@@ -447,7 +448,7 @@ export default {
                 "Impossible de se connecter au daemon. Veuillez vérifier si le daemon est en cours d'exécution.",
             connectionRestored: 'Connexion Rétablie',
             connectionRestoredMessage: 'La connexion au daemon a été rétablie.',
-            reconnecting: 'Reconnexion en cours…',
+            reconnecting: 'Reconnexion en cours...',
             disconnectedFor: 'Déconnecté depuis {time}',
         },
         speed: {

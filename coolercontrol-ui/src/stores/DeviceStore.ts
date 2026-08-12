@@ -98,7 +98,7 @@ export const useDeviceStore = defineStore('device', () => {
     }
 
     async function waitAndReload(wait_secs: number = 3): Promise<void> {
-        showLoadingOverlay({ text: 'Restarting...' })
+        showLoadingOverlay({ text: t('common.restarting') })
         let s = 0
         const daemonState = useDaemonState()
         while (s < 30) {
