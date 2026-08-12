@@ -171,6 +171,8 @@ export default {
                 selectProfile: 'プロファイルを選択',
                 sharedWith: '他{count}件と共有中',
                 sharedTooltip: 'このプロファイルは他のチャンネルも制御しています。',
+                notShared: 'このファンのみ',
+                notSharedTooltip: 'このプロファイルはこのチャンネルのみを制御します。',
                 forkForFan: 'このファン用に複製',
                 convert: {
                     button: 'キャリブレーション用に変換',

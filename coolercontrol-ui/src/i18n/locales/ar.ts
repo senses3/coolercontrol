@@ -171,6 +171,8 @@ export default {
                 selectProfile: 'اختر ملفًا شخصيًا',
                 sharedWith: 'مُشترَك مع {count} أخرى',
                 sharedTooltip: 'يشغّل هذا الملف الشخصي قنوات أخرى أيضًا.',
+                notShared: 'هذه المروحة فقط',
+                notSharedTooltip: 'يشغّل هذا الملف الشخصي هذه القناة فقط.',
                 forkForFan: 'إنشاء نسخة لهذه المروحة',
                 convert: {
                     button: 'تحويل للمعايرة',

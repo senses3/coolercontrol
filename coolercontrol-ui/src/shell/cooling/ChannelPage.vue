@@ -10,7 +10,6 @@ import {
     mdiAutoFix,
     mdiChartLine,
     mdiChevronDown,
-    mdiCalculatorVariantOutline,
     mdiShareVariantOutline,
     mdiSourceFork,
 } from '@mdi/js'
@@ -549,7 +548,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     v-tooltip.top="t('layout.shell.coolingPage.convert.tooltip')"
                     @click="convertForCalibration"
                 >
-                    <svg-icon type="mdi" :path="mdiCalculatorVariantOutline" :size="14" />
+                    <svg-icon type="mdi" :path="mdiSourceFork" :size="14" />
                     {{ t('layout.shell.coolingPage.convert.button') }}
                 </UiButton>
                 <SpeedFixedChart
@@ -591,16 +590,22 @@ if (channelDashboard.value.dataTypes.length > 0) {
                             :placeholder="t('layout.shell.coolingPage.selectProfile')"
                         />
                     </div>
-                    <div v-if="sharedChannels.length > 0" class="flex items-center gap-2">
+                    <div v-if="selectedProfile != null" class="flex items-center gap-2">
                         <span
                             class="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border-one bg-bg-two px-3 text-sm text-text-color-secondary"
-                            v-tooltip.top="t('layout.shell.coolingPage.sharedTooltip')"
+                            v-tooltip.top="
+                                sharedChannels.length > 0
+                                    ? t('layout.shell.coolingPage.sharedTooltip')
+                                    : t('layout.shell.coolingPage.notSharedTooltip')
+                            "
                         >
                             <svg-icon type="mdi" :path="mdiShareVariantOutline" :size="13" />
                             {{
-                                t('layout.shell.coolingPage.sharedWith', {
-                                    count: sharedChannels.length,
-                                })
+                                sharedChannels.length > 0
+                                    ? t('layout.shell.coolingPage.sharedWith', {
+                                          count: sharedChannels.length,
+                                      })
+                                    : t('layout.shell.coolingPage.notShared')
                             }}
                         </span>
                         <UiButton variant="outline" :disabled="applying" @click="forkProfile">
@@ -615,7 +620,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         v-tooltip.top="t('layout.shell.coolingPage.convert.tooltip')"
                         @click="convertForCalibration"
                     >
-                        <svg-icon type="mdi" :path="mdiCalculatorVariantOutline" :size="14" />
+                        <svg-icon type="mdi" :path="mdiSourceFork" :size="14" />
                         {{ t('layout.shell.coolingPage.convert.button') }}
                     </UiButton>
                 </div>

@@ -175,6 +175,8 @@ export default {
                 selectProfile: 'Profil auswählen',
                 sharedWith: 'Geteilt mit {count} weiteren',
                 sharedTooltip: 'Dieses Profil steuert auch andere Kanäle.',
+                notShared: 'Nur dieser Lüfter',
+                notSharedTooltip: 'Dieses Profil steuert nur diesen Kanal.',
                 forkForFan: 'Für diesen Lüfter abspalten',
                 convert: {
                     button: 'Für Kalibrierung umrechnen',

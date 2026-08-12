@@ -174,6 +174,8 @@ export default {
                 selectProfile: 'Selecione um perfil',
                 sharedWith: 'Compartilhado com mais {count}',
                 sharedTooltip: 'Este perfil também controla outros canais.',
+                notShared: 'Apenas esta ventoinha',
+                notSharedTooltip: 'Este perfil controla apenas este canal.',
                 forkForFan: 'Bifurcar para este ventilador',
                 convert: {
                     button: 'Converter para a calibração',

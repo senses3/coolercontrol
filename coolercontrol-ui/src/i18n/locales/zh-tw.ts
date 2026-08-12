@@ -170,6 +170,8 @@ export default {
                 selectProfile: '選擇設定檔',
                 sharedWith: '與另外 {count} 個共用',
                 sharedTooltip: '此設定檔也驅動其他通道。',
+                notShared: '僅此風扇',
+                notSharedTooltip: '此設定檔僅控制此通道。',
                 forkForFan: '為此風扇建立副本',
                 convert: {
                     button: '轉換以配合校準',

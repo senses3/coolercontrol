@@ -171,6 +171,8 @@ export default {
                 selectProfile: 'Select a profile',
                 sharedWith: 'Shared with {count} more',
                 sharedTooltip: 'This profile also drives other channels.',
+                notShared: 'Only this fan',
+                notSharedTooltip: 'This profile drives only this channel.',
                 forkForFan: 'Fork for this fan',
                 convert: {
                     button: 'Convert for calibration',

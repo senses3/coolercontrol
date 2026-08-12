@@ -172,6 +172,8 @@ export default {
                 selectProfile: 'एक प्रोफ़ाइल चुनें',
                 sharedWith: '{count} अन्य के साथ साझा',
                 sharedTooltip: 'यह प्रोफ़ाइल अन्य चैनलों को भी चलाती है।',
+                notShared: 'केवल यह फैन',
+                notSharedTooltip: 'यह प्रोफ़ाइल केवल इसी चैनल को नियंत्रित करती है।',
                 forkForFan: 'इस पंखे के लिए फोर्क करें',
                 convert: {
                     button: 'कैलिब्रेशन के लिए बदलें',
