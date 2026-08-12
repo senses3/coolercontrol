@@ -121,6 +121,7 @@ export const useDaemonState = defineStore('daemonState', () => {
             // await deviceStore.loadLogs()
             // re-check if the session is valid, in case the daemon has restarted
             // await deviceStore.login()
+            return
         }
         // else disconnected. No toast: a drop that resolves within the watchdog's
         // grace period is invisible on purpose, and a lasting one gets the overlay.
