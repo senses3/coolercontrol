@@ -21,21 +21,23 @@ export function showLoadingOverlay(options: LoadingOverlayOptions = {}): Loading
     const host = (options.target && document.querySelector(options.target)) || document.body
     const fullscreen = host === document.body
 
+    // Tailwind classes rather than inline styles so this stays in step with
+    // ConnectionLostOverlay.vue, which is the same screen in Vue form. Only the
+    // caller-supplied background stays inline. Above that overlay's z-[1500] on
+    // purpose: the Qt reconnect path stacks its "Restarting..." screen over it.
     const overlay = document.createElement('div')
-    overlay.style.position = fullscreen ? 'fixed' : 'absolute'
-    overlay.style.inset = '0'
-    overlay.style.zIndex = '9999'
-    overlay.style.display = 'flex'
-    overlay.style.flexDirection = 'column'
-    overlay.style.alignItems = 'center'
-    overlay.style.justifyContent = 'center'
-    overlay.style.gap = '0.75rem'
+    overlay.setAttribute(
+        'class',
+        `${fullscreen ? 'fixed' : 'absolute'} inset-0 z-[9999] flex flex-col ` +
+            'items-center justify-center gap-3 px-6 text-center',
+    )
     overlay.style.background = options.background ?? 'rgb(var(--colors-bg-one))'
 
+    // setAttribute, not className: an SVG element's className is an
+    // SVGAnimatedString and cannot be assigned.
     const spinner = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     spinner.setAttribute('viewBox', svgLoaderViewBox.replaceAll(',', ' '))
-    spinner.setAttribute('width', '50')
-    spinner.setAttribute('height', '50')
+    spinner.setAttribute('class', 'h-16 w-16')
     // static compile-time constant, never user input
     spinner.innerHTML = svgLoader
     overlay.appendChild(spinner)
@@ -43,8 +45,7 @@ export function showLoadingOverlay(options: LoadingOverlayOptions = {}): Loading
     if (options.text) {
         const label = document.createElement('span')
         label.textContent = options.text
-        label.style.color = 'rgb(var(--colors-accent))'
-        label.style.fontSize = '0.875rem'
+        label.setAttribute('class', 'text-lg text-accent')
         overlay.appendChild(label)
     }
 

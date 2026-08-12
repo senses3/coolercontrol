@@ -25,8 +25,7 @@ const daemonState = useDaemonState()
             <!-- static compile-time constant, never user input -->
             <svg
                 :viewBox="svgLoaderViewBox.replaceAll(',', ' ')"
-                width="64"
-                height="64"
+                class="h-16 w-16"
                 v-html="svgLoader"
             />
             <h2 class="text-2xl">{{ t('views.daemon.daemonDisconnected') }}</h2>
