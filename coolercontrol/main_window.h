@@ -5,6 +5,7 @@
 #define MAINWINDOW_H
 
 #include <QCloseEvent>
+#include <QElapsedTimer>
 #include <QJsonArray>
 #include <QMainWindow>
 #include <QMenu>
@@ -49,8 +50,6 @@ class MainWindow final : public QMainWindow {
   void reestablishDaemonConnection() const;
 
   void tryDaemonConnection();
-
-  void confirmDaemonLoss() const;
 
   void startWatchingSSE() const;
 
@@ -138,8 +137,6 @@ class MainWindow final : public QMainWindow {
   // Delays the discard so a quick hide/show toggle never pays a page reload.
   QTimer* m_discardTimer;
   QTimer* m_sensorPollTimer;
-  // Holds the disconnect notification back until the outage outlives a blip.
-  QTimer* m_disconnectNotifyTimer;
   mutable int m_sensorPollTicks{0};
   bool m_discardEnabled{true};
   // Set when the daemon reconnects while hidden. A discarded page reloads on its own
@@ -155,6 +152,9 @@ class MainWindow final : public QMainWindow {
   // on this, only the notifications do, so they stay paired: no "restored" without a
   // "disconnected" first, and no second "disconnected" before a recovery.
   mutable bool m_disconnectNotified{false};
+  // How long the daemon has been unreachable. Invalid while connected. Read only by a
+  // health probe that just failed, never on its own, so it cannot race a recovery.
+  mutable QElapsedTimer m_disconnectedFor;
   mutable int m_sseRetryDelayMs{0};
   mutable bool m_changeAddress{false};
   mutable bool m_daemonHasErrors{false};
@@ -252,6 +252,10 @@ class MainWindow final : public QMainWindow {
   /// keep being shown: after an outage they are old, and after an address change they
   /// belong to a different machine entirely.
   void clearTraySensorReadings() const;
+
+  /// Reports the outage, if one has outlived the grace period. Call only from a failed
+  /// health probe.
+  void confirmDaemonLossIfOverdue() const;
 
   // Shows the window on the channel's own page. The route is resolved by the UI, which
   // owns the rule that a controllable fan belongs on Cooling and a custom sensor on its

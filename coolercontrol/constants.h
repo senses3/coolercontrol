@@ -62,10 +62,10 @@ constexpr int SSE_RETRY_MAX_MS = 60000;
 // How long the window stays hidden before the renderer is torn down. Above the UI's own
 // 7s stale-history threshold, so a restore that reloads and a discard never disagree.
 constexpr int DISCARD_DELAY_MS = 10000;
-// How long the daemon must stay unreachable before the user is told. A drop that
-// resolves inside this window is a blip, not an outage, and a mobile connection
-// produces those routinely. Twice the daemon's 5s maximum poll rate, and the same
-// floor the UI's own overlay uses.
+// How long the daemon must stay unreachable before the user is told, measured across
+// failed health probes. A drop that resolves inside this window is a blip, not an
+// outage, and a mobile connection produces those routinely. Twice the daemon's 5s
+// maximum poll rate, and the same floor the UI's own overlay uses.
 constexpr int DAEMON_DISCONNECT_NOTIFY_DELAY_MS = 10000;
 // Above this many pinned sensors the rows move into their own submenu, so they stop
 // competing with Modes/Show/Quit for room in the main tray menu.

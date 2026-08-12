@@ -147,8 +147,7 @@ MainWindow::MainWindow(QWidget* parent)
       m_originFilter(new OriginFilter(this)),
       m_retryTimer(new QTimer(parent)),
       m_discardTimer(new QTimer(parent)),
-      m_sensorPollTimer(new QTimer(parent)),
-      m_disconnectNotifyTimer(new QTimer(parent)) {
+      m_sensorPollTimer(new QTimer(parent)) {
   setCentralWidget(m_view);
   m_profile->settings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, true);
   m_profile->settings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled, true);
@@ -218,9 +217,6 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_discardTimer, &QTimer::timeout, this, &MainWindow::discardPage);
   m_sensorPollTimer->setInterval(TRAY_SENSOR_POLL_MS);
   connect(m_sensorPollTimer, &QTimer::timeout, this, &MainWindow::pollTraySensors);
-  m_disconnectNotifyTimer->setSingleShot(true);
-  m_disconnectNotifyTimer->setInterval(DAEMON_DISCONNECT_NOTIFY_DELAY_MS);
-  connect(m_disconnectNotifyTimer, &QTimer::timeout, this, &MainWindow::confirmDaemonLoss);
   connect(m_ipc, &IPC::forceWindowShow, this, [this]() {
     // This is used so the UI Window will show when password input is required
     setAttribute(Qt::WidgetAttribute::WA_DontShowOnScreen, false);
@@ -1090,6 +1086,7 @@ void MainWindow::resetPerDaemonState() {
   m_uiAlertsActive = false;
   applyTrayIconNotificationBadge();
   m_disconnectNotified = false;
+  m_disconnectedFor.invalidate();
   m_sseRetryDelayMs = 0;
   m_loginWindowShown = false;
   m_uiLoadRetryCount = 0;
@@ -1610,12 +1607,12 @@ void MainWindow::watchDaemonEvents() const {
     // on error or dropped connection will be re-connected once connection is re-established.
     // Reconnection is unconditional: gating it could strand the app offline. Only the
     // notification is gated, so a second stream closing cannot report the same loss twice.
-    // Arming the timer rather than notifying here is what keeps a mobile blip quiet: the
-    // reconnect below still starts immediately, and confirmDaemonLoss only runs if it has
-    // not succeeded by the time the timer fires. isActive() keeps a second stream closing
-    // from restarting the countdown and pushing the notification further out.
-    if (!m_disconnectNotified && !m_disconnectNotifyTimer->isActive()) {
-      m_disconnectNotifyTimer->start();
+    // Starting the clock rather than notifying here is what keeps a mobile blip quiet: the
+    // reconnect below still starts immediately, and nothing is reported until a health
+    // probe has failed with the clock past the grace period. isValid() keeps a second
+    // stream closing from restarting it and pushing the notification further out.
+    if (!m_disconnectNotified && !m_disconnectedFor.isValid()) {
+      m_disconnectedFor.start();
     }
     emit daemonConnectionLost();
     sseReply->deleteLater();
@@ -1637,13 +1634,20 @@ void MainWindow::handleLogEvent(const QString& log) const {
 /*
   The outage outlived the grace period, so tell the user.
 
+  Only ever called from a health probe that just failed. A free-running timer was tried
+  first and raced the recovery it was waiting on: a daemon taking about the grace period
+  to come back produced the timeout and the successful probe in the same instant, so a
+  restart fired "disconnected" and "restored" together. Deciding from a failed probe
+  means a recovery in flight always wins.
+
   Everything the drop used to do immediately happens here instead: the tray readings are
   blanked at the same moment, because a reading that is stale by this long is the same
   problem the notification reports, and clearing it on every brief drop only made the
   tray flicker.
 */
-void MainWindow::confirmDaemonLoss() const {
-  if (m_disconnectNotified) {
+void MainWindow::confirmDaemonLossIfOverdue() const {
+  if (m_disconnectNotified || !m_disconnectedFor.isValid() ||
+      !m_disconnectedFor.hasExpired(DAEMON_DISCONNECT_NOTIFY_DELAY_MS)) {
     return;
   }
   m_disconnectNotified = true;
@@ -1696,6 +1700,7 @@ void MainWindow::tryDaemonConnection() {
       // connection that never came up.
       m_lastConnectionError = describeReplyError(healthReply);
       qDebug() << "Daemon connection attempt failed:" << m_lastConnectionError;
+      confirmDaemonLossIfOverdue();
       healthReply->deleteLater();
       return;
     }
@@ -1703,8 +1708,8 @@ void MainWindow::tryDaemonConnection() {
     m_retryTimer->stop();
     // Recovered inside the grace period: the user is never told anything happened.
     // notifyDaemonConnectionRestored below is already paired to m_disconnectNotified,
-    // so a cancelled countdown cannot leave a lone "restored" notification behind.
-    m_disconnectNotifyTimer->stop();
+    // so an unreported outage cannot leave a lone "restored" notification behind.
+    m_disconnectedFor.invalidate();
     provisionAccessToken();  // no-op once we hold one
     if (m_startup) {
       requestDaemonErrors();
