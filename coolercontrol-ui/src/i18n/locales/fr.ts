@@ -182,7 +182,7 @@ export default {
                 fork: {
                     confirmHeader: 'Dupliquer pour ce ventilateur',
                     confirmMessage:
-                        "Créer une copie de « {profile} » pour {channel} et l'affecter à ce ventilateur. « {profile} » et les autres ventilateurs qui l'utilisent restent intacts : les modifications ici n'affecteront que {channel}.",
+                        "Copier le profil « {profile} » vers un nouveau profil « {copy} » et l'affecter à {channel}.\n\nL'original reste intact : les modifications ici n'affecteront que {channel}.",
                     accept: 'Dupliquer',
                 },
                 convert: {
@@ -191,9 +191,9 @@ export default {
                         'Ce ventilateur est calibré : ses vitesses enregistrées sont désormais lues comme des vitesses réelles et reconverties à chaque écriture. Convertissez-les pour que le ventilateur se comporte comme avant la calibration.',
                     confirmHeader: 'Convertir pour le ventilateur calibré',
                     confirmProfile:
-                        'Dupliquer « {profile} » en une copie pour {channel} avec ses vitesses converties, et affecter la copie à ce ventilateur. « {profile} » reste intact. Ne le faites que pour des vitesses définies avant la calibration de ce ventilateur ; convertir les valeurs deux fois fait tourner le ventilateur à la mauvaise vitesse.',
+                        "Copier le profil « {profile} » vers un nouveau profil « {copy} », convertir ses vitesses et l'affecter à {channel}.\n\nNe convertissez que des vitesses définies avant la calibration de ce ventilateur. Une double conversion fait tourner le ventilateur à la mauvaise vitesse. L'original reste intact.",
                     confirmManual:
-                        "Convertir le rapport cyclique manuel de {channel} pour que le ventilateur conserve la vitesse qu'il avait avant la calibration. Ne le faites que pour une valeur définie avant la calibration de ce ventilateur ; une double conversion fait tourner le ventilateur à la mauvaise vitesse.",
+                        "Convertir le rapport cyclique manuel de {channel} pour que le ventilateur conserve la vitesse qu'il avait avant la calibration.\n\nNe convertissez qu'une valeur définie avant la calibration de ce ventilateur. Une double conversion fait tourner le ventilateur à la mauvaise vitesse.",
                     accept: 'Convertir',
                     successProfile:
                         '« {profile} » a été affecté à {channel} avec les vitesses converties.',

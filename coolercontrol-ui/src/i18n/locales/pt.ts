@@ -180,7 +180,7 @@ export default {
                 fork: {
                     confirmHeader: 'Bifurcar para este ventilador',
                     confirmMessage:
-                        "Criar uma cópia de '{profile}' para {channel} e atribuí-la a esta ventoinha. '{profile}' e as outras ventoinhas que o usam ficam intactos, por isso as alterações aqui só afetarão {channel}.",
+                        "Copiar o perfil '{profile}' para um novo perfil '{copy}' e atribuí-lo a {channel}.\n\nO original fica intacto, por isso as alterações aqui só afetarão {channel}.",
                     accept: 'Bifurcar',
                 },
                 convert: {
@@ -189,9 +189,9 @@ export default {
                         'Esta ventoinha está calibrada, por isso as velocidades guardadas passam a ser lidas como velocidades reais e são remapeadas a cada escrita. Converta-as para que a ventoinha se comporte como antes da calibração.',
                     confirmHeader: 'Converter para a ventoinha calibrada',
                     confirmProfile:
-                        "Bifurcar '{profile}' como uma cópia para {channel} com as velocidades convertidas e atribuir a cópia a esta ventoinha. '{profile}' permanece intacto. Faça isto apenas para velocidades definidas antes de calibrar esta ventoinha; converter os valores duas vezes faz a ventoinha girar à velocidade errada.",
+                        "Copiar o perfil '{profile}' para um novo perfil '{copy}', converter as suas velocidades e atribuí-lo a {channel}.\n\nConverta apenas velocidades definidas antes de calibrar esta ventoinha. Converter duas vezes faz a ventoinha girar à velocidade errada. O original fica intacto.",
                     confirmManual:
-                        'Converter o ciclo manual de {channel} para que a ventoinha mantenha a velocidade que tinha antes da calibração. Faça isto apenas para um valor definido antes de calibrar esta ventoinha; converter duas vezes faz a ventoinha girar à velocidade errada.',
+                        'Converter o ciclo manual de {channel} para que a ventoinha mantenha a velocidade que tinha antes da calibração.\n\nConverta apenas um valor definido antes de calibrar esta ventoinha. Converter duas vezes faz a ventoinha girar à velocidade errada.',
                     accept: 'Converter',
                     successProfile:
                         "'{profile}' foi atribuído a {channel} com as velocidades convertidas.",

@@ -180,7 +180,7 @@ export default {
                 fork: {
                     confirmHeader: 'Bifurcar para este ventilador',
                     confirmMessage:
-                        "Crear una copia de '{profile}' para {channel} y asignarla a este ventilador. '{profile}' y los demás ventiladores que lo usan quedan intactos, así que los cambios aquí solo afectarán a {channel}.",
+                        "Copiar el perfil '{profile}' a un nuevo perfil '{copy}' y asignarlo a {channel}.\n\nEl original queda intacto, así que los cambios aquí solo afectarán a {channel}.",
                     accept: 'Bifurcar',
                 },
                 convert: {
@@ -189,9 +189,9 @@ export default {
                         'Este ventilador está calibrado, así que sus velocidades guardadas ahora se leen como velocidades reales y se reasignan en cada escritura. Conviértelas para que el ventilador se comporte como antes de la calibración.',
                     confirmHeader: 'Convertir para el ventilador calibrado',
                     confirmProfile:
-                        "Bifurcar '{profile}' como una copia para {channel} con sus velocidades convertidas y asignar la copia a este ventilador. '{profile}' queda intacto. Hazlo solo con velocidades que definiste antes de calibrar este ventilador; convertir los valores dos veces hace que el ventilador gire a una velocidad incorrecta.",
+                        "Copiar el perfil '{profile}' a un nuevo perfil '{copy}', convertir sus velocidades y asignarlo a {channel}.\n\nConvierte solo velocidades que definiste antes de calibrar este ventilador. Convertir dos veces hace que el ventilador gire a una velocidad incorrecta. El original queda intacto.",
                     confirmManual:
-                        'Convertir el ciclo manual de {channel} para que el ventilador mantenga la velocidad que tenía antes de la calibración. Hazlo solo con un valor que definiste antes de calibrar este ventilador; convertirlo dos veces hace que el ventilador gire a una velocidad incorrecta.',
+                        'Convertir el ciclo manual de {channel} para que el ventilador mantenga la velocidad que tenía antes de la calibración.\n\nConvierte solo un valor que definiste antes de calibrar este ventilador. Convertirlo dos veces hace que el ventilador gire a una velocidad incorrecta.',
                     accept: 'Convertir',
                     successProfile:
                         "Se asignó '{profile}' a {channel} con las velocidades convertidas.",

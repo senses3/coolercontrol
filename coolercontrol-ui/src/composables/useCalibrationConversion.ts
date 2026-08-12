@@ -215,6 +215,7 @@ export function useCalibrationConversion(
     return {
         isConvertible,
         canConvertProfile,
+        forkName,
         forkProfile,
         convertProfile,
         convertManualDuty,

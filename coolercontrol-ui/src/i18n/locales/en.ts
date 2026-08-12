@@ -177,7 +177,7 @@ export default {
                 fork: {
                     confirmHeader: 'Fork for this fan',
                     confirmMessage:
-                        "Create a copy of '{profile}' for {channel} and assign it to this fan. '{profile}' and any other fans using it are left untouched, so changes here will only affect {channel}.",
+                        "Copy the profile '{profile}' to a new profile '{copy}' and assign it to {channel}.\n\nThe original is left untouched, so changes here only affect {channel}.",
                     accept: 'Fork',
                 },
                 convert: {
@@ -186,9 +186,9 @@ export default {
                         'This fan is calibrated, so its stored speeds are now read as true speeds and remapped on every write. Convert them so the fan behaves as it did before calibration.',
                     confirmHeader: 'Convert for the calibrated fan',
                     confirmProfile:
-                        "Fork '{profile}' as a copy for {channel} with its speeds converted, and assign the fork to this fan. '{profile}' is left untouched. Only do this for speeds you set before this fan was calibrated; converting values twice makes the fan run at the wrong speed.",
+                        "Copy the profile '{profile}' to a new profile '{copy}', convert its speeds, and assign it to {channel}.\n\nOnly convert speeds you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed. The original is left untouched.",
                     confirmManual:
-                        'Convert the manual duty for {channel} so the fan holds the speed it did before calibration. Only do this for a duty you set before this fan was calibrated; converting twice makes the fan run at the wrong speed.',
+                        'Convert the manual duty for {channel} so the fan holds the speed it did before calibration.\n\nOnly convert a duty you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed.',
                     accept: 'Convert',
                     successProfile: "Assigned '{profile}' to {channel} with converted speeds.",
                     successManual: 'Manual duty converted to {duty}%.',

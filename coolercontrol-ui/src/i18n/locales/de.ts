@@ -181,7 +181,7 @@ export default {
                 fork: {
                     confirmHeader: 'Für diesen Lüfter abspalten',
                     confirmMessage:
-                        "Eine Kopie von '{profile}' für {channel} erstellen und diesem Lüfter zuweisen. '{profile}' und alle anderen Lüfter, die es nutzen, bleiben unverändert, Änderungen hier betreffen also nur {channel}.",
+                        "Das Profil '{profile}' in ein neues Profil '{copy}' kopieren und {channel} zuweisen.\n\nDas Original bleibt unverändert, Änderungen hier betreffen also nur {channel}.",
                     accept: 'Abspalten',
                 },
                 convert: {
@@ -190,9 +190,9 @@ export default {
                         'Dieser Lüfter ist kalibriert, daher werden seine gespeicherten Drehzahlen jetzt als echte Drehzahlen gelesen und bei jedem Schreibvorgang neu zugeordnet. Rechne sie um, damit der Lüfter sich wie vor der Kalibrierung verhält.',
                     confirmHeader: 'Für den kalibrierten Lüfter umrechnen',
                     confirmProfile:
-                        "'{profile}' als Kopie für {channel} mit umgerechneten Drehzahlen abzweigen und die Kopie diesem Lüfter zuweisen. '{profile}' bleibt unverändert. Mache das nur für Drehzahlen, die du vor der Kalibrierung dieses Lüfters gesetzt hast; eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen.",
+                        "Das Profil '{profile}' in ein neues Profil '{copy}' kopieren, seine Drehzahlen umrechnen und {channel} zuweisen.\n\nRechne nur Drehzahlen um, die du vor der Kalibrierung dieses Lüfters gesetzt hast. Eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen. Das Original bleibt unverändert.",
                     confirmManual:
-                        'Die manuelle Leistung für {channel} umrechnen, damit der Lüfter die Drehzahl von vor der Kalibrierung hält. Mache das nur für einen Wert, den du vor der Kalibrierung dieses Lüfters gesetzt hast; eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen.',
+                        'Die manuelle Leistung für {channel} umrechnen, damit der Lüfter die Drehzahl von vor der Kalibrierung hält.\n\nRechne nur einen Wert um, den du vor der Kalibrierung dieses Lüfters gesetzt hast. Eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen.',
                     accept: 'Umrechnen',
                     successProfile:
                         "'{profile}' wurde {channel} mit umgerechneten Drehzahlen zugewiesen.",

@@ -176,7 +176,7 @@ export default {
                 fork: {
                     confirmHeader: '为此风扇创建副本',
                     confirmMessage:
-                        '为 {channel} 创建“{profile}”的副本并分配给此风扇。“{profile}”以及使用它的其他风扇保持不变，因此这里的更改只会影响 {channel}。',
+                        '将配置文件“{profile}”复制为新的配置文件“{copy}”，并分配给 {channel}。\n\n原配置文件保持不变，因此这里的更改只会影响 {channel}。',
                     accept: '创建副本',
                 },
                 convert: {
@@ -185,9 +185,9 @@ export default {
                         '此风扇已校准，因此其保存的转速现在会被视为真实转速，并在每次写入时重新映射。转换后，风扇将恢复校准前的表现。',
                     confirmHeader: '为已校准的风扇转换',
                     confirmProfile:
-                        '将“{profile}”复刻为 {channel} 专用副本并转换其转速，然后把副本分配给此风扇。“{profile}”保持不变。仅对本风扇校准之前设置的转速执行此操作；重复转换会使风扇以错误的转速运行。',
+                        '将配置文件“{profile}”复制为新的配置文件“{copy}”，转换其转速，并分配给 {channel}。\n\n仅转换本风扇校准之前设置的转速。重复转换会使风扇以错误的转速运行。原配置文件保持不变。',
                     confirmManual:
-                        '转换 {channel} 的手动占空比，使风扇保持校准前的转速。仅对本风扇校准之前设置的数值执行此操作；重复转换会使风扇以错误的转速运行。',
+                        '转换 {channel} 的手动占空比，使风扇保持校准前的转速。\n\n仅转换本风扇校准之前设置的数值。重复转换会使风扇以错误的转速运行。',
                     accept: '转换',
                     successProfile: '已将“{profile}”以转换后的转速分配给 {channel}。',
                     successManual: '手动占空比已转换为 {duty}%。',

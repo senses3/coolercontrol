@@ -339,6 +339,7 @@ const forkProfile = async (): Promise<void> => {
         t('layout.shell.coolingPage.fork.confirmHeader'),
         t('layout.shell.coolingPage.fork.confirmMessage', {
             profile: source.name,
+            copy: conversion.forkName(source.name),
             channel: channelLabel.value,
         }),
         t('layout.shell.coolingPage.fork.accept'),
@@ -406,6 +407,7 @@ const convertForCalibration = async (): Promise<void> => {
     const confirmed = await confirmConvert(
         t('layout.shell.coolingPage.convert.confirmProfile', {
             profile: source.name,
+            copy: conversion.forkName(source.name),
             channel: channelLabel.value,
         }),
     )
@@ -560,17 +562,18 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         :step="1"
                         suffix="%"
                     />
+                    <UiButton
+                        v-if="canConvert"
+                        class="ml-auto"
+                        variant="outline"
+                        :disabled="applying"
+                        v-tooltip.top="t('layout.shell.coolingPage.convert.tooltip')"
+                        @click="convertForCalibration"
+                    >
+                        <svg-icon type="mdi" :path="mdiSourceFork" :size="14" />
+                        {{ t('layout.shell.coolingPage.convert.button') }}
+                    </UiButton>
                 </div>
-                <UiButton
-                    v-if="canConvert"
-                    variant="outline"
-                    :disabled="applying"
-                    v-tooltip.top="t('layout.shell.coolingPage.convert.tooltip')"
-                    @click="convertForCalibration"
-                >
-                    <svg-icon type="mdi" :path="mdiSourceFork" :size="14" />
-                    {{ t('layout.shell.coolingPage.convert.button') }}
-                </UiButton>
                 <SpeedFixedChart
                     :duty="manualDuty"
                     :current-device-u-i-d="deviceUID"
