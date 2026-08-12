@@ -172,6 +172,23 @@ export default {
                 sharedWith: 'Shared with {count} more',
                 sharedTooltip: 'This profile also drives other channels.',
                 forkForFan: 'Fork for this fan',
+                convert: {
+                    button: 'Convert for calibration',
+                    tooltip:
+                        'This fan is calibrated, so its stored speeds are now read as true speeds and remapped on every write. Convert them so the fan behaves as it did before calibration.',
+                    confirmHeader: 'Convert for the calibrated fan',
+                    confirmProfile:
+                        "Fork '{profile}' as a copy for {channel} with its speeds converted, and assign the fork to this fan. '{profile}' is left untouched. Only do this for speeds you set before this fan was calibrated; converting values twice makes the fan run at the wrong speed.",
+                    confirmManual:
+                        'Convert the manual duty for {channel} so the fan holds the speed it did before calibration. Only do this for a duty you set before this fan was calibrated; converting twice makes the fan run at the wrong speed.',
+                    accept: 'Convert',
+                    successProfile: "Assigned '{profile}' to {channel} with converted speeds.",
+                    successManual: 'Manual duty converted to {duty}%.',
+                    error: 'Could not convert the speeds for this fan.',
+                    modesHeading: 'Modes still use the original',
+                    modesReminder:
+                        'These modes still assign the original profile to {channel}: {modes}. Update them to use the converted copy.',
+                },
                 notControllable:
                     'This channel reports its speed but cannot be controlled by CoolerControl.',
                 verdictFirmwareOverride:

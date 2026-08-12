@@ -2034,6 +2034,39 @@ export default class DaemonClient {
     }
 
     /**
+     * Map device duties to the true duties that reproduce them on a
+     * calibrated channel. Order and length match the request. Returns
+     * `undefined` when the channel has no stored calibration, and an
+     * `ErrorResponse` for a stepped calibration (409), which is written
+     * through unmapped and so has nothing to convert.
+     */
+    async mapCalibrationDuties(
+        deviceUID: UID,
+        channelName: string,
+        deviceDuties: Array<number>,
+    ): Promise<Array<number> | undefined | ErrorResponse> {
+        try {
+            const response = await this.getClient().post(
+                `/calibrations/${deviceUID}/channels/${channelName}/map`,
+                { device_duties: deviceDuties },
+            )
+            this.logDaemonResponse(response, 'Map Calibration Duties')
+            return (response.data as { true_duties: Array<number> }).true_duties
+        } catch (err: any) {
+            if (err.response?.status === 404) {
+                return undefined
+            }
+            this.logError(err)
+            if (err.response?.data) {
+                const errorResponse = plainToInstance(ErrorResponse, err.response.data as object)
+                errorResponse.status = err.response.status
+                return errorResponse
+            }
+            return new ErrorResponse('Unknown Cause')
+        }
+    }
+
+    /**
      * Poll the calibration status for a channel. Always returns a
      * `CalibrationStatus` on success (the daemon represents "no
      * diagnosis ever observed" as a `NotStarted` variant rather

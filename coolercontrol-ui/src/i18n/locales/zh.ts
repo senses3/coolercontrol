@@ -171,6 +171,23 @@ export default {
                 sharedWith: '另与 {count} 个共享',
                 sharedTooltip: '此配置文件还驱动其他通道。',
                 forkForFan: '为此风扇创建副本',
+                convert: {
+                    button: '转换以适配校准',
+                    tooltip:
+                        '此风扇已校准，因此其保存的转速现在会被视为真实转速，并在每次写入时重新映射。转换后，风扇将恢复校准前的表现。',
+                    confirmHeader: '为已校准的风扇转换',
+                    confirmProfile:
+                        '将“{profile}”复刻为 {channel} 专用副本并转换其转速，然后把副本分配给此风扇。“{profile}”保持不变。仅对本风扇校准之前设置的转速执行此操作；重复转换会使风扇以错误的转速运行。',
+                    confirmManual:
+                        '转换 {channel} 的手动占空比，使风扇保持校准前的转速。仅对本风扇校准之前设置的数值执行此操作；重复转换会使风扇以错误的转速运行。',
+                    accept: '转换',
+                    successProfile: '已将“{profile}”以转换后的转速分配给 {channel}。',
+                    successManual: '手动占空比已转换为 {duty}%。',
+                    error: '无法转换此风扇的转速。',
+                    modesHeading: '模式仍在使用原始配置',
+                    modesReminder:
+                        '以下模式仍将原始配置文件分配给 {channel}：{modes}。请更新为使用转换后的副本。',
+                },
                 notControllable: '此通道报告其速度，但无法由 CoolerControl 控制。',
                 verdictFirmwareOverride:
                     'CoolerControl 已将此通道设为手动控制，但固件将其改了回去。',

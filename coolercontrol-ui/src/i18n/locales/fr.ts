@@ -177,6 +177,24 @@ export default {
                 sharedWith: 'Partagé avec {count} autres',
                 sharedTooltip: "Ce profil pilote également d'autres canaux.",
                 forkForFan: 'Dupliquer pour ce ventilateur',
+                convert: {
+                    button: 'Convertir pour la calibration',
+                    tooltip:
+                        'Ce ventilateur est calibré : ses vitesses enregistrées sont désormais lues comme des vitesses réelles et reconverties à chaque écriture. Convertissez-les pour que le ventilateur se comporte comme avant la calibration.',
+                    confirmHeader: 'Convertir pour le ventilateur calibré',
+                    confirmProfile:
+                        'Dupliquer « {profile} » en une copie pour {channel} avec ses vitesses converties, et affecter la copie à ce ventilateur. « {profile} » reste intact. Ne le faites que pour des vitesses définies avant la calibration de ce ventilateur ; convertir les valeurs deux fois fait tourner le ventilateur à la mauvaise vitesse.',
+                    confirmManual:
+                        "Convertir le rapport cyclique manuel de {channel} pour que le ventilateur conserve la vitesse qu'il avait avant la calibration. Ne le faites que pour une valeur définie avant la calibration de ce ventilateur ; une double conversion fait tourner le ventilateur à la mauvaise vitesse.",
+                    accept: 'Convertir',
+                    successProfile:
+                        '« {profile} » a été affecté à {channel} avec les vitesses converties.',
+                    successManual: 'Rapport cyclique manuel converti à {duty} %.',
+                    error: 'Impossible de convertir les vitesses de ce ventilateur.',
+                    modesHeading: "Les modes utilisent toujours l'original",
+                    modesReminder:
+                        "Ces modes affectent encore le profil d'origine à {channel} : {modes}. Mettez-les à jour pour utiliser la copie convertie.",
+                },
                 notControllable:
                     'Ce canal signale sa vitesse mais ne peut pas être contrôlé par CoolerControl.',
                 verdictFirmwareOverride:

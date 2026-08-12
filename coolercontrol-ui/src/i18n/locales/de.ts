@@ -176,6 +176,24 @@ export default {
                 sharedWith: 'Geteilt mit {count} weiteren',
                 sharedTooltip: 'Dieses Profil steuert auch andere Kanäle.',
                 forkForFan: 'Für diesen Lüfter abspalten',
+                convert: {
+                    button: 'Für Kalibrierung umrechnen',
+                    tooltip:
+                        'Dieser Lüfter ist kalibriert, daher werden seine gespeicherten Drehzahlen jetzt als echte Drehzahlen gelesen und bei jedem Schreibvorgang neu zugeordnet. Rechne sie um, damit der Lüfter sich wie vor der Kalibrierung verhält.',
+                    confirmHeader: 'Für den kalibrierten Lüfter umrechnen',
+                    confirmProfile:
+                        "'{profile}' als Kopie für {channel} mit umgerechneten Drehzahlen abzweigen und die Kopie diesem Lüfter zuweisen. '{profile}' bleibt unverändert. Mache das nur für Drehzahlen, die du vor der Kalibrierung dieses Lüfters gesetzt hast; eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen.",
+                    confirmManual:
+                        'Die manuelle Leistung für {channel} umrechnen, damit der Lüfter die Drehzahl von vor der Kalibrierung hält. Mache das nur für einen Wert, den du vor der Kalibrierung dieses Lüfters gesetzt hast; eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen.',
+                    accept: 'Umrechnen',
+                    successProfile:
+                        "'{profile}' wurde {channel} mit umgerechneten Drehzahlen zugewiesen.",
+                    successManual: 'Manuelle Leistung auf {duty}% umgerechnet.',
+                    error: 'Die Drehzahlen für diesen Lüfter konnten nicht umgerechnet werden.',
+                    modesHeading: 'Modi verwenden weiterhin das Original',
+                    modesReminder:
+                        'Diese Modi weisen {channel} weiterhin das ursprüngliche Profil zu: {modes}. Aktualisiere sie auf die umgerechnete Kopie.',
+                },
                 notControllable:
                     'Dieser Kanal meldet seine Drehzahl, kann aber von CoolerControl nicht gesteuert werden.',
                 verdictFirmwareOverride:

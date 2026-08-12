@@ -171,6 +171,23 @@ export default {
                 sharedWith: '與另外 {count} 個共用',
                 sharedTooltip: '此設定檔也驅動其他通道。',
                 forkForFan: '為此風扇建立副本',
+                convert: {
+                    button: '轉換以配合校準',
+                    tooltip:
+                        '此風扇已校準，因此其儲存的轉速現在會被視為實際轉速，並在每次寫入時重新對應。轉換後，風扇將恢復校準前的表現。',
+                    confirmHeader: '為已校準的風扇轉換',
+                    confirmProfile:
+                        '將「{profile}」複刻為 {channel} 專用副本並轉換其轉速，然後將副本指派給此風扇。「{profile}」維持不變。僅對本風扇校準之前設定的轉速執行此操作；重複轉換會使風扇以錯誤的轉速運轉。',
+                    confirmManual:
+                        '轉換 {channel} 的手動工作週期，使風扇維持校準前的轉速。僅對本風扇校準之前設定的數值執行此操作；重複轉換會使風扇以錯誤的轉速運轉。',
+                    accept: '轉換',
+                    successProfile: '已將「{profile}」以轉換後的轉速指派給 {channel}。',
+                    successManual: '手動工作週期已轉換為 {duty}%。',
+                    error: '無法轉換此風扇的轉速。',
+                    modesHeading: '模式仍在使用原始設定檔',
+                    modesReminder:
+                        '以下模式仍將原始設定檔指派給 {channel}：{modes}。請更新為使用轉換後的副本。',
+                },
                 notControllable: '此通道會回報其速度，但無法由 CoolerControl 控制。',
                 verdictFirmwareOverride:
                     'CoolerControl 已將此通道設為手動控制，但韌體將其改了回去。',

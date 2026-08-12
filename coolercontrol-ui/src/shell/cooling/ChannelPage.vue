@@ -10,14 +10,16 @@ import {
     mdiAutoFix,
     mdiChartLine,
     mdiChevronDown,
+    mdiCalculatorVariantOutline,
     mdiShareVariantOutline,
     mdiSourceFork,
 } from '@mdi/js'
-import { instanceToPlain, plainToInstance } from 'class-transformer'
 import { storeToRefs } from 'pinia'
-import { v4 as uuidV4 } from 'uuid'
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useConfirm } from '@/shell/confirm'
+import { useToast } from '@/shell/toast'
+import { useCalibrationConversion } from '@/composables/useCalibrationConversion.ts'
 import ChannelExtensionSettings from '@/components/ChannelExtensionSettings.vue'
 import CalibrationBadge from '@/shell/cooling/CalibrationBadge.vue'
 import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
@@ -62,6 +64,8 @@ type ControlMode = 'automatic' | 'manual' | 'unmanaged'
 const props = defineProps<{ deviceUID: UID; channelName: string }>()
 
 const { t } = useI18n()
+const toast = useToast()
+const confirm = useConfirm()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { currentDeviceStatus } = storeToRefs(deviceStore)
@@ -317,18 +321,90 @@ const forkProfile = async (): Promise<void> => {
     if (source == null || applying.value) return
     applying.value = true
     try {
-        const forked = plainToInstance(Profile, instanceToPlain(source))
-        forked.uid = uuidV4()
-        forked.name = `${source.name} (${channelLabel.value})`
-        settingsStore.profiles.push(forked)
-        const saved = await settingsStore.saveProfile(forked.uid)
-        if (!saved) return
-        await settingsStore.saveDaemonDeviceSettingProfile(
-            props.deviceUID,
-            props.channelName,
-            new DeviceSettingWriteProfileDTO(forked.uid),
+        const forked = await conversion.forkProfile(source)
+        if (forked != null) selectedProfileUID.value = forked.uid
+    } finally {
+        applying.value = false
+    }
+}
+
+// ----- calibration conversion -----
+const conversion = useCalibrationConversion(
+    props.deviceUID,
+    props.channelName,
+    () => channelLabel.value,
+)
+
+const canConvert = computed<boolean>(() => {
+    if (!conversion.isConvertible.value || applying.value) return false
+    if (controlMode.value === 'manual') return true
+    if (controlMode.value !== 'automatic') return false
+    return selectedProfile.value != null && conversion.canConvertProfile(selectedProfile.value)
+})
+
+const confirmConvert = async (message: string): Promise<boolean> =>
+    new Promise<boolean>((resolve) => {
+        confirm.require({
+            header: t('layout.shell.coolingPage.convert.confirmHeader'),
+            message,
+            acceptLabel: t('layout.shell.coolingPage.convert.accept'),
+            rejectLabel: t('common.cancel'),
+            defaultFocus: 'reject',
+            accept: () => resolve(true),
+            reject: () => resolve(false),
+        })
+    })
+
+/**
+ * Converting is only correct once, so it always confirms first. The original
+ * profile is never modified: a mistake is undone by deleting the fork.
+ */
+const convertForCalibration = async (): Promise<void> => {
+    if (!canConvert.value) return
+    if (controlMode.value === 'manual') {
+        const confirmed = await confirmConvert(
+            t('layout.shell.coolingPage.convert.confirmManual', { channel: channelLabel.value }),
         )
+        if (!confirmed) return
+        applying.value = true
+        try {
+            const converted = await conversion.convertManualDuty(manualDuty.value)
+            if (converted == null) return
+            manualDuty.value = converted
+            toast.add({
+                severity: 'success',
+                summary: t('common.success'),
+                detail: t('layout.shell.coolingPage.convert.successManual', { duty: converted }),
+                life: 3000,
+            })
+        } finally {
+            applying.value = false
+        }
+        return
+    }
+    const source = selectedProfile.value
+    if (source == null) return
+    const confirmed = await confirmConvert(
+        t('layout.shell.coolingPage.convert.confirmProfile', {
+            profile: source.name,
+            channel: channelLabel.value,
+        }),
+    )
+    if (!confirmed) return
+    applying.value = true
+    try {
+        const forked = await conversion.convertProfile(source)
+        if (forked == null) return
         selectedProfileUID.value = forked.uid
+        toast.add({
+            severity: 'success',
+            summary: t('common.success'),
+            detail: t('layout.shell.coolingPage.convert.successProfile', {
+                profile: forked.name,
+                channel: channelLabel.value,
+            }),
+            life: 3000,
+        })
     } finally {
         applying.value = false
     }
@@ -466,6 +542,16 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         suffix="%"
                     />
                 </div>
+                <UiButton
+                    v-if="canConvert"
+                    variant="outline"
+                    :disabled="applying"
+                    v-tooltip.top="t('layout.shell.coolingPage.convert.tooltip')"
+                    @click="convertForCalibration"
+                >
+                    <svg-icon type="mdi" :path="mdiCalculatorVariantOutline" :size="14" />
+                    {{ t('layout.shell.coolingPage.convert.button') }}
+                </UiButton>
                 <SpeedFixedChart
                     :duty="manualDuty"
                     :current-device-u-i-d="deviceUID"
@@ -522,6 +608,16 @@ if (channelDashboard.value.dataTypes.length > 0) {
                             {{ t('layout.shell.coolingPage.forkForFan') }}
                         </UiButton>
                     </div>
+                    <UiButton
+                        v-if="canConvert"
+                        variant="outline"
+                        :disabled="applying"
+                        v-tooltip.top="t('layout.shell.coolingPage.convert.tooltip')"
+                        @click="convertForCalibration"
+                    >
+                        <svg-icon type="mdi" :path="mdiCalculatorVariantOutline" :size="14" />
+                        {{ t('layout.shell.coolingPage.convert.button') }}
+                    </UiButton>
                 </div>
 
                 <div v-if="selectedProfileUID != null" class="rounded-lg border border-border-one">

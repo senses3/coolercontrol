@@ -175,6 +175,24 @@ export default {
                 sharedWith: 'Compartilhado com mais {count}',
                 sharedTooltip: 'Este perfil também controla outros canais.',
                 forkForFan: 'Bifurcar para este ventilador',
+                convert: {
+                    button: 'Converter para a calibração',
+                    tooltip:
+                        'Esta ventoinha está calibrada, por isso as velocidades guardadas passam a ser lidas como velocidades reais e são remapeadas a cada escrita. Converta-as para que a ventoinha se comporte como antes da calibração.',
+                    confirmHeader: 'Converter para a ventoinha calibrada',
+                    confirmProfile:
+                        "Bifurcar '{profile}' como uma cópia para {channel} com as velocidades convertidas e atribuir a cópia a esta ventoinha. '{profile}' permanece intacto. Faça isto apenas para velocidades definidas antes de calibrar esta ventoinha; converter os valores duas vezes faz a ventoinha girar à velocidade errada.",
+                    confirmManual:
+                        'Converter o ciclo manual de {channel} para que a ventoinha mantenha a velocidade que tinha antes da calibração. Faça isto apenas para um valor definido antes de calibrar esta ventoinha; converter duas vezes faz a ventoinha girar à velocidade errada.',
+                    accept: 'Converter',
+                    successProfile:
+                        "'{profile}' foi atribuído a {channel} com as velocidades convertidas.",
+                    successManual: 'Ciclo manual convertido para {duty}%.',
+                    error: 'Não foi possível converter as velocidades desta ventoinha.',
+                    modesHeading: 'Os modos ainda usam o original',
+                    modesReminder:
+                        'Estes modos ainda atribuem o perfil original a {channel}: {modes}. Atualize-os para usar a cópia convertida.',
+                },
                 notControllable:
                     'Este canal reporta sua velocidade mas não pode ser controlado pelo CoolerControl.',
                 verdictFirmwareOverride:
