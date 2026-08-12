@@ -138,10 +138,9 @@ def _connect_with_whole_frame_transfers(self, **kwargs):
 def _switch_bucket_tracking_active(self, *args, **kwargs):
     """Records the displayed bucket and the pair we rotate between.
 
-    The pair is learned from whatever liquidctl allocates rather than assumed to be 0 and 1:
-    a device with buckets already in use, or a differently sized upload (a gif among the
-    per-tick images), sends liquidctl's allocator somewhere else entirely, and the rotation
-    has to follow it instead of switching itself off.
+    The pair is learned rather than assumed to be 0 and 1: buckets already in use, or a
+    differently sized upload, send liquidctl's allocator elsewhere and the rotation has to
+    follow it instead of switching itself off.
     """
     switched = _ORIGINAL_SWITCH_BUCKET(self, *args, **kwargs)
     if switched.__bool__() is False or args.__len__() == 0:
@@ -156,15 +155,11 @@ def _switch_bucket_tracking_active(self, *args, **kwargs):
 
 
 def _log_lcd_profile_once(self, path, frame_bytes, slots):
-    """Reports what this screen is and how it is being driven, once per device.
+    """Reports what this screen is and how it is driven, once per device.
 
-    An LCD report from a user carries none of this today, so triage starts by guessing the
-    model and which transfer path it took. Emitted at info so it lands in a default log
-    rather than needing the reporter to reproduce with debug on, and guarded per device so
-    it costs one line per screen per run, not one per frame.
-
-    Every field is read defensively: this is a diagnostic, and it must not be the reason an
-    LCD apply fails on a model nobody here has.
+    Info level so a bug report carries it without the reporter re-running with debug. Every
+    field is read defensively: a diagnostic must not be why an LCD apply fails on a model
+    nobody here has.
     """
     if getattr(self, "_cc_profile_logged", False):
         return
@@ -193,12 +188,8 @@ def _log_lcd_profile_once(self, path, frame_bytes, slots):
 def _send_2023_fw2_logged(self, data, bulkInfo):
     """Reports the Kraken 2023 firmware 2.x transfer, which nothing here patches.
 
-    That firmware takes `_send_2023_data_fw2` rather than `_send_data`, so the whole-frame
-    rotation never applies to it and liquidctl sends the frame twice per apply. Without this
-    line those devices are indistinguishable in a log from the ones that do rotate. Behavior
-    is liquidctl's, unchanged; only the reporting is ours.
-
-    Unverified on hardware: no Kraken 2023 on firmware 2.x has run this.
+    That firmware takes this instead of `_send_data`, so the rotation never applies to it and
+    liquidctl sends each frame twice. Reporting only; unverified on hardware.
     """
     _log_lcd_profile_once(self, "fw2-double", len(data), "n/a")
     return _ORIGINAL_SEND_2023_FW2(self, data, bulkInfo)
@@ -207,26 +198,21 @@ def _send_2023_fw2_logged(self, data, bulkInfo):
 def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
     """Drains queued reports before liquidctl reads the screen's brightness and orientation.
 
-    `set_screen` opens with `_write([0x30, 0x01])` and a `_read_until` for the [0x31, 0x01] reply,
-    which gives up after twelve reports with "missing messages (attempts=12, missing=1)". The device
-    streams status reports unasked, which is why `_get_status_directly` can read one without
-    writing anything first, and nothing consumes them while a frame is prepared and uploaded. That
-    backlog outlives the apply that produced it, so it accumulates across applies until this read
-    starves. What arms the stream is not worth pinning down here: on an hwmon-bound device
-    `initialize` skips the writes that would, and the reports arrive regardless.
+    `set_screen` opens with a `_read_until` for the [0x31, 0x01] reply that gives up after twelve
+    reports, raising "missing messages (attempts=12, missing=1)". The device streams status
+    reports unasked, which is why `_get_status_directly` reads one without writing first, and
+    nothing consumes them while a frame is prepared and uploaded, so the backlog accumulates
+    across applies until that read starves.
 
-    The drain inside `_send_frame_to_spare_bucket` cannot cover this: it runs after the read above,
-    on the frame liquidctl has already prepared. Re-initializing before every apply used to drain
-    the queue at this point, which is why the starvation only appeared once that was dropped.
+    The drain in `_send_frame_to_spare_bucket` runs after that read and cannot cover it. The
+    per-apply `initialize` drained here, which is why this appeared only once it was dropped.
     """
     self.device.clear_enqueued_reports()
     try:
         return _ORIGINAL_SET_SCREEN(self, channel, mode, value, **kwargs)
     except NotSupportedByDriver:
-        # Kraken 2023 firmware 2.x cannot show a gif at all (liquidctl issue #631). The daemon
-        # reports the failed apply either way; what it cannot say is that this is the firmware
-        # rather than a fault, and that no other LCD mode is affected. Said once per device,
-        # because the daemon re-applies this setting on a schedule and would repeat it forever.
+        # Firmware 2.x cannot show gifs at all (liquidctl issue #631). Said once per device:
+        # the daemon re-applies on a schedule, and the error alone reads as a fault.
         if mode == "gif" and not getattr(self, "_cc_gif_unsupported_logged", False):
             self._cc_gif_unsupported_logged = True
             log.warning(
@@ -239,8 +225,7 @@ def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
 def _fall_back_to_liquidctl(self, data, bulk_info, reason):
     """Hands the frame to liquidctl's own upload, recording which gate turned it away.
 
-    Every exit from the rotation reports why. A silent one reads as "the rotation is working"
-    while the device is quietly paying the full re-initialize on every frame.
+    A silent fallback reads as a working rotation while every frame pays the re-initialize.
     """
     log.debug("LCD rotation skipped (%s); using liquidctl's own upload", reason)
     return _send_data_with_clean_slate(self, data, bulk_info)
@@ -249,9 +234,8 @@ def _fall_back_to_liquidctl(self, data, bulk_info, reason):
 def _send_data_with_clean_slate(self, data, bulk_info):
     """liquidctl's own frame upload, preceded by the re-initialization it needs.
 
-    This path can rewrite the bucket that is on screen, so it keeps the artifact clearing that
-    CoolerControl used to do before every apply. A failed initialize is logged and the upload
-    still runs: a possible artifact beats no image at all.
+    This path can rewrite the displayed bucket, so it keeps the artifact clearing. A failed
+    initialize still uploads: a possible artifact beats no image.
     """
     try:
         self.initialize()
@@ -263,21 +247,14 @@ def _send_data_with_clean_slate(self, data, bulk_info):
 def _send_frame_to_spare_bucket(self, data, bulk_info):
     """Writes a frame to the bucket that is not on screen, reusing its existing allocation.
 
-    liquidctl's own path queries all 16 buckets and allocates a fresh one per frame, which
-    costs ~16 HID round trips and, once all 16 are occupied, settles on rewriting whichever
-    bucket is on screen.  Once two buckets hold a frame of this size, each update needs one
-    query, then delete, setup, write.
+    liquidctl queries all 16 buckets and allocates a fresh one per frame, ~16 HID round trips,
+    and once all 16 are occupied it rewrites whichever is on screen. That rewriting produced
+    the occasional image artifacts, and the per-apply `initialize` is what cleared them. This
+    rotation never touches the displayed bucket, so it needs none of that, which is what makes
+    dropping that initialize safe; the fallback keeps it, since it returns to the allocator.
 
-    Every value on the wire here is either produced by liquidctl's own helpers or reported by
-    the device (the memory offset is read back from the bucket, never computed), so no wire
-    format is re-derived.  Anything unexpected, including the first frames before the buckets
-    exist, falls back to `_send_data` unchanged.
-
-    The fallback re-initializes the device first.  liquidctl's upload cycles through all 16
-    buckets and, once they are all occupied, rewrites whichever one is on screen; that is what
-    produced occasional image artifacts, and re-initializing is what CoolerControl used to do
-    before every apply to clear them.  The rotation below does not touch the displayed bucket,
-    so it needs none of that, which is what makes dropping the per-apply initialize safe.
+    Every value on the wire comes from liquidctl's helpers or the device (the memory offset is
+    read back, never computed). Anything unexpected falls back to `_send_data` unchanged.
     """
     header = list(_LCD_BULK_HEADER) + bulk_info
     slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
@@ -286,33 +263,26 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     pair = getattr(self, "_cc_bucket_pair", ())
     active_bucket = getattr(self, "_cc_active_bucket", None)
     if len(pair) < 2 or active_bucket not in pair:
-        # Not rotating between two known buckets yet: let liquidctl allocate, and learn the
-        # bucket it picks. Two such frames are enough to establish the rotation, so this
-        # repeating past the first frames means `_switch_bucket` is not reporting success.
+        # Not rotating yet: let liquidctl allocate and learn the bucket it picks. Two frames
+        # establish it, so this repeating means `_switch_bucket` is not reporting success.
         return _fall_back_to_liquidctl(
             self, data, bulk_info, f"pair={pair} active={active_bucket}"
         )
 
     target_bucket = pair[0] if pair[1] == active_bucket else pair[1]
 
-    # Drain again. `set_screen` drained on entry, but preparing the frame between there and
-    # here decodes, resizes and rotates the image, and the device keeps streaming status
-    # reports throughout. What that backlog costs depends on which read meets it:
-    # `_write_then_read` returns the next report without checking that it answers the command
-    # just sent, so a leftover is taken as the answer and every read after it is off by one,
-    # silently, which is what the reply-prefix check below guards. `_delete_bucket` instead
-    # spends its twelve `_read_until_first_match` attempts on the backlog and raises.
-    #
-    # Whether this path also orphans a report is not established. The end-of-transfer
-    # `_write([0x36, 0x02])` below reads no reply, and the firmware-2 path issues that same
-    # command through `_write_then_read`, which suggests one arrives; if it does, the next
-    # apply's entry drain clears it. Nothing here depends on the answer.
+    # Drain again: `set_screen` drained on entry, but decoding and resizing the frame since
+    # then gave the stream time to refill. What a backlog costs depends on which read meets it.
+    # `_write_then_read` takes a leftover as the answer and goes silently off by one, which the
+    # prefix check below guards; `_delete_bucket` burns its twelve attempts and raises.
+    # Whether this path orphans its own report is unestablished: `_write([0x36, 0x02])` below
+    # reads no reply, and the firmware-2 path issues that command through `_write_then_read`.
     self.device.clear_enqueued_reports()
 
     bucket = self._write_then_read([0x30, 0x04, target_bucket])
     if list(bucket[0:2]) != _LCD_BUCKET_REPLY_PREFIX:
-        # Not the bucket's reply, so its bytes mean nothing: reading an offset out of an
-        # unrelated report and handing it to _setup_bucket would place a frame anywhere.
+        # Not the bucket's reply, so its bytes mean nothing: an offset read out of an
+        # unrelated report would place the frame anywhere.
         return _fall_back_to_liquidctl(
             self, data, bulk_info, f"reply prefix {list(bucket[0:2])}"
         )
