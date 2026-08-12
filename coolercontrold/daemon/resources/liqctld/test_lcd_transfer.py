@@ -535,5 +535,140 @@ class TestScreenEntryDrain(unittest.TestCase):
         )
 
 
+class TestDeviceProfileLine(unittest.TestCase):
+    """An LCD report carries no model, firmware or transfer path today, so triage starts by
+    guessing. These pin the one line that answers all of it."""
+
+    def _kraken(self, **overrides):
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(True)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        device.device.product_id = overrides.get("product_id", 0x3008)
+        device._fw = overrides.get("fw", (1, 2, 3))
+        device.lcd_resolution = overrides.get("resolution", (320, 320))
+        device.bulk_buffer_size = overrides.get("bulk", 2097152)
+        return device
+
+    def _profile_lines(self, captured):
+        return [m for m in captured.output if "LCD FakeKraken" in m]
+
+    def test_the_profile_reports_the_model_firmware_and_path(self):
+        """Goal: every field a maintainer needs before asking the reporter anything. Method:
+        drive one frame and read the line."""
+        device = self._kraken()
+
+        with self.assertLogs(level="INFO") as captured:
+            main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        line = self._profile_lines(captured)[0]
+        for expected in (
+            "pid=0x3008",
+            "fw=1.2.3",
+            "res=320x320",
+            "bulk=2097152",
+            "path=rotation",
+            "packing=rgbx",
+            f"frame={len(FRAME)}",
+        ):
+            self.assertIn(expected, line)
+
+    def test_it_is_said_once_per_device_not_once_per_frame(self):
+        """Goal: at info this would otherwise be a line on every LCD tick forever. Method:
+        send three frames and count."""
+        device = self._kraken()
+
+        with self.assertLogs(level="INFO") as captured:
+            for _ in range(3):
+                main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(len(self._profile_lines(captured)), 1)
+
+    def test_the_geometry_is_reported_even_when_the_rotation_never_engages(self):
+        """Goal: a device stuck on the fallback is the one worth diagnosing, so it must not be
+        the one that reports nothing. Method: run with the rotation unlearned."""
+        device = FakeKraken({})
+        device.device.product_id = 0x300C
+
+        with mock.patch.object(main, "_ORIGINAL_SEND_DATA", return_value=None):
+            with self.assertLogs(level="INFO") as captured:
+                main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        line = self._profile_lines(captured)[0]
+        self.assertIn(f"frame={len(FRAME)}", line)
+        self.assertIn("slots=401", line)
+
+    def test_the_firmware_2_path_names_itself_and_its_packing(self):
+        """Goal: the Kraken 2023 fw2 double-send is unpatched and invisible in a log today.
+        Method: drive that transfer and read the path and packing fields."""
+        device = self._kraken(product_id=0x300E, fw=(2, 0, 1), resolution=(240, 240))
+
+        with mock.patch.object(
+            main, "_ORIGINAL_SEND_2023_FW2", return_value=None
+        ) as original:
+            with self.assertLogs(level="INFO") as captured:
+                main._send_2023_fw2_logged(device, FRAME, BULK_INFO)
+
+        line = self._profile_lines(captured)[0]
+        self.assertIn("path=fw2-double", line)
+        self.assertIn("packing=rgb565", line)
+        self.assertIn("pid=0x300e", line)
+        original.assert_called_once()
+
+    def test_a_device_missing_every_attribute_still_sends_its_frame(self):
+        """Goal: this is a diagnostic, so an unfamiliar driver shape must not be the reason an
+        LCD apply fails. Method: strip the attributes it reads."""
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(True)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+
+        with self.assertLogs(level="INFO") as captured:
+            main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        line = self._profile_lines(captured)[0]
+        self.assertIn("fw=unknown", line)
+        self.assertIn("res=unknown", line)
+        self.assertEqual(len(device.bulk_writes), 2, "the frame must still go out")
+
+
+class TestGifUnsupportedIsExplained(unittest.TestCase):
+    """A firmware that cannot show gifs fails the same way a broken device does, and the daemon
+    re-applies on a schedule, so the explanation has to be said once and only once."""
+
+    def test_it_explains_the_refusal_once_and_still_raises(self):
+        device = FakeKraken({})
+
+        def refuse(self, channel, mode, value, **kwargs):
+            raise main.NotSupportedByDriver(
+                "gif images are not supported on firmware 2.X.Y"
+            )
+
+        with mock.patch.object(main, "_ORIGINAL_SET_SCREEN", refuse):
+            with self.assertLogs(level="WARNING") as captured:
+                for _ in range(3):
+                    with self.assertRaises(main.NotSupportedByDriver):
+                        main._set_screen_with_drained_queue(
+                            device, "lcd", "gif", "/tmp/a.gif"
+                        )
+
+        explained = [m for m in captured.output if "does not support LCD gifs" in m]
+        self.assertEqual(len(explained), 1, captured.output)
+
+    def test_a_refusal_that_is_not_about_gifs_is_not_explained_away(self):
+        """Goal: the message names gifs specifically, so it must not appear for another mode's
+        refusal. Method: refuse a static image."""
+        device = FakeKraken({})
+
+        def refuse(self, channel, mode, value, **kwargs):
+            raise main.NotSupportedByDriver("something else entirely")
+
+        with mock.patch.object(main, "_ORIGINAL_SET_SCREEN", refuse):
+            with self.assertRaises(main.NotSupportedByDriver):
+                with mock.patch.object(main.log, "warning") as warned:
+                    main._set_screen_with_drained_queue(
+                        device, "lcd", "static", "/tmp/a.png"
+                    )
+            warned.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

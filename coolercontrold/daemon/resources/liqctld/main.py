@@ -53,12 +53,19 @@ from liquidctl.driver.hydro_platinum import HydroPlatinum
 from liquidctl.driver.kraken2 import Kraken2
 from liquidctl.driver.kraken3 import KrakenZ3
 from liquidctl.driver.smart_device import SmartDevice, SmartDevice2
+from liquidctl.error import NotSupportedByDriver
 from PIL import Image
 
 _ORIGINAL_KRAKENZ3_CONNECT = KrakenZ3.connect
 _ORIGINAL_SWITCH_BUCKET = KrakenZ3._switch_bucket
 _ORIGINAL_SEND_DATA = KrakenZ3._send_data
 _ORIGINAL_SET_SCREEN = KrakenZ3.set_screen
+_ORIGINAL_SEND_2023_FW2 = getattr(KrakenZ3, "_send_2023_data_fw2", None)
+# Which packing layouts the C path replaced, reported per device by the profile line.
+_LCD_PACKING_PATCHED: set = set()
+# Product id whose firmware 2.x uses the RGB565 double-send path instead of the bucket
+# rotation. liquidctl gates that on this id alone; every other Kraken takes `_send_data`.
+_LCD_FW2_PRODUCT_ID: int = 0x300E
 
 #####################################################################
 # Basic Setup
@@ -148,6 +155,55 @@ def _switch_bucket_tracking_active(self, *args, **kwargs):
     return switched
 
 
+def _log_lcd_profile_once(self, path, frame_bytes, slots):
+    """Reports what this screen is and how it is being driven, once per device.
+
+    An LCD report from a user carries none of this today, so triage starts by guessing the
+    model and which transfer path it took. Emitted at info so it lands in a default log
+    rather than needing the reporter to reproduce with debug on, and guarded per device so
+    it costs one line per screen per run, not one per frame.
+
+    Every field is read defensively: this is a diagnostic, and it must not be the reason an
+    LCD apply fails on a model nobody here has.
+    """
+    if getattr(self, "_cc_profile_logged", False):
+        return
+    self._cc_profile_logged = True
+    firmware = getattr(self, "_fw", None)
+    resolution = getattr(self, "lcd_resolution", None)
+    packing = "rgb565" if path == "fw2-double" else "rgbx"
+    replaced = (
+        "_prepare_static_file_rgb16" if packing == "rgb565" else "_prepare_static_file"
+    )
+    log.info(
+        "LCD %s pid=%s fw=%s res=%s bulk=%s path=%s packing=%s%s frame=%s slots=%s",
+        type(self).__name__,
+        f"0x{getattr(self.device, 'product_id', 0):04x}",
+        ".".join(str(part) for part in firmware) if firmware else "unknown",
+        f"{resolution[0]}x{resolution[1]}" if resolution else "unknown",
+        getattr(self, "bulk_buffer_size", "unknown"),
+        path,
+        packing,
+        "" if replaced in _LCD_PACKING_PATCHED else "-unpatched",
+        frame_bytes,
+        slots,
+    )
+
+
+def _send_2023_fw2_logged(self, data, bulkInfo):
+    """Reports the Kraken 2023 firmware 2.x transfer, which nothing here patches.
+
+    That firmware takes `_send_2023_data_fw2` rather than `_send_data`, so the whole-frame
+    rotation never applies to it and liquidctl sends the frame twice per apply. Without this
+    line those devices are indistinguishable in a log from the ones that do rotate. Behavior
+    is liquidctl's, unchanged; only the reporting is ours.
+
+    Unverified on hardware: no Kraken 2023 on firmware 2.x has run this.
+    """
+    _log_lcd_profile_once(self, "fw2-double", len(data), "n/a")
+    return _ORIGINAL_SEND_2023_FW2(self, data, bulkInfo)
+
+
 def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
     """Drains queued reports before liquidctl reads the screen's brightness and orientation.
 
@@ -164,7 +220,20 @@ def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
     the queue at this point, which is why the starvation only appeared once that was dropped.
     """
     self.device.clear_enqueued_reports()
-    return _ORIGINAL_SET_SCREEN(self, channel, mode, value, **kwargs)
+    try:
+        return _ORIGINAL_SET_SCREEN(self, channel, mode, value, **kwargs)
+    except NotSupportedByDriver:
+        # Kraken 2023 firmware 2.x cannot show a gif at all (liquidctl issue #631). The daemon
+        # reports the failed apply either way; what it cannot say is that this is the firmware
+        # rather than a fault, and that no other LCD mode is affected. Said once per device,
+        # because the daemon re-applies this setting on a schedule and would repeat it forever.
+        if mode == "gif" and not getattr(self, "_cc_gif_unsupported_logged", False):
+            self._cc_gif_unsupported_logged = True
+            log.warning(
+                "This Kraken's firmware does not support LCD gifs; still images work. "
+                "Choose a non-gif LCD mode to stop the repeated errors."
+            )
+        raise
 
 
 def _fall_back_to_liquidctl(self, data, bulk_info, reason):
@@ -210,6 +279,10 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     before every apply to clear them.  The rotation below does not touch the displayed bucket,
     so it needs none of that, which is what makes dropping the per-apply initialize safe.
     """
+    header = list(_LCD_BULK_HEADER) + bulk_info
+    slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
+    _log_lcd_profile_once(self, "rotation", len(data), slots_needed)
+
     pair = getattr(self, "_cc_bucket_pair", ())
     active_bucket = getattr(self, "_cc_active_bucket", None)
     if len(pair) < 2 or active_bucket not in pair:
@@ -221,8 +294,6 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
         )
 
     target_bucket = pair[0] if pair[1] == active_bucket else pair[1]
-    header = list(_LCD_BULK_HEADER) + bulk_info
-    slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
 
     # Drain again. `set_screen` drained on entry, but preparing the frame between there and
     # here decodes, resizes and rotates the image, and the device keeps streaming status
@@ -303,6 +374,8 @@ def patch_kraken_lcd_transfer() -> bool:
     KrakenZ3._switch_bucket = _switch_bucket_tracking_active
     KrakenZ3._send_data = _send_frame_to_spare_bucket
     KrakenZ3.set_screen = _set_screen_with_drained_queue
+    if _ORIGINAL_SEND_2023_FW2 is not None:
+        KrakenZ3._send_2023_data_fw2 = _send_2023_fw2_logged
     log.debug("LCD transfer patched to whole-frame writes with a two-bucket rotation")
     return True
 
@@ -425,6 +498,7 @@ def patch_kraken_lcd_packing() -> bool:
             )
             continue
         setattr(KrakenZ3, name, replacement)
+        _LCD_PACKING_PATCHED.add(name)
         installed += 1
     log.debug("LCD framebuffer packing patched to Pillow's C path (%d of 2)", installed)
     return installed == len(replacements)
