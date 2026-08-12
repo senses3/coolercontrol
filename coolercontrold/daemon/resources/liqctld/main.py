@@ -53,7 +53,7 @@ from liquidctl.driver.hydro_platinum import HydroPlatinum
 from liquidctl.driver.kraken2 import Kraken2
 from liquidctl.driver.kraken3 import KrakenZ3
 from liquidctl.driver.smart_device import SmartDevice, SmartDevice2
-from liquidctl.error import NotSupportedByDriver
+from liquidctl.error import NotSupportedByDriver, Timeout
 from PIL import Image
 
 _ORIGINAL_KRAKENZ3_CONNECT = KrakenZ3.connect
@@ -125,12 +125,14 @@ _LCD_BUCKET_SLOT_BYTES: int = 1024
 
 
 def _connect_with_whole_frame_transfers(self, **kwargs):
-    """Raises the bulk transfer cap so a frame is written in one transfer, not 800."""
+    """Raises the bulk transfer cap so a frame is written in one transfer, not 800.
+
+    liquidctl's own cap is kept: a transfer that fails at the raised size returns to it.
+    """
     result = _ORIGINAL_KRAKENZ3_CONNECT(self, **kwargs)
-    if (
-        getattr(self, "bulk_buffer_size", _LCD_BULK_TRANSFER_BYTES)
-        < _LCD_BULK_TRANSFER_BYTES
-    ):
+    stock = getattr(self, "bulk_buffer_size", _LCD_BULK_TRANSFER_BYTES)
+    if stock < _LCD_BULK_TRANSFER_BYTES:
+        self._cc_stock_bulk_size = stock
         self.bulk_buffer_size = _LCD_BULK_TRANSFER_BYTES
     return result
 
@@ -244,6 +246,40 @@ def _send_data_with_clean_slate(self, data, bulk_info):
     return _ORIGINAL_SEND_DATA(self, data, bulk_info)
 
 
+def _bulk_write_frame(self, header, data):
+    """Writes the frame at the connection's transfer size, whole where it fits.
+
+    Handed over unsliced in that case: slicing a 400 KB frame copies it, every frame. The
+    loop is what makes the cap mean something once it is lowered.
+
+    A write that timed out cannot be resumed, so the retry is the next frame, and it takes
+    liquidctl's own transfer size. liquidctl cannot do that, since each run starts over; a
+    daemon that stays up is what makes remembering the failure worth anything.
+    """
+    chunk = getattr(self, "bulk_buffer_size", 0) or len(data)
+    try:
+        self._bulk_write(header)
+        if len(data) <= chunk:
+            self._bulk_write(data)
+            return
+        for start in range(0, len(data), chunk):
+            end = start + chunk
+            self._bulk_write(data[start:end])
+    except Timeout:
+        # Only a timeout says anything about the transfer size. A disconnect raises
+        # `USBError`, and blaming the size for that would slow every later frame.
+        stock = getattr(self, "_cc_stock_bulk_size", chunk)
+        if stock < chunk:
+            self.bulk_buffer_size = stock
+            log.warning(
+                "An LCD frame timed out in one %d byte write; falling back to "
+                "liquidctl's %d byte transfers for this device.",
+                chunk,
+                stock,
+            )
+        raise
+
+
 def _send_frame_to_spare_bucket(self, data, bulk_info):
     """Writes a frame to the bucket that is not on screen, reusing its existing allocation.
 
@@ -323,8 +359,7 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
             self, data, bulk_info, f"bucket {target_bucket} setup refused"
         )
     self._write_then_read([0x36, 0x01, target_bucket])
-    self._bulk_write(header)
-    self._bulk_write(data)  # one transfer for the whole frame
+    _bulk_write_frame(self, header, data)
     self._write([0x36, 0x02])
     self._switch_bucket(target_bucket)
     # Record what we asked for rather than what the switch reported. liquidctl never reads

@@ -346,6 +346,90 @@ class TestTheBucketIsFreedBeforeItIsReused(unittest.TestCase):
         self.assertEqual(len(reasons), 1, captured.output)
 
 
+class TestTransferSizeIsRespected(unittest.TestCase):
+    """The raised cap is what turns 800 transfers into one, and it is raised for the single
+    model liquidctl capped at 512 bytes. A transfer that cannot be resumed has to be able to
+    give that back."""
+
+    def _rotating(self, bulk_size):
+        device = FakeKraken({0: bucket_response(True), 1: bucket_response(True)})
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        device.bulk_buffer_size = bulk_size
+        return device
+
+    def test_the_frame_is_chunked_at_the_connections_transfer_size(self):
+        """Goal: the cap has to bound the write, or lowering it back would change nothing.
+        Method: rotate a frame on a device left at liquidctl's 512 bytes."""
+        device = self._rotating(512)
+
+        main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        header, *chunks = device.bulk_writes
+        self.assertEqual(header[:12], bytes(main._LCD_BULK_HEADER))
+        self.assertEqual(len(chunks), len(FRAME) // 512)
+        self.assertEqual(b"".join(chunks), FRAME)
+
+    def test_the_frame_is_handed_over_whole_without_a_copy(self):
+        """Goal: slicing the frame to chunk it copies all 400 KB of it, every frame, on the
+        path this branch exists to speed up. Method: capture what the write was given and
+        check it is the frame itself."""
+        device = self._rotating(main._LCD_BULK_TRANSFER_BYTES)
+        written = []
+        device._bulk_write = written.append
+
+        main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertIs(written[1], FRAME, "the frame must not be sliced when it fits")
+
+    def test_a_timed_out_transfer_returns_to_liquidctls_size(self):
+        """Goal: a bulk write that stops part way cannot be resumed, so the retry is the
+        next frame and it must not repeat a size the device just timed out at. Method: time
+        the frame write out and check the cap and the state left behind."""
+        device = self._rotating(main._LCD_BULK_TRANSFER_BYTES)
+        device._cc_stock_bulk_size = 512
+        device._bulk_write = mock.Mock(side_effect=main.Timeout())
+
+        with self.assertLogs(level="WARNING") as captured:
+            with self.assertRaises(main.Timeout):
+                main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(device.bulk_buffer_size, 512)
+        self.assertNotIn("switch_bucket", [c[0] for c in device.calls])
+        self.assertEqual(
+            device._cc_active_bucket, 0, "the next frame retries the same spare bucket"
+        )
+        self.assertTrue(
+            [m for m in captured.output if "liquidctl's 512 byte transfers" in m],
+            captured.output,
+        )
+
+    def test_a_failure_that_is_not_a_timeout_leaves_the_size_alone(self):
+        """Goal: a disconnect says nothing about how much the device can take in one write,
+        and slowing every later frame for it would be a permanent cost. Method: fail the
+        write with the error a vanished device raises."""
+        device = self._rotating(main._LCD_BULK_TRANSFER_BYTES)
+        device._cc_stock_bulk_size = 512
+        device._bulk_write = mock.Mock(side_effect=OSError("no such device"))
+
+        with self.assertRaises(OSError):
+            main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(device.bulk_buffer_size, main._LCD_BULK_TRANSFER_BYTES)
+
+    def test_a_device_that_was_never_raised_keeps_its_size(self):
+        """Goal: every model but one already uses 2 MB, and a timeout there says nothing
+        about the transfer size. Method: time out on a device with no stock size recorded.
+        """
+        device = self._rotating(main._LCD_BULK_TRANSFER_BYTES)
+        device._bulk_write = mock.Mock(side_effect=main.Timeout())
+
+        with self.assertRaises(main.Timeout):
+            main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(device.bulk_buffer_size, main._LCD_BULK_TRANSFER_BYTES)
+
+
 class TestSurvivesReportDesync(unittest.TestCase):
     """liquidctl reads the next report as if it answered the last command, so a stale one
     desyncs everything after it. These pin the guards against that."""
@@ -495,6 +579,23 @@ class TestSupportingPatches(unittest.TestCase):
             large = Device(main._LCD_BULK_TRANSFER_BYTES * 2)
             main._connect_with_whole_frame_transfers(large)
             self.assertEqual(large.bulk_buffer_size, main._LCD_BULK_TRANSFER_BYTES * 2)
+
+    def test_connect_remembers_the_size_it_replaced(self):
+        """Goal: a failed transfer has to be able to give the raised cap back, which needs
+        the size liquidctl chose for that model. Method: connect with each."""
+
+        class Device:
+            def __init__(self, size):
+                self.bulk_buffer_size = size
+
+        with mock.patch.object(main, "_ORIGINAL_KRAKENZ3_CONNECT", return_value=None):
+            small = Device(512)
+            main._connect_with_whole_frame_transfers(small)
+            self.assertEqual(small._cc_stock_bulk_size, 512)
+
+            large = Device(main._LCD_BULK_TRANSFER_BYTES)
+            main._connect_with_whole_frame_transfers(large)
+            self.assertFalse(hasattr(large, "_cc_stock_bulk_size"))
 
 
 class TestEveryFallbackReportsWhy(unittest.TestCase):
