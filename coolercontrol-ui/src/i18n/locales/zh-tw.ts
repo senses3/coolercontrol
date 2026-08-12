@@ -192,6 +192,9 @@ export default {
                     successProfile: '已將「{profile}」以轉換後的轉速指派給 {channel}。',
                     successManual: '手動工作週期已轉換為 {duty}%。',
                     error: '無法轉換此風扇的轉速。',
+                    floorHeading: '部分點已轉換為 0%',
+                    floorNotice:
+                        '有 {count} 個點低於校準後 {channel} 可設定的最低轉速，因此轉換為 0%。在依賴新曲線之前請先檢查。',
                     modesHeading: '模式仍在使用原始設定檔',
                     modesReminder:
                         '以下模式仍將原始設定檔指派給 {channel}：{modes}。請更新為使用轉換後的副本。',

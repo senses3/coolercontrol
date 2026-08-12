@@ -197,6 +197,9 @@ export default {
                         "'{profile}' foi atribuído a {channel} com as velocidades convertidas.",
                     successManual: 'Ciclo manual convertido para {duty}%.',
                     error: 'Não foi possível converter as velocidades desta ventoinha.',
+                    floorHeading: 'Alguns pontos foram convertidos para 0%',
+                    floorNotice:
+                        '{count} ponto(s) estavam abaixo da velocidade mais baixa que pode ser definida em {channel} após a calibração, por isso foram convertidos para 0%. Verifique a nova curva antes de confiar nela.',
                     modesHeading: 'Os modos ainda usam o original',
                     modesReminder:
                         'Estes modos ainda atribuem o perfil original a {channel}: {modes}. Atualize-os para usar a cópia convertida.',

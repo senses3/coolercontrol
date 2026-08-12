@@ -193,6 +193,9 @@ export default {
                     successProfile: '変換した速度で「{profile}」を{channel}に割り当てました。',
                     successManual: '手動デューティを{duty}%に変換しました。',
                     error: 'このファンの速度を変換できませんでした。',
+                    floorHeading: '一部のポイントが0%に変換されました',
+                    floorNotice:
+                        'キャリブレーション後に{channel}へ設定できる最低速度を{count}個のポイントが下回っていたため、0%に変換されました。使用する前に新しいカーブを確認してください。',
                     modesHeading: 'モードは元のプロファイルのままです',
                     modesReminder:
                         '次のモードは{channel}に元のプロファイルを割り当てたままです: {modes}。変換後のコピーを使うよう更新してください。',

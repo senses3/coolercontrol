@@ -138,6 +138,26 @@ export function useCalibrationConversion(
     }
 
     /**
+     * A duty under the calibrated sustain floor has no true-duty that
+     * reproduces it: the forward map jumps from off straight to the floor,
+     * so everything between is unreachable. Converting picks the nearest
+     * option, which is off, and that must never happen silently.
+     */
+    function warnAboutFlooredPoints(source: Array<number>, mapped: Array<number>): void {
+        const count = source.filter((duty, index) => duty > 0 && mapped[index] === 0).length
+        if (count === 0) return
+        toast.add({
+            severity: 'warn',
+            summary: t('layout.shell.coolingPage.convert.floorHeading'),
+            detail: t('layout.shell.coolingPage.convert.floorNotice', {
+                count,
+                channel: channelLabel(),
+            }),
+            life: 10000,
+        })
+    }
+
+    /**
      * Modes hold their own copy of each channel assignment, so a Mode that
      * still names the original profile re-applies the unconverted values when
      * activated. Nothing here can safely rewrite that for the user.
@@ -186,6 +206,7 @@ export function useCalibrationConversion(
         if (mapped == null) return undefined
         const forked = await forkProfile(source, mapped)
         if (forked == null) return undefined
+        warnAboutFlooredPoints(duties, mapped)
         remindAboutModes(source.uid)
         return forked
     }

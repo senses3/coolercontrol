@@ -193,6 +193,9 @@ export default {
                     successProfile: "변환된 속도로 '{profile}'을(를) {channel}에 할당했습니다.",
                     successManual: '수동 듀티를 {duty}%로 변환했습니다.',
                     error: '이 팬의 속도를 변환하지 못했습니다.',
+                    floorHeading: '일부 지점이 0%로 변환되었습니다',
+                    floorNotice:
+                        '보정 후 {channel}에 설정할 수 있는 가장 낮은 속도보다 {count}개 지점이 아래에 있어 0%로 변환되었습니다. 사용하기 전에 새 곡선을 확인하세요.',
                     modesHeading: '모드가 여전히 원본을 사용 중입니다',
                     modesReminder:
                         '다음 모드가 여전히 {channel}에 원본 프로필을 할당합니다: {modes}. 변환된 사본을 사용하도록 업데이트하세요.',

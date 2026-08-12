@@ -199,6 +199,9 @@ export default {
                         '« {profile} » a été affecté à {channel} avec les vitesses converties.',
                     successManual: 'Rapport cyclique manuel converti à {duty} %.',
                     error: 'Impossible de convertir les vitesses de ce ventilateur.',
+                    floorHeading: 'Certains points sont passés à 0 %',
+                    floorNotice:
+                        '{count} point(s) se situaient sous la vitesse la plus basse réglable sur {channel} après la calibration : ils sont passés à 0 %. Vérifiez la nouvelle courbe avant de vous y fier.',
                     modesHeading: "Les modes utilisent toujours l'original",
                     modesReminder:
                         "Ces modes affectent encore le profil d'origine à {channel} : {modes}. Mettez-les à jour pour utiliser la copie convertie.",

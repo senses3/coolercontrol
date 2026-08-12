@@ -197,6 +197,9 @@ export default {
                         "Se asignó '{profile}' a {channel} con las velocidades convertidas.",
                     successManual: 'Ciclo manual convertido a {duty}%.',
                     error: 'No se pudieron convertir las velocidades de este ventilador.',
+                    floorHeading: 'Algunos puntos se convirtieron a 0%',
+                    floorNotice:
+                        '{count} punto(s) estaban por debajo de la velocidad mínima que se puede fijar en {channel} tras la calibración, así que se convirtieron a 0%. Revisa la nueva curva antes de confiar en ella.',
                     modesHeading: 'Los modos siguen usando el original',
                     modesReminder:
                         'Estos modos siguen asignando el perfil original a {channel}: {modes}. Actualízalos para usar la copia convertida.',

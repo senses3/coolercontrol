@@ -198,6 +198,9 @@ export default {
                         "'{profile}' wurde {channel} mit umgerechneten Drehzahlen zugewiesen.",
                     successManual: 'Manuelle Leistung auf {duty}% umgerechnet.',
                     error: 'Die Drehzahlen für diesen Lüfter konnten nicht umgerechnet werden.',
+                    floorHeading: 'Einige Punkte wurden zu 0%',
+                    floorNotice:
+                        '{count} Punkt(e) lagen unter der langsamsten Drehzahl, die für {channel} nach der Kalibrierung einstellbar ist, und wurden daher zu 0%. Prüfe die neue Kurve, bevor du dich darauf verlässt.',
                     modesHeading: 'Modi verwenden weiterhin das Original',
                     modesReminder:
                         'Diese Modi weisen {channel} weiterhin das ursprüngliche Profil zu: {modes}. Aktualisiere sie auf die umgerechnete Kopie.',

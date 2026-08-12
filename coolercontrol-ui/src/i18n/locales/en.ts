@@ -193,6 +193,9 @@ export default {
                     successProfile: "Assigned '{profile}' to {channel} with converted speeds.",
                     successManual: 'Manual duty converted to {duty}%.',
                     error: 'Could not convert the speeds for this fan.',
+                    floorHeading: 'Some points converted to 0%',
+                    floorNotice:
+                        '{count} point(s) sat below the slowest speed {channel} can be set to once calibrated, so they converted to 0%. Check the new curve before relying on it.',
                     modesHeading: 'Modes still use the original',
                     modesReminder:
                         'These modes still assign the original profile to {channel}: {modes}. Update them to use the converted copy.',

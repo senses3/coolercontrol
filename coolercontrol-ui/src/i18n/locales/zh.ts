@@ -192,6 +192,9 @@ export default {
                     successProfile: '已将“{profile}”以转换后的转速分配给 {channel}。',
                     successManual: '手动占空比已转换为 {duty}%。',
                     error: '无法转换此风扇的转速。',
+                    floorHeading: '部分点已转换为 0%',
+                    floorNotice:
+                        '有 {count} 个点低于校准后 {channel} 可设置的最低转速，因此转换为 0%。在依赖新曲线之前请先检查。',
                     modesHeading: '模式仍在使用原始配置',
                     modesReminder:
                         '以下模式仍将原始配置文件分配给 {channel}：{modes}。请更新为使用转换后的副本。',
