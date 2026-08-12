@@ -20,6 +20,7 @@ import PanelHeader from '@/shell/PanelHeader.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiCheckbox from '@/shell/ui/UiCheckbox.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
 import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import { computed, inject, onMounted, ref, type Ref } from 'vue'
 import type { DynamicDialogInstance } from '@/shell/dialog'
@@ -239,6 +240,17 @@ const currentNumber = computed(() => {
     const index = entries.value.findIndex((entry) => entry.phase === 'running')
     return index >= 0 ? index + 1 : finishedCount.value
 })
+// One bar for the whole batch: settled fans count in full, running ones by
+// their own percent, so it advances smoothly at any concurrency.
+const batchPercent = computed(() => {
+    if (totalCount.value === 0) return 0
+    const sum = entries.value.reduce((total, entry) => {
+        if (entry.phase === 'queued') return total
+        if (entry.phase === 'running') return total + (entry.percent ?? 0)
+        return total + 100
+    }, 0)
+    return sum / totalCount.value
+})
 const doneCount = computed(() => entries.value.filter((entry) => entry.phase === 'done').length)
 const failedCount = computed(() => entries.value.filter((entry) => entry.phase === 'failed').length)
 const skippedCount = computed(
@@ -447,12 +459,17 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                                   })
                         }}
                     </small>
+                    <UiProgressBar
+                        v-if="isActive && totalCount > 1"
+                        :value="batchPercent"
+                        class="mx-1 mb-1"
+                    />
                     <div
                         v-for="entry in entries"
                         :key="entry.device_uid + entry.channel_name"
                         class="flex items-start justify-between gap-x-3 ml-1"
                     >
-                        <div class="flex items-center gap-x-2 min-w-0">
+                        <div class="flex items-center gap-x-2 min-w-0 w-2/5 shrink-0">
                             <!-- overflow-hidden clips the running spinner's rotation to its own box so it
                          does not expand the scroll container and flicker a scrollbar. -->
                             <span class="shrink-0 inline-flex overflow-hidden">
@@ -476,9 +493,12 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
                             }}</span>
                         </div>
                         <div class="text-right text-sm flex-1 min-w-0 break-words">
-                            <span v-if="entry.phase === 'running'" class="text-accent">{{
-                                runningText(entry)
-                            }}</span>
+                            <UiProgressBar
+                                v-if="entry.phase === 'running'"
+                                :value="entry.percent ?? 0"
+                                :label="runningText(entry)"
+                                class="mt-0.5"
+                            />
                             <span
                                 v-else-if="entry.phase === 'queued'"
                                 class="text-text-color-secondary"
