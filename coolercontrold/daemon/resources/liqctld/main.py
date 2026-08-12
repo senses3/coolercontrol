@@ -153,9 +153,11 @@ def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
 
     `set_screen` opens with `_write([0x30, 0x01])` and a `_read_until` for the [0x31, 0x01] reply,
     which gives up after twelve reports with "missing messages (attempts=12, missing=1)". The device
-    streams a status report roughly every half second, armed by the [0x70, 0x02, ...] write in
-    `initialize`, and nothing consumes them while a frame is prepared and uploaded. That backlog
-    outlives the apply that produced it, so it accumulates across applies until this read starves.
+    streams status reports unasked, which is why `_get_status_directly` can read one without
+    writing anything first, and nothing consumes them while a frame is prepared and uploaded. That
+    backlog outlives the apply that produced it, so it accumulates across applies until this read
+    starves. What arms the stream is not worth pinning down here: on an hwmon-bound device
+    `initialize` skips the writes that would, and the reports arrive regardless.
 
     The drain inside `_send_frame_to_spare_bucket` cannot cover this: it runs after the read above,
     on the frame liquidctl has already prepared. Re-initializing before every apply used to drain
@@ -230,9 +232,10 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     # silently, which is what the reply-prefix check below guards. `_delete_bucket` instead
     # spends its twelve `_read_until_first_match` attempts on the backlog and raises.
     #
-    # This path also leaves a report behind on every frame: the end-of-transfer
-    # `_write([0x36, 0x02])` below never reads its reply. The next apply's entry drain is what
-    # clears it.
+    # Whether this path also orphans a report is not established. The end-of-transfer
+    # `_write([0x36, 0x02])` below reads no reply, and the firmware-2 path issues that same
+    # command through `_write_then_read`, which suggests one arrives; if it does, the next
+    # apply's entry drain clears it. Nothing here depends on the answer.
     self.device.clear_enqueued_reports()
 
     bucket = self._write_then_read([0x30, 0x04, target_bucket])
