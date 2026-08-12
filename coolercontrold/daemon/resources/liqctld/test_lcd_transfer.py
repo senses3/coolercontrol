@@ -429,6 +429,58 @@ class TestSupportingPatches(unittest.TestCase):
             self.assertEqual(large.bulk_buffer_size, main._LCD_BULK_TRANSFER_BYTES * 2)
 
 
+class TestEveryFallbackReportsWhy(unittest.TestCase):
+    """A fallback costs the full re-initialize, so which gate turned the frame away has to be
+    in the log. Warm-up and permanently stuck look identical from the timing alone."""
+
+    def _fallback_reason(self, device):
+        with mock.patch.object(main, "_ORIGINAL_SEND_DATA", return_value=None):
+            with self.assertLogs(level="DEBUG") as captured:
+                main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+        reasons = [m for m in captured.output if "LCD rotation skipped" in m]
+        self.assertEqual(len(reasons), 1, captured.output)
+        return reasons[0]
+
+    def test_the_warm_up_frames_report_what_the_rotation_knows(self):
+        """Goal: the first frames legitimately fall back, and telling that apart from a stuck
+        rotation needs the learned state. Method: run with nothing learned yet."""
+        device = FakeKraken({})
+
+        reason = self._fallback_reason(device)
+
+        self.assertIn("pair=()", reason)
+        self.assertIn("active=None", reason)
+
+    def test_a_bucket_too_small_for_the_frame_reports_both_sizes(self):
+        """Goal: an outgrown bucket is silent otherwise, and looks exactly like a rotation that
+        never started. Method: answer the query with a bucket that cannot hold the frame.
+        """
+        device = FakeKraken(
+            {0: bucket_response(True), 1: bucket_response(True, slots=1)}
+        )
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+
+        reason = self._fallback_reason(device)
+
+        self.assertIn("bucket 1", reason)
+        self.assertIn("capacity=1", reason)
+        self.assertIn("needs=401", reason)
+
+    def test_an_unexpected_reply_reports_the_prefix_it_saw(self):
+        """Goal: the prefix is what says which report arrived instead, so it has to survive into
+        the log. Method: answer the query with a periodic status report."""
+        device = FakeKraken(
+            {0: bucket_response(True), 1: bucket_response(True, prefix=(0x75, 0x02))}
+        )
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+
+        reason = self._fallback_reason(device)
+
+        self.assertIn("[117, 2]", reason)
+
+
 class TestScreenEntryDrain(unittest.TestCase):
     """`set_screen` reads the screen's brightness and orientation before it hands the frame to
     the transfer path, so the queue has to be clear by then, not by the time the frame moves.

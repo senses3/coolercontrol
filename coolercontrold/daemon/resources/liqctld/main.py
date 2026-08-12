@@ -165,6 +165,16 @@ def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
     return _ORIGINAL_SET_SCREEN(self, channel, mode, value, **kwargs)
 
 
+def _fall_back_to_liquidctl(self, data, bulk_info, reason):
+    """Hands the frame to liquidctl's own upload, recording which gate turned it away.
+
+    Every exit from the rotation reports why. A silent one reads as "the rotation is working"
+    while the device is quietly paying the full re-initialize on every frame.
+    """
+    log.debug("LCD rotation skipped (%s); using liquidctl's own upload", reason)
+    return _send_data_with_clean_slate(self, data, bulk_info)
+
+
 def _send_data_with_clean_slate(self, data, bulk_info):
     """liquidctl's own frame upload, preceded by the re-initialization it needs.
 
@@ -202,8 +212,11 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     active_bucket = getattr(self, "_cc_active_bucket", None)
     if len(pair) < 2 or active_bucket not in pair:
         # Not rotating between two known buckets yet: let liquidctl allocate, and learn the
-        # bucket it picks. Two such frames are enough to establish the rotation.
-        return _send_data_with_clean_slate(self, data, bulk_info)
+        # bucket it picks. Two such frames are enough to establish the rotation, so this
+        # repeating past the first frames means `_switch_bucket` is not reporting success.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"pair={pair} active={active_bucket}"
+        )
 
     target_bucket = pair[0] if pair[1] == active_bucket else pair[1]
     header = list(_LCD_BULK_HEADER) + bulk_info
@@ -226,15 +239,20 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     if list(bucket[0:2]) != _LCD_BUCKET_REPLY_PREFIX:
         # Not the bucket's reply, so its bytes mean nothing: reading an offset out of an
         # unrelated report and handing it to _setup_bucket would place a frame anywhere.
-        log.debug(
-            "Unexpected reply to an LCD bucket query; using liquidctl's own upload"
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"reply prefix {list(bucket[0:2])}"
         )
-        return _send_data_with_clean_slate(self, data, bulk_info)
     occupied = any(bucket[15:])
     capacity = int.from_bytes([bucket[19], bucket[20]], "little")
     if not occupied or capacity < slots_needed:
         # First use of this bucket, or the frame outgrew it.
-        return _send_data_with_clean_slate(self, data, bulk_info)
+        return _fall_back_to_liquidctl(
+            self,
+            data,
+            bulk_info,
+            f"bucket {target_bucket} occupied={occupied} "
+            f"capacity={capacity} needs={slots_needed}",
+        )
 
     memory_start = [bucket[17], bucket[18]]
     self._write_then_read([0x36, 0x03])
