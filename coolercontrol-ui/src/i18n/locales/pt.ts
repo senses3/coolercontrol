@@ -181,7 +181,7 @@ export default {
                     confirmHeader: 'Bifurcar para este ventilador',
                     confirmMessage:
                         "Copiar o perfil '{profile}' para um novo perfil '{copy}' e atribuí-lo a {channel}.\n\nO original fica intacto, por isso as alterações aqui só afetarão {channel}.",
-                    accept: 'Bifurcar',
+                    accept: 'Criar cópia',
                 },
                 convert: {
                     button: 'Converter para a calibração',

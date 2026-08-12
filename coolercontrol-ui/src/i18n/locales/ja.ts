@@ -178,7 +178,7 @@ export default {
                     confirmHeader: 'このファン用に複製',
                     confirmMessage:
                         'プロファイル「{profile}」を新しいプロファイル「{copy}」にコピーし、{channel}に割り当てます。\n\n元のプロファイルはそのまま残るため、ここでの変更は{channel}にのみ影響します。',
-                    accept: '複製',
+                    accept: 'コピーを作成',
                 },
                 convert: {
                     button: 'キャリブレーション用に変換',

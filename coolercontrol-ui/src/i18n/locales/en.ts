@@ -178,7 +178,7 @@ export default {
                     confirmHeader: 'Fork for this fan',
                     confirmMessage:
                         "Copy the profile '{profile}' to a new profile '{copy}' and assign it to {channel}.\n\nThe original is left untouched, so changes here only affect {channel}.",
-                    accept: 'Fork',
+                    accept: 'Create copy',
                 },
                 convert: {
                     button: 'Convert for calibration',

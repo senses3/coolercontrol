@@ -182,7 +182,7 @@ export default {
                     confirmHeader: 'Für diesen Lüfter abspalten',
                     confirmMessage:
                         "Das Profil '{profile}' in ein neues Profil '{copy}' kopieren und {channel} zuweisen.\n\nDas Original bleibt unverändert, Änderungen hier betreffen also nur {channel}.",
-                    accept: 'Abspalten',
+                    accept: 'Kopie erstellen',
                 },
                 convert: {
                     button: 'Für Kalibrierung umrechnen',

@@ -178,7 +178,7 @@ export default {
                     confirmHeader: '이 팬용으로 분기',
                     confirmMessage:
                         "프로필 '{profile}'을(를) 새 프로필 '{copy}'(으)로 복사하고 {channel}에 할당합니다.\n\n원본은 그대로 유지되므로 여기서의 변경은 {channel}에만 적용됩니다.",
-                    accept: '분기',
+                    accept: '사본 만들기',
                 },
                 convert: {
                     button: '보정용으로 변환',

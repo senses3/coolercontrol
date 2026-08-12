@@ -183,7 +183,7 @@ export default {
                     confirmHeader: 'Dupliquer pour ce ventilateur',
                     confirmMessage:
                         "Copier le profil « {profile} » vers un nouveau profil « {copy} » et l'affecter à {channel}.\n\nL'original reste intact : les modifications ici n'affecteront que {channel}.",
-                    accept: 'Dupliquer',
+                    accept: 'Créer une copie',
                 },
                 convert: {
                     button: 'Convertir pour la calibration',
