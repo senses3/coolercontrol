@@ -489,239 +489,244 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex items-center justify-between px-2 pt-2">
-        <entity-title-rename
-            :current-name="channelLabel"
-            :fallback-name="defaultLabel"
-            :save-name-function="saveNameFunction"
-        />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div class="p-2 flex flex-row">
-                <UiButton
-                    class="w-32"
-                    :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    v-tooltip.top="t('views.lcd.saveLcdSettings')"
-                    @click="saveLCDSetting"
-                >
-                    <svg-icon
-                        class="outline-0"
-                        type="mdi"
-                        :path="mdiContentSaveOutline"
-                        :size="deviceStore.getREMSize(1.5)"
-                    />
-                </UiButton>
+    <div class="flex h-full flex-col">
+        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
+            <entity-title-rename
+                :current-name="channelLabel"
+                :fallback-name="defaultLabel"
+                :save-name-function="saveNameFunction"
+            />
+            <div class="flex flex-wrap gap-x-1 justify-end">
+                <div class="p-2 flex flex-row">
+                    <UiButton
+                        class="w-32"
+                        :class="{ 'animate-pulse-fast': contextIsDirty }"
+                        v-tooltip.top="t('views.lcd.saveLcdSettings')"
+                        @click="saveLCDSetting"
+                    >
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiContentSaveOutline"
+                            :size="deviceStore.getREMSize(1.5)"
+                        />
+                    </UiButton>
+                </div>
             </div>
         </div>
-    </div>
-    <ScrollAreaRoot id="lcd-control-pane" style="--scrollbar-size: 10px">
-        <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <health-warning
-                kind="lcd"
-                :device-uid="props.deviceUID"
-                :channel-name="props.channelName"
-                class="mb-4"
-            />
-            <div class="w-full flex flex-col lg:flex-row">
-                <div id="left-side">
-                    <div class="mt-0 mr-4 w-96">
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lcd.lcdMode') }}
-                        </small>
-                        <UiListbox
-                            :model-value="selectedLcdModeName"
-                            :options="lcdModeOptions"
-                            class="w-full"
-                            v-tooltip.top="t('views.lcd.lcdMode')"
-                            @update:model-value="changeLcdMode"
-                        />
-                    </div>
-                    <div v-if="selectedLcdMode.brightness" class="mt-4 mr-4 w-96 border-border-one">
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lcd.brightness') }}<br />
-                        </small>
-                        <div class="rounded-lg border border-border-one bg-bg-two p-3">
-                            <UiNumberInput
-                                v-model="selectedBrightness"
-                                :min="0"
-                                :max="100"
-                                :step="1"
-                                v-tooltip.top="t('views.lcd.brightnessPercent')"
-                                :suffix="t('common.percentUnit')"
+        <ScrollAreaRoot id="lcd-control-pane" class="min-h-0 flex-1" style="--scrollbar-size: 10px">
+            <ScrollAreaViewport class="p-4 h-full w-full">
+                <health-warning
+                    kind="lcd"
+                    :device-uid="props.deviceUID"
+                    :channel-name="props.channelName"
+                    class="mb-4"
+                />
+                <div class="w-full flex flex-col lg:flex-row">
+                    <div id="left-side">
+                        <div class="mt-0 mr-4 w-96">
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lcd.lcdMode') }}
+                            </small>
+                            <UiListbox
+                                :model-value="selectedLcdModeName"
+                                :options="lcdModeOptions"
+                                class="w-full"
+                                v-tooltip.top="t('views.lcd.lcdMode')"
+                                @update:model-value="changeLcdMode"
                             />
-                            <UiSlider
-                                v-model="selectedBrightness"
-                                class="mt-3 !w-full px-1"
-                                :step="1"
-                                :min="0"
-                                :max="100"
+                        </div>
+                        <div
+                            v-if="selectedLcdMode.brightness"
+                            class="mt-4 mr-4 w-96 border-border-one"
+                        >
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lcd.brightness') }}<br />
+                            </small>
+                            <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                                <UiNumberInput
+                                    v-model="selectedBrightness"
+                                    :min="0"
+                                    :max="100"
+                                    :step="1"
+                                    v-tooltip.top="t('views.lcd.brightnessPercent')"
+                                    :suffix="t('common.percentUnit')"
+                                />
+                                <UiSlider
+                                    v-model="selectedBrightness"
+                                    class="mt-3 !w-full px-1"
+                                    :step="1"
+                                    :min="0"
+                                    :max="100"
+                                />
+                            </div>
+                        </div>
+                        <div
+                            v-if="selectedLcdMode.orientation"
+                            class="mt-4 mr-4 w-96 border-border-one"
+                        >
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lcd.orientation') }}<br />
+                            </small>
+                            <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                                <UiNumberInput
+                                    v-model="selectedOrientation"
+                                    :min="0"
+                                    :max="270"
+                                    :step="90"
+                                    v-tooltip.top="t('views.lcd.orientationDegrees')"
+                                    suffix="°"
+                                />
+                                <UiSlider
+                                    v-model="selectedOrientation"
+                                    class="mt-3 !w-full px-1"
+                                    :step="90"
+                                    :min="0"
+                                    :max="270"
+                                />
+                            </div>
+                        </div>
+                        <div v-if="selectedLcdMode.image" class="mt-8 mr-4 w-96 border-border-one">
+                            <div
+                                class="flex flex-col gap-2 rounded-lg border border-dashed border-border-one p-3"
+                                @dragover.prevent
+                                @drop.prevent="filesDropped"
+                            >
+                                <input
+                                    ref="fileInputRef"
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/gif,image/tiff,image/bmp"
+                                    class="hidden"
+                                    @change="filesSelected"
+                                />
+                                <UiButton class="w-full" @click="fileInputRef?.click()">
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiImageMultipleOutline"
+                                        :size="18"
+                                        class="mr-1"
+                                    />
+                                    {{ t('views.lcd.chooseImage') }}
+                                </UiButton>
+                                <p class="text-center text-sm text-text-color-secondary">
+                                    {{ t('views.lcd.dragAndDrop') }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        id="right-side"
+                        v-if="selectedLcdMode.image"
+                        class="flex flex-col lg:flex-row mt-4 ml-1 w-96 h-96 min-w-96 min-h-96"
+                    >
+                        <div class="flex w-full mr-0">
+                            <img
+                                v-if="fileDataURLs.length > 0"
+                                :src="fileDataURLs[0]"
+                                id="lcd-image"
+                                alt="LCD Image"
+                            />
+                            <svg-icon
+                                v-else
+                                id="lcd-image"
+                                class="text-text-color-secondary h-96"
+                                style="padding: 40px"
+                                type="mdi"
+                                :path="mdiFileImageOutline"
+                                :size="imageWidth + 60"
                             />
                         </div>
                     </div>
                     <div
-                        v-if="selectedLcdMode.orientation"
-                        class="mt-4 mr-4 w-96 border-border-one"
+                        v-if="
+                            selectedLcdMode.type === LcdModeType.CUSTOM &&
+                            selectedLcdMode.name === 'temp'
+                        "
+                        class="mt-0 mr-4 w-96"
                     >
                         <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lcd.orientation') }}<br />
+                            {{ t('views.lcd.tempSource') }}
                         </small>
-                        <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                        <UiGroupedListbox
+                            :model-value="chosenTempKey"
+                            class="w-full mt-0 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenTemp == null"
+                            v-tooltip.top="t('views.lcd.tempSourceTooltip')"
+                            @update:model-value="changeTempSource"
+                        />
+                    </div>
+                    <div
+                        v-if="
+                            selectedLcdMode.type === LcdModeType.CUSTOM &&
+                            selectedLcdMode.name === 'carousel'
+                        "
+                        class="mt-0 mr-4 w-96"
+                    >
+                        <div class="flex flex-col">
+                            <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lcd.imagesPath') }}
+                            </small>
+                            <UiInput
+                                v-model="imagesPath"
+                                class="w-full mt-0"
+                                placeholder="/tmp/your_images_path"
+                                :class="{ '!border-error': !imagesPath }"
+                                v-tooltip.top="t('views.lcd.imagesPathTooltip')"
+                            />
+                            <div v-if="deviceStore.isQtApp()">
+                                <UiButton
+                                    class="mt-2 w-full"
+                                    v-tooltip.top="t('views.lcd.browseTooltip')"
+                                    @click="pathBrowse"
+                                >
+                                    <svg-icon
+                                        class="outline-0 mt-[-0.25rem]"
+                                        type="mdi"
+                                        :path="mdiFolderSearchOutline"
+                                        :size="deviceStore.getREMSize(1.5)"
+                                    />
+                                    {{ t('views.lcd.browse') }}
+                                </UiButton>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lcd.delayInterval') }}:
+                                <span class="font-extrabold">{{ delayIntervalFormatted }}</span
+                                ><br />
+                            </small>
                             <UiNumberInput
-                                v-model="selectedOrientation"
-                                :min="0"
-                                :max="270"
-                                :step="90"
-                                v-tooltip.top="t('views.lcd.orientationDegrees')"
-                                suffix="°"
+                                v-model="imagesDelayInterval"
+                                :min="5"
+                                :max="900"
+                                :step="1"
+                                v-tooltip.top="t('views.lcd.delayIntervalTooltip')"
+                                :suffix="t('common.secondAbbr')"
                             />
                             <UiSlider
-                                v-model="selectedOrientation"
-                                class="mt-3 !w-full px-1"
-                                :step="90"
-                                :min="0"
-                                :max="270"
+                                v-model="imagesDelayInterval"
+                                class="!w-[23.25rem] ml-1.5"
+                                :step="1"
+                                :min="2"
+                                :max="900"
                             />
                         </div>
                     </div>
-                    <div v-if="selectedLcdMode.image" class="mt-8 mr-4 w-96 border-border-one">
-                        <div
-                            class="flex flex-col gap-2 rounded-lg border border-dashed border-border-one p-3"
-                            @dragover.prevent
-                            @drop.prevent="filesDropped"
-                        >
-                            <input
-                                ref="fileInputRef"
-                                type="file"
-                                accept="image/jpeg,image/png,image/gif,image/tiff,image/bmp"
-                                class="hidden"
-                                @change="filesSelected"
-                            />
-                            <UiButton class="w-full" @click="fileInputRef?.click()">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiImageMultipleOutline"
-                                    :size="18"
-                                    class="mr-1"
-                                />
-                                {{ t('views.lcd.chooseImage') }}
-                            </UiButton>
-                            <p class="text-center text-sm text-text-color-secondary">
-                                {{ t('views.lcd.dragAndDrop') }}
-                            </p>
-                        </div>
-                    </div>
                 </div>
-                <div
-                    id="right-side"
-                    v-if="selectedLcdMode.image"
-                    class="flex flex-col lg:flex-row mt-4 ml-1 w-96 h-96 min-w-96 min-h-96"
-                >
-                    <div class="flex w-full mr-0">
-                        <img
-                            v-if="fileDataURLs.length > 0"
-                            :src="fileDataURLs[0]"
-                            id="lcd-image"
-                            alt="LCD Image"
-                        />
-                        <svg-icon
-                            v-else
-                            id="lcd-image"
-                            class="text-text-color-secondary h-96"
-                            style="padding: 40px"
-                            type="mdi"
-                            :path="mdiFileImageOutline"
-                            :size="imageWidth + 60"
-                        />
-                    </div>
-                </div>
-                <div
-                    v-if="
-                        selectedLcdMode.type === LcdModeType.CUSTOM &&
-                        selectedLcdMode.name === 'temp'
-                    "
-                    class="mt-0 mr-4 w-96"
-                >
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.lcd.tempSource') }}
-                    </small>
-                    <UiGroupedListbox
-                        :model-value="chosenTempKey"
-                        class="w-full mt-0 max-h-[28rem]"
-                        :groups="tempGroups"
-                        filter
-                        :filter-placeholder="t('common.search')"
-                        :invalid="chosenTemp == null"
-                        v-tooltip.top="t('views.lcd.tempSourceTooltip')"
-                        @update:model-value="changeTempSource"
-                    />
-                </div>
-                <div
-                    v-if="
-                        selectedLcdMode.type === LcdModeType.CUSTOM &&
-                        selectedLcdMode.name === 'carousel'
-                    "
-                    class="mt-0 mr-4 w-96"
-                >
-                    <div class="flex flex-col">
-                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lcd.imagesPath') }}
-                        </small>
-                        <UiInput
-                            v-model="imagesPath"
-                            class="w-full mt-0"
-                            placeholder="/tmp/your_images_path"
-                            :class="{ '!border-error': !imagesPath }"
-                            v-tooltip.top="t('views.lcd.imagesPathTooltip')"
-                        />
-                        <div v-if="deviceStore.isQtApp()">
-                            <UiButton
-                                class="mt-2 w-full"
-                                v-tooltip.top="t('views.lcd.browseTooltip')"
-                                @click="pathBrowse"
-                            >
-                                <svg-icon
-                                    class="outline-0 mt-[-0.25rem]"
-                                    type="mdi"
-                                    :path="mdiFolderSearchOutline"
-                                    :size="deviceStore.getREMSize(1.5)"
-                                />
-                                {{ t('views.lcd.browse') }}
-                            </UiButton>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lcd.delayInterval') }}:
-                            <span class="font-extrabold">{{ delayIntervalFormatted }}</span
-                            ><br />
-                        </small>
-                        <UiNumberInput
-                            v-model="imagesDelayInterval"
-                            :min="5"
-                            :max="900"
-                            :step="1"
-                            v-tooltip.top="t('views.lcd.delayIntervalTooltip')"
-                            :suffix="t('common.secondAbbr')"
-                        />
-                        <UiSlider
-                            v-model="imagesDelayInterval"
-                            class="!w-[23.25rem] ml-1.5"
-                            :step="1"
-                            :min="2"
-                            :max="900"
-                        />
-                    </div>
-                </div>
-            </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
-            orientation="vertical"
-        >
-            <ScrollAreaThumb
-                class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar
+                class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
+                orientation="vertical"
+            >
+                <ScrollAreaThumb
+                    class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
+                />
+            </ScrollAreaScrollbar>
+        </ScrollAreaRoot>
+    </div>
 </template>
 
 <style scoped lang="scss">

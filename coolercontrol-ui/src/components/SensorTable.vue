@@ -400,8 +400,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <ScrollAreaRoot style="--scrollbar-size: 10px">
-        <ScrollAreaViewport class="pb-24 h-screen w-full">
+    <ScrollAreaRoot class="h-full" style="--scrollbar-size: 10px">
+        <ScrollAreaViewport class="h-full w-full">
             <div class="h-full">
                 <UiTable sticky-header>
                     <template #head>

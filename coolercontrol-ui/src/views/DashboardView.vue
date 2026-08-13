@@ -513,199 +513,218 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div id="control-panel" class="flex flex-wrap items-center justify-between px-2 pt-2">
-        <entity-title-rename
-            v-if="sensorMode || !isMobile"
-            :current-name="sensorMode ? channelLabel : dashboard.name"
-            :fallback-name="fallbackName"
-            :save-name-function="saveNameFunction"
-        />
-        <span v-else class="w-full p-2">
-            <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-full" />
-        </span>
-        <!-- ml-auto, not just the parent's justify-between: once a long title
-             wraps this group onto its own line it is the only item there, and
-             justify-between would leave it flush left. -->
-        <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
-            <UiButton
-                v-if="hasCoolingPage"
-                variant="outline"
-                v-tooltip.top="t('views.dashboard.openCooling')"
-                @click="
-                    router.push({
-                        name: 'cooling-channel',
-                        params: { deviceUID: props.deviceUID!, channelName: props.channelName! },
-                    })
-                "
-            >
-                <svg-icon type="mdi" :path="mdiFan" :size="deviceStore.getREMSize(1.1)" />
-                <span class="ml-1">{{ t('layout.shell.cooling') }}</span>
-            </UiButton>
-            <div
-                v-if="dashboard.chartType == ChartType.TIME_CHART"
-                class="p-2 flex leading-none items-center"
-                v-tooltip.top="t('views.dashboard.mouseActions')"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
-            <template v-if="!sensorMode">
+    <div class="flex h-full flex-col">
+        <div
+            id="control-panel"
+            class="flex shrink-0 flex-wrap items-center justify-between px-2 pt-2"
+        >
+            <entity-title-rename
+                v-if="sensorMode || !isMobile"
+                :current-name="sensorMode ? channelLabel : dashboard.name"
+                :fallback-name="fallbackName"
+                :save-name-function="saveNameFunction"
+            />
+            <span v-else class="w-full p-2">
+                <UiSelect v-model="dashboardNav" :options="dashboardNavOptions" class="w-full" />
+            </span>
+            <!-- ml-auto, not just the parent's justify-between: once a long title
+                 wraps this group onto its own line it is the only item there, and
+                 justify-between would leave it flush left. -->
+            <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
                 <UiButton
-                    variant="ghost"
-                    size="icon"
-                    :class="{ '!text-accent': isHome }"
-                    v-tooltip.top="t('views.dashboard.setAsHome')"
-                    @click="setHome"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="isHome ? mdiHome : mdiHomeOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-                <UiButton
-                    variant="ghost"
-                    size="icon"
-                    v-tooltip.top="t('views.dashboard.duplicateDashboard')"
-                    @click="duplicateDashboard"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiContentCopy"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-                <UiButton
-                    v-if="settingsStore.dashboards.length > 1"
-                    variant="ghost"
-                    size="icon"
-                    v-tooltip.top="t('views.dashboard.deleteDashboard')"
-                    @click="deleteDashboard"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiTrashCanOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-                <UiButton
-                    variant="ghost"
-                    size="icon"
-                    v-tooltip.top="t('views.dashboard.fullPage')"
-                    @click="toggleFullPage"
-                >
-                    <svg-icon type="mdi" :path="mdiOverscan" :size="deviceStore.getREMSize(1.25)" />
-                </UiButton>
-            </template>
-            <div v-if="!sensorMode && settingsStore.tags.size > 0" class="p-2 pr-0 flex flex-row">
-                <span v-tooltip.top="t('views.dashboard.filterByTag')">
-                    <UiMultiSelect
-                        v-model="dashboard.selectedTags"
-                        :groups="tagGroups"
-                        class="w-36"
-                        :placeholder="t('views.dashboard.filterTags')"
-                    />
-                </span>
-            </div>
-            <div v-if="!sensorMode" class="p-2 pr-0 flex flex-row">
-                <span v-tooltip.top="t('views.dashboard.filterBySensor')">
-                    <UiMultiSelect
-                        v-model="chosenSensorKeys"
-                        :groups="sensorGroups"
-                        class="w-36"
-                        filter
-                        :filter-placeholder="t('common.search')"
-                        :placeholder="t('views.dashboard.filterSensors')"
-                    />
-                </span>
-                <span class="ml-3" v-tooltip.top="t('views.dashboard.filterByDataType')">
-                    <UiMultiSelect
-                        v-model="dashboard.dataTypes"
-                        :groups="dataTypeGroups"
-                        class="w-36"
-                        :placeholder="t('views.dashboard.filterTypes')"
-                    />
-                </span>
-            </div>
-            <div
-                v-if="dashboard.chartType == ChartType.TIME_CHART"
-                class="p-2 pr-0 flex flex-row bg-bg-one"
-            >
-                <UiNumberInput
-                    v-model="chartMinutes"
-                    :min="chartMinutesMin"
-                    :max="chartMinutesMax"
-                    :step="1"
-                    :suffix="t('common.minuteAbbr')"
-                    v-tooltip.top="t('views.dashboard.timeRange')"
-                />
-                <axis-options class="h-10 ml-3" :dashboard="dashboard" />
-            </div>
-            <div
-                v-if="dashboard.chartType == ChartType.TABLE"
-                class="p-2 pr-0 flex leading-none items-center bg-bg-one"
-            >
-                <UiButton
+                    v-if="hasCoolingPage"
                     variant="outline"
-                    @click="sensorTableRef?.resetStats()"
-                    v-tooltip.top="t('components.sensorTable.resetStatsTooltip')"
+                    v-tooltip.top="t('views.dashboard.openCooling')"
+                    @click="
+                        router.push({
+                            name: 'cooling-channel',
+                            params: {
+                                deviceUID: props.deviceUID!,
+                                channelName: props.channelName!,
+                            },
+                        })
+                    "
                 >
-                    <svg-icon type="mdi" :path="mdiRestart" :size="deviceStore.getREMSize(1.1)" />
-                    <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
+                    <svg-icon type="mdi" :path="mdiFan" :size="deviceStore.getREMSize(1.1)" />
+                    <span class="ml-1">{{ t('layout.shell.cooling') }}</span>
                 </UiButton>
-            </div>
-            <div class="p-2 bg-bg-one">
-                <span v-tooltip.top="t('views.dashboard.chartType')">
-                    <UiSelect
-                        v-model="dashboard.chartType"
-                        :options="chartTypeOptions"
-                        class="w-32"
-                    />
-                </span>
-            </div>
-        </div>
-        <!-- Inside #control-panel so the chart-height observer accounts for it. -->
-        <health-warning
-            v-if="sensorMode"
-            kind="channel"
-            :device-uid="props.deviceUID!"
-            :channel-name="props.channelName!"
-            class="w-full mx-2 mb-2"
-        />
-    </div>
-    <Fullscreen v-model="fullPage" :teleport="true" :page-only="true">
-        <div :class="{ 'full-page-wrapper': fullPage }">
-            <div
-                v-if="fullPage"
-                class="flex flex-row pt-0.5 fixed left-0 top-0 z-50 w-full justify-between"
-            >
-                <div />
-                <div v-tooltip.top="t('views.dashboard.exitFullPage')" @click="toggleFullPage">
+                <div
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    class="p-2 flex leading-none items-center"
+                    v-tooltip.top="t('views.dashboard.mouseActions')"
+                >
                     <svg-icon
                         type="mdi"
-                        class="text-text-color-secondary"
-                        :path="mdiOverscan"
-                        :size="deviceStore.getREMSize(1.325)"
+                        :path="mdiInformationSlabCircleOutline"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
                 </div>
-                <div />
+                <template v-if="!sensorMode">
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        :class="{ '!text-accent': isHome }"
+                        v-tooltip.top="t('views.dashboard.setAsHome')"
+                        @click="setHome"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="isHome ? mdiHome : mdiHomeOutline"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        v-tooltip.top="t('views.dashboard.duplicateDashboard')"
+                        @click="duplicateDashboard"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiContentCopy"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                    <UiButton
+                        v-if="settingsStore.dashboards.length > 1"
+                        variant="ghost"
+                        size="icon"
+                        v-tooltip.top="t('views.dashboard.deleteDashboard')"
+                        @click="deleteDashboard"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiTrashCanOutline"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        v-tooltip.top="t('views.dashboard.fullPage')"
+                        @click="toggleFullPage"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiOverscan"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                </template>
+                <div
+                    v-if="!sensorMode && settingsStore.tags.size > 0"
+                    class="p-2 pr-0 flex flex-row"
+                >
+                    <span v-tooltip.top="t('views.dashboard.filterByTag')">
+                        <UiMultiSelect
+                            v-model="dashboard.selectedTags"
+                            :groups="tagGroups"
+                            class="w-36"
+                            :placeholder="t('views.dashboard.filterTags')"
+                        />
+                    </span>
+                </div>
+                <div v-if="!sensorMode" class="p-2 pr-0 flex flex-row">
+                    <span v-tooltip.top="t('views.dashboard.filterBySensor')">
+                        <UiMultiSelect
+                            v-model="chosenSensorKeys"
+                            :groups="sensorGroups"
+                            class="w-36"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('views.dashboard.filterSensors')"
+                        />
+                    </span>
+                    <span class="ml-3" v-tooltip.top="t('views.dashboard.filterByDataType')">
+                        <UiMultiSelect
+                            v-model="dashboard.dataTypes"
+                            :groups="dataTypeGroups"
+                            class="w-36"
+                            :placeholder="t('views.dashboard.filterTypes')"
+                        />
+                    </span>
+                </div>
+                <div
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    class="p-2 pr-0 flex flex-row bg-bg-one"
+                >
+                    <UiNumberInput
+                        v-model="chartMinutes"
+                        :min="chartMinutesMin"
+                        :max="chartMinutesMax"
+                        :step="1"
+                        :suffix="t('common.minuteAbbr')"
+                        v-tooltip.top="t('views.dashboard.timeRange')"
+                    />
+                    <axis-options class="h-10 ml-3" :dashboard="dashboard" />
+                </div>
+                <div
+                    v-if="dashboard.chartType == ChartType.TABLE"
+                    class="p-2 pr-0 flex leading-none items-center bg-bg-one"
+                >
+                    <UiButton
+                        variant="outline"
+                        @click="sensorTableRef?.resetStats()"
+                        v-tooltip.top="t('components.sensorTable.resetStatsTooltip')"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiRestart"
+                            :size="deviceStore.getREMSize(1.1)"
+                        />
+                        <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
+                    </UiButton>
+                </div>
+                <div class="p-2 bg-bg-one">
+                    <span v-tooltip.top="t('views.dashboard.chartType')">
+                        <UiSelect
+                            v-model="dashboard.chartType"
+                            :options="chartTypeOptions"
+                            class="w-32"
+                        />
+                    </span>
+                </div>
             </div>
-            <TimeChart
-                v-if="dashboard.chartType == ChartType.TIME_CHART"
-                :dashboard="viewDashboard"
-                :key="chartKey"
-            />
-            <SensorTable
-                v-else-if="dashboard.chartType == ChartType.TABLE"
-                ref="sensorTableRef"
-                :dashboard="viewDashboard"
-                :key="'table' + chartKey"
+            <!-- Inside #control-panel so the chart-height observer accounts for it. -->
+            <health-warning
+                v-if="sensorMode"
+                kind="channel"
+                :device-uid="props.deviceUID!"
+                :channel-name="props.channelName!"
+                class="w-full mx-2 mb-2"
             />
         </div>
-    </Fullscreen>
+        <Fullscreen v-model="fullPage" :teleport="true" :page-only="true" class="min-h-0 flex-1">
+            <div class="h-full" :class="{ 'full-page-wrapper': fullPage }">
+                <div
+                    v-if="fullPage"
+                    class="flex flex-row pt-0.5 fixed left-0 top-0 z-50 w-full justify-between"
+                >
+                    <div />
+                    <div v-tooltip.top="t('views.dashboard.exitFullPage')" @click="toggleFullPage">
+                        <svg-icon
+                            type="mdi"
+                            class="text-text-color-secondary"
+                            :path="mdiOverscan"
+                            :size="deviceStore.getREMSize(1.325)"
+                        />
+                    </div>
+                    <div />
+                </div>
+                <TimeChart
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    :dashboard="viewDashboard"
+                    :key="chartKey"
+                />
+                <SensorTable
+                    v-else-if="dashboard.chartType == ChartType.TABLE"
+                    ref="sensorTableRef"
+                    :dashboard="viewDashboard"
+                    :key="'table' + chartKey"
+                />
+            </div>
+        </Fullscreen>
+    </div>
 </template>
 
 <style lang="scss" scoped>

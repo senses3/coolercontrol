@@ -380,251 +380,253 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex flex-wrap items-center justify-between px-2 pt-2">
-        <entity-title-rename
-            :current-name="currentFunction.name"
-            :save-name-function="saveNameFunction"
-        />
-        <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
-            <UiButton
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('components.wizards.functionApply.applyFunction')"
-                @click="openFunctionApplyWizard(currentFunction.uid)"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiExportVariant"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-            <UiButton
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('layout.menu.tooltips.duplicate')"
-                @click="duplicateFunction"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiContentDuplicate"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-            <UiButton
-                v-if="currentFunction.uid !== '0'"
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('views.functions.deleteFunction')"
-                @click="deleteFunction"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiDeleteOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-            <div class="p-2">
+    <div class="flex h-full flex-col">
+        <div class="flex shrink-0 flex-wrap items-center justify-between px-2 pt-2">
+            <entity-title-rename
+                :current-name="currentFunction.name"
+                :save-name-function="saveNameFunction"
+            />
+            <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
                 <UiButton
-                    class="w-32"
-                    :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    v-tooltip.top="t('views.functions.saveFunction')"
-                    @click="saveFunctionState"
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('components.wizards.functionApply.applyFunction')"
+                    @click="openFunctionApplyWizard(currentFunction.uid)"
                 >
                     <svg-icon
-                        class="outline-0"
                         type="mdi"
-                        :path="mdiContentSaveOutline"
-                        :size="deviceStore.getREMSize(1.5)"
+                        :path="mdiExportVariant"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
                 </UiButton>
-            </div>
-        </div>
-        <div
-            v-if="usedByProfiles.length > 0"
-            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
-        >
-            <span>{{ t('views.functions.usedBy') }}:</span>
-            <span
-                v-for="(profile, index) in usedByProfiles"
-                :key="profile.uid"
-                class="whitespace-nowrap"
-            >
-                <RouterLink
-                    :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-                    class="inline-flex items-center gap-1 rounded align-middle text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('layout.menu.tooltips.duplicate')"
+                    @click="duplicateFunction"
                 >
                     <svg-icon
                         type="mdi"
-                        :path="mdiChartMultiple"
-                        :size="14"
-                        class="shrink-0 text-text-color-secondary"
+                        :path="mdiContentDuplicate"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
-                    {{ profile.name }}
-                </RouterLink>
-                <span v-if="index < usedByProfiles.length - 1">,</span>
-            </span>
-        </div>
-    </div>
-    <ScrollAreaRoot style="--scrollbar-size: 10px">
-        <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <!-- Responsive card grid: full-width cards when narrow, two
-                 columns when wide, like the overview pages. -->
-            <div class="grid w-full max-w-4xl grid-cols-1 items-start gap-4 xl:grid-cols-2">
-                <UiSettingsCard :title="t('views.functions.stepSizeTitle')">
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.fixedStepSizeTooltip')"
-                        :label="t('views.functions.fixedStepSize')"
+                </UiButton>
+                <UiButton
+                    v-if="currentFunction.uid !== '0'"
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.functions.deleteFunction')"
+                    @click="deleteFunction"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDeleteOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <div class="p-2">
+                    <UiButton
+                        class="w-32"
+                        :class="{ 'animate-pulse-fast': contextIsDirty }"
+                        v-tooltip.top="t('views.functions.saveFunction')"
+                        @click="saveFunctionState"
                     >
-                        <UiSwitch
-                            v-model="chosenFixedStepSize"
-                            @update:model-value="updateFixedStepSize"
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiContentSaveOutline"
+                            :size="deviceStore.getREMSize(1.5)"
                         />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.asymmetricTooltip')"
-                        :label="t('views.functions.asymmetric')"
-                    >
-                        <UiSwitch
-                            v-model="chosenAsymmetric"
-                            @update:model-value="updateSymmetricStepSize"
-                        />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-tooltip.top="
-                            chosenFixedStepSize
-                                ? chosenAsymmetric
-                                    ? t('views.functions.stepSizeFixedIncreasingTooltip')
-                                    : t('views.functions.stepSizeFixedTooltip')
-                                : chosenAsymmetric
-                                  ? t('views.functions.stepSizeMinIncreasingTooltip')
-                                  : t('views.functions.stepSizeMinTooltip')
-                        "
-                        :label="
-                            chosenFixedStepSize
-                                ? chosenAsymmetric
-                                    ? t('views.functions.stepSizeFixedIncreasing')
-                                    : t('views.functions.stepSizeFixed')
-                                : chosenAsymmetric
-                                  ? t('views.functions.stepSizeMinIncreasing')
-                                  : t('views.functions.stepSizeMin')
-                        "
-                    >
-                        <UiNumberInput
-                            v-model="chosenStepDutyMinimum"
-                            :min="dutyMin"
-                            :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
-                            :suffix="t('common.percentUnit')"
-                        />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-if="!chosenFixedStepSize"
-                        v-tooltip.top="
-                            chosenAsymmetric
-                                ? t('views.functions.stepSizeMaxIncreasingTooltip')
-                                : t('views.functions.stepSizeMaxTooltip')
-                        "
-                        :label="
-                            chosenAsymmetric
-                                ? t('views.functions.stepSizeMaxIncreasing')
-                                : t('views.functions.stepSizeMax')
-                        "
-                    >
-                        <UiNumberInput
-                            v-model="chosenStepDutyMaximum"
-                            :min="chosenStepDutyMinimum"
-                            :max="dutyMax"
-                            :suffix="t('common.percentUnit')"
-                        />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-if="chosenAsymmetric"
-                        v-tooltip.top="
-                            chosenFixedStepSize
-                                ? t('views.functions.stepSizeFixedDecreasingTooltip')
-                                : t('views.functions.stepSizeMinDecreasingTooltip')
-                        "
-                        :label="
-                            chosenFixedStepSize
-                                ? t('views.functions.stepSizeFixedDecreasing')
-                                : t('views.functions.stepSizeMinDecreasing')
-                        "
-                    >
-                        <UiNumberInput
-                            v-model="chosenStepSizeMinDecreasing"
-                            :min="dutyMin"
-                            :max="chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing"
-                            :suffix="t('common.percentUnit')"
-                        />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-if="chosenAsymmetric && !chosenFixedStepSize"
-                        v-tooltip.top="t('views.functions.stepSizeMaxDecreasingTooltip')"
-                        :label="t('views.functions.stepSizeMaxDecreasing')"
-                    >
-                        <UiNumberInput
-                            v-model="chosenStepSizeMaxDecreasing"
-                            :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
-                            :max="dutyMax"
-                            :suffix="t('common.percentUnit')"
-                        />
-                    </UiSettingRow>
-                </UiSettingsCard>
-                <UiSettingsCard :title="t('views.functions.stepOverrides')">
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.thresholdHoppingTooltip')"
-                        :label="t('views.functions.thresholdHopping')"
-                    >
-                        <UiSwitch v-model="chosenThresholdHopping" />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')"
-                        :label="t('views.functions.bypassMinAtExtremes')"
-                    >
-                        <UiSwitch v-model="chosenBypassMinAtExtremes" />
-                    </UiSettingRow>
-                </UiSettingsCard>
-                <UiSettingsCard :title="t('views.functions.hysteresis')">
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
-                        :label="t('views.functions.hysteresisThreshold')"
-                    >
-                        <UiNumberInput
-                            v-model="chosenDeviance"
-                            :min="devianceMin"
-                            :max="devianceMax"
-                            :step="0.1"
-                            :suffix="t('common.tempUnit')"
-                        />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
-                        :label="t('views.functions.hysteresisDelay')"
-                    >
-                        <UiNumberInput
-                            v-model="chosenDelay"
-                            :min="delayMin"
-                            :max="delayMax"
-                            :suffix="t('common.secondAbbr')"
-                        />
-                    </UiSettingRow>
-                    <UiSettingRow
-                        v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
-                        :label="t('views.functions.onlyDownward')"
-                    >
-                        <UiSwitch v-model="chosenOnlyDownward" />
-                    </UiSettingRow>
-                </UiSettingsCard>
+                    </UiButton>
+                </div>
             </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
-            orientation="vertical"
-        >
-            <ScrollAreaThumb
-                class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
+            <div
+                v-if="usedByProfiles.length > 0"
+                class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
+            >
+                <span>{{ t('views.functions.usedBy') }}:</span>
+                <span
+                    v-for="(profile, index) in usedByProfiles"
+                    :key="profile.uid"
+                    class="whitespace-nowrap"
+                >
+                    <RouterLink
+                        :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
+                        class="inline-flex items-center gap-1 rounded align-middle text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiChartMultiple"
+                            :size="14"
+                            class="shrink-0 text-text-color-secondary"
+                        />
+                        {{ profile.name }}
+                    </RouterLink>
+                    <span v-if="index < usedByProfiles.length - 1">,</span>
+                </span>
+            </div>
+        </div>
+        <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
+            <ScrollAreaViewport class="p-4 h-full w-full">
+                <!-- Responsive card grid: full-width cards when narrow, two
+                     columns when wide, like the overview pages. -->
+                <div class="grid w-full max-w-4xl grid-cols-1 items-start gap-4 xl:grid-cols-2">
+                    <UiSettingsCard :title="t('views.functions.stepSizeTitle')">
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.fixedStepSizeTooltip')"
+                            :label="t('views.functions.fixedStepSize')"
+                        >
+                            <UiSwitch
+                                v-model="chosenFixedStepSize"
+                                @update:model-value="updateFixedStepSize"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.asymmetricTooltip')"
+                            :label="t('views.functions.asymmetric')"
+                        >
+                            <UiSwitch
+                                v-model="chosenAsymmetric"
+                                @update:model-value="updateSymmetricStepSize"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="
+                                chosenFixedStepSize
+                                    ? chosenAsymmetric
+                                        ? t('views.functions.stepSizeFixedIncreasingTooltip')
+                                        : t('views.functions.stepSizeFixedTooltip')
+                                    : chosenAsymmetric
+                                      ? t('views.functions.stepSizeMinIncreasingTooltip')
+                                      : t('views.functions.stepSizeMinTooltip')
+                            "
+                            :label="
+                                chosenFixedStepSize
+                                    ? chosenAsymmetric
+                                        ? t('views.functions.stepSizeFixedIncreasing')
+                                        : t('views.functions.stepSizeFixed')
+                                    : chosenAsymmetric
+                                      ? t('views.functions.stepSizeMinIncreasing')
+                                      : t('views.functions.stepSizeMin')
+                            "
+                        >
+                            <UiNumberInput
+                                v-model="chosenStepDutyMinimum"
+                                :min="dutyMin"
+                                :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
+                                :suffix="t('common.percentUnit')"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-if="!chosenFixedStepSize"
+                            v-tooltip.top="
+                                chosenAsymmetric
+                                    ? t('views.functions.stepSizeMaxIncreasingTooltip')
+                                    : t('views.functions.stepSizeMaxTooltip')
+                            "
+                            :label="
+                                chosenAsymmetric
+                                    ? t('views.functions.stepSizeMaxIncreasing')
+                                    : t('views.functions.stepSizeMax')
+                            "
+                        >
+                            <UiNumberInput
+                                v-model="chosenStepDutyMaximum"
+                                :min="chosenStepDutyMinimum"
+                                :max="dutyMax"
+                                :suffix="t('common.percentUnit')"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-if="chosenAsymmetric"
+                            v-tooltip.top="
+                                chosenFixedStepSize
+                                    ? t('views.functions.stepSizeFixedDecreasingTooltip')
+                                    : t('views.functions.stepSizeMinDecreasingTooltip')
+                            "
+                            :label="
+                                chosenFixedStepSize
+                                    ? t('views.functions.stepSizeFixedDecreasing')
+                                    : t('views.functions.stepSizeMinDecreasing')
+                            "
+                        >
+                            <UiNumberInput
+                                v-model="chosenStepSizeMinDecreasing"
+                                :min="dutyMin"
+                                :max="chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing"
+                                :suffix="t('common.percentUnit')"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-if="chosenAsymmetric && !chosenFixedStepSize"
+                            v-tooltip.top="t('views.functions.stepSizeMaxDecreasingTooltip')"
+                            :label="t('views.functions.stepSizeMaxDecreasing')"
+                        >
+                            <UiNumberInput
+                                v-model="chosenStepSizeMaxDecreasing"
+                                :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
+                                :max="dutyMax"
+                                :suffix="t('common.percentUnit')"
+                            />
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard :title="t('views.functions.stepOverrides')">
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.thresholdHoppingTooltip')"
+                            :label="t('views.functions.thresholdHopping')"
+                        >
+                            <UiSwitch v-model="chosenThresholdHopping" />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')"
+                            :label="t('views.functions.bypassMinAtExtremes')"
+                        >
+                            <UiSwitch v-model="chosenBypassMinAtExtremes" />
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                    <UiSettingsCard :title="t('views.functions.hysteresis')">
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
+                            :label="t('views.functions.hysteresisThreshold')"
+                        >
+                            <UiNumberInput
+                                v-model="chosenDeviance"
+                                :min="devianceMin"
+                                :max="devianceMax"
+                                :step="0.1"
+                                :suffix="t('common.tempUnit')"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
+                            :label="t('views.functions.hysteresisDelay')"
+                        >
+                            <UiNumberInput
+                                v-model="chosenDelay"
+                                :min="delayMin"
+                                :max="delayMax"
+                                :suffix="t('common.secondAbbr')"
+                            />
+                        </UiSettingRow>
+                        <UiSettingRow
+                            v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
+                            :label="t('views.functions.onlyDownward')"
+                        >
+                            <UiSwitch v-model="chosenOnlyDownward" />
+                        </UiSettingRow>
+                    </UiSettingsCard>
+                </div>
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar
+                class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
+                orientation="vertical"
+            >
+                <ScrollAreaThumb
+                    class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
+                />
+            </ScrollAreaScrollbar>
+        </ScrollAreaRoot>
+    </div>
 </template>
 
 <style scoped lang="scss"></style>

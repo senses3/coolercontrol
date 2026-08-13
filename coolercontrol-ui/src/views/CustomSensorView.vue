@@ -647,324 +647,330 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="flex items-center justify-between px-2 pt-2">
-        <entity-title-rename
-            :current-name="currentName"
-            :fallback-name="defaultLabel"
-            :save-name-function="saveNameFunction"
-        />
-        <div class="flex flex-wrap items-center gap-x-1 justify-end">
-            <UiButton
-                v-if="!shouldCreateSensor"
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('views.customSensors.deleteCustomSensor')"
-                @click="deleteSensor"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiTrashCanOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-
-            <div class="p-2">
+    <div class="flex h-full flex-col">
+        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
+            <entity-title-rename
+                :current-name="currentName"
+                :fallback-name="defaultLabel"
+                :save-name-function="saveNameFunction"
+            />
+            <div class="flex flex-wrap items-center gap-x-1 justify-end">
                 <UiButton
-                    class="w-32"
-                    v-tooltip.top="t('views.customSensors.saveCustomSensor')"
-                    :disabled="saveButtonDisabled()"
-                    @click="saveSensor"
+                    v-if="!shouldCreateSensor"
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.customSensors.deleteCustomSensor')"
+                    @click="deleteSensor"
                 >
                     <svg-icon
-                        class="outline-0"
                         type="mdi"
-                        :path="mdiContentSaveOutline"
-                        :size="deviceStore.getREMSize(1.5)"
+                        :path="mdiTrashCanOutline"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
                 </UiButton>
+
+                <div class="p-2">
+                    <UiButton
+                        class="w-32"
+                        v-tooltip.top="t('views.customSensors.saveCustomSensor')"
+                        :disabled="saveButtonDisabled()"
+                        @click="saveSensor"
+                    >
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiContentSaveOutline"
+                            :size="deviceStore.getREMSize(1.5)"
+                        />
+                    </UiButton>
+                </div>
             </div>
         </div>
-    </div>
-    <ScrollAreaRoot style="--scrollbar-size: 10px">
-        <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <health-warning kind="custom-sensor" :entity-uid="props.customSensorID" class="mb-4" />
-            <div
-                v-if="droppedSources.length > 0"
-                class="mb-4 flex flex-row items-center gap-2 rounded-lg border border-warning bg-warning/10 p-3"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="text-warning min-w-6"
-                    :path="mdiAlertCircle"
-                    :size="deviceStore.getREMSize(1.25)"
+        <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
+            <ScrollAreaViewport class="p-4 h-full w-full">
+                <health-warning
+                    kind="custom-sensor"
+                    :entity-uid="props.customSensorID"
+                    class="mb-4"
                 />
-                <span>
-                    {{
-                        t('views.customSensors.missingSourcesNotice', {
-                            sources: droppedSources.join(', '),
-                        })
-                    }}
-                </span>
-            </div>
-            <div class="w-full flex flex-col lg:flex-row">
-                <div class="mt-0 lg:mr-4 w-full max-w-96">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.sensorType') }}
-                    </small>
-                    <UiListbox
-                        :model-value="selectedSensorType"
-                        :options="sensorTypeOptions"
-                        class="w-full"
-                        @update:model-value="changeSensorType"
-                    >
-                        <template #option="{ option }">
-                            <div
-                                class="w-full"
-                                v-tooltip.right="
-                                    getSensorTypeHelpText(option.value as CustomSensorType)
-                                "
-                            >
-                                {{ option.label }}
-                            </div>
-                        </template>
-                    </UiListbox>
-                </div>
                 <div
-                    v-if="selectedSensorType === CustomSensorType.Mix"
-                    class="mt-4 lg:mt-0 w-full max-w-96"
+                    v-if="droppedSources.length > 0"
+                    class="mb-4 flex flex-row items-center gap-2 rounded-lg border border-warning bg-warning/10 p-3"
                 >
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.mixFunction') }}
-                    </small>
-                    <UiListbox
-                        :model-value="selectedMixFunction"
-                        :options="mixFunctionTypeOptions"
-                        class="w-full"
-                        v-tooltip.top="t('views.customSensors.howCalculateValue')"
-                        @update:model-value="changeMixFunction"
+                    <svg-icon
+                        type="mdi"
+                        class="text-warning min-w-6"
+                        :path="mdiAlertCircle"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
+                    <span>
+                        {{
+                            t('views.customSensors.missingSourcesNotice', {
+                                sources: droppedSources.join(', '),
+                            })
+                        }}
+                    </span>
                 </div>
-                <div
-                    v-if="selectedSensorType === CustomSensorType.Offset"
-                    class="flex flex-col mt-1 w-full max-w-96 mb-28"
-                >
-                    <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.offset') }}
-                    </small>
+                <div class="w-full flex flex-col lg:flex-row">
+                    <div class="mt-0 lg:mr-4 w-full max-w-96">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.sensorType') }}
+                        </small>
+                        <UiListbox
+                            :model-value="selectedSensorType"
+                            :options="sensorTypeOptions"
+                            class="w-full"
+                            @update:model-value="changeSensorType"
+                        >
+                            <template #option="{ option }">
+                                <div
+                                    class="w-full"
+                                    v-tooltip.right="
+                                        getSensorTypeHelpText(option.value as CustomSensorType)
+                                    "
+                                >
+                                    {{ option.label }}
+                                </div>
+                            </template>
+                        </UiListbox>
+                    </div>
                     <div
-                        class="rounded-lg bg-bg-two p-3 flex justify-center"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.offsetTooltip'),
-                        }"
+                        v-if="selectedSensorType === CustomSensorType.Mix"
+                        class="mt-4 lg:mt-0 w-full max-w-96"
                     >
-                        <UiNumberInput v-model="selectedOffset" :min="-100" :max="100" />
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.mixFunction') }}
+                        </small>
+                        <UiListbox
+                            :model-value="selectedMixFunction"
+                            :options="mixFunctionTypeOptions"
+                            class="w-full"
+                            v-tooltip.top="t('views.customSensors.howCalculateValue')"
+                            @update:model-value="changeMixFunction"
+                        />
+                    </div>
+                    <div
+                        v-if="selectedSensorType === CustomSensorType.Offset"
+                        class="flex flex-col mt-1 w-full max-w-96 mb-28"
+                    >
+                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.offset') }}
+                        </small>
+                        <div
+                            class="rounded-lg bg-bg-two p-3 flex justify-center"
+                            v-tooltip.top="{
+                                escape: false,
+                                value: t('views.customSensors.offsetTooltip'),
+                            }"
+                        >
+                            <UiNumberInput v-model="selectedOffset" :min="-100" :max="100" />
+                        </div>
+                    </div>
+                    <div
+                        v-if="
+                            selectedSensorType === CustomSensorType.TimeAverage ||
+                            selectedSensorType === CustomSensorType.ExponentialMovingAvg
+                        "
+                        class="flex flex-col mt-1 w-full max-w-96 mb-28"
+                    >
+                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.timeWindow') }}
+                        </small>
+                        <div
+                            class="rounded-lg bg-bg-two p-3 flex justify-center"
+                            v-tooltip.top="{
+                                escape: false,
+                                value: t('views.customSensors.timeWindowTooltip'),
+                            }"
+                        >
+                            <UiNumberInput
+                                v-model="selectedTimeWindowSeconds"
+                                :min="1"
+                                :max="300"
+                                :suffix="t('common.secondAbbr')"
+                            />
+                        </div>
+                    </div>
+                    <div
+                        v-else-if="selectedSensorType === CustomSensorType.File"
+                        class="flex flex-col w-full max-w-96 mt-1"
+                    >
+                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempFile') }}
+                        </small>
+                        <UiInput
+                            v-model="filePath"
+                            class="w-full"
+                            placeholder="/tmp/your_temp_file"
+                            :class="{ '!border-error': !filePath }"
+                            v-tooltip.top="t('views.customSensors.filePathTooltip')"
+                        />
+                        <div v-if="deviceStore.isQtApp()">
+                            <UiButton
+                                class="mt-2 w-full"
+                                v-tooltip.top="t('views.customSensors.browseCustomSensorFile')"
+                                @click="fileBrowse"
+                            >
+                                <svg-icon
+                                    class="outline-0 mt-[-0.25rem]"
+                                    type="mdi"
+                                    :path="mdiFolderSearchOutline"
+                                    :size="deviceStore.getREMSize(1.5)"
+                                />
+                                {{ t('views.customSensors.browse') }}
+                            </UiButton>
+                        </div>
                     </div>
                 </div>
                 <div
-                    v-if="
-                        selectedSensorType === CustomSensorType.TimeAverage ||
-                        selectedSensorType === CustomSensorType.ExponentialMovingAvg
-                    "
-                    class="flex flex-col mt-1 w-full max-w-96 mb-28"
+                    v-if="selectedSensorType === CustomSensorType.Mix"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
                 >
-                    <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.timeWindow') }}
-                    </small>
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSources') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenTempSourceKeys"
+                            class="w-full max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            multiple
+                            :invalid="chosenTempSources == null || chosenTempSources.length === 0"
+                            v-tooltip.top="{
+                                escape: false,
+                                value: t('views.customSensors.tempSourcesTooltip'),
+                            }"
+                        />
+                    </div>
                     <div
-                        class="rounded-lg bg-bg-two p-3 flex justify-center"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.timeWindowTooltip'),
-                        }"
+                        v-if="selectedMixFunction === CustomSensorMixFunctionType.WeightedAvg"
+                        class="w-full max-w-xl mt-4 lg:mt-0"
+                        v-tooltip.top="t('views.customSensors.tempWeights')"
                     >
-                        <UiNumberInput
-                            v-model="selectedTimeWindowSeconds"
-                            :min="1"
-                            :max="300"
-                            :suffix="t('common.secondAbbr')"
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempWeights') }}
+                        </small>
+                        <UiTable bordered>
+                            <template #head>
+                                <tr>
+                                    <th class="w-full">{{ t('views.customSensors.tempName') }}</th>
+                                    <th>{{ t('views.customSensors.weight') }}</th>
+                                </tr>
+                            </template>
+                            <tr
+                                v-for="source in chosenTempSources"
+                                :key="`${source.deviceUID}/${source.tempName}`"
+                            >
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiMinusThick"
+                                            :size="14"
+                                            class="shrink-0"
+                                            :style="{ color: source.lineColor }"
+                                        />
+                                        {{ source.tempFrontendName }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <UiNumberInput v-model="source.weight" :min="1" :max="254" />
+                                </td>
+                            </tr>
+                        </UiTable>
+                    </div>
+                </div>
+                <!--Need a separate model for single-selection temp source-->
+                <div
+                    v-if="selectedSensorType === CustomSensorType.Offset"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
+                >
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSource') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenOffsetTempSourceKey"
+                            class="w-full mt-1 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenOffsetTempSource == null"
                         />
                     </div>
                 </div>
                 <div
-                    v-else-if="selectedSensorType === CustomSensorType.File"
-                    class="flex flex-col w-full max-w-96 mt-1"
+                    v-if="selectedSensorType === CustomSensorType.TimeAverage"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
                 >
-                    <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempFile') }}
-                    </small>
-                    <UiInput
-                        v-model="filePath"
-                        class="w-full"
-                        placeholder="/tmp/your_temp_file"
-                        :class="{ '!border-error': !filePath }"
-                        v-tooltip.top="t('views.customSensors.filePathTooltip')"
-                    />
-                    <div v-if="deviceStore.isQtApp()">
-                        <UiButton
-                            class="mt-2 w-full"
-                            v-tooltip.top="t('views.customSensors.browseCustomSensorFile')"
-                            @click="fileBrowse"
-                        >
-                            <svg-icon
-                                class="outline-0 mt-[-0.25rem]"
-                                type="mdi"
-                                :path="mdiFolderSearchOutline"
-                                :size="deviceStore.getREMSize(1.5)"
-                            />
-                            {{ t('views.customSensors.browse') }}
-                        </UiButton>
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSource') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenTimeAverageTempSourceKey"
+                            class="w-full mt-1 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenTimeAverageTempSource == null"
+                        />
                     </div>
                 </div>
-            </div>
-            <div
-                v-if="selectedSensorType === CustomSensorType.Mix"
-                class="flex flex-col lg:flex-row mt-0 w-full"
-            >
-                <div class="w-full max-w-xl lg:mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSources') }}
-                    </small>
-                    <UiGroupedListbox
-                        v-model="chosenTempSourceKeys"
-                        class="w-full max-h-[28rem]"
-                        :groups="tempGroups"
-                        filter
-                        :filter-placeholder="t('common.search')"
-                        multiple
-                        :invalid="chosenTempSources == null || chosenTempSources.length === 0"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.tempSourcesTooltip'),
-                        }"
-                    />
+                <div
+                    v-if="selectedSensorType === CustomSensorType.ExponentialMovingAvg"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
+                >
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSource') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenEmaTempSourceKey"
+                            class="w-full mt-1 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenEmaTempSource == null"
+                        />
+                    </div>
                 </div>
                 <div
-                    v-if="selectedMixFunction === CustomSensorMixFunctionType.WeightedAvg"
-                    class="w-full max-w-xl mt-4 lg:mt-0"
-                    v-tooltip.top="t('views.customSensors.tempWeights')"
+                    v-if="!shouldCreateSensor"
+                    class="mt-6 shrink-0"
+                    style="--time-chart-height: 24rem"
+                    @wheel.capture="onChartWheelCapture"
                 >
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempWeights') }}
-                    </small>
-                    <UiTable bordered>
-                        <template #head>
-                            <tr>
-                                <th class="w-full">{{ t('views.customSensors.tempName') }}</th>
-                                <th>{{ t('views.customSensors.weight') }}</th>
-                            </tr>
-                        </template>
-                        <tr
-                            v-for="source in chosenTempSources"
-                            :key="`${source.deviceUID}/${source.tempName}`"
+                    <div class="mb-1 flex justify-center">
+                        <RouterLink
+                            :to="{
+                                name: 'monitoring-sensor',
+                                params: {
+                                    deviceUID: customSensorsDeviceUID,
+                                    channelName: customSensor.id,
+                                },
+                            }"
+                            class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                         >
-                            <td>
-                                <div class="flex items-center gap-2">
-                                    <svg-icon
-                                        type="mdi"
-                                        :path="mdiMinusThick"
-                                        :size="14"
-                                        class="shrink-0"
-                                        :style="{ color: source.lineColor }"
-                                    />
-                                    {{ source.tempFrontendName }}
-                                </div>
-                            </td>
-                            <td>
-                                <UiNumberInput v-model="source.weight" :min="1" :max="254" />
-                            </td>
-                        </tr>
-                    </UiTable>
+                            <svg-icon type="mdi" :path="mdiChartLine" :size="16" />
+                            {{ t('layout.shell.coolingPage.fullChart') }}
+                        </RouterLink>
+                    </div>
+                    <TimeChart :key="chartKey" :dashboard="singleDashboard" />
                 </div>
-            </div>
-            <!--Need a separate model for single-selection temp source-->
-            <div
-                v-if="selectedSensorType === CustomSensorType.Offset"
-                class="flex flex-col lg:flex-row mt-0 w-full"
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar
+                class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
+                orientation="vertical"
             >
-                <div class="w-full max-w-xl lg:mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSource') }}
-                    </small>
-                    <UiGroupedListbox
-                        v-model="chosenOffsetTempSourceKey"
-                        class="w-full mt-1 max-h-[28rem]"
-                        :groups="tempGroups"
-                        filter
-                        :filter-placeholder="t('common.search')"
-                        :invalid="chosenOffsetTempSource == null"
-                    />
-                </div>
-            </div>
-            <div
-                v-if="selectedSensorType === CustomSensorType.TimeAverage"
-                class="flex flex-col lg:flex-row mt-0 w-full"
-            >
-                <div class="w-full max-w-xl lg:mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSource') }}
-                    </small>
-                    <UiGroupedListbox
-                        v-model="chosenTimeAverageTempSourceKey"
-                        class="w-full mt-1 max-h-[28rem]"
-                        :groups="tempGroups"
-                        filter
-                        :filter-placeholder="t('common.search')"
-                        :invalid="chosenTimeAverageTempSource == null"
-                    />
-                </div>
-            </div>
-            <div
-                v-if="selectedSensorType === CustomSensorType.ExponentialMovingAvg"
-                class="flex flex-col lg:flex-row mt-0 w-full"
-            >
-                <div class="w-full max-w-xl lg:mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSource') }}
-                    </small>
-                    <UiGroupedListbox
-                        v-model="chosenEmaTempSourceKey"
-                        class="w-full mt-1 max-h-[28rem]"
-                        :groups="tempGroups"
-                        filter
-                        :filter-placeholder="t('common.search')"
-                        :invalid="chosenEmaTempSource == null"
-                    />
-                </div>
-            </div>
-            <div
-                v-if="!shouldCreateSensor"
-                class="mt-6 shrink-0"
-                style="--time-chart-height: 24rem"
-                @wheel.capture="onChartWheelCapture"
-            >
-                <div class="mb-1 flex justify-center">
-                    <RouterLink
-                        :to="{
-                            name: 'monitoring-sensor',
-                            params: {
-                                deviceUID: customSensorsDeviceUID,
-                                channelName: customSensor.id,
-                            },
-                        }"
-                        class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                        <svg-icon type="mdi" :path="mdiChartLine" :size="16" />
-                        {{ t('layout.shell.coolingPage.fullChart') }}
-                    </RouterLink>
-                </div>
-                <TimeChart :key="chartKey" :dashboard="singleDashboard" />
-            </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
-            orientation="vertical"
-        >
-            <ScrollAreaThumb
-                class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
+                <ScrollAreaThumb
+                    class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
+                />
+            </ScrollAreaScrollbar>
+        </ScrollAreaRoot>
+    </div>
 </template>
 
 <style scoped lang="scss"></style>

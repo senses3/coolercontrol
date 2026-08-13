@@ -216,118 +216,123 @@ const deleteMode = (): void => {
 </script>
 
 <template>
-    <div class="flex items-center justify-between px-2 pt-2">
-        <div class="flex flex-row overflow-hidden">
-            <entity-title-rename
-                :current-name="currentMode.name"
-                :save-name-function="saveNameFunction"
-            />
-            <div
-                class="px-4 py-2 flex flex-row leading-none items-center"
-                v-tooltip.top="t('views.mode.modeHint')"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
+    <div class="flex h-full flex-col">
+        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
+            <div class="flex flex-row overflow-hidden">
+                <entity-title-rename
+                    :current-name="currentMode.name"
+                    :save-name-function="saveNameFunction"
                 />
-            </div>
-        </div>
-        <div class="flex flex-row items-center gap-x-1">
-            <UiButton
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('views.modes.updateToCurrent')"
-                @click="updateModeWithCurrentSettings"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiContentSaveOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-            <UiButton
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('views.modes.duplicateMode')"
-                @click="duplicateMode"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiContentDuplicate"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-            <UiButton
-                variant="ghost"
-                size="icon"
-                v-tooltip.top="t('views.modes.deleteMode')"
-                @click="deleteMode"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiDeleteOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </UiButton>
-            <div
-                class="p-2"
-                v-tooltip.top="{ value: t('views.mode.currentlyActive'), disabled: !isActivated }"
-            >
-                <UiButton
-                    class="w-32"
-                    v-tooltip.top="t('views.mode.activateMode')"
-                    :disabled="isActivated"
-                    @click="activateMode"
+                <div
+                    class="px-4 py-2 flex flex-row leading-none items-center"
+                    v-tooltip.top="t('views.mode.modeHint')"
                 >
                     <svg-icon
-                        class="outline-0"
                         type="mdi"
-                        :path="mdiBookmarkCheckOutline"
-                        :size="deviceStore.getREMSize(1.5)"
+                        :path="mdiInformationSlabCircleOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </div>
+            </div>
+            <div class="flex flex-row items-center gap-x-1">
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.modes.updateToCurrent')"
+                    @click="updateModeWithCurrentSettings"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentSaveOutline"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
                 </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.modes.duplicateMode')"
+                    @click="duplicateMode"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentDuplicate"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.modes.deleteMode')"
+                    @click="deleteMode"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDeleteOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <div
+                    class="p-2"
+                    v-tooltip.top="{
+                        value: t('views.mode.currentlyActive'),
+                        disabled: !isActivated,
+                    }"
+                >
+                    <UiButton
+                        class="w-32"
+                        v-tooltip.top="t('views.mode.activateMode')"
+                        :disabled="isActivated"
+                        @click="activateMode"
+                    >
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiBookmarkCheckOutline"
+                            :size="deviceStore.getREMSize(1.5)"
+                        />
+                    </UiButton>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="h-full overflow-y-auto pb-14">
-        <UiTable sticky-header>
-            <template #head>
-                <tr>
-                    <th>{{ t('components.sensorTable.device') }}</th>
-                    <th>{{ t('components.sensorTable.channel') }}</th>
-                    <th>{{ t('components.modeTable.setting') }}</th>
-                    <th></th>
+        <div class="min-h-0 flex-1 overflow-y-auto">
+            <UiTable sticky-header>
+                <template #head>
+                    <tr>
+                        <th>{{ t('components.sensorTable.device') }}</th>
+                        <th>{{ t('components.sensorTable.channel') }}</th>
+                        <th>{{ t('components.modeTable.setting') }}</th>
+                        <th></th>
+                    </tr>
+                </template>
+                <tr v-for="(row, idx) in deviceTableData" :key="row.rowID">
+                    <td v-if="isFirstOfDevice(idx)" :rowspan="deviceRowSpan(idx)" class="align-top">
+                        <div class="flex leading-none items-center">
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiMemory"
+                                :size="deviceStore.getREMSize(1.3)"
+                                class="mr-2"
+                            />
+                            {{ row.deviceName }}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiMinusThick"
+                                :size="14"
+                                class="shrink-0"
+                                :style="{ color: row.channelColor }"
+                            />
+                            {{ row.channelLabel }}
+                        </div>
+                    </td>
+                    <td>{{ row.settingType }}</td>
+                    <td>{{ row.settingInfo }}</td>
                 </tr>
-            </template>
-            <tr v-for="(row, idx) in deviceTableData" :key="row.rowID">
-                <td v-if="isFirstOfDevice(idx)" :rowspan="deviceRowSpan(idx)" class="align-top">
-                    <div class="flex leading-none items-center">
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiMemory"
-                            :size="deviceStore.getREMSize(1.3)"
-                            class="mr-2"
-                        />
-                        {{ row.deviceName }}
-                    </div>
-                </td>
-                <td>
-                    <div class="flex items-center gap-2">
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiMinusThick"
-                            :size="14"
-                            class="shrink-0"
-                            :style="{ color: row.channelColor }"
-                        />
-                        {{ row.channelLabel }}
-                    </div>
-                </td>
-                <td>{{ row.settingType }}</td>
-                <td>{{ row.settingInfo }}</td>
-            </tr>
-        </UiTable>
+            </UiTable>
+        </div>
     </div>
 </template>
 
