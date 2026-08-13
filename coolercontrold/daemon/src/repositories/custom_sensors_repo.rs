@@ -216,9 +216,13 @@ impl CustomSensorsRepo {
                     }
                     parent_sensor.children.retain(|c| c != custom_sensor_id);
                     if let Some(sources) = parent_sensor.sources_mut() {
+                        // Only the deleted child goes: both halves must match for a
+                        // source to be the one being removed. Every custom-sensor
+                        // source shares `device_uid`, so requiring both to differ
+                        // stripped the parent's other children too.
                         sources.retain(|s| {
                             s.temp_source.device_uid != self.device_uid
-                                && s.temp_source.temp_name != custom_sensor_id
+                                || s.temp_source.temp_name != custom_sensor_id
                         });
                     }
                 } else {
@@ -2386,6 +2390,17 @@ mod tests {
                             .any(|s| s.temp_source.temp_name == "child_sensor")
                             .not()),
                 "Parent sensor still has child sensor"
+            );
+            assert!(
+                repo.sensors
+                    .borrow()
+                    .iter()
+                    .any(|sensor| sensor.id == "parent_sensor"
+                        && sensor
+                            .sources()
+                            .iter()
+                            .any(|s| s.temp_source.temp_name == "second_child_sensor")),
+                "Parent sensor lost its surviving child's source"
             );
         });
     }
