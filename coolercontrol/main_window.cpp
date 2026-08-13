@@ -1575,8 +1575,20 @@ void MainWindow::watchDaemonEvents() const {
     const auto status = sseReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     qDebug() << "Daemon Event SSE closed with status: " << status;
     if (status == 401) {
+      /*
+        The token was refused, so drop it and restart the health probe: that path
+        re-provisions a token and re-opens this stream once it succeeds. Without the
+        restart nothing ever runs again, because the retry timer was stopped by the
+        last successful probe, and tray modes, mode activation and daemon
+        notifications all go silent for the rest of the process lifetime.
+        No daemonConnectionLost here: the daemon answered, so nothing is lost, which
+        is the same reasoning the >= 400 branch below documents.
+      */
       clearAccessToken();
-      qDebug() << "Daemon Event SSE returned 401 - will retry after re-authentication.";
+      qDebug() << "Daemon Event SSE returned 401 - retrying after re-authentication.";
+      if (!m_forceQuit && !m_changeAddress) {
+        m_retryTimer->start();
+      }
       sseReply->deleteLater();
       return;
     }
