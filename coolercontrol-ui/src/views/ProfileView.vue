@@ -2069,19 +2069,25 @@ const router = useRouter()
 
 const duplicateProfile = async (): Promise<void> => {
     const source = currentProfile.value
+    // Copies, not the source's arrays: saveProfileState empties speed_profile and
+    // member_profile_uids in place, so a shared array means editing the original
+    // wipes the duplicate's curve.
     const newProfile = new Profile(
         `${source.name} ${t('common.copy')}`,
         source.p_type,
         source.speed_fixed,
         source.temp_source,
-        source.speed_profile,
-        source.member_profile_uids,
+        source.speed_profile.map((point): [number, number] => [point[0], point[1]]),
+        [...source.member_profile_uids],
         source.mix_function_type,
     )
     newProfile.function_uid = source.function_uid
     newProfile.temp_max = source.temp_max
     newProfile.temp_min = source.temp_min
-    newProfile.offset_profile = source.offset_profile
+    newProfile.offset_profile = source.offset_profile.map((point): [number, number] => [
+        point[0],
+        point[1],
+    ])
     settingsStore.profiles.push(newProfile)
     await settingsStore.saveProfile(newProfile.uid)
     toast.add({
