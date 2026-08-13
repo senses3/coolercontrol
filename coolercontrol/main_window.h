@@ -156,6 +156,10 @@ class MainWindow final : public QMainWindow {
   // health probe that just failed, never on its own, so it cannot race a recovery.
   mutable QElapsedTimer m_disconnectedFor;
   mutable int m_sseRetryDelayMs{0};
+  // A health probe is outstanding. The retry timer fires every two seconds while the
+  // request allows eight, so without this two probes can be in flight at once and both
+  // succeed, each opening its own event stream and doubling every notification.
+  mutable bool m_healthProbeInFlight{false};
   mutable bool m_changeAddress{false};
   mutable bool m_daemonHasErrors{false};
   mutable bool m_daemonHasWarnings{false};

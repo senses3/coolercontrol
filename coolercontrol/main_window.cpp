@@ -1678,6 +1678,13 @@ void MainWindow::reestablishDaemonConnection() const {
 }
 
 void MainWindow::tryDaemonConnection() {
+  if (m_healthProbeInFlight) {
+    // A probe outlives the retry interval on a slow link. Letting a second one start
+    // means both can succeed and each emits watchForSSE, which is the same stacked
+    // stream problem the finished-not-readyRead comment below describes.
+    return;
+  }
+  m_healthProbeInFlight = true;
   QNetworkRequest healthRequest;
   healthRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   healthRequest.setUrl(getEndpointUrl(ENDPOINT_HEALTH.data()));
@@ -1691,6 +1698,7 @@ void MainWindow::tryDaemonConnection() {
   // produced a disconnect notification. Locally the body arrives in one chunk, so it
   // only ever showed up over the network.
   connect(healthReply, &QNetworkReply::finished, [this, healthReply]() {
+    m_healthProbeInFlight = false;
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status == 401) {
       // A stored token the daemon no longer accepts (revoked, or its config was
