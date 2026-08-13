@@ -4,7 +4,13 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { plainToInstance } from 'class-transformer'
-import { alertIsSilenced, alertSources, AlertsDTO, AlertState } from '../Alert.ts'
+import {
+    alertIsSilenced,
+    alertIsSilencedAt,
+    alertSources,
+    AlertsDTO,
+    AlertState,
+} from '../Alert.ts'
 
 // class-transformer instantiates classes with NO constructor arguments and
 // assigns the payload fields afterwards; the Alert constructor must tolerate
@@ -125,5 +131,17 @@ describe('Alert deserialization', () => {
         expect(alertIsSilenced(alert)).toBe(true)
         alert.silenced_until = new Date(Date.now() - 60_000).toISOString()
         expect(alertIsSilenced(alert)).toBe(false)
+    })
+
+    it('compares against a caller-supplied clock', () => {
+        // The point of the -At form: a computed cannot depend on the wall clock, so it
+        // has to hand in a moment it controls for an expiry to be observable at all.
+        const dto = plainToInstance(AlertsDTO, daemonPayload as object)
+        const alert = dto.alerts[0]
+        const silencedUntil = Date.now() + 60_000
+        alert.silenced_until = new Date(silencedUntil).toISOString()
+        expect(alertIsSilencedAt(alert, silencedUntil - 1)).toBe(true)
+        expect(alertIsSilencedAt(alert, silencedUntil)).toBe(false)
+        expect(alertIsSilencedAt(alert, silencedUntil + 1)).toBe(false)
     })
 })

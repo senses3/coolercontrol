@@ -187,4 +187,32 @@ describe('store reactivity', () => {
         await drained()
         expect(dirty.value).toBe(true)
     })
+
+    // Locks what SettingsStore.anyActiveUnsilencedAlert depends on. A silence ends by
+    // the wall clock passing a timestamp, and no computed can depend on that: the alert
+    // list never changes, so the header and Qt tray badges stayed cleared for an alert
+    // that was still firing. Driving the comparison from a ref is what makes the expiry
+    // observable, and the first half of this test shows it staying stuck without one.
+    it('re-evaluates a silence only through a reactive clock', async () => {
+        const start = Date.now()
+        const silencedUntil = start + 60_000
+        const alerts = ref([{ uid: 'a', silencedUntil }])
+
+        const wallClockOnly = computed(() =>
+            alerts.value.some((alert) => alert.silencedUntil <= Date.now()),
+        )
+        const clock = ref(start)
+        const withClock = computed(() =>
+            alerts.value.some((alert) => alert.silencedUntil <= clock.value),
+        )
+        expect(wallClockOnly.value).toBe(false)
+        expect(withClock.value).toBe(false)
+
+        // The silence lapses. Nothing about the alert changed, which is the whole
+        // problem: only the computed reading a ref can notice.
+        clock.value = silencedUntil
+        await nextTick()
+        expect(withClock.value).toBe(true)
+        expect(wallClockOnly.value).toBe(false)
+    })
 })
