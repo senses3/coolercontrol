@@ -50,6 +50,23 @@ const usePositionStore = defineStore('test-positions', () => {
     return { positions, setReplacing, setInPlace }
 })
 
+// Locks the contract ChannelPage depends on for following a Mode activation. Activating a
+// Mode rewrites channel settings in the daemon and the SSE handler reloads every device,
+// replacing each channel DTO with a fresh object. A page that seeds its control state once
+// at setup keeps showing the old setting until it is remounted.
+const useChannelSettingsStore = defineStore('test-channel-settings', () => {
+    const allDaemonDeviceSettings = ref(new Map<string, Map<string, { profile_uid?: string }>>())
+
+    // Mirrors loadDaemonDeviceSettings: new DTOs every time, whether or not anything changed.
+    function reload(deviceUID: string, channelName: string, profileUID?: string): void {
+        const settings = new Map<string, { profile_uid?: string }>()
+        settings.set(channelName, { profile_uid: profileUID })
+        allDaemonDeviceSettings.value.set(deviceUID, settings)
+    }
+
+    return { allDaemonDeviceSettings, reload }
+})
+
 describe('store reactivity', () => {
     it('reaches a non-deep watcher only when an array setting is replaced', async () => {
         setActivePinia(createPinia())
@@ -113,5 +130,61 @@ describe('store reactivity', () => {
         store.publish('fan1', 75)
         await nextTick()
         expect(wrapper.text()).toBe('75')
+    })
+
+    it('re-seeds channel control state only when the daemon setting really changed', async () => {
+        setActivePinia(createPinia())
+        const store = useChannelSettingsStore()
+        store.reload('dev-1', 'fan1', 'profile-a')
+
+        const daemonSetting = computed(() =>
+            store.allDaemonDeviceSettings.get('dev-1')?.get('fan1'),
+        )
+        const selectedProfileUID = ref(daemonSetting.value?.profile_uid)
+        let reseeds = 0
+        // Separate getters, not one array getter: the array is a new value on every reload,
+        // so `watch(() => [a, b])` would re-seed even when nothing changed and would discard
+        // an edit in progress.
+        watch([() => daemonSetting.value?.profile_uid], () => {
+            reseeds += 1
+            selectedProfileUID.value = daemonSetting.value?.profile_uid
+        })
+
+        store.reload('dev-1', 'fan1', 'profile-b')
+        await nextTick()
+        expect(selectedProfileUID.value).toBe('profile-b')
+        expect(reseeds).toBe(1)
+
+        store.reload('dev-1', 'fan1', 'profile-b')
+        await nextTick()
+        expect(reseeds).toBe(1)
+    })
+
+    // Locks the ordering LightingView and LcdView rely on when a Mode activation re-seeds
+    // them. Their dirty watcher cannot tell a re-seed from a user edit, so it raises the
+    // unsaved-changes flag off the re-seed's own writes. Clearing on nextTick lands after
+    // that watcher has run; clearing inline would be overwritten and the page would then
+    // prompt about changes the user never made.
+    it('clears an unsaved-changes flag raised by the re-seed itself', async () => {
+        const drained = (): Promise<void> => new Promise((resolve) => setTimeout(resolve))
+        const daemonValue = ref('mode-a')
+        const selected = ref(daemonValue.value)
+        const dirty = ref(false)
+
+        watch(daemonValue, () => {
+            selected.value = daemonValue.value
+            void nextTick(() => (dirty.value = false))
+        })
+        watch(selected, () => (dirty.value = true))
+
+        daemonValue.value = 'mode-b'
+        await drained()
+        expect(selected.value).toBe('mode-b')
+        expect(dirty.value).toBe(false)
+
+        // A real edit still marks the page dirty.
+        selected.value = 'mode-c'
+        await drained()
+        expect(dirty.value).toBe(true)
     })
 })

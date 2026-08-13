@@ -63,8 +63,13 @@ for (const device of deviceStore.allDevices()) {
     }
 }
 
-let startingMode: LightingMode = noneLightingMode
-let startingSpeed: string =
+const daemonSetting = computed<DeviceSettingReadDTO | undefined>(() =>
+    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName),
+)
+const defaultColor = 'rgb(255, 255, 255)' // default LED color
+const rgbString = (rgbTuple: [number, number, number]): string =>
+    `rgb(${rgbTuple[0]}, ${rgbTuple[1]}, ${rgbTuple[2]})`
+const defaultSpeed: string =
     lightingSpeeds.length === 0
         ? 'none'
         : lightingSpeeds.length === 1
@@ -72,55 +77,56 @@ let startingSpeed: string =
           : lightingSpeeds.length === 5
             ? lightingSpeeds[2]
             : lightingSpeeds[Math.floor(lightingSpeeds.length / 2)]
-let startingBackwardEnabled = false
-let startingNumberOfColors: number = 0
-let colorsUI: Array<Ref<string>> = []
-const startingDeviceSetting: DeviceSettingReadDTO | undefined =
-    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName)
-if (startingDeviceSetting?.lighting != null) {
-    startingMode =
-        lightingModes.find(
-            (mode: LightingMode) => mode.name === startingDeviceSetting.lighting?.mode,
-        ) ?? noneLightingMode
-    if (startingMode.speed_enabled) {
-        startingSpeed =
-            lightingSpeeds.find(
-                (speed: string) => speed === startingDeviceSetting.lighting?.speed,
-            ) ?? startingSpeed
-    }
-    if (startingMode.backward_enabled) {
-        startingBackwardEnabled = startingDeviceSetting.lighting.backward ?? false
-    }
-    if (startingMode.max_colors > 0) {
-        startingNumberOfColors =
-            startingDeviceSetting.lighting.colors.length ?? startingNumberOfColors
-        for (const rgbTuple of startingDeviceSetting.lighting.colors) {
-            colorsUI.push(ref(`rgb(${rgbTuple[0]}, ${rgbTuple[1]}, ${rgbTuple[2]})`))
-        }
+
+// One ref per possible color for the page's lifetime. The pickers bind to these,
+// and only the first `selectedNumberOfColors` are ever shown or saved.
+const colorsUI: Array<Ref<string>> = Array.from({ length: absoluteMaxColors }, () =>
+    ref(defaultColor),
+)
+const selectedMode: Ref<LightingMode> = ref(noneLightingMode)
+const selectedSpeed: Ref<string> = ref(defaultSpeed)
+const selectedBackwardEnabled: Ref<boolean> = ref(false)
+const selectedNumberOfColors: Ref<number> = ref(0)
+
+const seedFromDaemonSetting = (): void => {
+    const lighting = daemonSetting.value?.lighting
+    const mode =
+        lighting != null
+            ? (lightingModes.find((candidate) => candidate.name === lighting.mode) ??
+              noneLightingMode)
+            : noneLightingMode
+    selectedMode.value = mode
+    selectedSpeed.value = mode.speed_enabled
+        ? (lightingSpeeds.find((speed) => speed === lighting?.speed) ?? defaultSpeed)
+        : defaultSpeed
+    selectedBackwardEnabled.value = mode.backward_enabled ? (lighting?.backward ?? false) : false
+    selectedNumberOfColors.value = mode.max_colors > 0 ? (lighting?.colors.length ?? 0) : 0
+    for (const [index, color] of colorsUI.entries()) {
+        const rgbTuple = lighting?.colors[index]
+        color.value = rgbTuple != null ? rgbString(rgbTuple) : defaultColor
     }
 }
-for (let i = 0; i < absoluteMaxColors - startingMode.max_colors; i++) {
-    colorsUI.push(ref('rgb(255, 255, 255)')) // default LED color is white
-}
+seedFromDaemonSetting()
 
-const selectedMode: Ref<LightingMode> = ref(startingMode)
-const selectedSpeed: Ref<string> = ref(startingSpeed)
-const selectedBackwardEnabled: Ref<boolean> = ref(startingBackwardEnabled)
-const selectedNumberOfColors: Ref<number> = ref(startingNumberOfColors)
+// Activating a Mode rewrites this channel's lighting in the daemon, as does any
+// other client. The state above is seeded once, so follow the daemon whenever its
+// setting really changes. Compared as a signature string: every settings reload
+// hands back new DTO objects, so object identity would fire on unrelated saves.
+watch(
+    () => JSON.stringify(daemonSetting.value?.lighting ?? null),
+    () => {
+        seedFromDaemonSetting()
+        // The dirty watcher runs on the same flush, off these very writes. The page
+        // now matches the daemon, so clear the flag once that watcher has had its turn.
+        nextTick(() => (contextIsDirty.value = false))
+    },
+)
 
-const colorsToShow = computed(() => {
-    return colorsUI.slice(0, selectedNumberOfColors.value)
-})
+const colorsToShow = computed(() => colorsUI.slice(0, selectedNumberOfColors.value))
 
 const getDefaultColor = (colorIndex: number): string => {
-    if (
-        startingDeviceSetting?.lighting != null &&
-        startingDeviceSetting.lighting.colors.length > colorIndex
-    ) {
-        const rgbTuple = startingDeviceSetting.lighting.colors[colorIndex]
-        return `rgb(${rgbTuple[0]}, ${rgbTuple[1]}, ${rgbTuple[2]})`
-    }
-    return 'rgb(255, 255, 255)'
+    const rgbTuple = daemonSetting.value?.lighting?.colors[colorIndex]
+    return rgbTuple != null ? rgbString(rgbTuple) : defaultColor
 }
 
 const parseRgbString = (rgbColor: string): [number, number, number] => {

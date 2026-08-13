@@ -141,48 +141,91 @@ const fillTempSources = () => {
     }
 }
 fillTempSources()
-let startingLcdMode: LcdMode = noneLcdMode
-let startingBrightness: number = 50
-let startingOrientation: number = 0
-let startingTempSource: AvailableTemp | undefined = undefined
-let startingImagePath: string | undefined = undefined
-let startingImagesPath: string = ''
-let startingInterval: number = 10
-const startingDeviceSetting: DeviceSettingReadDTO | undefined =
-    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName)
-if (startingDeviceSetting?.lcd != null) {
-    startingLcdMode =
-        lcdModes.find((lcdMode: LcdMode) => lcdMode.name === startingDeviceSetting.lcd?.mode) ??
-        noneLcdMode
-    startingBrightness = startingDeviceSetting.lcd.brightness ?? startingBrightness
-    startingOrientation = startingDeviceSetting.lcd.orientation ?? startingOrientation
-    startingImagePath = startingDeviceSetting.lcd.image_file_processed
-    startingImagesPath = startingDeviceSetting.lcd.carousel?.images_path ?? ''
-    startingInterval = startingDeviceSetting.lcd.carousel?.interval ?? 10
-    const savedTempSource: TempSource | undefined = startingDeviceSetting.lcd.temp_source
-    if (savedTempSource != null) {
-        outer: for (const tempDevice of tempSources.value) {
-            for (const tempSource of tempDevice.temps) {
-                if (
-                    tempSource.deviceUID === savedTempSource.device_uid &&
-                    tempSource.tempName === savedTempSource.temp_name
-                ) {
-                    startingTempSource = tempSource
-                    break outer
-                }
+const daemonSetting = computed<DeviceSettingReadDTO | undefined>(() =>
+    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName),
+)
+
+const selectedLcdMode: Ref<LcdMode> = ref(noneLcdMode)
+const selectedBrightness: Ref<number> = ref(50)
+const selectedOrientation: Ref<number> = ref(0)
+const chosenTemp: Ref<AvailableTemp | undefined> = ref()
+const files: Array<File> = []
+const fileDataURLs: Ref<Array<string>> = ref([])
+const imagesPath: Ref<string> = ref('')
+const imagesDelayInterval: Ref<number> = ref(10)
+// The image itself lives behind its own endpoint; the setting only names it.
+const savedImagePath: Ref<string | undefined> = ref()
+
+const findTempSource = (saved: TempSource | undefined): AvailableTemp | undefined => {
+    if (saved == null) return undefined
+    for (const tempDevice of tempSources.value) {
+        for (const tempSource of tempDevice.temps) {
+            if (
+                tempSource.deviceUID === saved.device_uid &&
+                tempSource.tempName === saved.temp_name
+            ) {
+                return tempSource
             }
         }
     }
+    return undefined
 }
 
-const selectedLcdMode: Ref<LcdMode> = ref(startingLcdMode)
-const selectedBrightness: Ref<number> = ref(startingBrightness)
-const selectedOrientation: Ref<number> = ref(startingOrientation)
-const chosenTemp: Ref<AvailableTemp | undefined> = ref(startingTempSource)
-const files: Array<File> = []
-const fileDataURLs: Ref<Array<string>> = ref([])
-const imagesPath: Ref<string> = ref(startingImagesPath)
-const imagesDelayInterval: Ref<number> = ref(startingInterval)
+const seedFromDaemonSetting = (): void => {
+    const lcd = daemonSetting.value?.lcd
+    selectedLcdMode.value =
+        lcd != null
+            ? (lcdModes.find((lcdMode: LcdMode) => lcdMode.name === lcd.mode) ?? noneLcdMode)
+            : noneLcdMode
+    selectedBrightness.value = lcd?.brightness ?? 50
+    selectedOrientation.value = lcd?.orientation ?? 0
+    chosenTemp.value = findTempSource(lcd?.temp_source)
+    savedImagePath.value = lcd?.image_file_processed
+    imagesPath.value = lcd?.carousel?.images_path ?? ''
+    imagesDelayInterval.value = lcd?.carousel?.interval ?? 10
+}
+seedFromDaemonSetting()
+
+const clearImages = (): void => {
+    for (const dataURL of fileDataURLs.value) {
+        // make sure these can be garbage collected:
+        URL.revokeObjectURL(dataURL)
+    }
+    fileDataURLs.value.length = 0
+    files.length = 0
+}
+
+const loadSavedImage = async (): Promise<void> => {
+    clearImages()
+    if (selectedLcdMode.value.name !== 'image' || savedImagePath.value == null) {
+        return
+    }
+    const response: File | ErrorResponse = await deviceStore.daemonClient.getDeviceSettingLcdImage(
+        props.deviceUID,
+        props.channelName,
+    )
+    if (response instanceof ErrorResponse) {
+        console.error(response.error)
+        return
+    }
+    fileDataURLs.value.push(URL.createObjectURL(response))
+    files.push(response)
+}
+
+// Activating a Mode rewrites this channel's LCD setting in the daemon, as does any
+// other client. The state above is seeded once, so follow the daemon whenever its
+// setting really changes. Compared as a signature string: every settings reload
+// hands back new DTO objects, so object identity would fire on unrelated saves.
+watch(
+    () => JSON.stringify(daemonSetting.value?.lcd ?? null),
+    async (): Promise<void> => {
+        seedFromDaemonSetting()
+        await loadSavedImage()
+        await nextTick()
+        // The page now matches the daemon, so the dirty flag these writes raised is stale.
+        contextIsDirty.value = false
+    },
+)
 
 /**
  * We intercept the automatic uploader to handle our custom logic here
@@ -440,19 +483,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
 onMounted(async () => {
     onBeforeRouteUpdate(checkForUnsavedChanges)
     onBeforeRouteLeave(checkForUnsavedChanges)
-    if (startingLcdMode.name === 'image' && startingImagePath != null) {
-        const response: File | ErrorResponse =
-            await deviceStore.daemonClient.getDeviceSettingLcdImage(
-                props.deviceUID,
-                props.channelName,
-            )
-        if (response instanceof ErrorResponse) {
-            console.error(response.error)
-        } else {
-            fileDataURLs.value.push(URL.createObjectURL(response))
-            files.push(response)
-        }
-    }
+    await loadSavedImage()
     watch(rawStore.currentDeviceStatus, () => {
         updateTemps()
     })
@@ -480,12 +511,7 @@ onMounted(async () => {
     })
 })
 
-onUnmounted(() => {
-    for (const dataURL of fileDataURLs.value) {
-        // make sure these can be garbage collected:
-        URL.revokeObjectURL(dataURL)
-    }
-})
+onUnmounted(clearImages)
 </script>
 
 <template>

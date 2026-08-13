@@ -14,7 +14,7 @@ import {
     mdiSourceFork,
 } from '@mdi/js'
 import { storeToRefs } from 'pinia'
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
@@ -106,17 +106,34 @@ const liveRpm = computed(
 )
 
 // ----- control mode state -----
-const initialControlMode = (): ControlMode => {
+const controlModeOf = (): ControlMode => {
     if (daemonSetting.value?.speed_fixed != null) return 'manual'
     if (daemonSetting.value?.profile_uid != null && daemonSetting.value.profile_uid !== '0') {
         return 'automatic'
     }
     return 'unmanaged'
 }
-const controlMode = ref<ControlMode>(initialControlMode())
-const manualDuty = ref<number>(daemonSetting.value?.speed_fixed ?? Number(liveDuty.value ?? '50'))
-const selectedProfileUID = ref<UID | undefined>(
-    daemonSetting.value?.profile_uid !== '0' ? daemonSetting.value?.profile_uid : undefined,
+const manualDutyOf = (): number =>
+    daemonSetting.value?.speed_fixed ?? Number(liveDuty.value ?? '50')
+const profileUIDOf = (): UID | undefined =>
+    daemonSetting.value?.profile_uid !== '0' ? daemonSetting.value?.profile_uid : undefined
+
+const controlMode = ref<ControlMode>(controlModeOf())
+const manualDuty = ref<number>(manualDutyOf())
+const selectedProfileUID = ref<UID | undefined>(profileUIDOf())
+
+// Activating a Mode rewrites this channel's setting while the page stays mounted,
+// as does any other client. The state above is seeded once, so follow the daemon
+// whenever its setting really changes. Separate sources, not one array getter: the
+// DTO is a new object after every reload, so only per-value comparison stays quiet
+// on reloads that left this channel alone.
+watch(
+    [() => daemonSetting.value?.profile_uid, () => daemonSetting.value?.speed_fixed],
+    (): void => {
+        controlMode.value = controlModeOf()
+        manualDuty.value = manualDutyOf()
+        selectedProfileUID.value = profileUIDOf()
+    },
 )
 
 const controlModeOptions = computed(() => [
