@@ -302,7 +302,10 @@ onMounted(async () => {
             // Qt renders its own dialogs and has no translations. Hand it the strings
             // it needs in the active locale; it caches them, since a discarded
             // renderer cannot be asked later.
-            ipc.setTranslations(JSON.stringify(buildQtStrings(t)))
+            // Optional: a Qt app that has not been restarted since the update has no
+            // such method, and a bare call there rejects this whole function, which
+            // would strand pushTrayPinnedSensors below.
+            ipc.setTranslations?.(JSON.stringify(buildQtStrings(t)))
             // Seed the tray's sensor list. The watch only fires on later changes.
             settingsStore.pushTrayPinnedSensors()
         }
