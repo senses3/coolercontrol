@@ -149,8 +149,10 @@ const changeCount = computed(() => {
 
 const apply = (): void => {
     if (edits.value.size === 0) return
-    deviceActions.applySensorChangesBatch(edits.value, (success) => {
-        if (!success) resetState()
+    deviceActions.applySensorChangesBatch(edits.value, (outcome) => {
+        // Only a daemon rejection discards the pending toggles. Backing out of the
+        // restart confirm leaves them in place to apply again.
+        if (outcome === 'failed') resetState()
     })
 }
 const cancel = (): void => {

@@ -236,12 +236,14 @@ const filesChosen = async (event: { files: File[] }): Promise<void> => {
         console.error('No File attached to the uploader')
         return
     }
+    // Validate before touching state: these used to only toast, so an oversized or
+    // non-image file was reported and then uploaded anyway.
+    for (const chosenFile of event.files) {
+        if (!validateFileType(chosenFile)) return
+        if (!validateFileSize(chosenFile)) return
+    }
     files.length = 0
     fileDataURLs.value.length = 0
-    for (const chosenFile of event.files) {
-        validateFileSize(chosenFile)
-        validateFileType(chosenFile)
-    }
     const processing = showLoadingOverlay({
         target: '#lcd-control-pane',
         text: t('views.lcd.processing'),
@@ -267,9 +269,9 @@ const filesChosen = async (event: { files: File[] }): Promise<void> => {
     files.push(response)
 }
 
-const validateFileSize = (file: File): void => {
+const validateFileSize = (file: File): boolean => {
     if (file.size <= imageSizeMaxBytes) {
-        return
+        return true
     }
     console.error('Image is too large for the LCD Screen memory')
     toast.add({
@@ -278,11 +280,12 @@ const validateFileSize = (file: File): void => {
         detail: t('views.lcd.imageTooLarge'),
         life: 4000,
     })
+    return false
 }
 
-const validateFileType = (file: File): void => {
+const validateFileType = (file: File): boolean => {
     if (file.type.startsWith('image/')) {
-        return
+        return true
     }
     console.error('File is not an image')
     toast.add({
@@ -291,6 +294,7 @@ const validateFileType = (file: File): void => {
         detail: t('views.lcd.notImageType'),
         life: 4000,
     })
+    return false
 }
 
 const saveLCDSetting = async () => {
@@ -409,8 +413,11 @@ const filesSelected = (event: Event): void => {
     }
 }
 const filesDropped = (event: DragEvent): void => {
+    // This drop zone only ever shows for single-image modes, and the file input
+    // beside it takes one file, so a multi-file drop keeps the first rather than
+    // sending the whole batch into a mode that can hold one image.
     const dropped = [...(event.dataTransfer?.files ?? [])]
-    if (dropped.length > 0) void filesChosen({ files: dropped })
+    if (dropped.length > 0) void filesChosen({ files: dropped.slice(0, 1) })
 }
 
 const delayIntervalFormatted: ComputedRef<string> = computed((): string => {

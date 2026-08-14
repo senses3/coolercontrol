@@ -4,7 +4,7 @@
 import { defineStore } from 'pinia'
 import { Function, FunctionsDTO, Profile, ProfilesDTO } from '@/models/Profile'
 import type { Ref } from 'vue'
-import { computed, reactive, inject, ref, toRaw, watch } from 'vue'
+import { computed, reactive, inject, ref, toRaw, watch, watchEffect } from 'vue'
 import {
     type AllDeviceSettings,
     CustomThemeSettings,
@@ -56,7 +56,7 @@ import { CreateModeDTO, Mode, ModeOrderDTO, UpdateModeDTO } from '@/models/Mode.
 import { Dashboard } from '@/models/Dashboard.ts'
 import { Emitter, EventType } from 'mitt'
 import _ from 'lodash'
-import { Alert, AlertLog, AlertState, alertIsSilenced } from '@/models/Alert.ts'
+import { Alert, AlertLog, AlertState, alertIsSilencedAt } from '@/models/Alert.ts'
 import {
     ChannelVerdictRef,
     DeviceHealthDTO,
@@ -109,16 +109,40 @@ export const useSettingsStore = defineStore('settings', () => {
     const alertLogs: Ref<Array<AlertLog>> = ref([])
     const alertsActive: Ref<Array<UID>> = ref([])
 
+    // A silence expires by the clock passing its timestamp, which is not something a
+    // computed can depend on, so the badge below would stay cleared for a still-firing
+    // alert. This ref is that missing dependency. It wakes once per pending expiry
+    // rather than polling, so nothing runs while nothing is silenced.
+    const silenceClock: Ref<number> = ref(Date.now())
+    let silenceTimer: ReturnType<typeof setTimeout> | undefined
+    watchEffect(() => {
+        clearTimeout(silenceTimer)
+        // Read so each tick re-arms the next one, for silences that expire in sequence.
+        void silenceClock.value
+        const now = Date.now()
+        let soonest = Number.POSITIVE_INFINITY
+        for (const alert of alerts.value) {
+            if (alert.silenced_until == null) continue
+            const until = new Date(alert.silenced_until).getTime()
+            if (until > now && until < soonest) soonest = until
+        }
+        if (soonest === Number.POSITIVE_INFINITY) return
+        silenceTimer = setTimeout(() => (silenceClock.value = Date.now()), soonest - now + 250)
+    })
+
     // The Qt tray badge mirrors the UI's alert state. Silencing/disabling happen in
     // the UI, and the daemon emits nothing on the wire for a steadily-Active alert
     // that becomes silenced or disabled, so push the derived state to Qt over IPC
     // instead of polling. `enabled` + not-silenced gate out muted alerts.
-    const anyActiveUnsilencedAlert = computed((): boolean =>
-        alerts.value.some(
+    const anyActiveUnsilencedAlert = computed((): boolean => {
+        const now = silenceClock.value
+        return alerts.value.some(
             (alert) =>
-                alert.enabled && alertsActive.value.includes(alert.uid) && !alertIsSilenced(alert),
-        ),
-    )
+                alert.enabled &&
+                alertsActive.value.includes(alert.uid) &&
+                !alertIsSilencedAt(alert, now),
+        )
+    })
     const pushTrayAlertState = (): void => {
         if (!deviceStore.isQtApp()) return
         // @ts-ignore - window.ipc is the QWebChannel bridge, present only in the Qt app.

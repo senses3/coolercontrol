@@ -44,7 +44,8 @@ impl StatusAugmenter for CalibrationStatusAugmenter {
             //    device-duty alone, used for un-cached channels (fresh
             //    startup) and when hardware has diverged from command.
             // 3. RPM-derived: fallback for rpm-only devices with no PWM
-            //    readback.
+            //    readback, and for a sub-floor device-duty whose rpm says the
+            //    fan is turning anyway.
             let device_duty = channel.duty.map(clamp_f64_to_duty);
             let commanded = self.fan_state_map.commanded_true_duty(&key);
             let cache_hit = match (device_duty, commanded) {
@@ -62,9 +63,27 @@ impl StatusAugmenter for CalibrationStatusAugmenter {
             let rpm_derived = channel
                 .rpm
                 .and_then(|r| self.calibration_store.rpm_to_true_duty(&key, r));
-            if let Some(displayed) = cache_hit.or(device_derived).or(rpm_derived) {
+            let derived = Self::prefer_rpm_over_stall(device_derived, rpm_derived);
+            if let Some(displayed) = cache_hit.or(derived) {
                 channel.duty = Some(f64::from(displayed));
             }
+        }
+    }
+}
+
+impl CalibrationStatusAugmenter {
+    /// Resolves the device-duty and rpm answers against each other. A device-duty
+    /// below the sustain floor reverses to 0, which is honest for a stalled fan but
+    /// wrong for one the firmware is still turning below the floor we measured. A
+    /// non-zero rpm proves it is turning, so that evidence wins.
+    fn prefer_rpm_over_stall(
+        device_derived: Option<Duty>,
+        rpm_derived: Option<Duty>,
+    ) -> Option<Duty> {
+        match (device_derived, rpm_derived) {
+            (Some(0), Some(rpm_duty)) if rpm_duty > 0 => Some(rpm_duty),
+            (Some(duty), _) => Some(duty),
+            (None, rpm_duty) => rpm_duty,
         }
     }
 }
@@ -144,6 +163,109 @@ mod tests {
                 })
                 .collect(),
         }
+    }
+
+    fn status_with_rpm_channel(name: &str, duty: f64, rpm: RPM) -> Status {
+        let mut status = status_with_channels(vec![(name, duty)]);
+        status.channels[0].rpm = Some(rpm);
+        status
+    }
+
+    #[test]
+    fn prefer_rpm_over_stall_lets_a_turning_fan_beat_a_sub_floor_zero() {
+        // Goal: pin the resolution order. Only the stall answer defers to rpm;
+        // every other combination keeps the device-duty answer, which is the
+        // more accurate of the two whenever it is not claiming the fan is off.
+        assert_eq!(
+            CalibrationStatusAugmenter::prefer_rpm_over_stall(Some(0), Some(3)),
+            Some(3),
+            "a non-zero rpm proves the fan is turning"
+        );
+        assert_eq!(
+            CalibrationStatusAugmenter::prefer_rpm_over_stall(Some(0), Some(0)),
+            Some(0),
+            "both agree the fan is off"
+        );
+        assert_eq!(
+            CalibrationStatusAugmenter::prefer_rpm_over_stall(Some(0), None),
+            Some(0),
+            "no rpm evidence leaves the stall answer standing"
+        );
+        assert_eq!(
+            CalibrationStatusAugmenter::prefer_rpm_over_stall(Some(40), Some(3)),
+            Some(40),
+            "an above-floor device duty is never overridden"
+        );
+        assert_eq!(
+            CalibrationStatusAugmenter::prefer_rpm_over_stall(None, Some(3)),
+            Some(3),
+            "rpm-only devices still resolve"
+        );
+        assert_eq!(
+            CalibrationStatusAugmenter::prefer_rpm_over_stall(None, None),
+            None
+        );
+    }
+
+    #[test]
+    fn augment_reports_a_spinning_fan_below_the_sustain_floor() {
+        // Goal: a calibrated fan the firmware drives below the measured sustain
+        // floor reads a sub-floor pwm, which reverses to 0. Its rpm says it is
+        // turning, so the displayed duty must not claim the fan is stopped.
+        let store = Rc::new(CalibrationStore::empty());
+        let state = Rc::new(FanStateMap::new());
+        let device = "dev-a".to_string();
+        let key = (device.clone(), "fan1".to_string());
+        // Nothing turns until 20%, so min_sustain_duty lands above the pwm below.
+        store.insert_unsaved(
+            key.clone(),
+            cal_with_samples(&[
+                (0, 0),
+                (5, 0),
+                (10, 0),
+                (15, 0),
+                (20, 400),
+                (40, 800),
+                (60, 1200),
+                (80, 1600),
+                (100, 2000),
+            ]),
+        );
+        let augmenter = CalibrationStatusAugmenter::new(Rc::clone(&store), Rc::clone(&state));
+        let mut status = status_with_rpm_channel("fan1", 12.0, 300);
+        augmenter.augment(&mut status, &device);
+        assert!(
+            status.channels[0].duty.unwrap() > 0.0,
+            "a fan turning at 300 rpm must not display as off"
+        );
+    }
+
+    #[test]
+    fn augment_reports_zero_for_a_stopped_fan_below_the_sustain_floor() {
+        // Goal: negative space for the test above. With the fan actually stopped,
+        // the sub-floor reverse stays 0 rather than inventing a floor reading.
+        let store = Rc::new(CalibrationStore::empty());
+        let state = Rc::new(FanStateMap::new());
+        let device = "dev-a".to_string();
+        let key = (device.clone(), "fan1".to_string());
+        store.insert_unsaved(
+            key.clone(),
+            cal_with_samples(&[
+                (0, 0),
+                (5, 0),
+                (10, 0),
+                (15, 0),
+                (20, 400),
+                (40, 800),
+                (60, 1200),
+                (80, 1600),
+                (100, 2000),
+            ]),
+        );
+        let augmenter = CalibrationStatusAugmenter::new(Rc::clone(&store), Rc::clone(&state));
+        let mut status = status_with_rpm_channel("fan1", 12.0, 0);
+        augmenter.augment(&mut status, &device);
+        assert_eq!(status.channels[0].duty, Some(0.0));
     }
 
     #[test]

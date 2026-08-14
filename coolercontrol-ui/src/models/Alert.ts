@@ -65,7 +65,14 @@ export function alertSources(alert: Alert): Array<ChannelSource> {
 
 /** True while a user-set silence timestamp lies in the future. */
 export function alertIsSilenced(alert: Alert): boolean {
-    return alert.silenced_until != null && new Date(alert.silenced_until) > new Date()
+    return alertIsSilencedAt(alert, Date.now())
+}
+
+// Takes the moment to compare against, so a caller inside a computed can depend on a
+// clock it controls. Reading the wall clock directly makes an expiring silence
+// invisible to Vue: nothing reactive changes when the timestamp simply passes.
+export function alertIsSilencedAt(alert: Alert, nowMillis: number): boolean {
+    return alert.silenced_until != null && new Date(alert.silenced_until).getTime() > nowMillis
 }
 
 export enum AlertState {

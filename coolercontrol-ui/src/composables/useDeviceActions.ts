@@ -16,6 +16,10 @@ import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 
+// 'cancelled' is the user backing out of the restart confirm, which must not be
+// treated as a failure: only 'failed' means the daemon refused the change.
+export type SensorChangeOutcome = 'saved' | 'failed' | 'cancelled'
+
 export function useDeviceActions() {
     const confirm = useConfirm()
     const toast = useToast()
@@ -157,7 +161,7 @@ export function useDeviceActions() {
     // the daemon is NOT restarted.
     const applySensorChangesBatch = (
         edits: Map<UID, { deviceEnabled: boolean; channelStates: Map<string, boolean> }>,
-        onDone: (success: boolean) => void,
+        onDone: (outcome: SensorChangeOutcome) => void,
     ): void => {
         confirm.require({
             message: t('layout.settings.devices.toggleRequiresRestart'),
@@ -174,7 +178,7 @@ export function useDeviceActions() {
                     if (ccSetting != null) settingsToSave.push(ccSetting)
                 }
                 if (settingsToSave.length === 0) {
-                    onDone(false)
+                    onDone('failed')
                     return
                 }
                 for (const ccSetting of settingsToSave) {
@@ -189,15 +193,17 @@ export function useDeviceActions() {
                             detail: result.error || t('layout.settings.devices.unknownError'),
                             life: 0,
                         })
-                        onDone(false)
+                        onDone('failed')
                         return
                     }
                 }
-                onDone(true)
+                onDone('saved')
                 await deviceStore.daemonClient.shutdownDaemon()
                 await deviceStore.waitAndReload()
             },
-            reject: () => onDone(false),
+            // Backing out of the confirm is not a failure: the pending edits are
+            // still the user's, so callers must be able to leave them alone.
+            reject: () => onDone('cancelled'),
         })
     }
 
@@ -205,7 +211,7 @@ export function useDeviceActions() {
         deviceUID: UID,
         deviceEnabled: boolean,
         channelStates: Map<string, boolean>,
-        onDone: (success: boolean) => void,
+        onDone: (outcome: SensorChangeOutcome) => void,
     ): void => {
         applySensorChangesBatch(new Map([[deviceUID, { deviceEnabled, channelStates }]]), onDone)
     }

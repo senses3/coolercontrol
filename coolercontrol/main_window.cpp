@@ -1575,8 +1575,20 @@ void MainWindow::watchDaemonEvents() const {
     const auto status = sseReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     qDebug() << "Daemon Event SSE closed with status: " << status;
     if (status == 401) {
+      /*
+        The token was refused, so drop it and restart the health probe: that path
+        re-provisions a token and re-opens this stream once it succeeds. Without the
+        restart nothing ever runs again, because the retry timer was stopped by the
+        last successful probe, and tray modes, mode activation and daemon
+        notifications all go silent for the rest of the process lifetime.
+        No daemonConnectionLost here: the daemon answered, so nothing is lost, which
+        is the same reasoning the >= 400 branch below documents.
+      */
       clearAccessToken();
-      qDebug() << "Daemon Event SSE returned 401 - will retry after re-authentication.";
+      qDebug() << "Daemon Event SSE returned 401 - retrying after re-authentication.";
+      if (!m_forceQuit && !m_changeAddress) {
+        m_retryTimer->start();
+      }
       sseReply->deleteLater();
       return;
     }
@@ -1666,6 +1678,13 @@ void MainWindow::reestablishDaemonConnection() const {
 }
 
 void MainWindow::tryDaemonConnection() {
+  if (m_healthProbeInFlight) {
+    // A probe outlives the retry interval on a slow link. Letting a second one start
+    // means both can succeed and each emits watchForSSE, which is the same stacked
+    // stream problem the finished-not-readyRead comment below describes.
+    return;
+  }
+  m_healthProbeInFlight = true;
   QNetworkRequest healthRequest;
   healthRequest.setTransferTimeout(DEFAULT_CONNECTION_TIMEOUT_MS);
   healthRequest.setUrl(getEndpointUrl(ENDPOINT_HEALTH.data()));
@@ -1679,6 +1698,7 @@ void MainWindow::tryDaemonConnection() {
   // produced a disconnect notification. Locally the body arrives in one chunk, so it
   // only ever showed up over the network.
   connect(healthReply, &QNetworkReply::finished, [this, healthReply]() {
+    m_healthProbeInFlight = false;
     const auto status = healthReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     if (status == 401) {
       // A stored token the daemon no longer accepts (revoked, or its config was

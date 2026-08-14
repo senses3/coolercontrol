@@ -36,12 +36,20 @@ interface Timer {
 const timers = new Map<number, Timer>()
 let paused = false
 
+// The hovered container is what resumes the countdowns, and it unmounts with the
+// last toast. Nothing would fire mouseleave then, so an emptied stack clears the
+// flag itself; otherwise every later toast is created paused and never expires.
+const clearPauseIfEmpty = (): void => {
+    if (toasts.length === 0) paused = false
+}
+
 const remove = (id: number): void => {
     const timer = timers.get(id)
     if (timer?.handle != null) clearTimeout(timer.handle)
     timers.delete(id)
     const index = toasts.findIndex((toast) => toast.id === id)
     if (index >= 0) toasts.splice(index, 1)
+    clearPauseIfEmpty()
 }
 
 const startTimer = (id: number): void => {
@@ -94,6 +102,7 @@ const removeAll = (): void => {
     for (const timer of timers.values()) if (timer.handle != null) clearTimeout(timer.handle)
     timers.clear()
     toasts.length = 0
+    clearPauseIfEmpty()
 }
 
 export const activeToasts = toasts

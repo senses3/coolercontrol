@@ -126,7 +126,9 @@ const currentName: Ref<string> = ref(
 const isUserName: boolean =
     settingsStore.nameOverrides.devices[customSensorsDeviceUID]?.channels?.[customSensor.id]
         ?.label != undefined
-const sensorName: Ref<string> = ref(isUserName ? currentName : '')
+// .value, not the ref: ref(existingRef) returns that same ref, which would alias
+// this to currentName and let saveNameFunction's second write undo its first.
+const sensorName: Ref<string> = ref(isUserName ? currentName.value : '')
 const selectedSensorType: Ref<CustomSensorType> = ref(customSensor.cs_type)
 const selectedMixFunction: Ref<CustomSensorMixFunctionType> = ref(customSensor.mix_function)
 const selectedOffset: Ref<number> = ref(customSensor.offset ?? 0)

@@ -296,6 +296,12 @@ const duplicateFunction = async (): Promise<void> => {
         source.deviance,
         source.only_downward,
     )
+    // Not constructor args, so they have to be carried over explicitly or the copy
+    // silently reverts to the defaults (threshold_hopping back on, steps symmetric).
+    newFunction.step_size_min_decreasing = source.step_size_min_decreasing
+    newFunction.step_size_max_decreasing = source.step_size_max_decreasing
+    newFunction.threshold_hopping = source.threshold_hopping
+    newFunction.bypass_min_at_extremes = source.bypass_min_at_extremes
     settingsStore.functions.push(newFunction)
     await settingsStore.saveFunction(newFunction.uid)
     toast.add({

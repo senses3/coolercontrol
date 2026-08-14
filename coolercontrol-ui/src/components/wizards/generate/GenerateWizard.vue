@@ -381,6 +381,26 @@ const applyError = (): void => {
 const createAndApply = async (): Promise<void> => {
     if (proposal.value == null) return
     applying.value = true
+    // saveFunction/saveProfile look their subject up in the store, so each has to be
+    // pushed before it can be persisted. Remember what went in so a failure can take
+    // it back out: a phantom entry would otherwise survive, and a second Save would
+    // re-run this loop over the same objects and duplicate them under uniqueName.
+    const pushedFunctionUIDs: string[] = []
+    const pushedProfileUIDs: string[] = []
+    const abortApply = (): void => {
+        for (const uid of pushedProfileUIDs) {
+            const index = settingsStore.profiles.findIndex((profile) => profile.uid === uid)
+            if (index >= 0) settingsStore.profiles.splice(index, 1)
+        }
+        for (const uid of pushedFunctionUIDs) {
+            const index = settingsStore.functions.findIndex((fn) => fn.uid === uid)
+            if (index >= 0) settingsStore.functions.splice(index, 1)
+        }
+        applyError()
+        // Closed, not left open to retry: the proposal's names and custom-sensor ids
+        // were already rewritten in place, so a second run would build on them.
+        closeDialog()
+    }
     try {
         // Custom sensor ids are the key, so rename on collision and rewire references.
         const existingSensorIds = new Set(
@@ -405,7 +425,7 @@ const createAndApply = async (): Promise<void> => {
         for (const sensor of proposal.value.custom_sensors) {
             // Use the daemon client directly to avoid a success toast per sensor.
             if ((await deviceStore.daemonClient.saveCustomSensor(sensor)) != null) {
-                applyError()
+                abortApply()
                 return
             }
         }
@@ -415,8 +435,9 @@ const createAndApply = async (): Promise<void> => {
             fn.name = uniqueName(fn.name, existingFunctionNames)
             existingFunctionNames.add(fn.name)
             settingsStore.functions.push(fn)
+            pushedFunctionUIDs.push(fn.uid)
             if (!(await settingsStore.saveFunction(fn.uid))) {
-                applyError()
+                abortApply()
                 return
             }
         }
@@ -425,8 +446,9 @@ const createAndApply = async (): Promise<void> => {
             profile.name = uniqueName(profile.name, existingProfileNames)
             existingProfileNames.add(profile.name)
             settingsStore.profiles.push(profile)
+            pushedProfileUIDs.push(profile.uid)
             if (!(await settingsStore.saveProfile(profile.uid))) {
-                applyError()
+                abortApply()
                 return
             }
         }

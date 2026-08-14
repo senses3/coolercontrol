@@ -8,6 +8,7 @@ use crate::device::UID;
 use crate::notifier::{self, NotificationHandle, NotificationIcon};
 use crate::overrides::OverridesController;
 use crate::paths;
+#[cfg(not(test))]
 use crate::repositories::utils::{ShellCommand, ShellCommandResult};
 use crate::setting::{ChannelMetric, ChannelSource};
 use crate::{cc_fs, rt, AllDevices};
@@ -385,6 +386,12 @@ struct AlertEvent {
     log: bool,
 }
 
+// Shell commands the alert side effects would have run, for assertions in tests.
+#[cfg(test)]
+thread_local! {
+    static FIRED_COMMANDS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+}
+
 pub struct AlertController {
     all_devices: AllDevices,
     overrides: Rc<OverridesController>,
@@ -614,7 +621,7 @@ impl AlertController {
                     alert.name
                 );
             }
-            Self::cancel_shutdown_if_quieted(&mut alert, existing_alert);
+            Self::cancel_shutdown_if_unwanted(&mut alert);
             if alert.enabled.not() {
                 Self::reset_saved_alert_state(&mut alert);
             }
@@ -623,31 +630,56 @@ impl AlertController {
         self.save_alert_data_to_config().await
     }
 
-    /// A silence or disable applied while a shutdown is pending cancels it, otherwise
-    /// the machine still halts a minute after the user muted the alert.
-    fn cancel_shutdown_if_quieted(alert: &mut Alert, existing: &Alert) {
+    /// True when a pending shutdown is no longer wanted, because the alert was
+    /// disabled, silenced, or had its shutdown behaviour turned off while the
+    /// countdown was running.
+    fn shutdown_pending_unwanted(alert: &Alert) -> bool {
         if alert.shutdown_scheduled.not() {
+            return false;
+        }
+        if alert.enabled.not() {
+            return true;
+        }
+        if alert.is_silenced() {
+            return true;
+        }
+        alert.shutdown_on_activation.not()
+    }
+
+    /// A disable, a silence, or a shutdown-behaviour opt-out applied while a shutdown
+    /// is pending cancels it, otherwise the machine still halts a minute after the user
+    /// acted to stop it. Clearing `shutdown_scheduled` is what keeps a later update from
+    /// firing a second cancel.
+    fn cancel_shutdown_if_unwanted(alert: &mut Alert) {
+        if Self::shutdown_pending_unwanted(alert).not() {
             return;
         }
-        let was_quiet = existing.enabled.not() || existing.is_silenced();
-        let quiet_now = alert.enabled.not() || alert.is_silenced();
-        if quiet_now && was_quiet.not() {
-            Self::fire_command(COMMAND_SHUTDOWN_CANCEL);
-            alert.shutdown_scheduled = false;
-            info!("Alert quieted: {} - pending shutdown cancelled", alert.name);
-        }
+        Self::fire_command(COMMAND_SHUTDOWN_CANCEL);
+        alert.shutdown_scheduled = false;
+        info!("Alert quieted: {} - pending shutdown cancelled", alert.name);
     }
 
     /// Deletes an existing Alert
     pub async fn delete(&self, alert_uid: UID) -> Result<()> {
-        if self.alerts.borrow().contains_key(&alert_uid).not() {
+        let Some(alert) = self.alerts.borrow_mut().shift_remove(&alert_uid) else {
             return Err(CCError::NotFound {
                 msg: format!("Alert with uid {alert_uid} does not exist"),
             }
             .into());
-        }
-        self.alerts.borrow_mut().shift_remove(&alert_uid);
+        };
+        Self::cancel_shutdown_on_delete(&alert);
         self.save_alert_data_to_config().await
+    }
+
+    /// A deleted Alert can no longer resolve its own pending shutdown, so removing it
+    /// has to cancel one. Deleting an Alert to stop an imminent shutdown is the obvious
+    /// reading of the action, and without this the machine halts anyway.
+    fn cancel_shutdown_on_delete(alert: &Alert) {
+        if alert.shutdown_scheduled.not() {
+            return;
+        }
+        Self::fire_command(COMMAND_SHUTDOWN_CANCEL);
+        info!("Alert deleted: {} - pending shutdown cancelled", alert.name);
     }
 
     /// Processes all Alerts, firing off messages if an alert state has changed.
@@ -1187,6 +1219,7 @@ impl AlertController {
         }
     }
 
+    #[cfg(not(test))]
     fn fire_command(cmd: &str) {
         let cmd = cmd.to_string();
         rt::spawn(async move {
@@ -1198,6 +1231,13 @@ impl AlertController {
                 }
             }
         });
+    }
+
+    /// Recorded instead of executed under test, so the shutdown paths are assertable
+    /// without spawning onto a runtime or halting the machine running the suite.
+    #[cfg(test)]
+    fn fire_command(cmd: &str) {
+        FIRED_COMMANDS.with_borrow_mut(|fired| fired.push(cmd.to_string()));
     }
 }
 
@@ -1804,6 +1844,91 @@ mod tests {
     }
 
     // -- build_quiet_event tests (silence expiry, shutdown re-arm, repeat) --
+
+    /// Drains the recorded commands, so each test starts from a known state.
+    fn take_fired_commands() -> Vec<String> {
+        FIRED_COMMANDS.with_borrow_mut(std::mem::take)
+    }
+
+    /// Builds an alert mid-countdown: shutdown armed and already issued.
+    fn make_alert_with_pending_shutdown() -> Alert {
+        let mut alert = make_alert("a", 20.0, 80.0, AlertState::Active);
+        alert.shutdown_on_activation = true;
+        alert.shutdown_scheduled = true;
+        alert
+    }
+
+    #[test]
+    fn cancel_shutdown_if_unwanted_cancels_when_shutdown_behaviour_turned_off() {
+        // Goal: unchecking shutdown_on_activation mid-countdown must cancel. The
+        // update path carries shutdown_scheduled forward when the source set is
+        // unchanged, so without this the machine halts after the user turned the
+        // behaviour off.
+        let _ = take_fired_commands();
+        let mut alert = make_alert_with_pending_shutdown();
+        alert.shutdown_on_activation = false;
+        AlertController::cancel_shutdown_if_unwanted(&mut alert);
+        assert!(alert.shutdown_scheduled.not());
+        assert_eq!(
+            take_fired_commands(),
+            vec![COMMAND_SHUTDOWN_CANCEL.to_string()]
+        );
+    }
+
+    #[test]
+    fn cancel_shutdown_if_unwanted_cancels_on_disable_and_on_silence() {
+        // Goal: the two originally-handled quieting actions still cancel, so
+        // broadening the condition did not drop the behaviour it replaced.
+        let _ = take_fired_commands();
+        let mut disabled = make_alert_with_pending_shutdown();
+        disabled.enabled = false;
+        AlertController::cancel_shutdown_if_unwanted(&mut disabled);
+        assert!(disabled.shutdown_scheduled.not());
+
+        let mut silenced = make_alert_with_pending_shutdown();
+        silenced.silenced_until = Some(Local::now() + Duration::seconds(600));
+        AlertController::cancel_shutdown_if_unwanted(&mut silenced);
+        assert!(silenced.shutdown_scheduled.not());
+
+        assert_eq!(take_fired_commands().len(), 2);
+    }
+
+    #[test]
+    fn cancel_shutdown_if_unwanted_leaves_a_wanted_shutdown_alone() {
+        // Goal: negative space. An edit that changes nothing about the alert's
+        // quieting must not fire a spurious cancel, and a second pass over an
+        // already-cancelled alert must stay silent.
+        let _ = take_fired_commands();
+        let mut alert = make_alert_with_pending_shutdown();
+        AlertController::cancel_shutdown_if_unwanted(&mut alert);
+        assert!(alert.shutdown_scheduled, "the shutdown is still wanted");
+
+        alert.enabled = false;
+        AlertController::cancel_shutdown_if_unwanted(&mut alert);
+        AlertController::cancel_shutdown_if_unwanted(&mut alert);
+        assert_eq!(
+            take_fired_commands().len(),
+            1,
+            "clearing the flag prevents a second cancel"
+        );
+    }
+
+    #[test]
+    fn cancel_shutdown_on_delete_cancels_a_pending_shutdown() {
+        // Goal: deleting an alert mid-countdown must cancel, since nothing is
+        // left to resolve it. An alert with no pending shutdown stays silent.
+        let _ = take_fired_commands();
+        AlertController::cancel_shutdown_on_delete(&make_alert_with_pending_shutdown());
+        assert_eq!(
+            take_fired_commands(),
+            vec![COMMAND_SHUTDOWN_CANCEL.to_string()]
+        );
+
+        let mut idle = make_alert_with_pending_shutdown();
+        idle.shutdown_scheduled = false;
+        AlertController::cancel_shutdown_on_delete(&idle);
+        assert!(take_fired_commands().is_empty());
+    }
 
     #[test]
     fn build_quiet_event_announces_after_silence_lapses() {
