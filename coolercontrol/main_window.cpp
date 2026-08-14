@@ -1058,6 +1058,11 @@ void MainWindow::applyDaemonConnection(const connections::Connection connection)
   }
   qInfo() << "Switching to daemon" << connections::displayName(connection);
   connections::setCurrent(connection);
+  // Stop before yielding: delay() spins a nested event loop, and a retry tick inside it
+  // probes the new address while the old per-daemon state is still live. A 200 took the
+  // reconnect branch, announced a false "Connection Restored" and opened an SSE stream
+  // that the startup path below then opened a second time.
+  m_retryTimer->stop();
   m_changeAddress = true;
   emit dropConnections();
   delay(300);  // give signals a moment to process.
