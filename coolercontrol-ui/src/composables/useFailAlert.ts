@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useI18n } from 'vue-i18n'
+import { v4 as uuidV4 } from 'uuid'
 import { useRouter } from 'vue-router'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
 
@@ -22,6 +23,10 @@ export function useFailAlert() {
                 min: '1',
                 max: String(FAIL_ALERT_RPM_MAX),
                 name: `${label} ${t('layout.shell.monitoringPanel.failAlertSuffix')}`,
+                // The router-view is keyed on path plus this, and the path does not change
+                // between two create-alert clicks. Without it the editor is not remounted
+                // and keeps the first sensor's prefill while the URL names the second.
+                key: uuidV4(),
             },
         })
     }
