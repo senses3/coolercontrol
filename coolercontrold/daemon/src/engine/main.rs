@@ -33,7 +33,7 @@ use crate::repositories::repository::{DeviceLock, Repository};
 use crate::rt;
 use crate::setting::{
     ChannelExtensions, FunctionUID, LcdModeKind, LcdModeName, LcdSettings, LightingSettings,
-    Profile, ProfileType, ProfileUID, Setting, SettingKind, DEFAULT_FUNCTION_UID,
+    Profile, ProfileType, ProfileUID, Setting, SettingKind, TempSource, DEFAULT_FUNCTION_UID,
 };
 use crate::{cc_fs, repositories, AllDevices, Repos};
 use anyhow::{anyhow, Context, Result};
@@ -340,27 +340,8 @@ impl Engine {
             && &temp_source.device_uid == device_uid
             && hw_curve_enabled
         {
-            let key: ChannelKey = (device_uid.clone(), channel_name.to_string());
-            // The firmware owns the channel now, so the dispatcher's
-            // kick/sustain state for it is stale.
-            self.fan_state_map.forget(&key);
-            let speed_profile = profile.speed_profile().unwrap();
-            // A calibrated channel's curve is drawn in true-duty, which the
-            // firmware cannot interpret. Functions are time-domain and can't
-            // be baked into a static curve, but this mapping is point-wise.
-            let mapped_profile = self.calibration_store.map_curve_points(&key, speed_profile);
-            info!(
-                "Applying | hardware internal profile:: {} | calibration mapped: {}",
-                self.log_device_channel(device_uid, channel_name),
-                mapped_profile.is_some()
-            );
-            repo.apply_setting_speed_profile(
-                device_uid,
-                channel_name,
-                temp_source,
-                mapped_profile.as_deref().unwrap_or(speed_profile),
-            )
-            .await
+            self.apply_hw_curve_profile(device_uid, channel_name, profile, temp_source, repo)
+                .await
         } else if speed_options.fixed_enabled {
             repo.apply_setting_manual_control(device_uid, channel_name)
                 .await?;
@@ -376,6 +357,40 @@ impl Engine {
                 "Speed Profiles not enabled for this device: {device_uid}"
             ))
         }
+    }
+
+    /// Hands a Graph Profile to the channel's own firmware curve. Split from
+    /// `set_graph_profile` so that function stays inside the line budget.
+    async fn apply_hw_curve_profile(
+        &self,
+        device_uid: &UID,
+        channel_name: &str,
+        profile: &Profile,
+        temp_source: &TempSource,
+        repo: &Rc<dyn Repository>,
+    ) -> Result<()> {
+        let key: ChannelKey = (device_uid.clone(), channel_name.to_string());
+        // The firmware owns the channel now, so the dispatcher's
+        // kick/sustain state for it is stale.
+        self.fan_state_map.forget(&key);
+        // Present: `set_graph_profile` rejects a profile without one before reaching here.
+        let speed_profile = profile.speed_profile().unwrap();
+        // A calibrated channel's curve is drawn in true-duty, which the
+        // firmware cannot interpret. Functions are time-domain and can't
+        // be baked into a static curve, but this mapping is point-wise.
+        let mapped_profile = self.calibration_store.map_curve_points(&key, speed_profile);
+        info!(
+            "Applying | hardware internal profile:: {} | calibration mapped: {}",
+            self.log_device_channel(device_uid, channel_name),
+            mapped_profile.is_some()
+        );
+        repo.apply_setting_speed_profile(
+            device_uid,
+            channel_name,
+            temp_source,
+            mapped_profile.as_deref().unwrap_or(speed_profile),
+        )
+        .await
     }
 
     async fn set_mix_profile(

@@ -1515,6 +1515,14 @@ fn sse_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_middleware)),
         )
+        .merge(legacy_sse_routes())
+}
+
+/// The per-stream endpoints `/sse` replaced. Split out so neither registration function
+/// exceeds the line budget, and so the deprecated set is removable as one unit.
+/// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
+fn legacy_sse_routes() -> ApiRouter<AppState> {
+    ApiRouter::new()
         .api_route(
             "/sse/logs",
             get_with(sse::logs, |o| {
@@ -1557,6 +1565,14 @@ fn sse_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_middleware)),
         )
+        .merge(legacy_sse_event_routes())
+}
+
+/// The remaining deprecated per-stream endpoints, split from `legacy_sse_routes` purely
+/// to stay inside the line budget. Removed with it.
+/// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
+fn legacy_sse_event_routes() -> ApiRouter<AppState> {
+    ApiRouter::new()
         .api_route(
             "/sse/alerts",
             get_with(sse::alerts, |o| {
