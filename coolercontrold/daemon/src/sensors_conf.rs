@@ -367,7 +367,7 @@ fn apply_ignore(arguments: &[Token], blocks: &mut [ChipBlock], location: &Locati
 /// features that map onto our channels. Other features have underscores of their own, such as
 /// `cpu0_vid`, so the check is deliberately narrow.
 fn is_subfeature_name(feature: &str) -> bool {
-    const CHANNEL_PREFIXES: [&str; 3] = ["temp", "fan", "pwm"];
+    const CHANNEL_PREFIXES: [&str; 4] = ["temp", "fan", "pwm", "power"];
     let has_channel_prefix = CHANNEL_PREFIXES
         .iter()
         .any(|prefix| feature.starts_with(prefix));
