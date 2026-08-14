@@ -147,10 +147,23 @@ impl Alert {
         } else {
             self.channel_source = self.channel_sources[0].clone();
         }
+        // The API rejects an over-long list, but a hand-edited alerts.json reaches this
+        // without passing it, and every tick walks these sources. Trim rather than refuse
+        // the file: one malformed alert must not stop the daemon from loading the rest.
+        if self.channel_sources.len() > MAX_ALERT_SOURCES {
+            warn!(
+                "Alert {} lists {} sources, above the maximum of {MAX_ALERT_SOURCES}. \
+                 Keeping the first {MAX_ALERT_SOURCES}.",
+                self.name,
+                self.channel_sources.len()
+            );
+            self.channel_sources.truncate(MAX_ALERT_SOURCES);
+        }
         if self.source_states.len() != self.channel_sources.len() {
             self.source_states = vec![AlertState::Inactive; self.channel_sources.len()];
         }
         assert!(self.channel_sources.is_empty().not());
+        assert!(self.channel_sources.len() <= MAX_ALERT_SOURCES);
         assert_eq!(self.source_states.len(), self.channel_sources.len());
     }
 
@@ -1629,6 +1642,27 @@ mod tests {
         alert.normalize_sources();
         assert_eq!(alert.channel_source, alert.channel_sources[0]);
         assert_eq!(alert.source_states.len(), 2);
+    }
+
+    #[test]
+    fn normalize_sources_trims_beyond_the_source_maximum() {
+        // Goal: the cap has to hold on the load path, not only at the API. A hand-edited
+        // alerts.json never passes the API's check, and every tick walks these sources.
+        // Method: hand an alert twice the maximum and assert it is trimmed rather than
+        // rejected, since one malformed alert must not stop the rest of the file loading.
+        let mut alert = make_alert("a", 0.0, 1000.0, AlertState::Inactive);
+        alert.channel_sources = (0..MAX_ALERT_SOURCES * 2)
+            .map(|i| make_source(&format!("fan{i}"), ChannelMetric::RPM))
+            .collect();
+
+        alert.normalize_sources();
+
+        assert_eq!(alert.channel_sources.len(), MAX_ALERT_SOURCES);
+        assert_eq!(alert.source_states.len(), MAX_ALERT_SOURCES);
+        assert_eq!(
+            alert.channel_source, alert.channel_sources[0],
+            "the legacy mirror still tracks the first surviving source"
+        );
     }
 
     // -- build_transition_event tests --

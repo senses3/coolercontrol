@@ -748,14 +748,20 @@ impl CustomSensorsRepo {
         temps
     }
 
-    /// How many samples fit in `window_seconds` at the current `poll_rate`. Always at least 1.
-    /// Pure helper so it's directly testable without setting up a Repo.
+    /// How many samples fit in `window_seconds` at the current `poll_rate`. Always at least
+    /// 1 and never more than `SAMPLE_WINDOW_MAX_SLOTS`. Pure helper so it's directly
+    /// testable without setting up a Repo.
+    ///
+    /// The API caps `window_seconds` at 300 and clamps `poll_rate` to 0.5, which is exactly
+    /// the maximum. A hand-edited config.toml reaches this without passing either check, so
+    /// the ceiling is enforced here too rather than only by the `debug_assert!` on
+    /// `SampleWindow`, which compiles out of a release build.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn window_sample_count(window_seconds: u16, poll_rate: f64) -> usize {
         debug_assert!(window_seconds >= 1);
         debug_assert!(poll_rate > 0.0);
         let count = (f64::from(window_seconds) / poll_rate).ceil() as usize;
-        count.max(1)
+        count.clamp(1, SAMPLE_WINDOW_MAX_SLOTS)
     }
 
     /// Returns the arithmetic mean of the samples in iteration order, or `None` if empty.
@@ -1447,7 +1453,9 @@ mod tests {
     use crate::device::{
         Device, DeviceInfo, DeviceType, Status, TempInfo, TempName, TempStatus, UID,
     };
-    use crate::repositories::custom_sensors_repo::{CustomSensorsRepo, SampleWindow, TempData};
+    use crate::repositories::custom_sensors_repo::{
+        CustomSensorsRepo, SampleWindow, TempData, SAMPLE_WINDOW_MAX_SLOTS,
+    };
     use crate::repositories::failsafe::MISSING_TEMP_FAILSAFE;
     use crate::repositories::repository::{DeviceLock, Repository};
     use crate::setting::{
@@ -2715,6 +2723,31 @@ mod tests {
     #[test]
     fn time_average_window_sample_count_max_window() {
         assert_eq!(CustomSensorsRepo::window_sample_count(300, 1.0), 300);
+    }
+
+    // The API's own limits meet exactly at the declared ceiling: a 300s window at the
+    // fastest allowed 0.5s poll rate is 600 slots, no more.
+    #[test]
+    fn time_average_window_sample_count_api_maximum_is_the_ceiling() {
+        assert_eq!(
+            CustomSensorsRepo::window_sample_count(300, 0.5),
+            SAMPLE_WINDOW_MAX_SLOTS
+        );
+    }
+
+    // A hand-edited config.toml bypasses the API's 1..=300 check, so the ceiling has to
+    // hold here too: the `debug_assert!` on SampleWindow compiles out of a release build,
+    // which would otherwise allocate ~131k slots per sensor for a u16 window.
+    #[test]
+    fn time_average_window_sample_count_clamps_beyond_the_api_range() {
+        assert_eq!(
+            CustomSensorsRepo::window_sample_count(u16::MAX, 0.5),
+            SAMPLE_WINDOW_MAX_SLOTS
+        );
+        assert_eq!(
+            CustomSensorsRepo::window_sample_count(3600, 1.0),
+            SAMPLE_WINDOW_MAX_SLOTS
+        );
     }
 
     // ==================== EMA helper tests ====================
