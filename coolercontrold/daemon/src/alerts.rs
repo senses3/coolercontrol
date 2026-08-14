@@ -742,15 +742,27 @@ impl AlertController {
                 continue;
             }
             let outcomes = self.evaluate_sources(alert);
-            if let Some(event) = Self::build_transition_event(alert, &outcomes) {
-                events.push(event);
-            } else if let Some(event) = Self::build_suppression_event(alert, &outcomes) {
-                events.push(event);
-            } else if let Some(event) = Self::build_quiet_event(alert, &outcomes) {
+            if let Some(event) = Self::process_alert(alert, &outcomes) {
                 events.push(event);
             }
         }
         events
+    }
+
+    /// Refreshes the aggregate state from the source states, then produces this tick's
+    /// event, if any. The two belong together: the aggregate must follow the sources on
+    /// every tick, including the silent timer hops (`Error` -> `WarmUp`, `WarmUp` ->
+    /// `Inactive`) that produce no event. Recomputing inside the event builders instead
+    /// stranded `state` at its last announced value in `GET /alerts` and the UI badge.
+    fn process_alert(alert: &mut Alert, outcomes: &SourceOutcomes) -> Option<AlertEvent> {
+        alert.state = alert.worst_of_visible();
+        if let Some(event) = Self::build_transition_event(alert, outcomes) {
+            return Some(event);
+        }
+        if let Some(event) = Self::build_suppression_event(alert, outcomes) {
+            return Some(event);
+        }
+        Self::build_quiet_event(alert, outcomes)
     }
 
     /// Advances every source state machine one tick and collects the
@@ -914,7 +926,6 @@ impl AlertController {
         if outcomes.has_transitions().not() {
             return None;
         }
-        alert.state = alert.worst_of_visible();
         let silenced = alert.is_silenced();
         let kind = if outcomes.fired.is_empty().not() {
             AlertEventKind::Triggered
@@ -990,7 +1001,6 @@ impl AlertController {
         if outcomes.suppressed.not() {
             return None;
         }
-        alert.state = alert.worst_of_visible();
         if alert.state != AlertState::Inactive {
             return None;
         }
@@ -1648,7 +1658,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(matches!(event.kind, AlertEventKind::Triggered));
         assert_eq!(event.message, "fan1: 0 too low; fan2: 10 too low");
         assert_eq!(event.alert.state, AlertState::Active);
@@ -1740,7 +1750,7 @@ mod tests {
             resolved: vec!["temp1: back in range".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(matches!(event.kind, AlertEventKind::Resolved));
         assert_eq!(event.alert.state, AlertState::Inactive);
         assert!(event.notify_desktop);
@@ -1798,7 +1808,7 @@ mod tests {
             fired: vec!["temp1: 90 too high".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(event.fire_shutdown);
         assert!(alert.shutdown_scheduled);
 
@@ -1822,7 +1832,7 @@ mod tests {
             resolved: vec!["temp1: back in range".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(event.cancel_shutdown);
         assert!(!alert.shutdown_scheduled);
     }
@@ -1837,10 +1847,42 @@ mod tests {
             errors: vec!["temp1: Device not found".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(matches!(event.kind, AlertEventKind::SourceError));
         assert_eq!(event.alert.state, AlertState::Error);
         assert!(event.notify_desktop);
+    }
+
+    #[test]
+    fn process_alert_clears_error_state_over_silent_transitions() {
+        // Goal: an alert whose source recovers through the silent timer hops must not
+        // strand its aggregate state at Error. `transition_kind` classifies both
+        // Error -> WarmUp and WarmUp -> Inactive as silent, so neither tick produces an
+        // event; the aggregate has to follow the source states regardless. Method: drive
+        // the source through the three states with empty outcomes and assert the
+        // aggregate tracks each one.
+        let mut alert = make_alert("a", 20.0, 80.0, AlertState::Error);
+        alert.source_states = vec![AlertState::Error];
+        let quiet = SourceOutcomes::default();
+
+        // The unreadable tick: aggregate reports Error, as the source does.
+        assert!(AlertController::process_alert(&mut alert, &quiet).is_none());
+        assert_eq!(alert.state, AlertState::Error);
+
+        // Reading resumes out of range: the source starts its warm-up, which is
+        // wire-visible as Inactive. Silent hop, no event.
+        alert.source_states = vec![AlertState::WarmUp(Local::now())];
+        assert!(AlertController::process_alert(&mut alert, &quiet).is_none());
+        assert_eq!(
+            alert.state,
+            AlertState::Inactive,
+            "aggregate stranded at Error across a silent hop"
+        );
+
+        // Back in range for good.
+        alert.source_states = vec![AlertState::Inactive];
+        assert!(AlertController::process_alert(&mut alert, &quiet).is_none());
+        assert_eq!(alert.state, AlertState::Inactive);
     }
 
     // -- build_quiet_event tests (silence expiry, shutdown re-arm, repeat) --
