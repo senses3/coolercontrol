@@ -2088,8 +2088,22 @@ const duplicateProfile = async (): Promise<void> => {
         point[0],
         point[1],
     ])
+    // saveProfile looks its subject up in the store, so the copy has to be pushed before
+    // it can be persisted. Take it back out when the save fails: a phantom entry would
+    // otherwise sit in the sidebar until a reload, and editing it would call
+    // updateProfile against a UID the daemon has never seen.
     settingsStore.profiles.push(newProfile)
-    await settingsStore.saveProfile(newProfile.uid)
+    if (!(await settingsStore.saveProfile(newProfile.uid))) {
+        const index = settingsStore.profiles.findIndex((profile) => profile.uid === newProfile.uid)
+        if (index >= 0) settingsStore.profiles.splice(index, 1)
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: t('views.profiles.profileUpdateError'),
+            life: 3000,
+        })
+        return
+    }
     toast.add({
         severity: 'success',
         summary: t('common.success'),

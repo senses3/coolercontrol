@@ -302,8 +302,22 @@ const duplicateFunction = async (): Promise<void> => {
     newFunction.step_size_max_decreasing = source.step_size_max_decreasing
     newFunction.threshold_hopping = source.threshold_hopping
     newFunction.bypass_min_at_extremes = source.bypass_min_at_extremes
+    // saveFunction looks its subject up in the store, so the copy has to be pushed before
+    // it can be persisted. Take it back out when the save fails: a phantom entry would
+    // otherwise sit in the sidebar until a reload, and editing it would call
+    // updateFunction against a UID the daemon has never seen.
     settingsStore.functions.push(newFunction)
-    await settingsStore.saveFunction(newFunction.uid)
+    if (!(await settingsStore.saveFunction(newFunction.uid))) {
+        const index = settingsStore.functions.findIndex((fn) => fn.uid === newFunction.uid)
+        if (index >= 0) settingsStore.functions.splice(index, 1)
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: t('views.functions.functionError'),
+            life: 3000,
+        })
+        return
+    }
     toast.add({
         severity: 'success',
         summary: t('common.success'),
