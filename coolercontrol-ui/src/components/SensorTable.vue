@@ -456,7 +456,7 @@ onBeforeUnmount(() => {
                             </td>
                             <td>
                                 <span v-if="row.count === 0" class="text-text-color-secondary"
-                                    >—</span
+                                    >-</span
                                 >
                                 <span
                                     v-else
@@ -465,7 +465,7 @@ onBeforeUnmount(() => {
                                     <span class="text-right min-w-[3rem]">{{
                                         format(row.min, row.dataType)
                                     }}</span>
-                                    <span class="mx-2 text-text-color-secondary">–</span>
+                                    <span class="mx-2 text-text-color-secondary">-</span>
                                     <span class="text-left min-w-[3rem]">{{
                                         format(row.max, row.dataType)
                                     }}</span>
@@ -476,7 +476,7 @@ onBeforeUnmount(() => {
                             </td>
                             <td>
                                 <span v-if="row.count === 0" class="text-text-color-secondary"
-                                    >—</span
+                                    >-</span
                                 >
                                 <template v-else>
                                     {{ format(row.avg, row.dataType) }}
