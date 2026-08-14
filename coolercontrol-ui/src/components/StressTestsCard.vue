@@ -148,7 +148,12 @@ const doCpuStress = async () => {
     )
     cpuLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'CPU Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.cpuStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         cpuActive.value = true
         startPolling()
@@ -171,7 +176,12 @@ const doGpuStress = async () => {
     )
     gpuLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'GPU Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.gpuStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         gpuActive.value = true
         startPolling()
@@ -194,7 +204,12 @@ const doRamStress = async () => {
     )
     ramLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'RAM Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.ramStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         ramActive.value = true
         startPolling()
@@ -229,7 +244,12 @@ const doDriveStress = async () => {
     )
     driveLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'Drive Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.driveStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         driveActive.value = true
         startPolling()
