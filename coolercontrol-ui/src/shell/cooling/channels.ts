@@ -44,3 +44,10 @@ export function coolingChannels(devices: Iterable<Device>): CoolingDeviceGroup[]
 export function pinId(deviceUID: UID, channelName: string): string {
     return `${deviceUID}_${channelName}`
 }
+
+// Enumerable at runtime on purpose: each kind names a
+// `layout.shell.coolingPage.chain.*` translation key that ChainStrip only builds as a
+// template literal, invisible to an unused-key sweep. The i18n spec walks this array.
+export const CHAIN_PILL_KINDS = ['tempSource', 'profile', 'function'] as const
+
+export type ChainPillKind = (typeof CHAIN_PILL_KINDS)[number]
