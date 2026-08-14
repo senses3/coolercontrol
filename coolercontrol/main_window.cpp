@@ -1094,6 +1094,10 @@ void MainWindow::resetPerDaemonState() {
   m_uiLoadingStopped = false;
   m_reloadOnShow = false;
   m_startup = true;
+  // Re-arming m_startup without this leaves the guards that pair the two dead for the new
+  // daemon's load: hideEvent and closeEvent both test m_startup && !m_webLoadFinished, and
+  // the flag is only ever set true once the first page finishes.
+  m_webLoadFinished = false;
 }
 
 void MainWindow::displayAddressWizard() const {
