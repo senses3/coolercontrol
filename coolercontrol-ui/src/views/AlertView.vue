@@ -430,34 +430,6 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
     })
 }
 
-const minScrolled = (event: WheelEvent): void => {
-    if (chosenMin.value == null) return
-    const step = stepSize(selectedMetric.value)
-    if (event.deltaY < 0) {
-        const max = chosenMax.value - (selectedMetric.value !== ChannelMetric.RPM ? 1 : 100)
-        if (chosenMin.value < max) chosenMin.value += step
-    } else {
-        if (chosenMin.value >= step) chosenMin.value -= step
-    }
-}
-const maxScrolled = (event: WheelEvent): void => {
-    if (chosenMax.value == null) return
-    const step = stepSize(selectedMetric.value)
-    if (event.deltaY < 0) {
-        const max = valueMax(selectedMetric.value)
-        if (chosenMax.value < max) chosenMax.value += step
-    } else {
-        const min = chosenMin.value + (selectedMetric.value !== ChannelMetric.RPM ? 1 : 100)
-        if (chosenMax.value >= min) chosenMax.value -= step
-    }
-}
-const addScrollEventListeners = (): void => {
-    // @ts-ignore
-    document?.querySelector('#min-input')?.addEventListener('wheel', minScrolled)
-    // @ts-ignore
-    document?.querySelector('#max-input')?.addEventListener('wheel', maxScrolled)
-}
-
 onMounted(async () => {
     watch(rawStore.currentDeviceStatus, () => {
         updateValues()
@@ -486,7 +458,6 @@ onMounted(async () => {
     )
     onBeforeRouteUpdate(checkForUnsavedChanges)
     onBeforeRouteLeave(checkForUnsavedChanges)
-    addScrollEventListeners()
 })
 </script>
 

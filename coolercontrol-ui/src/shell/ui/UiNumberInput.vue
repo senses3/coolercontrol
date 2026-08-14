@@ -42,6 +42,16 @@ const stepBy = (direction: number): void => {
     model.value = round(clamp((model.value ?? 0) + direction * props.step))
 }
 
+// Wheel-over-input adjusts the value, as the raw inputs this component replaced did. It
+// lives here rather than in each view: the views attached their listeners by querying
+// class and id hooks that only existed on those raw inputs, so every one of them silently
+// became a no-op. Scrolling up raises the value, matching the increment button above.
+const onWheel = (event: WheelEvent): void => {
+    if (props.disabled || event.deltaY === 0) return
+    event.preventDefault()
+    stepBy(event.deltaY < 0 ? 1 : -1)
+}
+
 // Press-and-hold repeats the step: one step on press, then auto-repeat.
 let holdDelay: ReturnType<typeof setTimeout> | undefined
 let holdRepeat: ReturnType<typeof setInterval> | undefined
@@ -97,6 +107,7 @@ const outsideSafeBand = computed(() => {
             outsideSafeBand ? 'border-warning' : 'border-border-one',
             { 'pointer-events-none opacity-50': disabled },
         ]"
+        @wheel="onWheel"
     >
         <button
             type="button"
