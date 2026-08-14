@@ -402,6 +402,13 @@ void MainWindow::initWebUI() {
       displayAddressWizard();
       notifyDaemonConnectionError();
     } else {
+      // Blanking the page is deliberate, and that load reports success. Treating it as a
+      // loaded UI cleared the stop flag a refused certificate had just set, logged a false
+      // success and restarted the retry timer, which left m_startup set and closeEvent
+      // ignoring every close for the rest of the process.
+      if (m_view->url().toString() == QStringLiteral("about:blank")) {
+        return;
+      }
       m_uiLoadingStopped = false;
       m_uiLoadRetryCount = 0;
       qInfo() << "Successfully loaded UI at: " << getDaemonUrl().url();
