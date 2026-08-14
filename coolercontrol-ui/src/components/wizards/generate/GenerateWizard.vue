@@ -382,17 +382,18 @@ const createAndApply = async (): Promise<void> => {
     if (proposal.value == null) return
     applying.value = true
     // saveFunction/saveProfile look their subject up in the store, so each has to be
-    // pushed before it can be persisted. Remember what went in so a failure can take
-    // it back out: a phantom entry would otherwise survive, and a second Save would
-    // re-run this loop over the same objects and duplicate them under uniqueName.
-    const pushedFunctionUIDs: string[] = []
-    const pushedProfileUIDs: string[] = []
+    // pushed before it can be persisted. These hold only what is in the store but NOT yet
+    // in the daemon, so a failure takes back exactly the phantom entries: anything already
+    // persisted stays, or the Cooling page would omit entities the daemon really created
+    // and a later drag-reorder would send the truncated list.
+    const unpersistedFunctionUIDs: string[] = []
+    const unpersistedProfileUIDs: string[] = []
     const abortApply = (): void => {
-        for (const uid of pushedProfileUIDs) {
+        for (const uid of unpersistedProfileUIDs) {
             const index = settingsStore.profiles.findIndex((profile) => profile.uid === uid)
             if (index >= 0) settingsStore.profiles.splice(index, 1)
         }
-        for (const uid of pushedFunctionUIDs) {
+        for (const uid of unpersistedFunctionUIDs) {
             const index = settingsStore.functions.findIndex((fn) => fn.uid === uid)
             if (index >= 0) settingsStore.functions.splice(index, 1)
         }
@@ -435,22 +436,24 @@ const createAndApply = async (): Promise<void> => {
             fn.name = uniqueName(fn.name, existingFunctionNames)
             existingFunctionNames.add(fn.name)
             settingsStore.functions.push(fn)
-            pushedFunctionUIDs.push(fn.uid)
+            unpersistedFunctionUIDs.push(fn.uid)
             if (!(await settingsStore.saveFunction(fn.uid))) {
                 abortApply()
                 return
             }
+            unpersistedFunctionUIDs.pop() // now in the daemon, so it stays in the store
         }
         const existingProfileNames = new Set(settingsStore.profiles.map((profile) => profile.name))
         for (const profile of proposal.value.profiles) {
             profile.name = uniqueName(profile.name, existingProfileNames)
             existingProfileNames.add(profile.name)
             settingsStore.profiles.push(profile)
-            pushedProfileUIDs.push(profile.uid)
+            unpersistedProfileUIDs.push(profile.uid)
             if (!(await settingsStore.saveProfile(profile.uid))) {
                 abortApply()
                 return
             }
+            unpersistedProfileUIDs.pop() // now in the daemon, so it stays in the store
         }
         for (const assignment of proposal.value.assignments) {
             await settingsStore.saveDaemonDeviceSettingProfile(
