@@ -314,3 +314,166 @@ impl From<AlertDto> for Alert {
 fn default_true() -> bool {
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{effective_sources, validate_alert, validate_sources, validate_thresholds};
+    use crate::alerts::{MAX_ALERT_SOURCES, MIN_REPEAT_INTERVAL_SECONDS};
+    use crate::api::alerts::AlertDto;
+    use crate::setting::{ChannelMetric, ChannelSource};
+
+    fn source(channel_name: &str, channel_metric: ChannelMetric) -> ChannelSource {
+        ChannelSource {
+            device_uid: "dev1".to_string(),
+            channel_name: channel_name.to_string(),
+            channel_metric,
+        }
+    }
+
+    /// A DTO that passes every check, so each test can break exactly one thing.
+    fn valid_dto() -> AlertDto {
+        AlertDto {
+            uid: "alert-uid".to_string(),
+            name: "Fan Stall".to_string(),
+            channel_source: None,
+            channel_sources: vec![source("fan1", ChannelMetric::RPM)],
+            min: 300.0,
+            max: 2000.0,
+            state: None,
+            source_states: Vec::new(),
+            warmup_duration: 0.0,
+            cooldown_duration: 0.0,
+            repeat_interval: 0.0,
+            enabled: true,
+            silenced_until: None,
+            desktop_notify: true,
+            desktop_notify_recovery: true,
+            desktop_notify_audio: false,
+            shutdown_on_activation: false,
+        }
+    }
+
+    #[test]
+    fn the_valid_baseline_passes() {
+        // Goal: pin the fixture itself, so a later failure names the field a test broke
+        // rather than an unnoticed defect in the baseline.
+        assert!(validate_alert(&valid_dto()).is_ok());
+    }
+
+    #[test]
+    fn effective_sources_prefers_the_multi_source_list() {
+        // Goal: `channel_sources` is authoritative; the legacy single source is only a
+        // fallback for an older client that sends nothing else.
+        let mut dto = valid_dto();
+        dto.channel_source = Some(source("legacy", ChannelMetric::RPM));
+        assert_eq!(effective_sources(&dto), dto.channel_sources);
+
+        dto.channel_sources = Vec::new();
+        assert_eq!(effective_sources(&dto).len(), 1);
+        assert_eq!(effective_sources(&dto)[0].channel_name, "legacy");
+
+        dto.channel_source = None;
+        assert!(effective_sources(&dto).is_empty());
+    }
+
+    #[test]
+    fn an_alert_needs_a_uid_and_a_name() {
+        let mut dto = valid_dto();
+        dto.uid = String::new();
+        assert!(validate_alert(&dto).is_err());
+
+        let mut dto = valid_dto();
+        dto.name = String::new();
+        assert!(validate_alert(&dto).is_err());
+    }
+
+    #[test]
+    fn an_alert_needs_at_least_one_source() {
+        let mut dto = valid_dto();
+        dto.channel_sources = Vec::new();
+        dto.channel_source = None;
+        assert!(validate_sources(&dto).is_err());
+    }
+
+    #[test]
+    fn the_source_maximum_is_the_boundary_not_beyond_it() {
+        // Goal: cover both sides of the cap, since an off-by-one here either rejects a
+        // legitimate alert or lets an unbounded list through to the per-tick walk.
+        let mut dto = valid_dto();
+        dto.channel_sources = (0..MAX_ALERT_SOURCES)
+            .map(|i| source(&format!("fan{i}"), ChannelMetric::RPM))
+            .collect();
+        assert!(
+            validate_sources(&dto).is_ok(),
+            "the maximum itself is legal"
+        );
+
+        dto.channel_sources
+            .push(source("one_too_many", ChannelMetric::RPM));
+        assert!(validate_sources(&dto).is_err());
+    }
+
+    #[test]
+    fn every_source_needs_a_device_and_a_channel() {
+        let mut dto = valid_dto();
+        dto.channel_sources[0].device_uid = String::new();
+        assert!(validate_sources(&dto).is_err());
+
+        let mut dto = valid_dto();
+        dto.channel_sources[0].channel_name = String::new();
+        assert!(validate_sources(&dto).is_err());
+    }
+
+    #[test]
+    fn sources_must_share_one_metric() {
+        // Goal: a mixed-metric alert has no single meaningful threshold, and the
+        // evaluator's Temp arm assumes the rejection happened here.
+        let mut dto = valid_dto();
+        dto.channel_sources
+            .push(source("temp1", ChannelMetric::Temp));
+        assert!(validate_sources(&dto).is_err());
+    }
+
+    #[test]
+    fn thresholds_must_form_a_non_empty_positive_range() {
+        for (min, max) in [(2000.0, 300.0), (300.0, 300.0), (-1.0, 100.0)] {
+            let mut dto = valid_dto();
+            dto.min = min;
+            dto.max = max;
+            assert!(
+                validate_thresholds(&dto).is_err(),
+                "min {min} / max {max} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn durations_cannot_be_negative() {
+        let mut dto = valid_dto();
+        dto.warmup_duration = -1.0;
+        assert!(validate_thresholds(&dto).is_err());
+
+        let mut dto = valid_dto();
+        dto.cooldown_duration = -1.0;
+        assert!(validate_thresholds(&dto).is_err());
+
+        let mut dto = valid_dto();
+        dto.repeat_interval = -1.0;
+        assert!(validate_thresholds(&dto).is_err());
+    }
+
+    #[test]
+    fn a_repeat_interval_is_zero_or_at_least_the_floor() {
+        // Goal: 0 disables repeats, and anything positive must clear the floor, so a
+        // typo like 1 cannot notify on every tick.
+        let mut dto = valid_dto();
+        dto.repeat_interval = 0.0;
+        assert!(validate_thresholds(&dto).is_ok());
+
+        dto.repeat_interval = MIN_REPEAT_INTERVAL_SECONDS - 1.0;
+        assert!(validate_thresholds(&dto).is_err());
+
+        dto.repeat_interval = MIN_REPEAT_INTERVAL_SECONDS;
+        assert!(validate_thresholds(&dto).is_ok());
+    }
+}
