@@ -196,44 +196,17 @@ impl CustomSensorsRepo {
 
     pub fn delete_custom_sensor(&self, custom_sensor_id: &str) -> Result<()> {
         // checks are already made to make sure this sensor isn't in use by a Profile.
-        if let Some(parents) = self.relationships.borrow().get(custom_sensor_id) {
-            for parent_name in parents {
-                if let Some(parent_sensor) = self
-                    .sensors
-                    .borrow_mut()
-                    .iter_mut()
-                    .find(|s| &s.id == parent_name)
-                {
-                    if parent_sensor.children.len() < 2 {
-                        return Err(CCError::UserError {
-                            msg: format!(
-                                "Parent sensor {parent_name} for Custom Sensor {custom_sensor_id} \
-                                only has this one child. The parent must first be deleted before \
-                                deleting this Custom Sensor."
-                            ),
-                        }
-                        .into());
-                    }
-                    parent_sensor.children.retain(|c| c != custom_sensor_id);
-                    if let Some(sources) = parent_sensor.sources_mut() {
-                        // Only the deleted child goes: both halves must match for a
-                        // source to be the one being removed. Every custom-sensor
-                        // source shares `device_uid`, so requiring both to differ
-                        // stripped the parent's other children too.
-                        sources.retain(|s| {
-                            s.temp_source.device_uid != self.device_uid
-                                || s.temp_source.temp_name != custom_sensor_id
-                        });
-                    }
-                } else {
-                    return Err(CCError::InternalError {
-                        msg: format!("Parent sensor {parent_name} for Custom Sensor {custom_sensor_id} not found"),
-                    }
-                    .into());
-                }
-            }
-        }
+        let parents = self
+            .relationships
+            .borrow()
+            .get(custom_sensor_id)
+            .cloned()
+            .unwrap_or_default();
+        self.validate_parents_can_drop_child(&parents, custom_sensor_id)?;
+        // Persist before mutating: a failed config write must not leave the in-memory
+        // parents already stripped, which would report a different value until restart.
         self.config.delete_custom_sensor(custom_sensor_id)?;
+        self.drop_child_from_parents(&parents, custom_sensor_id);
         Self::remove_status_history_for_sensor(self, custom_sensor_id);
         self.sensors
             .borrow_mut()
@@ -247,6 +220,60 @@ impl CustomSensorsRepo {
         self.update_device_info_temps();
         self.reconstruct_relationships();
         Ok(())
+    }
+
+    /// Every parent must be able to give up this child. Checked before any parent is
+    /// touched: rejecting partway through the loop used to leave earlier parents already
+    /// stripped in memory while the config write never ran.
+    fn validate_parents_can_drop_child(
+        &self,
+        parents: &[ParentName],
+        child_id: &str,
+    ) -> Result<()> {
+        let sensors = self.sensors.borrow();
+        for parent_name in parents {
+            let Some(parent) = sensors.iter().find(|s| &s.id == parent_name) else {
+                return Err(CCError::InternalError {
+                    msg: format!(
+                        "Parent sensor {parent_name} for Custom Sensor {child_id} not found"
+                    ),
+                }
+                .into());
+            };
+            if parent.children.len() < 2 {
+                return Err(CCError::UserError {
+                    msg: format!(
+                        "Parent sensor {parent_name} for Custom Sensor {child_id} \
+                        only has this one child. The parent must first be deleted before \
+                        deleting this Custom Sensor."
+                    ),
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    /// Strips `child_id` from every parent. Only reached once every parent has been
+    /// approved, so it cannot fail partway and leave the set half-updated.
+    fn drop_child_from_parents(&self, parents: &[ParentName], child_id: &str) {
+        let mut sensors = self.sensors.borrow_mut();
+        for parent_name in parents {
+            let Some(parent) = sensors.iter_mut().find(|s| &s.id == parent_name) else {
+                debug_assert!(false, "parent vanished between validation and mutation");
+                continue;
+            };
+            parent.children.retain(|c| c != child_id);
+            let Some(sources) = parent.sources_mut() else {
+                continue;
+            };
+            // Only the deleted child goes: both halves must match for a source to be
+            // the one being removed. Every custom-sensor source shares `device_uid`,
+            // so requiring both to differ stripped the parent's other children too.
+            sources.retain(|s| {
+                s.temp_source.device_uid != self.device_uid || s.temp_source.temp_name != child_id
+            });
+        }
     }
 
     #[allow(clippy::cast_possible_truncation)]
@@ -2257,6 +2284,70 @@ mod tests {
 
             // then:
             assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn delete_rejected_by_one_parent_leaves_the_others_untouched() {
+        // Goal: a delete that a later parent rejects must not have already stripped an
+        // earlier one. Method: give the shared child two parents, one that can spare it
+        // (two children) and one that cannot (only child). The delete must fail and the
+        // two-child parent must still hold both children and both sources, because the
+        // config write never ran and the in-memory set must match what is on disk.
+        cc_fs::test_runtime(async {
+            let test_config = Rc::new(Config::init_default_config().unwrap());
+            let mut repo = CustomSensorsRepo::new(test_config, vec![], test_overrides()).unwrap();
+            repo.initialize_devices()
+                .await
+                .expect("Failed to initialize devices");
+
+            let test_file = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
+            cc_fs::write(&test_file, b"80000".to_vec()).await.unwrap();
+            repo.set_custom_sensor(file_sensor("shared_child", test_file.clone()))
+                .await
+                .expect("Failed to set shared child");
+            repo.set_custom_sensor(file_sensor("other_child", test_file))
+                .await
+                .expect("Failed to set other child");
+            repo.set_custom_sensor(mix_sensor(
+                "sparing_parent",
+                vec![
+                    temp_source(&repo.device_uid.clone(), "shared_child"),
+                    temp_source(&repo.device_uid.clone(), "other_child"),
+                ],
+            ))
+            .await
+            .expect("Failed to set sparing parent");
+            repo.set_custom_sensor(mix_sensor(
+                "only_child_parent",
+                vec![temp_source(&repo.device_uid.clone(), "shared_child")],
+            ))
+            .await
+            .expect("Failed to set only-child parent");
+
+            let result = repo.delete_custom_sensor("shared_child");
+
+            assert!(
+                result.is_err(),
+                "the only-child parent must reject the delete"
+            );
+            let sensors = repo.sensors.borrow();
+            let sparing = sensors
+                .iter()
+                .find(|s| s.id == "sparing_parent")
+                .expect("sparing parent still exists");
+            assert_eq!(
+                sparing.children.len(),
+                2,
+                "a rejected delete stripped a child from an unrelated parent"
+            );
+            assert_eq!(
+                sparing.sources().len(),
+                2,
+                "a rejected delete stripped a source from an unrelated parent"
+            );
+            assert!(sensors.iter().any(|s| s.id == "shared_child"));
         });
     }
 
