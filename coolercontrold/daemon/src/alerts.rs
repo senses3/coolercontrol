@@ -49,6 +49,8 @@ pub type AlertName = String;
 pub type AlertLogMessage = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+// The bools are independent user toggles persisted in alerts.json, not a state machine
+// that could be folded into an enum: each one is set on its own in the UI.
 #[allow(clippy::struct_excessive_bools)]
 pub struct Alert {
     pub uid: UID,
@@ -386,6 +388,9 @@ enum AlertEventKind {
 
 /// One coalesced, fully-decided outcome for an alert on one tick.
 /// Built by the evaluation pass; executed verbatim by `send_notifications`.
+// Each bool is a separate decision the evaluation pass already made, which
+// `send_notifications` then executes verbatim; collapsing them would re-introduce the
+// branching this type exists to remove.
 #[allow(clippy::struct_excessive_bools)]
 struct AlertEvent {
     alert: Alert,
@@ -749,8 +754,11 @@ impl AlertController {
 
     /// Collects one fully-decided event per alert that needs firing this tick.
     fn process_and_collect_alerts_to_fire(&self) -> Vec<AlertEvent> {
-        let mut events = Vec::new();
-        for alert in self.alerts.borrow_mut().values_mut() {
+        let mut alerts = self.alerts.borrow_mut();
+        // Runs every tick and at most one event per alert is produced, so the exact
+        // capacity is known up front.
+        let mut events = Vec::with_capacity(alerts.len());
+        for alert in alerts.values_mut() {
             if alert.enabled.not() {
                 continue;
             }
@@ -839,6 +847,8 @@ impl AlertController {
     }
 
     /// Files the message for one source's tick outcome into the right bucket.
+    // Every argument is a distinct part of one tick's outcome. Grouping them into a
+    // struct would only move the same fields behind another name for a single call site.
     #[allow(clippy::too_many_arguments)]
     fn collect_source_messages(
         &self,
@@ -950,12 +960,11 @@ impl AlertController {
         let mut fire_shutdown = false;
         let mut cancel_shutdown = false;
         if silenced.not() {
-            if alert.shutdown_on_activation
-                && alert.shutdown_scheduled.not()
-                && alert.any_source_visible_active()
-            {
-                fire_shutdown = true;
-                alert.shutdown_scheduled = true;
+            if alert.shutdown_on_activation && alert.shutdown_scheduled.not() {
+                if alert.any_source_visible_active() {
+                    fire_shutdown = true;
+                    alert.shutdown_scheduled = true;
+                }
             }
             if alert.shutdown_scheduled && alert.state == AlertState::Inactive {
                 cancel_shutdown = true;
@@ -1741,7 +1750,7 @@ mod tests {
         assert_eq!(event.alert.state, AlertState::Active);
         assert!(alert.notified, "episode continues until all sources clear");
         assert!(
-            !event.notify_desktop,
+            event.notify_desktop.not(),
             "a partial recovery must not announce resolved while still firing"
         );
         assert!(event.log, "the per-source recovery still reaches the log");
@@ -1825,7 +1834,7 @@ mod tests {
         assert!(!event.fire_shutdown);
         assert!(!alert.shutdown_scheduled);
         assert!(
-            !alert.notified,
+            alert.notified.not(),
             "a silenced fire leaves the catch-up pending"
         );
         assert!(event.log);
@@ -2205,7 +2214,7 @@ mod tests {
         };
         let json = serde_json::to_string(&config).unwrap();
         assert!(
-            !json.contains("\"logs\""),
+            json.contains("\"logs\"").not(),
             "logs must not appear in config JSON"
         );
         let parsed: AlertConfigFile = serde_json::from_str(&json).unwrap();
