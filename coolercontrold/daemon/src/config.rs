@@ -423,7 +423,7 @@ impl Config {
         }
         // Always written even though unused: 4.3.x hard-requires lcd.colors on load, so
         // omitting it breaks a daemon downgrade.
-        // DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): see DEPRECATIONS.md.
+        // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
         channel_setting["lcd"]["colors"] = Item::Value(Value::Array(toml_edit::Array::new()));
         if let Some(temp_source) = lcd.temp_source() {
             channel_setting["lcd"]["temp_source"]["temp_name"] =
@@ -2923,7 +2923,7 @@ offset = 5
             config.set_lcd_shutdown_setting(device_uid, channel_name, &lcd);
 
             // 4.3.x hard-requires lcd.colors on load, so the no-op write must keep it present.
-            // DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): remove with the colors field.
+            // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): remove with the colors field.
             {
                 let doc = config.document.borrow();
                 let colors = doc["lcd-shutdown-settings"][device_uid][channel_name]["lcd"]

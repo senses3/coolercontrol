@@ -303,6 +303,9 @@ fn sse_response(app_state: &AppState, selected: &[Substream]) -> SseResponse {
     ))
 }
 
+/// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md. This and the other
+/// per-stream handlers below back the legacy `/sse/{logs,status,modes,alerts,notifications}`
+/// routes, superseded by `GET /sse?events=`. Kept so a 4.3.x UI still receives events.
 pub async fn logs(State(app_state): State<AppState>) -> SseResponse {
     sse_response(&app_state, &[Substream::Logs])
 }

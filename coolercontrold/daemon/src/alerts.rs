@@ -54,7 +54,7 @@ pub struct Alert {
     pub uid: UID,
     pub name: AlertName,
 
-    /// DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): 4.3.x hard-requires a single
+    /// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): 4.3.x hard-requires a single
     /// `channel_source` in alerts.json; kept written as `channel_sources[0]`.
     pub channel_source: ChannelSource,
 

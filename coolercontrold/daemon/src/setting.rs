@@ -122,7 +122,7 @@ pub struct LcdSettings {
     /// Unused; kept for downgrade compatibility.
     // Written as an empty no-op because 4.3.x hard-requires this field when parsing
     // config.toml and modes.json, so removing it breaks a daemon downgrade.
-    // DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): see DEPRECATIONS.md.
+    // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
     #[serde(default)]
     pub colors: Vec<(R, G, B)>,
 
