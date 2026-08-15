@@ -135,8 +135,14 @@ const { getLimitInfo } = useProfileLimitInfo()
 const contextIsDirty: Ref<boolean> = ref(false)
 const tableDataKey: Ref<number> = ref(0)
 
+// Deleting drops the profile from the store while this page is still mounted,
+// and every render here dereferences it, so hold what was opened and fall back
+// to it. The fallback covers the moment between the delete and the route change
+// that unmounts this page, and the same moment when another client deletes it.
+const openedProfile = settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!
 const currentProfile = computed(
-    () => settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
+    () =>
+        settingsStore.profiles.find((profile) => profile.uid === props.profileUID) ?? openedProfile,
 )
 const selectedType: Ref<ProfileType> = ref(
     props.graphOnly ? ProfileType.Graph : currentProfile.value.p_type,
@@ -2126,14 +2132,17 @@ const deleteProfile = (): void => {
         icon: mdiAlertOutline,
         accept: async () => {
             contextIsDirty.value = false
-            await settingsStore.deleteProfile(currentProfile.value.uid)
+            // Leave first: the store reloads several times inside the delete,
+            // and every one of them re-renders a page whose profile is gone.
+            const deletedUID = currentProfile.value.uid
+            await router.push({ name: 'section-cooling' })
+            await settingsStore.deleteProfile(deletedUID)
             toast.add({
                 severity: 'success',
                 summary: t('common.success'),
                 detail: t('views.profiles.profileDeleted'),
                 life: 3000,
             })
-            await router.push({ name: 'section-cooling' })
         },
     })
 }
