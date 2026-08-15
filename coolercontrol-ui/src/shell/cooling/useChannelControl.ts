@@ -127,10 +127,22 @@ export function useChannelControl(deviceUID: UID, channelName: string) {
     })
 
     const applying = ref(false)
-    // Bound by the host page's template: the embedded profile editor and the
-    // channel extension settings both save through this page's apply.
+    // The embedded profile editor and the channel extension settings both save
+    // through this page's apply, so the page hands their instances back here.
+    //
+    // Setter functions rather than the refs themselves: `:ref="someRef"` in a
+    // <script setup> template compiles to `ref: _unref(someRef)`, which hands
+    // the binding the ref's value (undefined) instead of the ref, and it then
+    // never populates. A function ref is called with the instance, and stays
+    // the same function across renders, so nothing churns.
     const editorRef = ref()
     const extensionSettingsRef = ref()
+    const setEditorRef = (instance: unknown): void => {
+        editorRef.value = instance
+    }
+    const setExtensionSettingsRef = (instance: unknown): void => {
+        extensionSettingsRef.value = instance
+    }
     const editorDirty = computed<boolean>(() => editorRef.value?.contextIsDirty === true)
 
     const assignmentDirty = computed<boolean>(() => {
@@ -212,7 +224,8 @@ export function useChannelControl(deviceUID: UID, channelName: string) {
         sharedChannels,
         applying,
         editorRef,
-        extensionSettingsRef,
+        setEditorRef,
+        setExtensionSettingsRef,
         editorDirty,
         assignmentDirty,
         canApply,

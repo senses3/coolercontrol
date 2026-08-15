@@ -77,8 +77,8 @@ const {
     selectedProfile,
     sharedChannels,
     applying,
-    editorRef,
-    extensionSettingsRef,
+    setEditorRef,
+    setExtensionSettingsRef,
     editorDirty,
     canApply,
     apply,
@@ -390,7 +390,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     </template>
                 </ChannelSetupMenu>
                 <ChannelExtensionSettings
-                    :ref="extensionSettingsRef"
+                    :ref="setExtensionSettingsRef"
                     :device-u-i-d="deviceUID"
                     :channel-name="channelName"
                     :chosen-profile="controlMode === 'automatic' ? selectedProfile : undefined"
@@ -534,7 +534,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
 
                 <div v-if="selectedProfileUID != null" class="rounded-lg border border-border-one">
                     <ProfileEditor
-                        :ref="editorRef"
+                        :ref="setEditorRef"
                         :key="selectedProfileUID"
                         :profile-u-i-d="selectedProfileUID"
                         :channel-device-u-i-d="deviceUID"

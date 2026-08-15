@@ -54,7 +54,7 @@ const {
     selectedProfile,
     sharedChannels,
     applying,
-    editorRef,
+    setEditorRef,
     editorDirty,
     canApply,
     apply,
@@ -266,7 +266,7 @@ const onPageWheelCapture = (event: WheelEvent): void => {
             <div v-else-if="ownership === 'owned' && selectedProfileUID != null">
                 <div class="rounded-lg border border-border-one">
                     <ProfileEditor
-                        :ref="editorRef"
+                        :ref="setEditorRef"
                         :key="selectedProfileUID"
                         :profile-u-i-d="selectedProfileUID"
                         :channel-device-u-i-d="deviceUID"
