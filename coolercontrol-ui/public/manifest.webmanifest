@@ -1,0 +1,35 @@
+{
+    "id": "/",
+    "name": "CoolerControl Web UI",
+    "short_name": "CoolerControl Web",
+    "description": "Powerful cooling control and monitoring",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#1b1e23",
+    "theme_color": "#2c313c",
+    "categories": ["utilities", "system"],
+    "launch_handler": {
+        "client_mode": ["focus-existing", "auto"]
+    },
+    "icons": [
+        {
+            "src": "/icons/app-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/app-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/app-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

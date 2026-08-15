@@ -56,6 +56,13 @@ export const useThemeColorsStore = defineStore('theme-colors', () => {
         // theme's brightness so they don't render light-on-dark.
         document.documentElement.style.colorScheme =
             relLuminance(parseRgb(rawVar('--colors-bg-one'))) > 0.4 ? 'light' : 'dark'
+        // Keep an installed app window's title bar on the same surface as the app
+        // header, which ShellLayout paints with bg-two. The manifest's static
+        // theme_color only covers the dark default, and themes are user-chosen.
+        // Absent in the unit-test DOM, which mounts components without index.html.
+        document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute('content', `rgb(${rawVar('--colors-bg-two')})`)
     }
 
     const reLoadThemeColors = () => {
