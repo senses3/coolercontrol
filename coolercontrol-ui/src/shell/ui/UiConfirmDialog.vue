@@ -40,20 +40,32 @@ const open = computed<boolean>({
         if (!value) finish('reject')
     },
 })
+
+// Messages carry their own line breaks. Each chunk becomes its own paragraph so
+// multi-sentence confirmations keep a readable rhythm.
+const paragraphs = computed<Array<string>>(
+    () =>
+        active.value?.message
+            ?.split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0) ?? [],
+)
 </script>
 
 <template>
     <UiModal v-if="active" v-model:open="open" :title="active.header" content-class="min-w-80">
         <slot name="message" :message="active">
-            <div class="flex flex-col items-center">
+            <div class="flex items-start gap-3">
                 <svg-icon
                     v-if="active.icon"
                     type="mdi"
                     :path="active.icon"
-                    :size="36"
-                    class="mb-2 text-text-color-secondary"
+                    :size="24"
+                    class="mt-0.5 shrink-0 text-text-color-secondary"
                 />
-                <p class="max-w-96 whitespace-pre-line text-center">{{ active.message }}</p>
+                <div class="max-w-96 space-y-2 leading-relaxed">
+                    <p v-for="(paragraph, index) in paragraphs" :key="index">{{ paragraph }}</p>
+                </div>
             </div>
         </slot>
         <div class="mt-6 flex justify-end gap-3">
