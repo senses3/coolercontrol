@@ -6,12 +6,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import {
-    mdiAlertCircleOutline,
-    mdiBookOpenPageVariantOutline,
-    mdiLinkVariant,
-    mdiPowerPlugOutline,
-} from '@mdi/js'
+import { mdiAlertCircleOutline, mdiLinkVariant, mdiPowerPlugOutline } from '@mdi/js'
 import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import UiTable from '@/shell/ui/UiTable.vue'
 import UiTag from '@/shell/ui/UiTag.vue'
@@ -109,10 +104,10 @@ onUnmounted(() => {
                     >
                         <svg-icon
                             type="mdi"
-                            :path="mdiBookOpenPageVariantOutline"
+                            :path="mdiPowerPlugOutline"
                             :size="deviceStore.getREMSize(1.25)"
                         />
-                        {{ t('layout.plugins.docsLink') }}
+                        {{ t('layout.plugins.findPlugins') }}
                         <svg-icon
                             type="mdi"
                             :path="mdiLinkVariant"

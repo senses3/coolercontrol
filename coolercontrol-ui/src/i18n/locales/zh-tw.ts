@@ -416,7 +416,7 @@ export default {
             overview: '外掛概覽',
             gettingStarted:
                 '外掛透過額外的裝置支援、整合和自動化來擴展 CoolerControl。它們可以提供新的裝置感測器和控制、連接外部服務或新增自訂 UI 頁面。',
-            docsLink: '外掛文件',
+            findPlugins: '尋找並安裝外掛',
             restartNote:
                 '如果您最近新增了外掛但它未顯示在此處，請重新啟動 CoolerControl 守護程式。',
             containerNote:

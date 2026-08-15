@@ -432,7 +432,7 @@ export default {
             overview: '플러그인 개요',
             gettingStarted:
                 '플러그인은 추가 장치 지원, 통합 및 자동화로 CoolerControl을 확장합니다. 새로운 장치 센서 및 제어를 제공하고, 외부 서비스에 연결하거나, 사용자 지정 UI 페이지를 추가할 수 있습니다.',
-            docsLink: '플러그인 문서',
+            findPlugins: '플러그인 찾기 및 설치',
             restartNote:
                 '최근에 새 플러그인을 추가했는데 여기에 표시되지 않으면 CoolerControl 데몬을 재시작하세요.',
             containerNote:

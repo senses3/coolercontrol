@@ -438,7 +438,7 @@ export default {
             overview: 'Visão Geral dos Plugins',
             gettingStarted:
                 'Os plugins estendem o CoolerControl com suporte adicional a dispositivos, integrações e automação. Eles podem fornecer novos sensores e controles de dispositivos, conectar-se a serviços externos ou adicionar páginas de interface personalizadas.',
-            docsLink: 'Documentação de Plugins',
+            findPlugins: 'Encontrar e instalar Plugins',
             restartNote:
                 'Se você adicionou recentemente um novo plugin e ele não aparece aqui, reinicie o daemon do CoolerControl.',
             containerNote:

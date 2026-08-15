@@ -434,7 +434,7 @@ export default {
             overview: 'プラグイン概要',
             gettingStarted:
                 'プラグインはCoolerControlに追加のデバイスサポート、統合、自動化を拡張します。新しいデバイスセンサーとコントロールの提供、外部サービスへの接続、カスタムUIページの追加が可能です。',
-            docsLink: 'プラグインドキュメント',
+            findPlugins: 'プラグインを探してインストール',
             restartNote:
                 '最近新しいプラグインを追加してここに表示されない場合は、CoolerControlデーモンを再起動してください。',
             containerNote:
