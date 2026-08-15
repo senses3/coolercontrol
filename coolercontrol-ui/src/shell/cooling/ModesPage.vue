@@ -30,10 +30,13 @@ const activate = async (modeUID: string): Promise<void> => {
             </UiButton>
         </div>
         <div v-if="settingsStore.modes.length > 0" class="mt-4 flex flex-col gap-2">
-            <div
+            <!-- The whole row opens the mode, as the cooling cards do. Activate
+                 sits inside it, so it stops the click from following the link. -->
+            <RouterLink
                 v-for="mode in settingsStore.modes"
                 :key="mode.uid"
-                class="flex items-center gap-3 rounded-lg border border-border-one bg-bg-two px-3 py-2"
+                :to="{ name: 'modes', params: { modeUID: mode.uid } }"
+                class="flex items-center gap-3 rounded-lg border border-border-one bg-bg-two px-3 py-2 outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <svg-icon
                     type="mdi"
@@ -51,12 +54,7 @@ const activate = async (modeUID: string): Promise<void> => {
                             : 'text-text-color-secondary'
                     "
                 />
-                <RouterLink
-                    :to="{ name: 'modes', params: { modeUID: mode.uid } }"
-                    class="truncate text-text-color outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                    {{ mode.name }}
-                </RouterLink>
+                <span class="truncate text-text-color">{{ mode.name }}</span>
                 <span
                     v-if="mode.uid === settingsStore.modeActiveCurrent"
                     class="text-sm text-accent"
@@ -73,11 +71,11 @@ const activate = async (modeUID: string): Promise<void> => {
                     v-if="mode.uid !== settingsStore.modeActiveCurrent"
                     variant="outline"
                     class="ml-auto"
-                    @click="activate(mode.uid)"
+                    @click.stop.prevent="activate(mode.uid)"
                 >
                     {{ t('layout.shell.coolingPage.activate') }}
                 </UiButton>
-            </div>
+            </RouterLink>
         </div>
         <div v-else class="flex flex-1 items-center justify-center text-text-color-secondary">
             {{ t('layout.shell.coolingPage.noModes') }}
