@@ -132,6 +132,30 @@ describe('shell i18n keys', () => {
         expect(missing).toEqual([])
     })
 
+    // Same story for the interface mode: its labels come from a model helper, and
+    // the rail reads the section labels through a variable key, so nothing under
+    // shell/ names them where the sweep above can see them.
+    it('resolves the interface mode keys in every locale', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        expect(locales).toHaveLength(LOCALE_COUNT)
+
+        const keys = [
+            'layout.settings.uiMode',
+            'layout.settings.tooltips.uiMode',
+            'models.uiMode.simple',
+            'models.uiMode.full',
+            'layout.shell.simple.fans',
+            'layout.shell.simple.sensors',
+        ]
+        const missing: string[] = []
+        for (const [path, module] of locales) {
+            for (const key of keys) {
+                if (!resolves(module.default, key)) missing.push(`${path}: ${key}`)
+            }
+        }
+        expect(missing).toEqual([])
+    })
+
     // ChainStrip and DevicePage build these keys as template literals, so the static sweep
     // above cannot see them and neither can an unused-key prune. Both sets are driven from
     // the same exported arrays the components use, so the check cannot drift from the code.
