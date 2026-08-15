@@ -37,6 +37,7 @@ import { useDeviceStore } from '@/stores/DeviceStore'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
 import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
 import { channelRoute } from '@/shell/channelRoute.ts'
+import { firstRunUiMode } from '@/shell/simple/firstRun.ts'
 import router from '@/router'
 import type { AllDaemonDeviceSettings } from '@/models/DaemonSettings'
 import type { NameOverrides } from '@/models/NameOverrides'
@@ -393,6 +394,8 @@ export const useSettingsStore = defineStore('settings', () => {
         ramStressBackend.value = uiSettings.ramStressBackend ?? 'stress_ng'
         driveStressBackend.value = uiSettings.driveStressBackend ?? 'built_in'
         startupPage.value = uiSettings.startupPage ?? StartupPage.AppInfo
+        // A config that has never chosen is settled at the end of this
+        // function, once the profiles it is judged on have loaded.
         uiMode.value = uiSettings.uiMode ?? UiMode.FULL
         tags.value.clear()
         if (uiSettings.tagNames.length === uiSettings.tagColors.length) {
@@ -452,6 +455,17 @@ export const useSettingsStore = defineStore('settings', () => {
         await getActiveModes()
 
         await startWatchingToSaveChanges()
+
+        // First run. Resolved here, after the saver is watching, so choosing
+        // simple writes `uiMode` to the config and is never asked again. Full is
+        // the same answer every boot for a config that already has a setup, so
+        // leaving it unwritten costs nothing.
+        if (uiSettings.uiMode == null) {
+            uiMode.value = firstRunUiMode(
+                profiles.value.filter((profile) => profile.uid !== '0').length,
+                uiSettings.dashboards.length,
+            )
+        }
     }
 
     async function loadCCSettings(): Promise<void> {

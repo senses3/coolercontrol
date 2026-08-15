@@ -38,7 +38,10 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
 // The logo resets to the configured startup page, which is what sets it apart
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
-const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.startupPage) }))
+// Simple mode boots to Home whatever the setting says, so the logo goes there too.
+const startupTarget = computed(() => ({
+    name: settingsStore.isSimpleMode ? 'section-home' : startupRouteName(settingsStore.startupPage),
+}))
 
 // The rail's half of the mode switch; Settings carries the other half. Quiet on
 // purpose: it is an escape hatch, not a section.
