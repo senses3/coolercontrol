@@ -87,6 +87,8 @@ export default {
             simple: {
                 fans: 'Ventoinhas',
                 sensors: 'Sensores',
+                sensorsHint: 'Selecione um sensor para ver seu histórico.',
+                noSensors: 'Nenhum sensor foi detectado.',
                 modeCurve: 'Curva',
                 modeFixed: 'Velocidade fixa',
                 useCurve: 'Usar uma curva simples',

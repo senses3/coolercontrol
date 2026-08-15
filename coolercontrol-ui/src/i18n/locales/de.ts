@@ -88,6 +88,8 @@ export default {
             simple: {
                 fans: 'Lüfter',
                 sensors: 'Sensoren',
+                sensorsHint: 'Wählen Sie einen Sensor, um seinen Verlauf zu sehen.',
+                noSensors: 'Es wurden keine Sensoren erkannt.',
                 modeCurve: 'Kurve',
                 modeFixed: 'Feste Drehzahl',
                 useCurve: 'Einfache Kurve verwenden',

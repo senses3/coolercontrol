@@ -87,6 +87,8 @@ export default {
             simple: {
                 fans: 'Вентиляторы',
                 sensors: 'Датчики',
+                sensorsHint: 'Выберите датчик, чтобы увидеть его историю.',
+                noSensors: 'Датчики не обнаружены.',
                 modeCurve: 'Кривая',
                 modeFixed: 'Фиксированная скорость',
                 useCurve: 'Использовать простую кривую',

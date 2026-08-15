@@ -88,6 +88,8 @@ export default {
             simple: {
                 fans: 'Ventilateurs',
                 sensors: 'Capteurs',
+                sensorsHint: 'Sélectionnez un capteur pour voir son historique.',
+                noSensors: "Aucun capteur n'a été détecté.",
                 modeCurve: 'Courbe',
                 modeFixed: 'Vitesse fixe',
                 useCurve: 'Utiliser une courbe simple',

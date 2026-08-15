@@ -86,6 +86,8 @@ export default {
             simple: {
                 fans: 'पंखे',
                 sensors: 'सेंसर',
+                sensorsHint: 'इतिहास देखने के लिए एक सेंसर चुनें।',
+                noSensors: 'कोई सेंसर नहीं मिला।',
                 modeCurve: 'कर्व',
                 modeFixed: 'निश्चित गति',
                 useCurve: 'सरल कर्व का उपयोग करें',

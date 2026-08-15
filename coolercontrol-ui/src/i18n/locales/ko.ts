@@ -85,6 +85,8 @@ export default {
             simple: {
                 fans: '팬',
                 sensors: '센서',
+                sensorsHint: '센서를 선택하면 기록을 볼 수 있습니다.',
+                noSensors: '감지된 센서가 없습니다.',
                 modeCurve: '커브',
                 modeFixed: '고정 속도',
                 useCurve: '간단한 커브 사용',

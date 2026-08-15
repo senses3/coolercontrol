@@ -85,6 +85,8 @@ export default {
             simple: {
                 fans: 'Fans',
                 sensors: 'Sensors',
+                sensorsHint: 'Select a sensor to see its history.',
+                noSensors: 'No sensors were detected.',
                 modeCurve: 'Curve',
                 modeFixed: 'Fixed speed',
                 useCurve: 'Use a simple curve',

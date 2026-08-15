@@ -85,6 +85,8 @@ export default {
             simple: {
                 fans: '風扇',
                 sensors: '感測器',
+                sensorsHint: '選擇一個感測器以檢視其歷史記錄。',
+                noSensors: '未偵測到感測器。',
                 modeCurve: '曲線',
                 modeFixed: '固定轉速',
                 useCurve: '使用簡單曲線',

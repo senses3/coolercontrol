@@ -43,7 +43,7 @@ const sectionRoutes: RouteRecordRaw[] = [
         // Section landing is the home dashboard (DashboardView's no-param fallback).
         path: 'monitoring',
         name: 'section-monitoring',
-        component: () => import('@/views/DashboardView.vue'),
+        component: () => import('@/shell/simple/MonitoringSectionRoute.vue'),
         meta: { section: 'monitoring' },
     },
     {

@@ -85,6 +85,8 @@ export default {
             simple: {
                 fans: 'المراوح',
                 sensors: 'المستشعرات',
+                sensorsHint: 'حدد مستشعرًا لعرض سجله.',
+                noSensors: 'لم يتم اكتشاف أي مستشعرات.',
                 modeCurve: 'منحنى',
                 modeFixed: 'سرعة ثابتة',
                 useCurve: 'استخدام منحنى بسيط',
