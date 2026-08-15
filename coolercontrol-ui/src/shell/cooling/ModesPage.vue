@@ -31,12 +31,15 @@ const activate = async (modeUID: string): Promise<void> => {
         </div>
         <div v-if="settingsStore.modes.length > 0" class="mt-4 flex flex-col gap-2">
             <!-- The whole row opens the mode, as the cooling cards do. Activate
-                 sits inside it, so it stops the click from following the link. -->
+                 sits inside it, so it stops the click from following the link.
+                 The active row carries no Activate button, and the height it
+                 gives the others (min-h-14: py-2 either side of a 2.5rem
+                 button) is held so the list does not step. -->
             <RouterLink
                 v-for="mode in settingsStore.modes"
                 :key="mode.uid"
                 :to="{ name: 'modes', params: { modeUID: mode.uid } }"
-                class="flex items-center gap-3 rounded-lg border border-border-one bg-bg-two px-3 py-2 outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                class="flex min-h-14 items-center gap-3 rounded-lg border border-border-one bg-bg-two px-3 py-2 outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <svg-icon
                     type="mdi"
