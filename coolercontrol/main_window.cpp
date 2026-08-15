@@ -1014,31 +1014,52 @@ QUrl MainWindow::getEndpointUrl(const QString& endpoint, const bool forceHttp) {
 }
 
 /*
-  Rebuilt outright on every change, the way the Modes submenu already is. Only the
+  The rows are built once and kept; a switch only moves the checked one. Only the
   submenu's own visibility touches the top-level menu, so hosts that cache the tray
   layout over DBusMenu see a stable one.
+
+  Rebuilding the rows on every switch is what wedged the tray. A StatusNotifierItem host
+  draws the menu from its own copy of the layout, and rows destroyed underneath it stay
+  on screen addressing ids the app no longer has: the second switch showed two daemons
+  checked at once, which this function cannot produce (one liveIndex, exclusive group),
+  and its rows then did nothing when clicked. So the row set is only torn down when the
+  saved list actually changes length, the way the Modes submenu keeps its rows and just
+  flips `checked` in setActiveMode.
 */
 void MainWindow::rebuildDaemonsTrayMenu() {
   const auto list = connections::all();
   m_daemonsTrayMenu->menuAction()->setVisible(list.size() > 1);
-  m_daemonsTrayMenu->clear();
-  // The rows are parented to the group, so this is what frees the previous ones. It has
-  // to be deleteLater: this runs from one of those rows' own triggered handler, and
-  // deleting it outright would pull the object out from under the running signal.
-  if (m_daemonsActionGroup != nullptr) {
-    m_daemonsActionGroup->deleteLater();
+  auto rows = m_daemonsTrayMenu->actions();
+  if (rows.size() != list.size()) {
+    m_daemonsTrayMenu->clear();
+    // The rows are parented to the group, so this is what frees the previous ones. It
+    // has to be deleteLater: this can run from one of those rows' own triggered handler,
+    // and deleting it outright would pull the object out from under the running signal.
+    if (m_daemonsActionGroup != nullptr) {
+      m_daemonsActionGroup->deleteLater();
+    }
+    m_daemonsActionGroup = new QActionGroup(m_daemonsTrayMenu);
+    m_daemonsActionGroup->setExclusive(true);
+    for (auto i = 0; i < list.size(); ++i) {
+      const auto action = new QAction(m_daemonsActionGroup);
+      action->setCheckable(true);
+      // The row reads its connection when clicked instead of capturing one. Rows now
+      // outlive edits to the saved list, and a captured copy would point at the entry
+      // that sat there when the row was made.
+      connect(action, &QAction::triggered, this, [this, i]() {
+        const auto saved = connections::all();
+        if (i < saved.size()) {
+          applyDaemonConnection(saved.at(i));
+        }
+      });
+      m_daemonsTrayMenu->addAction(action);
+    }
+    rows = m_daemonsTrayMenu->actions();
   }
-  m_daemonsActionGroup = new QActionGroup(m_daemonsTrayMenu);
-  m_daemonsActionGroup->setExclusive(true);
   const auto liveIndex = connections::currentIndex();
   for (auto i = 0; i < list.size(); ++i) {
-    const auto connection = list.at(i);
-    const auto action = new QAction(connections::displayName(connection), m_daemonsActionGroup);
-    action->setCheckable(true);
-    action->setChecked(i == liveIndex);
-    connect(action, &QAction::triggered, this,
-            [this, connection]() { applyDaemonConnection(connection); });
-    m_daemonsTrayMenu->addAction(action);
+    rows.at(i)->setText(connections::displayName(list.at(i)));
+    rows.at(i)->setChecked(i == liveIndex);
   }
 }
 
