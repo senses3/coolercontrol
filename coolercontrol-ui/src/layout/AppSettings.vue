@@ -575,9 +575,10 @@ onUnmounted(() => {
                     :label="t('layout.settings.uiMode')"
                 >
                     <UiSelect
-                        v-model="settingsStore.uiMode"
+                        :model-value="settingsStore.uiMode"
                         :options="uiModeOptions"
                         class="w-full"
+                        @update:model-value="(mode) => settingsStore.setUiMode(mode as UiMode)"
                     />
                 </UiSettingRow>
                 <!-- Simple mode always opens on Home, so the choice would do nothing. -->

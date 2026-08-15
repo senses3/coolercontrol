@@ -71,7 +71,7 @@ const activeModeName = computed<string | undefined>(
 // control over what the whole interface is showing; Settings carries the other
 // half. The label says where it goes, not where you are.
 const toggleUiMode = (): void => {
-    settingsStore.uiMode = settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE
+    settingsStore.setUiMode(settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE)
 }
 const uiModeLabel = computed(() =>
     settingsStore.isSimpleMode
