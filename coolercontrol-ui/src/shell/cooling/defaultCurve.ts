@@ -1,0 +1,56 @@
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/**
+ * The curve a new Graph profile starts from: a straight ramp across the temp
+ * source's usable range, from off to full.
+ *
+ * One definition, because three surfaces draw it. The profile editor and the
+ * new-profile wizard both open on it, and the simple interface saves it as the
+ * starting point for a fan that has no curve. A fan given a curve in the simple
+ * interface has to be the same fan given one in the full interface, or the two
+ * would disagree about what a new profile is.
+ */
+
+/** Point count, when the device's own limits leave room for it. */
+const PREFERRED_POINTS = 5
+
+const round = (value: number, precision: number): number => {
+    const multiplier = Math.pow(10, precision)
+    return Math.round(value * multiplier) / multiplier
+}
+
+/** Evenly spaced values from start to stop, inclusive of both ends. */
+function lineSpace(
+    startValue: number,
+    stopValue: number,
+    cardinality: number,
+    precision: number,
+): Array<number> {
+    const values: Array<number> = []
+    const step = (stopValue - startValue) / (cardinality - 1)
+    for (let index = 0; index < cardinality; index++) {
+        values.push(round(startValue + step * index, precision))
+    }
+    return values
+}
+
+/**
+ * `tempMin`/`tempMax` are the temp source device's range, already clamped to
+ * the axis the caller draws. `profileMinLength`/`profileMaxLength` are that
+ * device's own limits on how many points a profile may carry.
+ */
+export function defaultGraphCurve(
+    tempMin: number,
+    tempMax: number,
+    profileMinLength: number,
+    profileMaxLength: number,
+): Array<[number, number]> {
+    const points =
+        profileMinLength <= PREFERRED_POINTS && profileMaxLength >= PREFERRED_POINTS
+            ? PREFERRED_POINTS
+            : profileMaxLength
+    const temps = lineSpace(tempMin, tempMax, points, 1)
+    const duties = lineSpace(0, 100, points, 0)
+    return temps.map((temp, index): [number, number] => [temp, duties[index]])
+}

@@ -97,7 +97,7 @@ export default {
                 forkMessage:
                     "Diese Kurve in eine neue Kurve '{copy}' kopieren, die nur {channel} verwendet.\n\nDie Lüfter, die sich das Original teilen, behalten es.",
                 seedMessage:
-                    'Eine Kurve für {channel} erstellen, die bei der aktuellen Drehzahl von {duty}% beginnt.\n\nForme sie im Editor darunter.',
+                    'Eine Kurve für {channel} erstellen, ausgehend von der Standard-Lüfterkurve.\n\nForme sie im Editor darunter.',
                 sharedSummary:
                     'Diese Kurve steuert nur diesen Lüfter | Diese Kurve steuert auch {count} weiteren Lüfter, eine Änderung hier würde ihn ebenfalls ändern. | Diese Kurve steuert auch {count} weitere Lüfter, eine Änderung hier würde sie ebenfalls ändern.',
                 otherSummary: '{profile} steuert diesen Lüfter und ist keine einfache Kurve.',

@@ -94,7 +94,7 @@ export default {
                 forkMessage:
                     '將此曲線複製為新曲線「{copy}」，僅供 {channel} 使用。\n\n共用原曲線的風扇維持不變。',
                 seedMessage:
-                    '為 {channel} 建立一條曲線，從目前轉速 {duty}% 開始。\n\n在下方編輯器中調整形狀。',
+                    '為 {channel} 建立一條曲線，以標準風扇曲線為起點。\n\n在下方編輯器中調整形狀。',
                 sharedSummary:
                     '此曲線僅控制此風扇 | 此曲線還控制另外 {count} 個風扇，在此編輯也會改變它們。 | 此曲線還控制另外 {count} 個風扇，在此編輯也會改變它們。',
                 otherSummary: '{profile} 控制此風扇，且不是簡單曲線。',

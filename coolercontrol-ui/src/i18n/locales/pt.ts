@@ -96,7 +96,7 @@ export default {
                 forkMessage:
                     "Copiar esta curva para uma nova, '{copy}', usada somente por {channel}.\n\nAs ventoinhas que compartilham a original a mantêm.",
                 seedMessage:
-                    'Criar uma curva para {channel} começando na velocidade atual de {duty}%.\n\nAjuste o formato no editor abaixo.',
+                    'Criar uma curva para {channel}, partindo da curva de ventoinha padrão.\n\nAjuste o formato no editor abaixo.',
                 sharedSummary:
                     'Esta curva controla apenas esta ventoinha | Esta curva também controla mais {count} ventoinha, então editá-la aqui mudaria essa também. | Esta curva também controla mais {count} ventoinhas, então editá-la aqui mudaria essas também.',
                 otherSummary: '{profile} controla esta ventoinha e não é uma curva simples.',

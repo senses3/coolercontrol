@@ -17,7 +17,8 @@ import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
 import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
 import { useChannelControl } from '@/shell/cooling/useChannelControl.ts'
 import { fitProfileName } from '@/shell/cooling/profileNames.ts'
-import { curveOwnership, seedCurve, seedTempSource } from '@/shell/simple/simpleCurve.ts'
+import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
+import { curveOwnership, seedTempSource } from '@/shell/simple/simpleCurve.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import type { UID } from '@/models/Device.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
@@ -67,12 +68,6 @@ const controlModeOptions = computed(() => [
 
 const ownership = computed(() => curveOwnership(selectedProfile.value, sharedChannels.value.length))
 
-// What the fan is doing right now, which is what a new curve starts from.
-const currentDuty = computed(() => {
-    const live = Number(liveDuty.value)
-    return Math.round(Number.isFinite(live) ? live : manualDuty.value)
-})
-
 const conversion = useCalibrationConversion(
     props.deviceUID,
     props.channelName,
@@ -108,10 +103,7 @@ const useSimpleCurve = async (): Promise<void> => {
               channel: channelLabel.value,
               copy: conversion.forkName(source.name),
           })
-        : t('layout.shell.simple.seedMessage', {
-              channel: channelLabel.value,
-              duty: currentDuty.value,
-          })
+        : t('layout.shell.simple.seedMessage', { channel: channelLabel.value })
     if (!(await confirmAction(message))) return
     busy.value = true
     try {
@@ -124,6 +116,12 @@ const useSimpleCurve = async (): Promise<void> => {
     }
 }
 
+/**
+ * A new Graph profile on the curve a new profile always starts from, so a fan
+ * set up here and a fan set up in the full interface begin identically. The
+ * temp range is clamped the way the editor clamps its axis, or the curve it
+ * draws on open would not be the curve that was saved.
+ */
 const createSeededCurve = async (): Promise<Profile | undefined> => {
     const tempSource = seedTempSource(
         deviceStore.allDevices(),
@@ -131,19 +129,21 @@ const createSeededCurve = async (): Promise<Profile | undefined> => {
         selectedProfile.value?.temp_source,
     )
     if (tempSource == null) return undefined
-    const tempDevice = [...deviceStore.allDevices()].find(
+    const info = [...deviceStore.allDevices()].find(
         (device) => device.uid === tempSource.device_uid,
-    )
+    )?.info
+    if (info == null) return undefined
     const profile = new Profile(
         // The suffix carries its own leading separator so each locale can word it.
         fitProfileName(channelLabel.value, t('layout.shell.simple.curveNameSuffix')),
         ProfileType.Graph,
         undefined,
         tempSource,
-        seedCurve(
-            currentDuty.value,
-            tempDevice?.info?.temp_min ?? 20,
-            tempDevice?.info?.temp_max ?? 100,
+        defaultGraphCurve(
+            Math.max(info.temp_min, 0),
+            Math.min(info.temp_max, 100),
+            info.profile_min_length,
+            info.profile_max_length,
         ),
     )
     settingsStore.profiles.push(profile)

@@ -7,8 +7,9 @@ import { describe, expect, it } from 'vitest'
 import { Device, DeviceType } from '@/models/Device.ts'
 import { DeviceInfo } from '@/models/DeviceInfo.ts'
 import { Profile, ProfileTempSource, ProfileType } from '@/models/Profile.ts'
+import { Status, TempStatus } from '@/models/Status.ts'
 import { TempInfo } from '@/models/TempInfo.ts'
-import { curveOwnership, seedCurve, seedTempSource } from '@/shell/simple/simpleCurve.ts'
+import { curveOwnership, seedTempSource } from '@/shell/simple/simpleCurve.ts'
 
 const graph = (uid: string): Profile => {
     const profile = new Profile('curve', ProfileType.Graph)
@@ -16,10 +17,13 @@ const graph = (uid: string): Profile => {
     return profile
 }
 
+// Reported temps, which is what the profile editor offers as a temp source.
 const withTemps = (uid: string, type: DeviceType, temps: string[]): Device => {
-    const info = new DeviceInfo()
-    for (const name of temps) info.temps.set(name, new TempInfo(name, 1))
-    return new Device(uid, uid, type, 1, undefined, info)
+    const status = new Status(
+        '2026-01-01',
+        temps.map((name) => new TempStatus(name, 40)),
+    )
+    return new Device(uid, uid, type, 1, undefined, new DeviceInfo(), [status])
 }
 
 describe('simple curve ownership', () => {
@@ -42,28 +46,6 @@ describe('simple curve ownership', () => {
     it('treats no profile and the default profile as none', () => {
         expect(curveOwnership(undefined, 0)).toBe('none')
         expect(curveOwnership(Profile.createDefault(), 0)).toBe('none')
-    })
-})
-
-describe('seeded curve', () => {
-    it('holds the fan at its current duty across the span', () => {
-        expect(seedCurve(42, 20, 100)).toEqual([
-            [20, 42],
-            [100, 42],
-        ])
-    })
-
-    it('rounds and clamps the duty into the writable range', () => {
-        expect(seedCurve(42.6, 20, 80)[0][1]).toBe(43)
-        expect(seedCurve(140, 20, 80)[0][1]).toBe(100)
-        expect(seedCurve(-5, 20, 80)[0][1]).toBe(0)
-        expect(seedCurve(Number.NaN, 20, 80)[0][1]).toBe(0)
-    })
-
-    // The daemon rejects an empty speed profile, so a degenerate span must still
-    // yield a point.
-    it('yields a single point when the span is empty', () => {
-        expect(seedCurve(30, 40, 40)).toEqual([[40, 30]])
     })
 })
 
@@ -100,5 +82,14 @@ describe('seeded temp source', () => {
         expect(
             seedTempSource([withTemps('fans-1', DeviceType.HWMON, [])], 'fans-1'),
         ).toBeUndefined()
+    })
+
+    // A device can describe a temp it is not currently reporting; the editor
+    // builds its list from the reported ones, so this must too.
+    it('ignores a temp the device describes but does not report', () => {
+        const info = new DeviceInfo()
+        info.temps.set('Ghost', new TempInfo('Ghost', 1))
+        const quiet = new Device('quiet-1', 'quiet-1', DeviceType.HWMON, 1, undefined, info)
+        expect(seedTempSource([quiet], 'quiet-1')).toBeUndefined()
     })
 })

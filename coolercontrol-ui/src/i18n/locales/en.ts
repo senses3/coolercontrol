@@ -94,7 +94,7 @@ export default {
                 forkMessage:
                     "Copy this curve to a new one, '{copy}', used by {channel} alone.\n\nThe fans that share the original keep it.",
                 seedMessage:
-                    'Create a curve for {channel} that starts at its current speed of {duty}%.\n\nShape it in the editor below.',
+                    'Create a curve for {channel}, starting from the standard fan curve.\n\nShape it in the editor below.',
                 sharedSummary:
                     'This curve drives only this fan | This curve also drives {count} other fan, so editing it here would change that one too. | This curve also drives {count} other fans, so editing it here would change them too.',
                 otherSummary: '{profile} controls this fan, and it is not a plain curve.',

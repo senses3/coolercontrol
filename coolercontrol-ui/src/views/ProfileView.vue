@@ -78,6 +78,7 @@ import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vu
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
+import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 import HealthWarning from '@/components/HealthWarning.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
@@ -465,38 +466,18 @@ interface PointData {
     }
 }
 
-const lineSpace = (
-    startValue: number,
-    stopValue: number,
-    cardinality: number,
-    precision: number,
-): Array<number> => {
-    const arr = []
-    const step = (stopValue - startValue) / (cardinality - 1)
-    for (let i = 0; i < cardinality; i++) {
-        const value = startValue + step * i
-        arr.push(deviceStore.round(value, precision))
-    }
-    return arr
-}
-
 const defaultDataValues = (): Array<PointData> => {
     const result: Array<PointData> = []
     if (selectedTempSource != null) {
-        const profileLength =
-            selectedTempSource.profileMinLength <= 5 && selectedTempSource.profileMaxLength >= 5
-                ? 5
-                : selectedTempSource.profileMaxLength
-        const temps = lineSpace(
+        const curve = defaultGraphCurve(
             Math.max(selectedTempSource.tempMin, axisXTempMin.value),
             Math.min(selectedTempSource.tempMax, axisXTempMax.value),
-            profileLength,
-            1,
+            selectedTempSource.profileMinLength,
+            selectedTempSource.profileMaxLength,
         )
-        const duties = lineSpace(dutyMin, dutyMax, profileLength, 0)
-        for (const [index, temp] of temps.entries()) {
+        for (const [temp, duty] of curve) {
             result.push({
-                value: [temp, duties[index]],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
