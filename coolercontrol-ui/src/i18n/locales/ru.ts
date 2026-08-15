@@ -77,8 +77,6 @@ export default {
             devices: 'Устройства',
             settings: 'Настройки',
             plugins: 'Плагины',
-            fullInterface: 'Полный интерфейс',
-            simpleInterface: 'Простой интерфейс',
             modes: 'Режимы',
             manageModes: 'Управление режимами',
             access: 'Доступ',

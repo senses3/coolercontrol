@@ -78,8 +78,6 @@ export default {
             devices: 'Appareils',
             settings: 'Paramètres',
             plugins: 'Plugins',
-            fullInterface: 'Interface complète',
-            simpleInterface: 'Interface simple',
             modes: 'Modes',
             manageModes: 'Gérer les modes',
             access: 'Accès',

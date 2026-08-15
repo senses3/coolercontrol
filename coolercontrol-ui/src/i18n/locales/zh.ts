@@ -75,8 +75,6 @@ export default {
             devices: '设备',
             settings: '设置',
             plugins: '插件',
-            fullInterface: '完整界面',
-            simpleInterface: '简洁界面',
             modes: '模式',
             manageModes: '管理模式',
             access: '访问',

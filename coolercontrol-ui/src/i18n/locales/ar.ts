@@ -75,8 +75,6 @@ export default {
             devices: 'الأجهزة',
             settings: 'الإعدادات',
             plugins: 'الإضافات',
-            fullInterface: 'الواجهة الكاملة',
-            simpleInterface: 'الواجهة البسيطة',
             modes: 'الأوضاع',
             manageModes: 'إدارة الأوضاع',
             access: 'الوصول',

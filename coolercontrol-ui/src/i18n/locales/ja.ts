@@ -75,8 +75,6 @@ export default {
             devices: 'デバイス',
             settings: '設定',
             plugins: 'プラグイン',
-            fullInterface: '完全なインターフェース',
-            simpleInterface: 'シンプルインターフェース',
             modes: 'モード',
             manageModes: 'モードを管理',
             access: 'アクセス',

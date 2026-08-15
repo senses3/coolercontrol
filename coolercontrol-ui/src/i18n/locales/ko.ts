@@ -75,8 +75,6 @@ export default {
             devices: '장치',
             settings: '설정',
             plugins: '플러그인',
-            fullInterface: '전체 인터페이스',
-            simpleInterface: '간단한 인터페이스',
             modes: '모드',
             manageModes: '모드 관리',
             access: '액세스',

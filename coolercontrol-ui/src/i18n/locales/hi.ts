@@ -76,8 +76,6 @@ export default {
             devices: 'उपकरण',
             settings: 'सेटिंग्स',
             plugins: 'प्लगइन्स',
-            fullInterface: 'पूर्ण इंटरफ़ेस',
-            simpleInterface: 'सरल इंटरफ़ेस',
             modes: 'मोड',
             manageModes: 'मोड प्रबंधित करें',
             access: 'पहुंच',

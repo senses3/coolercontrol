@@ -75,8 +75,6 @@ export default {
             devices: '裝置',
             settings: '設定',
             plugins: '外掛',
-            fullInterface: '完整介面',
-            simpleInterface: '簡潔介面',
             modes: '模式',
             manageModes: '管理模式',
             access: '存取',

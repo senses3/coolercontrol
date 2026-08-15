@@ -28,7 +28,7 @@ import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { PLUGINS_SECTION } from '@/shell/sections.ts'
-import { UiMode } from '@/models/UISettings.ts'
+import { getUiModeDisplayName, UiMode } from '@/models/UISettings.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
@@ -74,9 +74,7 @@ const toggleUiMode = (): void => {
     settingsStore.setUiMode(settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE)
 }
 const uiModeLabel = computed(() =>
-    settingsStore.isSimpleMode
-        ? t('layout.shell.fullInterface')
-        : t('layout.shell.simpleInterface'),
+    getUiModeDisplayName(settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE),
 )
 
 // Provided by ShellLayout; toggles the reka splitter panel (desktop only).
