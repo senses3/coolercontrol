@@ -271,7 +271,9 @@ onMounted(async () => {
     // root URL (startedAtRoot), not on a direct/deep link like /#/home. The
     // `startup-page` route resolves this too, but it ran before settings had
     // loaded, so it landed on the default; re-apply now that they are in.
-    if (startedAtRoot) {
+    // Simple mode always opens on Home: the other startup pages are full-shell
+    // surfaces, and its rail has no way back to them.
+    if (startedAtRoot && !settingsStore.isSimpleMode) {
         const target = startupRouteName(settingsStore.startupPage)
         if (target !== 'section-home') {
             await router.replace({ name: target })
@@ -289,8 +291,10 @@ onMounted(async () => {
         openCalibrationWizard()
     }
     await deviceStore.loadLogs()
-    // Some other dialogs, like the password dialog, will wait until Onboarding has closed
-    if (settingsStore.showOnboarding) startTour()
+    // Some other dialogs, like the password dialog, will wait until Onboarding has closed.
+    // The tour walks the full shell's rail, so simple mode leaves it for the
+    // switch to full; it stays available from Settings either way.
+    if (settingsStore.showOnboarding && !settingsStore.isSimpleMode) startTour()
     let signalLoadFinished = async (): Promise<void> => {
         if (deviceStore.isQtApp()) {
             // Helps with Qt startup handling, i.e. startInTray

@@ -87,8 +87,9 @@ const isMobile = computed(() => width.value < 768)
                 <svg-icon type="mdi" :path="mdiArrowLeft" :size="deviceStore.getREMSize(1.25)" />
             </button>
         </UiTooltip>
+        <!-- Simple mode renders no panel, so there is nothing to collapse. -->
         <UiTooltip
-            v-if="!isMobile"
+            v-if="!isMobile && !settingsStore.isSimpleMode"
             :text="
                 settingsStore.collapsedMainMenu
                     ? t('layout.topbar.expandMenu')
@@ -114,7 +115,7 @@ const isMobile = computed(() => width.value < 768)
                 </span>
             </RouterLink>
         </UiTooltip>
-        <UiTooltip :text="t('layout.topbar.alerts')">
+        <UiTooltip v-if="!settingsStore.isSimpleMode" :text="t('layout.topbar.alerts')">
             <RouterLink
                 :to="{ name: 'monitoring-alerts' }"
                 class="flex items-center justify-center rounded-lg p-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
@@ -132,7 +133,7 @@ const isMobile = computed(() => width.value < 768)
             </RouterLink>
         </UiTooltip>
         <div class="flex-1" />
-        <UiDropdownMenu>
+        <UiDropdownMenu v-if="!settingsStore.isSimpleMode">
             <template #trigger>
                 <UiButton id="modes-switcher" variant="outline">
                     <svg-icon
@@ -180,7 +181,8 @@ const isMobile = computed(() => width.value < 768)
                 {{ t('layout.shell.manageModes') }}
             </DropdownMenuItem>
         </UiDropdownMenu>
-        <!-- Mobile has no rail, so its Plugins/Access/Power entries live here. -->
+        <!-- Mobile has no rail, so its Plugins/Access/Power entries live here.
+             Simple mode has no Plugins section, so only Access/Power remain. -->
         <UiDropdownMenu v-if="isMobile">
             <template #trigger>
                 <button
@@ -194,14 +196,16 @@ const isMobile = computed(() => width.value < 768)
                     />
                 </button>
             </template>
-            <DropdownMenuItem
-                :class="dropdownItemClass"
-                @select="router.push({ name: PLUGINS_SECTION.routeName })"
-            >
-                <svg-icon type="mdi" :path="PLUGINS_SECTION.icon" :size="15" />
-                {{ t(PLUGINS_SECTION.labelKey) }}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            <template v-if="!settingsStore.isSimpleMode">
+                <DropdownMenuItem
+                    :class="dropdownItemClass"
+                    @select="router.push({ name: PLUGINS_SECTION.routeName })"
+                >
+                    <svg-icon type="mdi" :path="PLUGINS_SECTION.icon" :size="15" />
+                    {{ t(PLUGINS_SECTION.labelKey) }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            </template>
             <ShellAccessMenuItems />
             <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
             <ShellPowerMenuItems />

@@ -77,11 +77,17 @@ export default {
             devices: 'Dispositivos',
             settings: 'Configuración',
             plugins: 'Plugins',
+            fullInterface: 'Interfaz completa',
+            simpleInterface: 'Interfaz simple',
             modes: 'Modos',
             manageModes: 'Gestionar modos',
             access: 'Acceso',
             power: 'Energía',
             noModes: 'No hay modos guardados',
+            simple: {
+                fans: 'Ventiladores',
+                sensors: 'Sensores',
+            },
             supportWizards: {
                 summary: '¡Magos del soporte activados!',
                 detail: 'Gracias a los voluntarios que ayudan a nuestros usuarios a hacer funcionar su hardware y sus controladores.',
@@ -293,6 +299,7 @@ export default {
             time24h: '24 horas',
             time12h: '12 horas',
             frequencyPrecision: 'Precisión de frecuencia',
+            uiMode: 'Modo de interfaz',
             startupPage: 'Página de inicio',
             dashboardLineSize: 'Tamaño de línea del panel',
             themeStyle: 'Estilo del tema',
@@ -347,6 +354,7 @@ export default {
             tooltips: {
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) o 24 horas',
                 frequencyPrecision: 'Ajustar la precisión de los valores de frecuencia mostrados.',
+                uiMode: 'Simple muestra solo el control de ventiladores y los sensores. La interfaz completa lo muestra todo.',
                 startupPage: 'La página que se muestra después de cargar la aplicación.',
                 eyeCandy:
                     'Habilitar animaciones visuales como iconos de ventiladores giratorios.\nEsto utilizará algunos recursos adicionales de la GPU.',
@@ -1512,6 +1520,10 @@ export default {
         channelViewType: {
             control: 'Control',
             dashboard: 'Panel',
+        },
+        uiMode: {
+            simple: 'Simple',
+            full: 'Interfaz completa',
         },
         startupPage: {
             appInfo: 'Info y Herramientas',

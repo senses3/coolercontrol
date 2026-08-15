@@ -78,11 +78,17 @@ export default {
             devices: 'Appareils',
             settings: 'Paramètres',
             plugins: 'Plugins',
+            fullInterface: 'Interface complète',
+            simpleInterface: 'Interface simple',
             modes: 'Modes',
             manageModes: 'Gérer les modes',
             access: 'Accès',
             power: 'Alimentation',
             noModes: 'Aucun mode enregistré',
+            simple: {
+                fans: 'Ventilateurs',
+                sensors: 'Capteurs',
+            },
             supportWizards: {
                 summary: 'Magiciens du support activés !',
                 detail: 'Merci aux bénévoles qui aident nos utilisateurs à faire fonctionner leur matériel et leurs pilotes.',
@@ -295,6 +301,7 @@ export default {
             time24h: '24 heures',
             time12h: '12 heures',
             frequencyPrecision: 'Précision de la fréquence',
+            uiMode: "Mode d'interface",
             startupPage: 'Page de démarrage',
             dashboardLineSize: 'Taille des lignes du tableau de bord',
             themeStyle: 'Style du thème',
@@ -354,6 +361,7 @@ export default {
             tooltips: {
                 timeFormat: "Format de l'heure : 12 heures (AM/PM) ou 24 heures",
                 frequencyPrecision: 'Ajuster la précision des valeurs de fréquence affichées.',
+                uiMode: "Simple n'affiche que le contrôle des ventilateurs et les capteurs. L'interface complète affiche tout.",
                 startupPage: "La page affichée après le chargement de l'application.",
                 eyeCandy:
                     'Activer les animations visuelles comme les icônes de ventilateurs en rotation.\nCela utilisera des ressources GPU supplémentaires.',
@@ -1523,6 +1531,10 @@ export default {
         channelViewType: {
             control: 'Contrôle',
             dashboard: 'Tableau de Bord',
+        },
+        uiMode: {
+            simple: 'Simple',
+            full: 'Interface complète',
         },
         startupPage: {
             appInfo: 'Info & Outils',

@@ -6,18 +6,14 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiCog, mdiLockOutline, mdiPower } from '@mdi/js'
+import { mdiArrowCollapse, mdiArrowExpand, mdiCog, mdiLockOutline, mdiPower } from '@mdi/js'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import {
-    PLUGINS_SECTION,
-    SHELL_SECTIONS,
-    type SectionId,
-    startupRouteName,
-} from '@/shell/sections.ts'
+import { PLUGINS_SECTION, type SectionId, sectionsFor, startupRouteName } from '@/shell/sections.ts'
+import { UiMode } from '@/models/UISettings.ts'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
 import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
@@ -31,16 +27,24 @@ const settingsStore = useSettingsStore()
 
 // Settings is docked at the rail bottom (below), so it is dropped from the top list.
 // Plugins is always shown so its overview (a getting-started page) stays discoverable
-// even before any plugin is installed.
+// even before any plugin is installed. Simple mode has no Plugins section.
 const railSections = computed(() => {
-    const sections = SHELL_SECTIONS.filter((section) => section.id !== 'settings')
-    return [...sections, PLUGINS_SECTION]
+    const sections = sectionsFor(settingsStore.uiMode).filter(
+        (section) => section.id !== 'settings',
+    )
+    return settingsStore.isSimpleMode ? sections : [...sections, PLUGINS_SECTION]
 })
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 // The logo resets to the configured startup page, which is what sets it apart
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
 const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.startupPage) }))
+
+// The rail's half of the mode switch; Settings carries the other half. Quiet on
+// purpose: it is an escape hatch, not a section.
+const toggleUiMode = (): void => {
+    settingsStore.uiMode = settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE
+}
 
 // Hidden tribute: a run of taps here turns every fan glyph into a wizard hat.
 // The navigation the link already does is left alone, so a user who never finds
@@ -58,7 +62,7 @@ const onLogoTap = (): void => {
 </script>
 
 <template>
-    <nav class="flex h-full w-20 flex-col items-center gap-1 py-2">
+    <nav class="flex h-full w-20 flex-col items-center gap-1 overflow-y-auto py-2">
         <RouterLink
             id="logo"
             :to="startupTarget"
@@ -151,5 +155,24 @@ const onLogoTap = (): void => {
             </template>
             <ShellPowerMenuItems />
         </UiDropdownMenu>
+        <button
+            id="rail-ui-mode"
+            type="button"
+            class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+            @click="toggleUiMode"
+        >
+            <svg-icon
+                type="mdi"
+                :path="settingsStore.isSimpleMode ? mdiArrowExpand : mdiArrowCollapse"
+                :size="deviceStore.getREMSize(1.5)"
+            />
+            <span class="text-center text-[0.8125rem] leading-tight">
+                {{
+                    settingsStore.isSimpleMode
+                        ? t('layout.shell.fullInterface')
+                        : t('layout.shell.simpleInterface')
+                }}
+            </span>
+        </button>
     </nav>
 </template>

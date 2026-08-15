@@ -78,11 +78,17 @@ export default {
             devices: 'Geräte',
             settings: 'Einstellungen',
             plugins: 'Plugins',
+            fullInterface: 'Vollständige Oberfläche',
+            simpleInterface: 'Einfache Oberfläche',
             modes: 'Modi',
             manageModes: 'Modi verwalten',
             access: 'Zugriff',
             power: 'Ein/Aus',
             noModes: 'Keine Modi gespeichert',
+            simple: {
+                fans: 'Lüfter',
+                sensors: 'Sensoren',
+            },
             supportWizards: {
                 summary: 'Support-Zauberer aktiviert!',
                 detail: 'Mit Dank an die Freiwilligen, die unseren Nutzern helfen, Hardware und Treiber zum Laufen zu bringen.',
@@ -296,6 +302,7 @@ export default {
             time24h: '24 Stunden',
             time12h: '12 Stunden',
             frequencyPrecision: 'Frequenzgenauigkeit',
+            uiMode: 'Oberflächenmodus',
             startupPage: 'Startseite',
             dashboardLineSize: 'Dashboard-Liniengröße',
             themeStyle: 'Theme-Stil',
@@ -351,6 +358,7 @@ export default {
                 timeFormat: 'Zeitformat: 12-Stunden (AM/PM) oder 24-Stunden',
                 frequencyPrecision:
                     'Stellen Sie die Genauigkeit der angezeigten Frequenzwerte ein.',
+                uiMode: 'Einfach zeigt nur die Lüftersteuerung und Sensoren. Die vollständige Oberfläche zeigt alles.',
                 startupPage: 'Die Seite, die nach dem Laden der Anwendung angezeigt wird.',
                 eyeCandy:
                     'Visuelle Animationen wie drehende Lüftersymbole aktivieren.\nDies beansprucht zusätzliche GPU-Ressourcen.',
@@ -1523,6 +1531,10 @@ export default {
         channelViewType: {
             control: 'Steuerung',
             dashboard: 'Dashboard',
+        },
+        uiMode: {
+            simple: 'Einfach',
+            full: 'Vollständige Oberfläche',
         },
         startupPage: {
             appInfo: 'Info & Werkzeuge',

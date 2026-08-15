@@ -75,11 +75,17 @@ export default {
             devices: 'Devices',
             settings: 'Settings',
             plugins: 'Plugins',
+            fullInterface: 'Full interface',
+            simpleInterface: 'Simple interface',
             modes: 'Modes',
             manageModes: 'Manage modes',
             access: 'Access',
             power: 'Power',
             noModes: 'No modes saved',
+            simple: {
+                fans: 'Fans',
+                sensors: 'Sensors',
+            },
             supportWizards: {
                 summary: 'Support Wizards Activated!',
                 detail: 'With thanks to the volunteers who help our users get their hardware and drivers working.',
@@ -288,6 +294,7 @@ export default {
             time24h: '24hr',
             time12h: '12hr',
             frequencyPrecision: 'Frequency Precision',
+            uiMode: 'Interface Mode',
             startupPage: 'Startup Page',
             dashboardLineSize: 'Dashboard Line Size',
             themeStyle: 'Theme Style',
@@ -342,6 +349,7 @@ export default {
             tooltips: {
                 timeFormat: 'Time format: 12-hour (AM/PM) or 24-hour',
                 frequencyPrecision: 'Adjust the precision of displayed frequency values.',
+                uiMode: 'Simple shows only fan control and sensors. Full interface shows everything.',
                 startupPage: 'The page shown after the application loads.',
                 eyeCandy:
                     'Enable visual animations like spinning fan icons.\nThis will use some additional GPU resources.',
@@ -1487,6 +1495,10 @@ export default {
         channelViewType: {
             control: 'Control',
             dashboard: 'Dashboard',
+        },
+        uiMode: {
+            simple: 'Simple',
+            full: 'Full interface',
         },
         startupPage: {
             appInfo: 'Info & Tools',

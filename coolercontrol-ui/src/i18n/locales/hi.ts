@@ -76,11 +76,17 @@ export default {
             devices: 'उपकरण',
             settings: 'सेटिंग्स',
             plugins: 'प्लगइन्स',
+            fullInterface: 'पूर्ण इंटरफ़ेस',
+            simpleInterface: 'सरल इंटरफ़ेस',
             modes: 'मोड',
             manageModes: 'मोड प्रबंधित करें',
             access: 'पहुंच',
             power: 'पावर',
             noModes: 'कोई मोड सहेजा नहीं गया',
+            simple: {
+                fans: 'पंखे',
+                sensors: 'सेंसर',
+            },
             supportWizards: {
                 summary: 'सपोर्ट के जादूगर सक्रिय!',
                 detail: 'उन स्वयंसेवकों का धन्यवाद जो हमारे उपयोगकर्ताओं का हार्डवेयर और ड्राइवर चलाने में मदद करते हैं।',
@@ -289,6 +295,7 @@ export default {
             time24h: '24 घंटे',
             time12h: '12 घंटे',
             frequencyPrecision: 'आवृत्ति सटीकता',
+            uiMode: 'इंटरफ़ेस मोड',
             startupPage: 'स्टार्टअप पेज',
             dashboardLineSize: 'डैशबोर्ड रेखा आकार',
             themeStyle: 'थीम स्टाइल',
@@ -343,6 +350,7 @@ export default {
             tooltips: {
                 timeFormat: 'समय प्रारूप: 12-घंटे (AM/PM) या 24-घंटे',
                 frequencyPrecision: 'प्रदर्शित आवृत्ति मानों की सटीकता समायोजित करें।',
+                uiMode: 'सरल केवल पंखा नियंत्रण और सेंसर दिखाता है। पूर्ण इंटरफ़ेस सब कुछ दिखाता है।',
                 startupPage: 'एप्लिकेशन लोड होने के बाद दिखाया जाने वाला पेज।',
                 eyeCandy:
                     'घूमते पंखे के आइकन जैसे विज़ुअल एनिमेशन सक्षम करें।\nइससे कुछ अतिरिक्त GPU संसाधनों का उपयोग होगा।',
@@ -1487,6 +1495,10 @@ export default {
         channelViewType: {
             control: 'नियंत्रण',
             dashboard: 'डैशबोर्ड',
+        },
+        uiMode: {
+            simple: 'सरल',
+            full: 'पूर्ण इंटरफ़ेस',
         },
         startupPage: {
             appInfo: 'जानकारी और उपकरण',

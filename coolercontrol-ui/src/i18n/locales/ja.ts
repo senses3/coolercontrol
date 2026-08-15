@@ -75,11 +75,17 @@ export default {
             devices: 'デバイス',
             settings: '設定',
             plugins: 'プラグイン',
+            fullInterface: '完全なインターフェース',
+            simpleInterface: 'シンプルインターフェース',
             modes: 'モード',
             manageModes: 'モードを管理',
             access: 'アクセス',
             power: '電源',
             noModes: '保存されたモードがありません',
+            simple: {
+                fans: 'ファン',
+                sensors: 'センサー',
+            },
             supportWizards: {
                 summary: 'サポートの魔法使いを召喚！',
                 detail: 'ハードウェアとドライバーを動かす手助けをしてくれるボランティアの皆さんに感謝します。',
@@ -290,6 +296,7 @@ export default {
             time24h: '24時間',
             time12h: '12時間',
             frequencyPrecision: '周波数の精度',
+            uiMode: 'インターフェースモード',
             startupPage: '起動時のページ',
             dashboardLineSize: 'ダッシュボードの線のサイズ',
             themeStyle: 'テーマスタイル',
@@ -344,6 +351,7 @@ export default {
             tooltips: {
                 timeFormat: '時間形式：12時間（AM/PM）または24時間',
                 frequencyPrecision: '表示される周波数値の精度を調整します。',
+                uiMode: 'シンプルはファン制御とセンサーのみを表示します。完全なインターフェースはすべてを表示します。',
                 startupPage: 'アプリケーション読み込み後に表示されるページ。',
                 eyeCandy:
                     '回転するファンアイコンなどのビジュアルアニメーションを有効にします。\nこれにより追加のGPUリソースが使用されます。',
@@ -1493,6 +1501,10 @@ export default {
         channelViewType: {
             control: '制御',
             dashboard: 'ダッシュボード',
+        },
+        uiMode: {
+            simple: 'シンプル',
+            full: '完全なインターフェース',
         },
         startupPage: {
             appInfo: '情報とツール',

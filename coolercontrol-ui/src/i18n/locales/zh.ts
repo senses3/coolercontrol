@@ -75,11 +75,17 @@ export default {
             devices: '设备',
             settings: '设置',
             plugins: '插件',
+            fullInterface: '完整界面',
+            simpleInterface: '简洁界面',
             modes: '模式',
             manageModes: '管理模式',
             access: '访问',
             power: '电源',
             noModes: '尚未保存模式',
+            simple: {
+                fans: '风扇',
+                sensors: '传感器',
+            },
             supportWizards: {
                 summary: '支持魔法师已激活！',
                 detail: '感谢帮助我们的用户让硬件和驱动正常工作的志愿者们。',
@@ -279,6 +285,7 @@ export default {
             time24h: '24小时制',
             time12h: '12小时制',
             frequencyPrecision: '频率精度',
+            uiMode: '界面模式',
             startupPage: '启动页面',
             dashboardLineSize: '仪表盘线条大小',
             themeStyle: '主题样式',
@@ -333,6 +340,7 @@ export default {
             tooltips: {
                 timeFormat: '时间格式：12小时制（上午/下午）或24小时制',
                 frequencyPrecision: '调整显示的频率值精度。',
+                uiMode: '简洁模式仅显示风扇控制和传感器。完整界面显示全部内容。',
                 startupPage: '应用程序加载后显示的页面。',
                 eyeCandy: '启用视觉动画，例如旋转的风扇图标。\n这将使用一些额外的 GPU 资源。',
                 interfaceFont: '使用 CoolerControl 附带的字体，或系统中配置的字体。',
@@ -1426,6 +1434,10 @@ export default {
         channelViewType: {
             control: '控制',
             dashboard: '仪表盘',
+        },
+        uiMode: {
+            simple: '简洁',
+            full: '完整界面',
         },
         startupPage: {
             appInfo: '信息与工具',

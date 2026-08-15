@@ -77,11 +77,17 @@ export default {
             devices: 'Dispositivos',
             settings: 'Configurações',
             plugins: 'Plugins',
+            fullInterface: 'Interface completa',
+            simpleInterface: 'Interface simples',
             modes: 'Modos',
             manageModes: 'Gerenciar modos',
             access: 'Acesso',
             power: 'Energia',
             noModes: 'Nenhum modo salvo',
+            simple: {
+                fans: 'Ventoinhas',
+                sensors: 'Sensores',
+            },
             supportWizards: {
                 summary: 'Magos do suporte ativados!',
                 detail: 'Agradecemos aos voluntários que ajudam nossos usuários a fazer o hardware e os drivers funcionarem.',
@@ -293,6 +299,7 @@ export default {
             time24h: '24 horas',
             time12h: '12 horas',
             frequencyPrecision: 'Precisão de frequência',
+            uiMode: 'Modo da interface',
             startupPage: 'Página inicial',
             dashboardLineSize: 'Tamanho da linha do painel',
             themeStyle: 'Estilo do tema',
@@ -347,6 +354,7 @@ export default {
             tooltips: {
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) ou 24 horas',
                 frequencyPrecision: 'Ajustar a precisão dos valores de frequência exibidos.',
+                uiMode: 'Simples mostra apenas o controle de ventoinhas e os sensores. A interface completa mostra tudo.',
                 startupPage: 'A página exibida após o carregamento do aplicativo.',
                 eyeCandy:
                     'Ativar animações visuais como ícones de ventoinhas girando.\nIsto utilizará alguns recursos adicionais da GPU.',
@@ -1509,6 +1517,10 @@ export default {
         channelViewType: {
             control: 'Controle',
             dashboard: 'Painel',
+        },
+        uiMode: {
+            simple: 'Simples',
+            full: 'Interface completa',
         },
         startupPage: {
             appInfo: 'Info e Ferramentas',

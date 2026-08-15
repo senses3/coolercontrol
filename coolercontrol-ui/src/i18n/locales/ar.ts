@@ -75,11 +75,17 @@ export default {
             devices: 'الأجهزة',
             settings: 'الإعدادات',
             plugins: 'الإضافات',
+            fullInterface: 'الواجهة الكاملة',
+            simpleInterface: 'الواجهة البسيطة',
             modes: 'الأوضاع',
             manageModes: 'إدارة الأوضاع',
             access: 'الوصول',
             power: 'الطاقة',
             noModes: 'لا توجد أوضاع محفوظة',
+            simple: {
+                fans: 'المراوح',
+                sensors: 'المستشعرات',
+            },
             supportWizards: {
                 summary: 'تم تفعيل سحرة الدعم!',
                 detail: 'شكرًا للمتطوعين الذين يساعدون مستخدمينا على تشغيل أجهزتهم وبرامج التشغيل الخاصة بها.',
@@ -289,6 +295,7 @@ export default {
             time24h: '24 ساعة',
             time12h: '12 ساعة',
             frequencyPrecision: 'دقة التردد',
+            uiMode: 'وضع الواجهة',
             startupPage: 'صفحة البدء',
             dashboardLineSize: 'حجم خط لوحة المعلومات',
             themeStyle: 'نمط السمة',
@@ -343,6 +350,7 @@ export default {
             tooltips: {
                 timeFormat: 'تنسيق الوقت: 12 ساعة (صباحًا/مساءً) أو 24 ساعة',
                 frequencyPrecision: 'ضبط دقة قيم التردد المعروضة.',
+                uiMode: 'الوضع البسيط يعرض التحكم في المراوح والمستشعرات فقط. الواجهة الكاملة تعرض كل شيء.',
                 startupPage: 'الصفحة المعروضة بعد تحميل التطبيق.',
                 eyeCandy:
                     'تمكين الرسوم المتحركة المرئية مثل أيقونات المراوح الدوارة.\nسيستخدم هذا بعض موارد وحدة معالجة الرسومات الإضافية.',
@@ -1474,6 +1482,10 @@ export default {
         channelViewType: {
             control: 'تحكم',
             dashboard: 'لوحة معلومات',
+        },
+        uiMode: {
+            simple: 'بسيطة',
+            full: 'الواجهة الكاملة',
         },
         startupPage: {
             appInfo: 'معلومات وأدوات',

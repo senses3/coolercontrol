@@ -13,6 +13,7 @@ import ShellRail from '@/shell/ShellRail.vue'
 import ShellHeader from '@/shell/ShellHeader.vue'
 import ShellPanel from '@/shell/ShellPanel.vue'
 import ShellBottomNav from '@/shell/ShellBottomNav.vue'
+import { hotkeySections } from '@/shell/sections.ts'
 import hotkeys from 'hotkeys-js'
 import { useRouter } from 'vue-router'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
@@ -56,26 +57,24 @@ const toggleMainMenu = (): void => {
 }
 provide('toggleMainMenu', toggleMainMenu)
 
-// Section hotkeys. Browsers reserve Ctrl+number for tab switching, so the
-// Ctrl+Alt variants exist for web use; plain Ctrl+number works in the Qt app.
+// Section hotkeys: ctrl+N opens the Nth section of the current mode, so simple
+// mode renumbers along with its shorter rail. Browsers reserve Ctrl+number for
+// tab switching, so the Ctrl+Alt variants exist for web use; plain Ctrl+number
+// works in the Qt app. The mode is read inside the handler because the bindings
+// are registered once, at setup.
 const router = useRouter()
 const { openShortcutsDialog } = useShortcutsDialog()
-const SECTION_KEYS: Array<[string, string]> = [
-    ['1', 'section-home'],
-    ['2', 'section-cooling'],
-    ['3', 'section-monitoring'],
-    ['4', 'section-devices'],
-    ['5', 'settings'],
-    ['6', 'plugins-overview'],
-]
+const SECTION_DIGITS = ['1', '2', '3', '4', '5', '6']
 const HOTKEY_SCOPES: string[] = []
-for (const [digit, routeName] of SECTION_KEYS) {
+for (const [index, digit] of SECTION_DIGITS.entries()) {
     const combo = `ctrl+${digit},ctrl+alt+${digit}`
     HOTKEY_SCOPES.push(combo)
     hotkeys(combo, (event) => {
-        if (routeName === 'plugins-overview' && deviceStore.plugins.length === 0) return
+        const section = hotkeySections(settingsStore.uiMode)[index]
+        if (section == null) return
+        if (section.id === 'plugins' && deviceStore.plugins.length === 0) return
         event.preventDefault()
-        router.push({ name: routeName })
+        router.push({ name: section.routeName })
     })
 }
 hotkeys('ctrl+,', (event) => {
@@ -113,7 +112,23 @@ onUnmounted(() => {
         <ShellRail />
         <div class="flex min-w-0 flex-1 flex-col pb-2 pr-2">
             <ShellHeader />
-            <SplitterGroup direction="horizontal" :keyboard-resize-by="10" class="min-h-0 flex-1">
+            <!-- Simple mode has no contextual panel: the page owns the width. -->
+            <div
+                v-if="settingsStore.isSimpleMode"
+                class="min-h-0 flex-1 truncate rounded-lg border border-border-one bg-bg-one"
+            >
+                <router-view v-slot="{ Component, route }">
+                    <Suspense>
+                        <component :is="Component" :key="route.path + (route.query?.key ?? '')" />
+                    </Suspense>
+                </router-view>
+            </div>
+            <SplitterGroup
+                v-else
+                direction="horizontal"
+                :keyboard-resize-by="10"
+                class="min-h-0 flex-1"
+            >
                 <SplitterPanel
                     ref="panelRef"
                     collapsible

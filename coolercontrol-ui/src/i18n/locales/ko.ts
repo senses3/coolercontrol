@@ -75,11 +75,17 @@ export default {
             devices: '장치',
             settings: '설정',
             plugins: '플러그인',
+            fullInterface: '전체 인터페이스',
+            simpleInterface: '간단한 인터페이스',
             modes: '모드',
             manageModes: '모드 관리',
             access: '액세스',
             power: '전원',
             noModes: '저장된 모드 없음',
+            simple: {
+                fans: '팬',
+                sensors: '센서',
+            },
             supportWizards: {
                 summary: '지원 마법사 활성화!',
                 detail: '사용자의 하드웨어와 드라이버가 동작하도록 도와주는 자원봉사자들에게 감사드립니다.',
@@ -289,6 +295,7 @@ export default {
             time24h: '24시간',
             time12h: '12시간',
             frequencyPrecision: '주파수 정밀도',
+            uiMode: '인터페이스 모드',
             startupPage: '시작 페이지',
             dashboardLineSize: '대시보드 선 크기',
             themeStyle: '테마 스타일',
@@ -343,6 +350,7 @@ export default {
             tooltips: {
                 timeFormat: '시간 형식: 12시간 (AM/PM) 또는 24시간',
                 frequencyPrecision: '표시되는 주파수 값의 정밀도를 조정하세요.',
+                uiMode: '간단은 팬 제어와 센서만 표시합니다. 전체 인터페이스는 모든 것을 표시합니다.',
                 startupPage: '애플리케이션 로드 후 표시되는 페이지입니다.',
                 eyeCandy:
                     '회전하는 팬 아이콘과 같은 시각적 애니메이션을 활성화합니다.\n이 기능은 추가적인 GPU 리소스를 사용합니다.',
@@ -1474,6 +1482,10 @@ export default {
         channelViewType: {
             control: '제어',
             dashboard: '대시보드',
+        },
+        uiMode: {
+            simple: '간단',
+            full: '전체 인터페이스',
         },
         startupPage: {
             appInfo: '정보 및 도구',

@@ -10,11 +10,14 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { SHELL_SECTIONS, type SectionId } from '@/shell/sections.ts'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { type SectionId, sectionsFor } from '@/shell/sections.ts'
 
 const route = useRoute()
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
+const settingsStore = useSettingsStore()
+const navSections = computed(() => sectionsFor(settingsStore.uiMode))
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 </script>
 
@@ -24,7 +27,7 @@ const activeSection = computed(() => route.meta.section as SectionId | undefined
         class="flex h-14 shrink-0 items-stretch justify-around border-t border-border-one"
     >
         <RouterLink
-            v-for="section in SHELL_SECTIONS"
+            v-for="section in navSections"
             :key="section.id"
             :to="{ name: section.routeName }"
             class="relative flex min-w-14 flex-col items-center justify-center gap-0.5 px-1 outline-none"

@@ -106,6 +106,27 @@ export enum ChannelViewType {
     Dashboard = 'Dashboard',
 }
 
+/**
+ * Which shell the interface renders. `Simple` is a lens over the same daemon
+ * config: fan control and sensors only. `Full` is the complete interface.
+ */
+export enum UiMode {
+    SIMPLE = 'simple',
+    FULL = 'full',
+}
+
+export function getUiModeDisplayName(mode: UiMode): string {
+    const { t } = i18n.global
+    switch (mode) {
+        case UiMode.SIMPLE:
+            return t('models.uiMode.simple')
+        case UiMode.FULL:
+            return t('models.uiMode.full')
+        default:
+            return String(mode)
+    }
+}
+
 export enum StartupPage {
     AppInfo = 'app-info',
     HomeDashboard = 'dashboards',
@@ -258,4 +279,7 @@ export class UISettingsDTO {
     ramStressBackend: 'stress_ng' | 'built_in' = 'built_in'
     driveStressBackend: 'stress_ng' | 'built_in' = 'built_in'
     startupPage: StartupPage = StartupPage.AppInfo
+    // Undefined means the user has never chosen; the store resolves a default
+    // once, at load, and persists it from then on.
+    uiMode?: UiMode
 }

@@ -38,9 +38,11 @@ import {
     defaultCustomTheme,
     getInterfaceFontDisplayName,
     getThemeModeDisplayName,
+    getUiModeDisplayName,
     InterfaceFont,
     StartupPage,
     ThemeMode,
+    UiMode,
 } from '@/models/UISettings.ts'
 import {
     INSTALLED_THEMES,
@@ -235,6 +237,9 @@ const lineThicknessSelectOptions = computed(() =>
     })),
 )
 
+const uiModeOptions = computed(() =>
+    Object.values(UiMode).map((mode) => ({ value: mode, label: getUiModeDisplayName(mode) })),
+)
 const startupPageOptions = computed(() => [
     { value: StartupPage.AppInfo, label: t('layout.shell.home') },
     { value: StartupPage.Controls, label: t('layout.shell.cooling') },
@@ -566,6 +571,18 @@ onUnmounted(() => {
                     }}</UiButton>
                 </UiSettingRow>
                 <UiSettingRow
+                    v-tooltip.top="t('layout.settings.tooltips.uiMode')"
+                    :label="t('layout.settings.uiMode')"
+                >
+                    <UiSelect
+                        v-model="settingsStore.uiMode"
+                        :options="uiModeOptions"
+                        class="w-full"
+                    />
+                </UiSettingRow>
+                <!-- Simple mode always opens on Home, so the choice would do nothing. -->
+                <UiSettingRow
+                    v-if="!settingsStore.isSimpleMode"
                     v-tooltip.top="t('layout.settings.tooltips.startupPage')"
                     :label="t('layout.settings.startupPage')"
                 >
