@@ -77,11 +77,32 @@ export default {
             devices: 'Dispositivos',
             settings: 'Configurações',
             plugins: 'Plugins',
+            fullInterface: 'Interface completa',
+            simpleInterface: 'Interface simples',
             modes: 'Modos',
             manageModes: 'Gerenciar modos',
             access: 'Acesso',
             power: 'Energia',
             noModes: 'Nenhum modo salvo',
+            simple: {
+                fans: 'Ventoinhas',
+                sensors: 'Sensores',
+                sensorsHint: 'Selecione um sensor para ver seu histórico.',
+                noSensors: 'Nenhum sensor foi detectado.',
+                modeCurve: 'Curva',
+                modeFixed: 'Velocidade fixa',
+                useCurve: 'Usar uma curva simples',
+                useCurveAccept: 'Criar curva',
+                forkMessage:
+                    "Copiar esta curva para uma nova, '{copy}', usada somente por {channel}.\n\nAs ventoinhas que compartilham a original a mantêm.",
+                seedMessage:
+                    'Criar uma curva para {channel}, partindo da curva de ventoinha padrão.\n\nAjuste o formato no editor abaixo.',
+                sharedSummary:
+                    'Esta curva controla apenas esta ventoinha | Esta curva também controla mais {count} ventoinha, então editá-la aqui mudaria essa também. | Esta curva também controla mais {count} ventoinhas, então editá-la aqui mudaria essas também.',
+                otherSummary: '{profile} controla esta ventoinha e não é uma curva simples.',
+                noCurveSummary: 'Esta ventoinha ainda não tem curva.',
+                curveNameSuffix: ' Curva',
+            },
             supportWizards: {
                 summary: 'Magos do suporte ativados!',
                 detail: 'Agradecemos aos voluntários que ajudam nossos usuários a fazer o hardware e os drivers funcionarem.',
@@ -171,6 +192,8 @@ export default {
                     'O dispositivo ou seu firmware controla este canal. O CoolerControl não enviará comandos de velocidade.',
                 apply: 'Aplicar',
                 saveAndApply: 'Salvar e Aplicar',
+                unsavedChanges: 'Há alterações neste canal que não foram aplicadas.',
+                unsavedChangesHeader: 'Alterações não salvas',
                 selectProfile: 'Selecione um perfil',
                 sharedWith: 'Compartilhado com mais {count}',
                 sharedTooltip: 'Este perfil também controla outros canais.',
@@ -293,6 +316,7 @@ export default {
             time24h: '24 horas',
             time12h: '12 horas',
             frequencyPrecision: 'Precisão de frequência',
+            uiMode: 'Modo da interface',
             startupPage: 'Página inicial',
             dashboardLineSize: 'Tamanho da linha do painel',
             themeStyle: 'Estilo do tema',
@@ -347,6 +371,7 @@ export default {
             tooltips: {
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) ou 24 horas',
                 frequencyPrecision: 'Ajustar a precisão dos valores de frequência exibidos.',
+                uiMode: 'Simples mostra apenas o controle de ventoinhas e os sensores. A interface completa mostra tudo.',
                 startupPage: 'A página exibida após o carregamento do aplicativo.',
                 eyeCandy:
                     'Ativar animações visuais como ícones de ventoinhas girando.\nIsto utilizará alguns recursos adicionais da GPU.',
@@ -938,9 +963,25 @@ export default {
         },
         onboarding: {
             welcome: 'Bem-vindo ao CoolerControl!',
+            simpleHome: 'Início',
+            simpleHomeDesc:
+                'Status do serviço e saúde dos dispositivos de relance, além dos registros e do relatório de hardware para enviar quando algo não é detectado.',
+            simpleFans: 'Ventoinhas',
+            simpleFansDesc:
+                'Todas as ventoinhas e bombas que o CoolerControl pode controlar. Abra uma para dar-lhe uma curva, manter uma velocidade fixa ou deixá-la com o firmware.',
+            simpleSensors: 'Sensores',
+            simpleSensorsDesc:
+                'Todas as leituras de temperatura, ventoinha e energia do sistema. Abra uma para ver seu histórico recente.',
+            interfaceMode: 'Interface',
+            interfaceModeDesc:
+                'Alterne entre a interface simples e a completa aqui a qualquer momento. Nada se perde: ambas controlam as mesmas configurações.',
+            chooseInterface: 'Qual interface você prefere?',
+            simpleChoiceDesc: 'Curvas de ventoinha e sensores, e nada mais.',
+            fullChoiceDesc: 'Tudo: perfis, funções, painéis, alertas, modos, iluminação e mais.',
             gettingStartedIntro:
                 'Faça um tour rápido para se orientar. Ele percorre a barra de navegação e as áreas principais do aplicativo.',
-            startTourAgain: 'Pode iniciar este tour novamente a qualquer momento na página Início.',
+            startTourAgain:
+                'Você pode iniciar este tour novamente a qualquer momento nas Configurações.',
             startTour: 'Iniciar Tour',
             maybeLater: 'Talvez mais tarde',
             openGettingStarted: 'Abrir Documentação de Introdução',
@@ -1509,6 +1550,10 @@ export default {
         channelViewType: {
             control: 'Controle',
             dashboard: 'Painel',
+        },
+        uiMode: {
+            simple: 'Simples',
+            full: 'Interface completa',
         },
         startupPage: {
             appInfo: 'Info e Ferramentas',

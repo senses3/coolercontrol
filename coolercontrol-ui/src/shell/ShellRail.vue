@@ -12,12 +12,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import {
-    PLUGINS_SECTION,
-    SHELL_SECTIONS,
-    type SectionId,
-    startupRouteName,
-} from '@/shell/sections.ts'
+import { PLUGINS_SECTION, type SectionId, sectionsFor, startupRouteName } from '@/shell/sections.ts'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
 import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
@@ -31,16 +26,21 @@ const settingsStore = useSettingsStore()
 
 // Settings is docked at the rail bottom (below), so it is dropped from the top list.
 // Plugins is always shown so its overview (a getting-started page) stays discoverable
-// even before any plugin is installed.
+// even before any plugin is installed. Simple mode has no Plugins section.
 const railSections = computed(() => {
-    const sections = SHELL_SECTIONS.filter((section) => section.id !== 'settings')
-    return [...sections, PLUGINS_SECTION]
+    const sections = sectionsFor(settingsStore.uiMode).filter(
+        (section) => section.id !== 'settings',
+    )
+    return settingsStore.isSimpleMode ? sections : [...sections, PLUGINS_SECTION]
 })
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 // The logo resets to the configured startup page, which is what sets it apart
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
-const startupTarget = computed(() => ({ name: startupRouteName(settingsStore.startupPage) }))
+// Simple mode boots to Home whatever the setting says, so the logo goes there too.
+const startupTarget = computed(() => ({
+    name: settingsStore.isSimpleMode ? 'section-home' : startupRouteName(settingsStore.startupPage),
+}))
 
 // Hidden tribute: a run of taps here turns every fan glyph into a wizard hat.
 // The navigation the link already does is left alone, so a user who never finds

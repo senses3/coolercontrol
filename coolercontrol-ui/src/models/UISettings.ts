@@ -106,6 +106,27 @@ export enum ChannelViewType {
     Dashboard = 'Dashboard',
 }
 
+/**
+ * Which shell the interface renders. `Simple` is a lens over the same daemon
+ * config: fan control and sensors only. `Full` is the complete interface.
+ */
+export enum UiMode {
+    SIMPLE = 'simple',
+    FULL = 'full',
+}
+
+export function getUiModeDisplayName(mode: UiMode): string {
+    const { t } = i18n.global
+    switch (mode) {
+        case UiMode.SIMPLE:
+            return t('models.uiMode.simple')
+        case UiMode.FULL:
+            return t('models.uiMode.full')
+        default:
+            return String(mode)
+    }
+}
+
 export enum StartupPage {
     AppInfo = 'app-info',
     HomeDashboard = 'dashboards',
@@ -159,6 +180,10 @@ export class SensorAndChannelSettings {
     @Type(() => Dashboard)
     channelDashboard?: Dashboard
     tags: Array<string> = []
+    // The profile last seen driving this channel. A fixed speed or an unmanaged
+    // channel carries no profile in the daemon's setting, so this is the only
+    // record of what to offer back when the channel returns to one.
+    lastProfileUID?: UID
 
     constructor(defaultColor: Color = '#568af2') {
         this.defaultColor = defaultColor
@@ -212,8 +237,9 @@ export class DeviceUISettings {
 }
 
 // Bump when the tour changes enough that everyone should see it again. 1 was
-// the original tour; 2 reworked it for the new shell.
-export const ONBOARDING_TOUR_VERSION = 2
+// the original tour; 2 reworked it for the new shell; 3 split it per interface
+// and put the interface choice in the welcome, which everyone should be asked.
+export const ONBOARDING_TOUR_VERSION = 3
 
 /**
  * A DTO Class to hold all the UI settings to be persisted by the daemon.
@@ -258,4 +284,7 @@ export class UISettingsDTO {
     ramStressBackend: 'stress_ng' | 'built_in' = 'built_in'
     driveStressBackend: 'stress_ng' | 'built_in' = 'built_in'
     startupPage: StartupPage = StartupPage.AppInfo
+    // Undefined means the user has never chosen; the store resolves a default
+    // once, at load, and persists it from then on.
+    uiMode?: UiMode
 }

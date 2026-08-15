@@ -75,11 +75,32 @@ export default {
             devices: '设备',
             settings: '设置',
             plugins: '插件',
+            fullInterface: '完整界面',
+            simpleInterface: '简洁界面',
             modes: '模式',
             manageModes: '管理模式',
             access: '访问',
             power: '电源',
             noModes: '尚未保存模式',
+            simple: {
+                fans: '风扇',
+                sensors: '传感器',
+                sensorsHint: '选择一个传感器以查看其历史记录。',
+                noSensors: '未检测到传感器。',
+                modeCurve: '曲线',
+                modeFixed: '固定转速',
+                useCurve: '使用简单曲线',
+                useCurveAccept: '创建曲线',
+                forkMessage:
+                    '将此曲线复制为新曲线“{copy}”，仅供 {channel} 使用。\n\n共享原曲线的风扇保持不变。',
+                seedMessage:
+                    '为 {channel} 创建一条曲线，以标准风扇曲线为起点。\n\n在下方编辑器中调整形状。',
+                sharedSummary:
+                    '此曲线仅控制该风扇 | 此曲线还控制另外 {count} 个风扇，在此编辑也会改变它们。 | 此曲线还控制另外 {count} 个风扇，在此编辑也会改变它们。',
+                otherSummary: '{profile} 控制着该风扇，它不是简单曲线。',
+                noCurveSummary: '该风扇还没有曲线。',
+                curveNameSuffix: ' 曲线',
+            },
             supportWizards: {
                 summary: '支持魔法师已激活！',
                 detail: '感谢帮助我们的用户让硬件和驱动正常工作的志愿者们。',
@@ -167,6 +188,8 @@ export default {
                 unmanagedHint: '该设备或其固件控制此通道。CoolerControl 将不会发送任何速度命令。',
                 apply: '应用',
                 saveAndApply: '保存并应用',
+                unsavedChanges: '此通道有尚未应用的更改。',
+                unsavedChangesHeader: '未保存的更改',
                 selectProfile: '选择配置文件',
                 sharedWith: '另与 {count} 个共享',
                 sharedTooltip: '此配置文件还驱动其他通道。',
@@ -279,6 +302,7 @@ export default {
             time24h: '24小时制',
             time12h: '12小时制',
             frequencyPrecision: '频率精度',
+            uiMode: '界面模式',
             startupPage: '启动页面',
             dashboardLineSize: '仪表盘线条大小',
             themeStyle: '主题样式',
@@ -333,6 +357,7 @@ export default {
             tooltips: {
                 timeFormat: '时间格式：12小时制（上午/下午）或24小时制',
                 frequencyPrecision: '调整显示的频率值精度。',
+                uiMode: '简洁模式仅显示风扇控制和传感器。完整界面显示全部内容。',
                 startupPage: '应用程序加载后显示的页面。',
                 eyeCandy: '启用视觉动画，例如旋转的风扇图标。\n这将使用一些额外的 GPU 资源。',
                 interfaceFont: '使用 CoolerControl 附带的字体，或系统中配置的字体。',
@@ -891,8 +916,22 @@ export default {
         },
         onboarding: {
             welcome: '欢迎使用CoolerControl！',
+            simpleHome: '主页',
+            simpleHomeDesc:
+                '一目了然的守护进程状态和设备健康情况，还有日志以及在设备未被识别时可发送的硬件报告。',
+            simpleFans: '风扇',
+            simpleFansDesc:
+                'CoolerControl 可控制的所有风扇和水泵。打开其中一个即可设置曲线、保持固定转速，或交给固件处理。',
+            simpleSensors: '传感器',
+            simpleSensorsDesc: '系统的所有温度、风扇和功耗读数。打开其中一个即可查看近期历史。',
+            interfaceMode: '界面',
+            interfaceModeDesc:
+                '随时在此切换简洁界面与完整界面。两者驱动相同的设置，切换不会丢失任何内容。',
+            chooseInterface: '您想使用哪个界面？',
+            simpleChoiceDesc: '只有风扇曲线和传感器。',
+            fullChoiceDesc: '全部功能：配置文件、函数、仪表板、警报、模式、灯光等。',
             gettingStartedIntro: '通过快速导览来熟悉应用。它会介绍导航栏和应用的主要区域。',
-            startTourAgain: '您可以随时从主页重新启动此导览。',
+            startTourAgain: '您可以随时从设置中重新开始此导览。',
             startTour: '开始导览',
             maybeLater: '稍后',
             openGettingStarted: '打开入门文档',
@@ -1426,6 +1465,10 @@ export default {
         channelViewType: {
             control: '控制',
             dashboard: '仪表盘',
+        },
+        uiMode: {
+            simple: '简洁',
+            full: '完整界面',
         },
         startupPage: {
             appInfo: '信息与工具',

@@ -21,6 +21,11 @@ const settingsStore = useSettingsStore()
 
 const groups = computed(() => coolingChannels(deviceStore.allDevices()))
 
+// Simple mode calls the section Fans, and keeps the wizards out of it.
+const title = computed(() =>
+    settingsStore.isSimpleMode ? t('layout.shell.simple.fans') : t('layout.shell.cooling'),
+)
+
 const deviceLabel = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
 
@@ -33,11 +38,11 @@ const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
 <template>
     <div class="flex h-full flex-col overflow-y-auto">
         <div class="flex flex-wrap items-center gap-3 px-4 pt-4">
-            <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.cooling') }}</h1>
+            <h1 class="text-xl font-semibold text-text-color">{{ title }}</h1>
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.coolingPage.landingHint') }}
             </span>
-            <span class="ml-auto flex items-center gap-2">
+            <span v-if="!settingsStore.isSimpleMode" class="ml-auto flex items-center gap-2">
                 <UiButton
                     v-if="features.coolingWizard"
                     size="sm"

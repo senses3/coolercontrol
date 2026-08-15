@@ -75,11 +75,32 @@ export default {
             devices: 'Devices',
             settings: 'Settings',
             plugins: 'Plugins',
+            fullInterface: 'Full interface',
+            simpleInterface: 'Simple interface',
             modes: 'Modes',
             manageModes: 'Manage modes',
             access: 'Access',
             power: 'Power',
             noModes: 'No modes saved',
+            simple: {
+                fans: 'Fans',
+                sensors: 'Sensors',
+                sensorsHint: 'Select a sensor to see its history.',
+                noSensors: 'No sensors were detected.',
+                modeCurve: 'Curve',
+                modeFixed: 'Fixed speed',
+                useCurve: 'Use a simple curve',
+                useCurveAccept: 'Create curve',
+                forkMessage:
+                    "Copy this curve to a new one, '{copy}', used by {channel} alone.\n\nThe fans that share the original keep it.",
+                seedMessage:
+                    'Create a curve for {channel}, starting from the standard fan curve.\n\nShape it in the editor below.',
+                sharedSummary:
+                    'This curve drives only this fan | This curve also drives {count} other fan, so editing it here would change that one too. | This curve also drives {count} other fans, so editing it here would change them too.',
+                otherSummary: '{profile} controls this fan, and it is not a plain curve.',
+                noCurveSummary: 'This fan has no curve yet.',
+                curveNameSuffix: ' Curve',
+            },
             supportWizards: {
                 summary: 'Support Wizards Activated!',
                 detail: 'With thanks to the volunteers who help our users get their hardware and drivers working.',
@@ -168,6 +189,8 @@ export default {
                     'The device or its firmware controls this channel. CoolerControl will not send any speed commands.',
                 apply: 'Apply',
                 saveAndApply: 'Save & Apply',
+                unsavedChanges: 'There are changes to this channel that have not been applied.',
+                unsavedChangesHeader: 'Unsaved Changes',
                 selectProfile: 'Select a profile',
                 sharedWith: 'Shared with {count} more',
                 sharedTooltip: 'This profile also drives other channels.',
@@ -288,6 +311,7 @@ export default {
             time24h: '24hr',
             time12h: '12hr',
             frequencyPrecision: 'Frequency Precision',
+            uiMode: 'Interface Mode',
             startupPage: 'Startup Page',
             dashboardLineSize: 'Dashboard Line Size',
             themeStyle: 'Theme Style',
@@ -342,6 +366,7 @@ export default {
             tooltips: {
                 timeFormat: 'Time format: 12-hour (AM/PM) or 24-hour',
                 frequencyPrecision: 'Adjust the precision of displayed frequency values.',
+                uiMode: 'Simple shows only fan control and sensors. Full interface shows everything.',
                 startupPage: 'The page shown after the application loads.',
                 eyeCandy:
                     'Enable visual animations like spinning fan icons.\nThis will use some additional GPU resources.',
@@ -925,9 +950,25 @@ export default {
         },
         onboarding: {
             welcome: 'Welcome to CoolerControl!',
+            simpleHome: 'Home',
+            simpleHomeDesc:
+                'Daemon status and device health at a glance, plus logs and the hardware report to send when something is not detected.',
+            simpleFans: 'Fans',
+            simpleFansDesc:
+                'Every fan and pump CoolerControl can control. Open one to give it a curve, hold a fixed speed, or leave it to the firmware.',
+            simpleSensors: 'Sensors',
+            simpleSensorsDesc:
+                'Every temperature, fan and power reading on the system. Open one to see its recent history.',
+            interfaceMode: 'Interface',
+            interfaceModeDesc:
+                'Switch between the simple and full interfaces here at any time. Nothing is lost either way: both drive the same settings.',
+            chooseInterface: 'Which interface would you like?',
+            simpleChoiceDesc: 'Fan curves and sensors, and nothing else.',
+            fullChoiceDesc:
+                'Everything: profiles, functions, dashboards, alerts, modes, lighting and more.',
             gettingStartedIntro:
                 'Take a quick tour to get oriented. It walks through the navigation rail and the main areas of the app.',
-            startTourAgain: 'You can start this tour again at any time from the Home page.',
+            startTourAgain: 'You can start this tour again at any time from Settings.',
             startTour: 'Start Tour',
             maybeLater: 'Maybe Later',
             openGettingStarted: 'Open Getting Started Docs',
@@ -1487,6 +1528,10 @@ export default {
         channelViewType: {
             control: 'Control',
             dashboard: 'Dashboard',
+        },
+        uiMode: {
+            simple: 'Simple',
+            full: 'Full interface',
         },
         startupPage: {
             appInfo: 'Info & Tools',

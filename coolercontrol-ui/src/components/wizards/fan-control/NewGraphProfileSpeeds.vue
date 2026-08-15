@@ -47,6 +47,7 @@ import _ from 'lodash'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
+import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 
 echarts.use([
     GridComponent,
@@ -244,38 +245,18 @@ interface PointData {
     }
 }
 
-const lineSpace = (
-    startValue: number,
-    stopValue: number,
-    cardinality: number,
-    precision: number,
-): Array<number> => {
-    const arr = []
-    const step = (stopValue - startValue) / (cardinality - 1)
-    for (let i = 0; i < cardinality; i++) {
-        const value = startValue + step * i
-        arr.push(deviceStore.round(value, precision))
-    }
-    return arr
-}
-
 const defaultDataValues = (): Array<PointData> => {
     const result: Array<PointData> = []
     if (selectedTempSource != null) {
-        const profileLength =
-            selectedTempSource.profileMinLength <= 5 && selectedTempSource.profileMaxLength >= 5
-                ? 5
-                : selectedTempSource.profileMaxLength
-        const temps = lineSpace(
+        const curve = defaultGraphCurve(
             Math.max(selectedTempSource.tempMin, axisXTempMin.value),
             Math.min(selectedTempSource.tempMax, axisXTempMax.value),
-            profileLength,
-            1,
+            selectedTempSource.profileMinLength,
+            selectedTempSource.profileMaxLength,
         )
-        const duties = lineSpace(dutyMin, dutyMax, profileLength, 0)
-        for (const [index, temp] of temps.entries()) {
+        for (const [temp, duty] of curve) {
             result.push({
-                value: [temp, duties[index]],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
@@ -283,10 +264,9 @@ const defaultDataValues = (): Array<PointData> => {
             })
         }
     } else {
-        for (let i = 0; i < 100; i = i + 25) {
-            const value = 25 * i
+        for (const [temp, duty] of placeholderGraphCurve()) {
             result.push({
-                value: [value, value],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,

@@ -75,11 +75,32 @@ export default {
             devices: '장치',
             settings: '설정',
             plugins: '플러그인',
+            fullInterface: '전체 인터페이스',
+            simpleInterface: '간단한 인터페이스',
             modes: '모드',
             manageModes: '모드 관리',
             access: '액세스',
             power: '전원',
             noModes: '저장된 모드 없음',
+            simple: {
+                fans: '팬',
+                sensors: '센서',
+                sensorsHint: '센서를 선택하면 기록을 볼 수 있습니다.',
+                noSensors: '감지된 센서가 없습니다.',
+                modeCurve: '커브',
+                modeFixed: '고정 속도',
+                useCurve: '간단한 커브 사용',
+                useCurveAccept: '커브 만들기',
+                forkMessage:
+                    "이 커브를 새 커브 '{copy}'로 복사하여 {channel}에서만 사용합니다.\n\n원본을 공유하는 팬은 그대로 유지됩니다.",
+                seedMessage:
+                    '{channel}의 커브를 기본 팬 커브에서 시작해 만듭니다.\n\n아래 편집기에서 모양을 조정하세요.',
+                sharedSummary:
+                    '이 커브는 이 팬만 제어합니다 | 이 커브는 다른 팬 {count}개도 제어하므로 여기서 편집하면 그 팬도 바뀝니다. | 이 커브는 다른 팬 {count}개도 제어하므로 여기서 편집하면 그 팬들도 바뀝니다.',
+                otherSummary: '{profile}이(가) 이 팬을 제어하며 단순한 커브가 아닙니다.',
+                noCurveSummary: '이 팬에는 아직 커브가 없습니다.',
+                curveNameSuffix: ' 커브',
+            },
             supportWizards: {
                 summary: '지원 마법사 활성화!',
                 detail: '사용자의 하드웨어와 드라이버가 동작하도록 도와주는 자원봉사자들에게 감사드립니다.',
@@ -168,6 +189,8 @@ export default {
                     '장치 또는 펌웨어가 이 채널을 제어합니다. CoolerControl은 속도 명령을 전송하지 않습니다.',
                 apply: '적용',
                 saveAndApply: '저장 및 적용',
+                unsavedChanges: '이 채널에 적용되지 않은 변경 사항이 있습니다.',
+                unsavedChangesHeader: '저장하지 않은 변경 사항',
                 selectProfile: '프로파일 선택',
                 sharedWith: '다른 {count}개와 공유됨',
                 sharedTooltip: '이 프로파일은 다른 채널도 구동합니다.',
@@ -289,6 +312,7 @@ export default {
             time24h: '24시간',
             time12h: '12시간',
             frequencyPrecision: '주파수 정밀도',
+            uiMode: '인터페이스 모드',
             startupPage: '시작 페이지',
             dashboardLineSize: '대시보드 선 크기',
             themeStyle: '테마 스타일',
@@ -343,6 +367,7 @@ export default {
             tooltips: {
                 timeFormat: '시간 형식: 12시간 (AM/PM) 또는 24시간',
                 frequencyPrecision: '표시되는 주파수 값의 정밀도를 조정하세요.',
+                uiMode: '간단은 팬 제어와 센서만 표시합니다. 전체 인터페이스는 모든 것을 표시합니다.',
                 startupPage: '애플리케이션 로드 후 표시되는 페이지입니다.',
                 eyeCandy:
                     '회전하는 팬 아이콘과 같은 시각적 애니메이션을 활성화합니다.\n이 기능은 추가적인 GPU 리소스를 사용합니다.',
@@ -918,9 +943,24 @@ export default {
         },
         onboarding: {
             welcome: 'CoolerControl에 오신 것을 환영합니다!',
+            simpleHome: '홈',
+            simpleHomeDesc:
+                '데몬 상태와 장치 상태를 한눈에 볼 수 있고, 로그와 무언가 감지되지 않을 때 보낼 하드웨어 보고서도 있습니다.',
+            simpleFans: '팬',
+            simpleFansDesc:
+                'CoolerControl이 제어할 수 있는 모든 팬과 펌프입니다. 하나를 열어 커브를 주거나, 고정 속도로 두거나, 펌웨어에 맡기세요.',
+            simpleSensors: '센서',
+            simpleSensorsDesc:
+                '시스템의 모든 온도, 팬, 전력 값입니다. 하나를 열면 최근 기록을 볼 수 있습니다.',
+            interfaceMode: '인터페이스',
+            interfaceModeDesc:
+                '여기서 언제든지 간단한 인터페이스와 전체 인터페이스를 전환할 수 있습니다. 둘 다 같은 설정을 사용하므로 잃는 것은 없습니다.',
+            chooseInterface: '어떤 인터페이스를 사용하시겠습니까?',
+            simpleChoiceDesc: '팬 커브와 센서만.',
+            fullChoiceDesc: '프로필, 함수, 대시보드, 알림, 모드, 조명 등 모든 것.',
             gettingStartedIntro:
                 '간단한 둘러보기로 앱을 익혀 보세요. 내비게이션 바와 앱의 주요 영역을 안내합니다.',
-            startTourAgain: '이 둘러보기는 홈 페이지에서 언제든지 다시 시작할 수 있습니다.',
+            startTourAgain: '이 둘러보기는 설정에서 언제든지 다시 시작할 수 있습니다.',
             startTour: '투어 시작',
             maybeLater: '나중에',
             openGettingStarted: '시작하기 문서 열기',
@@ -1474,6 +1514,10 @@ export default {
         channelViewType: {
             control: '제어',
             dashboard: '대시보드',
+        },
+        uiMode: {
+            simple: '간단',
+            full: '전체 인터페이스',
         },
         startupPage: {
             appInfo: '정보 및 도구',

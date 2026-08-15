@@ -77,11 +77,32 @@ export default {
             devices: 'Dispositivos',
             settings: 'Configuración',
             plugins: 'Plugins',
+            fullInterface: 'Interfaz completa',
+            simpleInterface: 'Interfaz simple',
             modes: 'Modos',
             manageModes: 'Gestionar modos',
             access: 'Acceso',
             power: 'Energía',
             noModes: 'No hay modos guardados',
+            simple: {
+                fans: 'Ventiladores',
+                sensors: 'Sensores',
+                sensorsHint: 'Seleccione un sensor para ver su historial.',
+                noSensors: 'No se detectaron sensores.',
+                modeCurve: 'Curva',
+                modeFixed: 'Velocidad fija',
+                useCurve: 'Usar una curva simple',
+                useCurveAccept: 'Crear curva',
+                forkMessage:
+                    "Copiar esta curva a una nueva, '{copy}', que solo usará {channel}.\n\nLos ventiladores que comparten la original la conservan.",
+                seedMessage:
+                    'Crear una curva para {channel}, partiendo de la curva de ventilador estándar.\n\nDele forma en el editor de abajo.',
+                sharedSummary:
+                    'Esta curva solo controla este ventilador | Esta curva también controla {count} ventilador más, así que editarla aquí también lo cambiaría. | Esta curva también controla {count} ventiladores más, así que editarla aquí también los cambiaría.',
+                otherSummary: '{profile} controla este ventilador y no es una curva simple.',
+                noCurveSummary: 'Este ventilador aún no tiene curva.',
+                curveNameSuffix: ' Curva',
+            },
             supportWizards: {
                 summary: '¡Magos del soporte activados!',
                 detail: 'Gracias a los voluntarios que ayudan a nuestros usuarios a hacer funcionar su hardware y sus controladores.',
@@ -171,6 +192,8 @@ export default {
                     'El dispositivo o su firmware controla este canal. CoolerControl no enviará ningún comando de velocidad.',
                 apply: 'Aplicar',
                 saveAndApply: 'Guardar y Aplicar',
+                unsavedChanges: 'Hay cambios en este canal que no se han aplicado.',
+                unsavedChangesHeader: 'Cambios sin guardar',
                 selectProfile: 'Seleccionar un perfil',
                 sharedWith: 'Compartido con {count} más',
                 sharedTooltip: 'Este perfil también controla otros canales.',
@@ -293,6 +316,7 @@ export default {
             time24h: '24 horas',
             time12h: '12 horas',
             frequencyPrecision: 'Precisión de frecuencia',
+            uiMode: 'Modo de interfaz',
             startupPage: 'Página de inicio',
             dashboardLineSize: 'Tamaño de línea del panel',
             themeStyle: 'Estilo del tema',
@@ -347,6 +371,7 @@ export default {
             tooltips: {
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) o 24 horas',
                 frequencyPrecision: 'Ajustar la precisión de los valores de frecuencia mostrados.',
+                uiMode: 'Simple muestra solo el control de ventiladores y los sensores. La interfaz completa lo muestra todo.',
                 startupPage: 'La página que se muestra después de cargar la aplicación.',
                 eyeCandy:
                     'Habilitar animaciones visuales como iconos de ventiladores giratorios.\nEsto utilizará algunos recursos adicionales de la GPU.',
@@ -938,10 +963,26 @@ export default {
         },
         onboarding: {
             welcome: '¡Bienvenido a CoolerControl!',
+            simpleHome: 'Inicio',
+            simpleHomeDesc:
+                'Estado del servicio y salud de los dispositivos de un vistazo, además de los registros y el informe de hardware para enviar cuando algo no se detecta.',
+            simpleFans: 'Ventiladores',
+            simpleFansDesc:
+                'Todos los ventiladores y bombas que CoolerControl puede controlar. Abra uno para darle una curva, mantener una velocidad fija o dejarlo al firmware.',
+            simpleSensors: 'Sensores',
+            simpleSensorsDesc:
+                'Todas las lecturas de temperatura, ventilador y potencia del sistema. Abra una para ver su historial reciente.',
+            interfaceMode: 'Interfaz',
+            interfaceModeDesc:
+                'Cambie entre la interfaz simple y la completa aquí en cualquier momento. No se pierde nada: ambas controlan la misma configuración.',
+            chooseInterface: '¿Qué interfaz prefiere?',
+            simpleChoiceDesc: 'Curvas de ventilador y sensores, nada más.',
+            fullChoiceDesc:
+                'Todo: perfiles, funciones, paneles, alertas, modos, iluminación y más.',
             gettingStartedIntro:
                 'Haga un recorrido rápido para orientarse. Recorre la barra de navegación y las áreas principales de la aplicación.',
             startTourAgain:
-                'Puede iniciar este recorrido de nuevo en cualquier momento desde la página Inicio.',
+                'Puede volver a iniciar este recorrido en cualquier momento desde Configuración.',
             startTour: 'Iniciar Recorrido',
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',
@@ -1512,6 +1553,10 @@ export default {
         channelViewType: {
             control: 'Control',
             dashboard: 'Panel',
+        },
+        uiMode: {
+            simple: 'Simple',
+            full: 'Interfaz completa',
         },
         startupPage: {
             appInfo: 'Info y Herramientas',

@@ -78,11 +78,32 @@ export default {
             devices: 'Appareils',
             settings: 'Paramètres',
             plugins: 'Plugins',
+            fullInterface: 'Interface complète',
+            simpleInterface: 'Interface simple',
             modes: 'Modes',
             manageModes: 'Gérer les modes',
             access: 'Accès',
             power: 'Alimentation',
             noModes: 'Aucun mode enregistré',
+            simple: {
+                fans: 'Ventilateurs',
+                sensors: 'Capteurs',
+                sensorsHint: 'Sélectionnez un capteur pour voir son historique.',
+                noSensors: "Aucun capteur n'a été détecté.",
+                modeCurve: 'Courbe',
+                modeFixed: 'Vitesse fixe',
+                useCurve: 'Utiliser une courbe simple',
+                useCurveAccept: 'Créer la courbe',
+                forkMessage:
+                    "Copier cette courbe vers une nouvelle, '{copy}', utilisée par {channel} seul.\n\nLes ventilateurs qui partagent l'originale la conservent.",
+                seedMessage:
+                    "Créer une courbe pour {channel}, à partir de la courbe de ventilateur standard.\n\nFaçonnez-la dans l'éditeur ci-dessous.",
+                sharedSummary:
+                    'Cette courbe ne pilote que ce ventilateur | Cette courbe pilote aussi {count} autre ventilateur, la modifier ici le changerait aussi. | Cette courbe pilote aussi {count} autres ventilateurs, la modifier ici les changerait aussi.',
+                otherSummary: "{profile} pilote ce ventilateur et n'est pas une simple courbe.",
+                noCurveSummary: "Ce ventilateur n'a pas encore de courbe.",
+                curveNameSuffix: ' Courbe',
+            },
             supportWizards: {
                 summary: 'Magiciens du support activés !',
                 detail: 'Merci aux bénévoles qui aident nos utilisateurs à faire fonctionner leur matériel et leurs pilotes.',
@@ -173,6 +194,8 @@ export default {
                     "L'appareil ou son firmware contrôle ce canal. CoolerControl n'enverra aucune commande de vitesse.",
                 apply: 'Appliquer',
                 saveAndApply: 'Enregistrer et appliquer',
+                unsavedChanges: "Des modifications de ce canal n'ont pas été appliquées.",
+                unsavedChangesHeader: 'Modifications non enregistrées',
                 selectProfile: 'Sélectionner un profil',
                 sharedWith: 'Partagé avec {count} autres',
                 sharedTooltip: "Ce profil pilote également d'autres canaux.",
@@ -295,6 +318,7 @@ export default {
             time24h: '24 heures',
             time12h: '12 heures',
             frequencyPrecision: 'Précision de la fréquence',
+            uiMode: "Mode d'interface",
             startupPage: 'Page de démarrage',
             dashboardLineSize: 'Taille des lignes du tableau de bord',
             themeStyle: 'Style du thème',
@@ -354,6 +378,7 @@ export default {
             tooltips: {
                 timeFormat: "Format de l'heure : 12 heures (AM/PM) ou 24 heures",
                 frequencyPrecision: 'Ajuster la précision des valeurs de fréquence affichées.',
+                uiMode: "Simple n'affiche que le contrôle des ventilateurs et les capteurs. L'interface complète affiche tout.",
                 startupPage: "La page affichée après le chargement de l'application.",
                 eyeCandy:
                     'Activer les animations visuelles comme les icônes de ventilateurs en rotation.\nCela utilisera des ressources GPU supplémentaires.',
@@ -950,10 +975,26 @@ export default {
         },
         onboarding: {
             welcome: 'Bienvenue dans CoolerControl !',
+            simpleHome: 'Accueil',
+            simpleHomeDesc:
+                "État du service et santé des appareils en un coup d'œil, avec les journaux et le rapport matériel à envoyer lorsque quelque chose n'est pas détecté.",
+            simpleFans: 'Ventilateurs',
+            simpleFansDesc:
+                'Tous les ventilateurs et pompes que CoolerControl peut piloter. Ouvrez-en un pour lui donner une courbe, tenir une vitesse fixe, ou le laisser au firmware.',
+            simpleSensors: 'Capteurs',
+            simpleSensorsDesc:
+                'Toutes les mesures de température, de ventilateur et de puissance du système. Ouvrez-en une pour voir son historique récent.',
+            interfaceMode: 'Interface',
+            interfaceModeDesc:
+                "Basculez ici entre l'interface simple et l'interface complète à tout moment. Rien n'est perdu : les deux pilotent les mêmes réglages.",
+            chooseInterface: 'Quelle interface souhaitez-vous ?',
+            simpleChoiceDesc: 'Des courbes de ventilateurs et des capteurs, rien de plus.',
+            fullChoiceDesc:
+                'Tout : profils, fonctions, tableaux de bord, alertes, modes, éclairage et plus encore.',
             gettingStartedIntro:
                 "Faites une visite rapide pour vous orienter. Elle parcourt la barre de navigation et les principales zones de l'application.",
             startTourAgain:
-                'Vous pouvez relancer cette visite à tout moment depuis la page Accueil.',
+                'Vous pouvez relancer cette visite à tout moment depuis les Paramètres.',
             startTour: 'Démarrer la visite',
             maybeLater: 'Peut-être plus tard',
             openGettingStarted: 'Ouvrir la Documentation',
@@ -1523,6 +1564,10 @@ export default {
         channelViewType: {
             control: 'Contrôle',
             dashboard: 'Tableau de Bord',
+        },
+        uiMode: {
+            simple: 'Simple',
+            full: 'Interface complète',
         },
         startupPage: {
             appInfo: 'Info & Outils',

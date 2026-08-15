@@ -7,6 +7,8 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
+    mdiArrowCollapse,
+    mdiArrowExpand,
     mdiArrowLeft,
     mdiBellOutline,
     mdiBellRingOutline,
@@ -26,6 +28,7 @@ import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { PLUGINS_SECTION } from '@/shell/sections.ts'
+import { UiMode } from '@/models/UISettings.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
@@ -64,6 +67,18 @@ const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
 )
 
+// One half of the interface switch, sat next to Modes because that is the other
+// control over what the whole window is showing; Settings carries the other
+// half. The label says where it goes, not where you are.
+const toggleUiMode = (): void => {
+    settingsStore.setUiMode(settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE)
+}
+const uiModeLabel = computed(() =>
+    settingsStore.isSimpleMode
+        ? t('layout.shell.fullInterface')
+        : t('layout.shell.simpleInterface'),
+)
+
 // Provided by ShellLayout; toggles the reka splitter panel (desktop only).
 const toggleMainMenu = inject<() => void>('toggleMainMenu')
 
@@ -87,8 +102,9 @@ const isMobile = computed(() => width.value < 768)
                 <svg-icon type="mdi" :path="mdiArrowLeft" :size="deviceStore.getREMSize(1.25)" />
             </button>
         </UiTooltip>
+        <!-- Simple mode renders no panel, so there is nothing to collapse. -->
         <UiTooltip
-            v-if="!isMobile"
+            v-if="!isMobile && !settingsStore.isSimpleMode"
             :text="
                 settingsStore.collapsedMainMenu
                     ? t('layout.topbar.expandMenu')
@@ -114,7 +130,7 @@ const isMobile = computed(() => width.value < 768)
                 </span>
             </RouterLink>
         </UiTooltip>
-        <UiTooltip :text="t('layout.topbar.alerts')">
+        <UiTooltip v-if="!settingsStore.isSimpleMode" :text="t('layout.topbar.alerts')">
             <RouterLink
                 :to="{ name: 'monitoring-alerts' }"
                 class="flex items-center justify-center rounded-lg p-1.5 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
@@ -132,7 +148,7 @@ const isMobile = computed(() => width.value < 768)
             </RouterLink>
         </UiTooltip>
         <div class="flex-1" />
-        <UiDropdownMenu>
+        <UiDropdownMenu v-if="!settingsStore.isSimpleMode">
             <template #trigger>
                 <UiButton id="modes-switcher" variant="outline">
                     <svg-icon
@@ -180,7 +196,27 @@ const isMobile = computed(() => width.value < 768)
                 {{ t('layout.shell.manageModes') }}
             </DropdownMenuItem>
         </UiDropdownMenu>
-        <!-- Mobile has no rail, so its Plugins/Access/Power entries live here. -->
+        <!-- The tooltip says what the two modes are; the label says which one the
+             button goes to, so neither repeats the other. -->
+        <UiTooltip :text="t('layout.settings.tooltips.uiMode')">
+            <UiButton
+                id="ui-mode-switch"
+                variant="outline"
+                :size="isMobile ? 'icon' : 'md'"
+                @click="toggleUiMode"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="settingsStore.isSimpleMode ? mdiArrowExpand : mdiArrowCollapse"
+                    :size="deviceStore.getREMSize(1.1)"
+                />
+                <!-- The narrow header already carries Modes and the overflow menu,
+                     so the glyph and its tooltip stand alone there. -->
+                <span v-if="!isMobile">{{ uiModeLabel }}</span>
+            </UiButton>
+        </UiTooltip>
+        <!-- Mobile has no rail, so its Plugins/Access/Power entries live here.
+             Simple mode has no Plugins section, so only Access/Power remain. -->
         <UiDropdownMenu v-if="isMobile">
             <template #trigger>
                 <button
@@ -194,14 +230,16 @@ const isMobile = computed(() => width.value < 768)
                     />
                 </button>
             </template>
-            <DropdownMenuItem
-                :class="dropdownItemClass"
-                @select="router.push({ name: PLUGINS_SECTION.routeName })"
-            >
-                <svg-icon type="mdi" :path="PLUGINS_SECTION.icon" :size="15" />
-                {{ t(PLUGINS_SECTION.labelKey) }}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            <template v-if="!settingsStore.isSimpleMode">
+                <DropdownMenuItem
+                    :class="dropdownItemClass"
+                    @select="router.push({ name: PLUGINS_SECTION.routeName })"
+                >
+                    <svg-icon type="mdi" :path="PLUGINS_SECTION.icon" :size="15" />
+                    {{ t(PLUGINS_SECTION.labelKey) }}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
+            </template>
             <ShellAccessMenuItems />
             <DropdownMenuSeparator class="my-1 h-px bg-border-one" />
             <ShellPowerMenuItems />

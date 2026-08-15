@@ -78,11 +78,32 @@ export default {
             devices: 'Geräte',
             settings: 'Einstellungen',
             plugins: 'Plugins',
+            fullInterface: 'Vollständige Oberfläche',
+            simpleInterface: 'Einfache Oberfläche',
             modes: 'Modi',
             manageModes: 'Modi verwalten',
             access: 'Zugriff',
             power: 'Ein/Aus',
             noModes: 'Keine Modi gespeichert',
+            simple: {
+                fans: 'Lüfter',
+                sensors: 'Sensoren',
+                sensorsHint: 'Wählen Sie einen Sensor, um seinen Verlauf zu sehen.',
+                noSensors: 'Es wurden keine Sensoren erkannt.',
+                modeCurve: 'Kurve',
+                modeFixed: 'Feste Drehzahl',
+                useCurve: 'Einfache Kurve verwenden',
+                useCurveAccept: 'Kurve erstellen',
+                forkMessage:
+                    "Diese Kurve in eine neue Kurve '{copy}' kopieren, die nur {channel} verwendet.\n\nDie Lüfter, die sich das Original teilen, behalten es.",
+                seedMessage:
+                    'Eine Kurve für {channel} erstellen, ausgehend von der Standard-Lüfterkurve.\n\nForme sie im Editor darunter.',
+                sharedSummary:
+                    'Diese Kurve steuert nur diesen Lüfter | Diese Kurve steuert auch {count} weiteren Lüfter, eine Änderung hier würde ihn ebenfalls ändern. | Diese Kurve steuert auch {count} weitere Lüfter, eine Änderung hier würde sie ebenfalls ändern.',
+                otherSummary: '{profile} steuert diesen Lüfter und ist keine einfache Kurve.',
+                noCurveSummary: 'Dieser Lüfter hat noch keine Kurve.',
+                curveNameSuffix: ' Kurve',
+            },
             supportWizards: {
                 summary: 'Support-Zauberer aktiviert!',
                 detail: 'Mit Dank an die Freiwilligen, die unseren Nutzern helfen, Hardware und Treiber zum Laufen zu bringen.',
@@ -172,6 +193,8 @@ export default {
                     'Das Gerät oder seine Firmware steuert diesen Kanal. CoolerControl sendet keine Drehzahlbefehle.',
                 apply: 'Anwenden',
                 saveAndApply: 'Speichern & Anwenden',
+                unsavedChanges: 'An diesem Kanal gibt es Änderungen, die nicht angewendet wurden.',
+                unsavedChangesHeader: 'Nicht gespeicherte Änderungen',
                 selectProfile: 'Profil auswählen',
                 sharedWith: 'Geteilt mit {count} weiteren',
                 sharedTooltip: 'Dieses Profil steuert auch andere Kanäle.',
@@ -296,6 +319,7 @@ export default {
             time24h: '24 Stunden',
             time12h: '12 Stunden',
             frequencyPrecision: 'Frequenzgenauigkeit',
+            uiMode: 'Oberflächenmodus',
             startupPage: 'Startseite',
             dashboardLineSize: 'Dashboard-Liniengröße',
             themeStyle: 'Theme-Stil',
@@ -351,6 +375,7 @@ export default {
                 timeFormat: 'Zeitformat: 12-Stunden (AM/PM) oder 24-Stunden',
                 frequencyPrecision:
                     'Stellen Sie die Genauigkeit der angezeigten Frequenzwerte ein.',
+                uiMode: 'Einfach zeigt nur die Lüftersteuerung und Sensoren. Die vollständige Oberfläche zeigt alles.',
                 startupPage: 'Die Seite, die nach dem Laden der Anwendung angezeigt wird.',
                 eyeCandy:
                     'Visuelle Animationen wie drehende Lüftersymbole aktivieren.\nDies beansprucht zusätzliche GPU-Ressourcen.',
@@ -948,9 +973,26 @@ export default {
         },
         onboarding: {
             welcome: 'Willkommen bei CoolerControl!',
+            simpleHome: 'Start',
+            simpleHomeDesc:
+                'Dienststatus und Gerätezustand auf einen Blick, dazu Protokolle und der Hardware-Bericht, falls etwas nicht erkannt wird.',
+            simpleFans: 'Lüfter',
+            simpleFansDesc:
+                'Alle Lüfter und Pumpen, die CoolerControl steuern kann. Öffnen Sie einen, um ihm eine Kurve zu geben, eine feste Drehzahl zu halten oder ihn der Firmware zu überlassen.',
+            simpleSensors: 'Sensoren',
+            simpleSensorsDesc:
+                'Alle Temperatur-, Lüfter- und Leistungswerte des Systems. Öffnen Sie einen, um seinen bisherigen Verlauf zu sehen.',
+            interfaceMode: 'Oberfläche',
+            interfaceModeDesc:
+                'Wechseln Sie hier jederzeit zwischen der einfachen und der vollständigen Oberfläche. Dabei geht nichts verloren: beide steuern dieselben Einstellungen.',
+            chooseInterface: 'Welche Oberfläche möchten Sie?',
+            simpleChoiceDesc: 'Lüfterkurven und Sensoren, sonst nichts.',
+            fullChoiceDesc:
+                'Alles: Profile, Funktionen, Dashboards, Alarme, Modi, Beleuchtung und mehr.',
             gettingStartedIntro:
                 'Machen Sie eine kurze Tour, um sich zu orientieren. Sie führt durch die Navigationsleiste und die wichtigsten Bereiche der Anwendung.',
-            startTourAgain: 'Sie können diese Tour jederzeit über die Seite Start erneut starten.',
+            startTourAgain:
+                'Sie können diese Tour jederzeit über die Einstellungen erneut starten.',
             startTour: 'Tour starten',
             maybeLater: 'Vielleicht später',
             openGettingStarted: 'Erste-Schritte-Dokumentation öffnen',
@@ -1523,6 +1565,10 @@ export default {
         channelViewType: {
             control: 'Steuerung',
             dashboard: 'Dashboard',
+        },
+        uiMode: {
+            simple: 'Einfach',
+            full: 'Vollständige Oberfläche',
         },
         startupPage: {
             appInfo: 'Info & Werkzeuge',

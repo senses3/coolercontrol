@@ -7,16 +7,16 @@
 import { RouterView, useRouter } from 'vue-router'
 import { startupRouteName } from '@/shell/sections.ts'
 import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
-import { TOUR_STEPS } from '@/shell/tour.ts'
+import { tourStepsFor } from '@/shell/tour.ts'
 import { buildQtStrings } from '@/shell/qtStrings.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
-import { Ref, onMounted, ref, inject, nextTick } from 'vue'
+import { Ref, computed, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiClose, mdiOpenInNew, mdiRefresh } from '@mdi/js'
+import { mdiClose, mdiOpenInNew, mdiRadioboxBlank, mdiRadioboxMarked, mdiRefresh } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiInput from '@/shell/ui/UiInput.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
@@ -26,7 +26,7 @@ import SupportWizardOverlay from '@/shell/SupportWizardOverlay.vue'
 import UiConfirmDialog from '@/shell/ui/UiConfirmDialog.vue'
 import UiModal from '@/shell/ui/UiModal.vue'
 import UiDynamicDialog from '@/shell/ui/UiDynamicDialog.vue'
-import { ThemeMode } from '@/models/UISettings.ts'
+import { getUiModeDisplayName, ThemeMode, UiMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
@@ -138,19 +138,37 @@ const filterPresent = (list: any[]): any[] =>
     list.filter((s) => document.querySelector(s.attachTo.element) !== null)
 
 // filterPresent drops any absent anchor (e.g. #rail-plugins when no plugins are
-// installed).
+// installed). Built after the welcome step's interface choice, so the walk is
+// always the one for the interface now on screen.
 const buildTourSteps = (): any[] =>
     filterPresent([
-        ...TOUR_STEPS.map((step) => makeStep(step.selector, step.key, step.placement)),
+        ...tourStepsFor(settingsStore.uiMode).map((step) =>
+            makeStep(step.selector, step.key, step.placement),
+        ),
         finishStep(),
     ])
+
+// The welcome step's interface choice. Switching here rebuilds nothing on its
+// own: the walk is built when the user starts it, from whatever is chosen then.
+const interfaceOptions = computed(() => [
+    {
+        mode: UiMode.SIMPLE,
+        label: getUiModeDisplayName(UiMode.SIMPLE),
+        description: t('components.onboarding.simpleChoiceDesc'),
+    },
+    {
+        mode: UiMode.FULL,
+        label: getUiModeDisplayName(UiMode.FULL),
+        description: t('components.onboarding.fullChoiceDesc'),
+    },
+])
 
 const startTour = (): void => {
     steps.value = [welcomeStep()]
     start()
 }
 
-const startFullTour = async (): Promise<void> => {
+const startWalkthrough = async (): Promise<void> => {
     isTransitioningMode.value = true
     finish()
     steps.value = buildTourSteps()
@@ -271,7 +289,9 @@ onMounted(async () => {
     // root URL (startedAtRoot), not on a direct/deep link like /#/home. The
     // `startup-page` route resolves this too, but it ran before settings had
     // loaded, so it landed on the default; re-apply now that they are in.
-    if (startedAtRoot) {
+    // Simple mode always opens on Home: the other startup pages are full-shell
+    // surfaces, and its rail has no way back to them.
+    if (startedAtRoot && !settingsStore.isSimpleMode) {
         const target = startupRouteName(settingsStore.startupPage)
         if (target !== 'section-home') {
             await router.replace({ name: target })
@@ -289,7 +309,7 @@ onMounted(async () => {
         openCalibrationWizard()
     }
     await deviceStore.loadLogs()
-    // Some other dialogs, like the password dialog, will wait until Onboarding has closed
+    // Some other dialogs, like the password dialog, will wait until Onboarding has closed.
     if (settingsStore.showOnboarding) startTour()
     let signalLoadFinished = async (): Promise<void> => {
         if (deviceStore.isQtApp()) {
@@ -502,7 +522,12 @@ onMounted(async () => {
                                 <p class="mt-4 text-base text-text-color-secondary leading-relaxed">
                                     {{ t('components.onboarding.gettingStartedIntro') }}
                                 </p>
+                                <!-- Guided Setup, Profiles and Auto-Create are all
+                                     full-interface machinery, and the simple walk's
+                                     own Fans step already says how a curve is made
+                                     there, so this drops out with the interface. -->
                                 <div
+                                    v-if="!settingsStore.isSimpleMode"
                                     class="mt-4 p-3 rounded-md bg-accent/10 border-l-4 border-accent"
                                 >
                                     <p class="text-text-color-secondary font-semibold leading-snug">
@@ -549,12 +574,56 @@ onMounted(async () => {
                                         {{ t('views.appInfo.hardwareSupport') }}
                                     </a>
                                 </div>
+                                <!-- The interface choice, asked before the walk so
+                                     the walk is the one for what was chosen. Picking
+                                     switches immediately: the shell behind the
+                                     overlay is the answer to the question. -->
+                                <p class="mt-6 text-base text-text-color">
+                                    {{ t('components.onboarding.chooseInterface') }}
+                                </p>
+                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <button
+                                        v-for="option in interfaceOptions"
+                                        :key="option.mode"
+                                        type="button"
+                                        class="rounded-lg border p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                        :class="
+                                            settingsStore.uiMode === option.mode
+                                                ? 'border-accent bg-accent/10'
+                                                : 'border-border-one hover:bg-surface-hover'
+                                        "
+                                        @click="settingsStore.setUiMode(option.mode)"
+                                    >
+                                        <span
+                                            class="flex items-center gap-2 font-medium text-text-color"
+                                        >
+                                            <svg-icon
+                                                type="mdi"
+                                                :path="
+                                                    settingsStore.uiMode === option.mode
+                                                        ? mdiRadioboxMarked
+                                                        : mdiRadioboxBlank
+                                                "
+                                                :size="16"
+                                                :class="
+                                                    settingsStore.uiMode === option.mode
+                                                        ? 'text-accent'
+                                                        : 'text-text-color-secondary'
+                                                "
+                                            />
+                                            {{ option.label }}
+                                        </span>
+                                        <span class="mt-1 block text-sm text-text-color-secondary">
+                                            {{ option.description }}
+                                        </span>
+                                    </button>
+                                </div>
                                 <p class="mt-4 text-sm italic text-text-color-secondary">
                                     {{ t('components.onboarding.startTourAgain') }}
                                 </p>
                                 <div class="mt-6 flex flex-col sm:flex-row gap-3">
                                     <button
-                                        @click="startFullTour"
+                                        @click="startWalkthrough"
                                         type="button"
                                         class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent px-4 py-2 font-medium text-accent-fg shadow-sm outline-none hover:bg-accent/90"
                                     >

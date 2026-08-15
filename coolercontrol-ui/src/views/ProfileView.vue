@@ -78,6 +78,7 @@ import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vu
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
+import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 import HealthWarning from '@/components/HealthWarning.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
@@ -107,6 +108,10 @@ interface Props {
     // Hides the internal save button; the host page saves via the exposed
     // saveProfileState (e.g. the channel page's Apply button).
     hideSave?: boolean
+    // Plain curve editor: no profile type picker (Graph only), no function
+    // selector, no profile name. Simple mode embeds the editor this way, where
+    // profiles and functions are not entities the user manages.
+    graphOnly?: boolean
     // Channel context when embedded in a channel page; lets charts show the
     // channel's live Actual duty next to the calculated Target.
     channelDeviceUID?: string
@@ -130,10 +135,18 @@ const { getLimitInfo } = useProfileLimitInfo()
 const contextIsDirty: Ref<boolean> = ref(false)
 const tableDataKey: Ref<number> = ref(0)
 
+// Deleting drops the profile from the store while this page is still mounted,
+// and every render here dereferences it, so hold what was opened and fall back
+// to it. The fallback covers the moment between the delete and the route change
+// that unmounts this page, and the same moment when another client deletes it.
+const openedProfile = settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!
 const currentProfile = computed(
-    () => settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
+    () =>
+        settingsStore.profiles.find((profile) => profile.uid === props.profileUID) ?? openedProfile,
 )
-const selectedType: Ref<ProfileType> = ref(currentProfile.value.p_type)
+const selectedType: Ref<ProfileType> = ref(
+    props.graphOnly ? ProfileType.Graph : currentProfile.value.p_type,
+)
 const profileTypeOptions = computed(() => {
     return [...$enum(ProfileType).values()].map((type) => ({
         value: type,
@@ -459,38 +472,18 @@ interface PointData {
     }
 }
 
-const lineSpace = (
-    startValue: number,
-    stopValue: number,
-    cardinality: number,
-    precision: number,
-): Array<number> => {
-    const arr = []
-    const step = (stopValue - startValue) / (cardinality - 1)
-    for (let i = 0; i < cardinality; i++) {
-        const value = startValue + step * i
-        arr.push(deviceStore.round(value, precision))
-    }
-    return arr
-}
-
 const defaultDataValues = (): Array<PointData> => {
     const result: Array<PointData> = []
     if (selectedTempSource != null) {
-        const profileLength =
-            selectedTempSource.profileMinLength <= 5 && selectedTempSource.profileMaxLength >= 5
-                ? 5
-                : selectedTempSource.profileMaxLength
-        const temps = lineSpace(
+        const curve = defaultGraphCurve(
             Math.max(selectedTempSource.tempMin, axisXTempMin.value),
             Math.min(selectedTempSource.tempMax, axisXTempMax.value),
-            profileLength,
-            1,
+            selectedTempSource.profileMinLength,
+            selectedTempSource.profileMaxLength,
         )
-        const duties = lineSpace(dutyMin, dutyMax, profileLength, 0)
-        for (const [index, temp] of temps.entries()) {
+        for (const [temp, duty] of curve) {
             result.push({
-                value: [temp, duties[index]],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
@@ -498,10 +491,9 @@ const defaultDataValues = (): Array<PointData> => {
             })
         }
     } else {
-        for (let i = 0; i < 100; i = i + 25) {
-            const value = 25 * i
+        for (const [temp, duty] of placeholderGraphCurve()) {
             result.push({
-                value: [value, value],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
@@ -2140,14 +2132,17 @@ const deleteProfile = (): void => {
         icon: mdiAlertOutline,
         accept: async () => {
             contextIsDirty.value = false
-            await settingsStore.deleteProfile(currentProfile.value.uid)
+            // Leave first: the store reloads several times inside the delete,
+            // and every one of them re-renders a page whose profile is gone.
+            const deletedUID = currentProfile.value.uid
+            await router.push({ name: 'section-cooling' })
+            await settingsStore.deleteProfile(deletedUID)
             toast.add({
                 severity: 'success',
                 summary: t('common.success'),
                 detail: t('views.profiles.profileDeleted'),
                 life: 3000,
             })
-            await router.push({ name: 'section-cooling' })
         },
     })
 }
@@ -2348,8 +2343,12 @@ onMounted(async () => {
         if (selectedType.value !== ProfileType.Fixed) return
         if (duty !== currentProfile.value.speed_fixed) contextIsDirty.value = true
     })
-    onBeforeRouteUpdate(checkForUnsavedChanges)
-    onBeforeRouteLeave(checkForUnsavedChanges)
+    // An embedded editor saves through its host page (hideSave), which prompts
+    // for its changes along with its own. Two guards would ask twice.
+    if (!props.hideSave) {
+        onBeforeRouteUpdate(checkForUnsavedChanges)
+        onBeforeRouteLeave(checkForUnsavedChanges)
+    }
 })
 onUnmounted(() => {
     window.removeEventListener('resize', updateResponsiveGraphHeight)
@@ -2385,6 +2384,7 @@ defineExpose({ saveProfileState, contextIsDirty })
 <template>
     <div id="control-panel" class="flex flex-wrap items-center justify-between px-2 pt-2">
         <entity-title-rename
+            v-if="!graphOnly"
             :current-name="currentProfile.name"
             :save-name-function="saveNameFunction"
         />
@@ -2428,7 +2428,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                     />
                 </UiButton>
             </template>
-            <div class="p-2 pr-0">
+            <div v-if="!graphOnly" class="p-2 pr-0">
                 <span
                     v-tooltip.top="{
                         escape: false,
@@ -2506,7 +2506,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                         />
                     </span>
                 </div>
-                <div class="p-2 pr-0">
+                <div v-if="!graphOnly" class="p-2 pr-0">
                     <span v-tooltip.top="t('views.profiles.functionToApply')">
                         <UiSelect
                             v-model="chosenFunctionUid"

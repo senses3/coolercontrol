@@ -75,11 +75,32 @@ export default {
             devices: 'デバイス',
             settings: '設定',
             plugins: 'プラグイン',
+            fullInterface: '完全なインターフェース',
+            simpleInterface: 'シンプルインターフェース',
             modes: 'モード',
             manageModes: 'モードを管理',
             access: 'アクセス',
             power: '電源',
             noModes: '保存されたモードがありません',
+            simple: {
+                fans: 'ファン',
+                sensors: 'センサー',
+                sensorsHint: 'センサーを選択すると履歴が表示されます。',
+                noSensors: 'センサーは検出されませんでした。',
+                modeCurve: 'カーブ',
+                modeFixed: '固定速度',
+                useCurve: 'シンプルなカーブを使う',
+                useCurveAccept: 'カーブを作成',
+                forkMessage:
+                    'このカーブを新しいカーブ「{copy}」にコピーし、{channel} だけで使用します。\n\n元のカーブを共有しているファンはそのままです。',
+                seedMessage:
+                    '{channel} 用のカーブを、標準のファンカーブから作成します。\n\n下のエディターで形を整えてください。',
+                sharedSummary:
+                    'このカーブはこのファンだけを制御しています | このカーブは他に {count} 台のファンも制御しているため、ここで編集するとそれらも変わります。 | このカーブは他に {count} 台のファンも制御しているため、ここで編集するとそれらも変わります。',
+                otherSummary: '{profile} がこのファンを制御しており、単純なカーブではありません。',
+                noCurveSummary: 'このファンにはまだカーブがありません。',
+                curveNameSuffix: ' カーブ',
+            },
             supportWizards: {
                 summary: 'サポートの魔法使いを召喚！',
                 detail: 'ハードウェアとドライバーを動かす手助けをしてくれるボランティアの皆さんに感謝します。',
@@ -168,6 +189,8 @@ export default {
                     'デバイスまたはそのファームウェアがこのチャンネルを制御します。CoolerControlは速度コマンドを送信しません。',
                 apply: '適用',
                 saveAndApply: '保存して適用',
+                unsavedChanges: 'このチャンネルには適用されていない変更があります。',
+                unsavedChangesHeader: '未保存の変更',
                 selectProfile: 'プロファイルを選択',
                 sharedWith: '他{count}件と共有中',
                 sharedTooltip: 'このプロファイルは他のチャンネルも制御しています。',
@@ -290,6 +313,7 @@ export default {
             time24h: '24時間',
             time12h: '12時間',
             frequencyPrecision: '周波数の精度',
+            uiMode: 'インターフェースモード',
             startupPage: '起動時のページ',
             dashboardLineSize: 'ダッシュボードの線のサイズ',
             themeStyle: 'テーマスタイル',
@@ -344,6 +368,7 @@ export default {
             tooltips: {
                 timeFormat: '時間形式：12時間（AM/PM）または24時間',
                 frequencyPrecision: '表示される周波数値の精度を調整します。',
+                uiMode: 'シンプルはファン制御とセンサーのみを表示します。完全なインターフェースはすべてを表示します。',
                 startupPage: 'アプリケーション読み込み後に表示されるページ。',
                 eyeCandy:
                     '回転するファンアイコンなどのビジュアルアニメーションを有効にします。\nこれにより追加のGPUリソースが使用されます。',
@@ -930,9 +955,25 @@ export default {
         },
         onboarding: {
             welcome: 'CoolerControlへようこそ！',
+            simpleHome: 'ホーム',
+            simpleHomeDesc:
+                'デーモンの状態とデバイスの健全性がひと目でわかります。ログと、何かが検出されないときに送るハードウェアレポートもここにあります。',
+            simpleFans: 'ファン',
+            simpleFansDesc:
+                'CoolerControl が制御できるすべてのファンとポンプ。開いてカーブを設定したり、固定速度にしたり、ファームウェアに任せたりできます。',
+            simpleSensors: 'センサー',
+            simpleSensorsDesc:
+                'システムのすべての温度、ファン、電力の値。開くと最近の履歴を確認できます。',
+            interfaceMode: 'インターフェース',
+            interfaceModeDesc:
+                'シンプルと完全なインターフェースはここでいつでも切り替えられます。どちらも同じ設定を操作するので、失われるものはありません。',
+            chooseInterface: 'どちらのインターフェースを使いますか?',
+            simpleChoiceDesc: 'ファンカーブとセンサーだけ。',
+            fullChoiceDesc:
+                'プロファイル、関数、ダッシュボード、アラート、モード、ライティングなどすべて。',
             gettingStartedIntro:
                 '簡単なツアーで概要を把握しましょう。ナビゲーションバーとアプリの主要な領域を案内します。',
-            startTourAgain: 'このツアーはホームページからいつでも再開できます。',
+            startTourAgain: 'このツアーは設定からいつでも再開できます。',
             startTour: 'ツアーを開始',
             maybeLater: '後で',
             openGettingStarted: 'はじめに文書を開く',
@@ -1493,6 +1534,10 @@ export default {
         channelViewType: {
             control: '制御',
             dashboard: 'ダッシュボード',
+        },
+        uiMode: {
+            simple: 'シンプル',
+            full: '完全なインターフェース',
         },
         startupPage: {
             appInfo: '情報とツール',
