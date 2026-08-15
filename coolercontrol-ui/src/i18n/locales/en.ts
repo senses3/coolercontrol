@@ -174,6 +174,7 @@ export default {
                 notShared: 'Only this fan',
                 notSharedTooltip: 'This profile drives only this channel.',
                 forkForFan: 'Fork for this fan',
+                forkQualifier: '{channel} copy',
                 fork: {
                     confirmHeader: 'Fork for this fan',
                     confirmMessage:
@@ -189,6 +190,7 @@ export default {
                         "Copy the profile '{profile}' to a new profile '{copy}', convert its speeds, and assign it to {channel}.\n\nOnly convert speeds you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed. The original is left untouched.",
                     confirmManual:
                         'Convert the manual duty for {channel} so the fan holds the speed it did before calibration.\n\nOnly convert a duty you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed.',
+                    nameQualifier: 'calibrated',
                     accept: 'Convert',
                     successProfile: "Assigned '{profile}' to {channel} with converted speeds.",
                     successManual: 'Manual duty converted to {duty}%.',

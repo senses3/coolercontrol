@@ -15,6 +15,7 @@ import {
     DeviceSettingWriteProfileDTO,
 } from '@/models/DaemonSettings.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
+import { fitProfileName } from '@/shell/cooling/profileNames.ts'
 import type { UID } from '@/models/Device.ts'
 
 /** Guards the numbered-suffix search so a name clash cannot spin. */
@@ -77,18 +78,39 @@ export function useCalibrationConversion(
         return true
     }
 
-    /** `"Name (Fan)"`, numbered when a profile already holds that name. */
-    const forkName = (sourceName: string): string => {
-        const base = `${sourceName} (${channelLabel()})`
+    /** `"Name (qualifier)"`, numbered when a profile already holds that name. */
+    const uniqueName = (sourceName: string, qualifier: string): string => {
+        const suffix = ` (${qualifier})`
         const taken = (name: string): boolean =>
             settingsStore.profiles.some((profile) => profile.name === name)
+        const base = fitProfileName(sourceName, suffix)
         if (!taken(base)) return base
         for (let attempt = 2; attempt <= MAX_NAME_ATTEMPTS; attempt++) {
-            const candidate = `${base} ${attempt}`
+            const candidate = fitProfileName(sourceName, `${suffix} ${attempt}`)
             if (!taken(candidate)) return candidate
         }
-        return `${base} ${uuidV4().slice(0, 8)}`
+        return fitProfileName(sourceName, `${suffix} ${uuidV4().slice(0, 8)}`)
     }
+
+    /**
+     * A plain fork is the same act as duplicating an entity, so it says so the
+     * same way, scoped to the channel it was made for. The channel alone is
+     * what tells two forks of one source apart.
+     */
+    const forkName = (sourceName: string): string =>
+        uniqueName(
+            sourceName,
+            t('layout.shell.coolingPage.forkQualifier', { channel: channelLabel() }),
+        )
+
+    /**
+     * A converted fork is marked instead: the qualifier already makes the name
+     * unique, and it warns against the one mistake that matters, converting the
+     * same duties twice. The channel would only stutter, since profiles are
+     * usually named after the fan they were made for.
+     */
+    const convertedName = (sourceName: string): string =>
+        uniqueName(sourceName, t('layout.shell.coolingPage.convert.nameQualifier'))
 
     /** The duties a conversion would remap, in the order they are stored. */
     const dutiesOf = (profile: Profile): Array<number> =>
@@ -118,7 +140,7 @@ export function useCalibrationConversion(
     ): Promise<Profile | undefined> {
         const forked = plainToInstance(Profile, instanceToPlain(source))
         forked.uid = uuidV4()
-        forked.name = forkName(source.name)
+        forked.name = mappedDuties != null ? convertedName(source.name) : forkName(source.name)
         if (mappedDuties != null) {
             applyDuties(forked, mappedDuties)
         }
@@ -237,6 +259,7 @@ export function useCalibrationConversion(
         isConvertible,
         canConvertProfile,
         forkName,
+        convertedName,
         forkProfile,
         convertProfile,
         convertManualDuty,

@@ -173,6 +173,7 @@ export default {
                 notShared: '仅此风扇',
                 notSharedTooltip: '此配置文件仅控制此通道。',
                 forkForFan: '为此风扇创建副本',
+                forkQualifier: '{channel} 副本',
                 fork: {
                     confirmHeader: '为此风扇创建副本',
                     confirmMessage:
@@ -188,6 +189,7 @@ export default {
                         '将配置文件“{profile}”复制为新的配置文件“{copy}”，转换其转速，并分配给 {channel}。\n\n仅转换本风扇校准之前设置的转速。重复转换会使风扇以错误的转速运行。原配置文件保持不变。',
                     confirmManual:
                         '转换 {channel} 的手动占空比，使风扇保持校准前的转速。\n\n仅转换本风扇校准之前设置的数值。重复转换会使风扇以错误的转速运行。',
+                    nameQualifier: '已校准',
                     accept: '转换',
                     successProfile: '已将“{profile}”以转换后的转速分配给 {channel}。',
                     successManual: '手动占空比已转换为 {duty}%。',

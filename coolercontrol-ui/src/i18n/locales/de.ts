@@ -178,6 +178,7 @@ export default {
                 notShared: 'Nur dieser Lüfter',
                 notSharedTooltip: 'Dieses Profil steuert nur diesen Kanal.',
                 forkForFan: 'Für diesen Lüfter abspalten',
+                forkQualifier: '{channel} Kopie',
                 fork: {
                     confirmHeader: 'Für diesen Lüfter abspalten',
                     confirmMessage:
@@ -193,6 +194,7 @@ export default {
                         "Das Profil '{profile}' in ein neues Profil '{copy}' kopieren, seine Drehzahlen umrechnen und {channel} zuweisen.\n\nRechne nur Drehzahlen um, die du vor der Kalibrierung dieses Lüfters gesetzt hast. Eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen. Das Original bleibt unverändert.",
                     confirmManual:
                         'Die manuelle Leistung für {channel} umrechnen, damit der Lüfter die Drehzahl von vor der Kalibrierung hält.\n\nRechne nur einen Wert um, den du vor der Kalibrierung dieses Lüfters gesetzt hast. Eine doppelte Umrechnung lässt den Lüfter mit falscher Drehzahl laufen.',
+                    nameQualifier: 'kalibriert',
                     accept: 'Umrechnen',
                     successProfile:
                         "'{profile}' wurde {channel} mit umgerechneten Drehzahlen zugewiesen.",

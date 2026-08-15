@@ -174,6 +174,7 @@ export default {
                 notShared: 'このファンのみ',
                 notSharedTooltip: 'このプロファイルはこのチャンネルのみを制御します。',
                 forkForFan: 'このファン用に複製',
+                forkQualifier: '{channel} コピー',
                 fork: {
                     confirmHeader: 'このファン用に複製',
                     confirmMessage:
@@ -189,6 +190,7 @@ export default {
                         'プロファイル「{profile}」を新しいプロファイル「{copy}」にコピーし、速度を変換して{channel}に割り当てます。\n\n変換はこのファンのキャリブレーション前に設定した速度にのみ行ってください。二重に変換するとファンが誤った速度で回ります。元のプロファイルはそのまま残ります。',
                     confirmManual:
                         '{channel}の手動デューティを変換し、キャリブレーション前と同じ速度を保つようにします。\n\n変換はこのファンのキャリブレーション前に設定した値にのみ行ってください。二重に変換するとファンが誤った速度で回ります。',
+                    nameQualifier: '校正済み',
                     accept: '変換',
                     successProfile: '変換した速度で「{profile}」を{channel}に割り当てました。',
                     successManual: '手動デューティを{duty}%に変換しました。',

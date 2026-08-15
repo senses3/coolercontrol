@@ -174,6 +174,7 @@ export default {
                 notShared: '이 팬만',
                 notSharedTooltip: '이 프로필은 이 채널만 제어합니다.',
                 forkForFan: '이 팬용으로 분기',
+                forkQualifier: '{channel} 복사',
                 fork: {
                     confirmHeader: '이 팬용으로 분기',
                     confirmMessage:
@@ -189,6 +190,7 @@ export default {
                         "프로필 '{profile}'을(를) 새 프로필 '{copy}'(으)로 복사하고 속도를 변환하여 {channel}에 할당합니다.\n\n이 팬을 보정하기 전에 설정한 속도만 변환하세요. 두 번 변환하면 팬이 잘못된 속도로 동작합니다. 원본은 그대로 유지됩니다.",
                     confirmManual:
                         '{channel}의 수동 듀티를 변환하여 팬이 보정 전과 같은 속도를 유지하도록 합니다.\n\n이 팬을 보정하기 전에 설정한 값만 변환하세요. 두 번 변환하면 팬이 잘못된 속도로 동작합니다.',
+                    nameQualifier: '보정됨',
                     accept: '변환',
                     successProfile: "변환된 속도로 '{profile}'을(를) {channel}에 할당했습니다.",
                     successManual: '수동 듀티를 {duty}%로 변환했습니다.',

@@ -173,6 +173,7 @@ export default {
                 notShared: '僅此風扇',
                 notSharedTooltip: '此設定檔僅控制此通道。',
                 forkForFan: '為此風扇建立副本',
+                forkQualifier: '{channel} 副本',
                 fork: {
                     confirmHeader: '為此風扇建立副本',
                     confirmMessage:
@@ -188,6 +189,7 @@ export default {
                         '將設定檔「{profile}」複製為新的設定檔「{copy}」，轉換其轉速，並指派給 {channel}。\n\n僅轉換本風扇校準之前設定的轉速。重複轉換會使風扇以錯誤的轉速運轉。原設定檔維持不變。',
                     confirmManual:
                         '轉換 {channel} 的手動工作週期，使風扇維持校準前的轉速。\n\n僅轉換本風扇校準之前設定的數值。重複轉換會使風扇以錯誤的轉速運轉。',
+                    nameQualifier: '已校正',
                     accept: '轉換',
                     successProfile: '已將「{profile}」以轉換後的轉速指派給 {channel}。',
                     successManual: '手動工作週期已轉換為 {duty}%。',

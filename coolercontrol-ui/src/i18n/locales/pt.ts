@@ -177,6 +177,7 @@ export default {
                 notShared: 'Apenas esta ventoinha',
                 notSharedTooltip: 'Este perfil controla apenas este canal.',
                 forkForFan: 'Bifurcar para este ventilador',
+                forkQualifier: 'cópia de {channel}',
                 fork: {
                     confirmHeader: 'Bifurcar para este ventilador',
                     confirmMessage:
@@ -192,6 +193,7 @@ export default {
                         "Copiar o perfil '{profile}' para um novo perfil '{copy}', converter as suas velocidades e atribuí-lo a {channel}.\n\nConverta apenas velocidades definidas antes de calibrar esta ventoinha. Converter duas vezes faz a ventoinha girar à velocidade errada. O original fica intacto.",
                     confirmManual:
                         'Converter o ciclo manual de {channel} para que a ventoinha mantenha a velocidade que tinha antes da calibração.\n\nConverta apenas um valor definido antes de calibrar esta ventoinha. Converter duas vezes faz a ventoinha girar à velocidade errada.',
+                    nameQualifier: 'calibrado',
                     accept: 'Converter',
                     successProfile:
                         "'{profile}' foi atribuído a {channel} com as velocidades convertidas.",

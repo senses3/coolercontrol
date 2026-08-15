@@ -177,6 +177,7 @@ export default {
                 notShared: 'Solo este ventilador',
                 notSharedTooltip: 'Este perfil solo controla este canal.',
                 forkForFan: 'Bifurcar para este ventilador',
+                forkQualifier: 'copia de {channel}',
                 fork: {
                     confirmHeader: 'Bifurcar para este ventilador',
                     confirmMessage:
@@ -192,6 +193,7 @@ export default {
                         "Copiar el perfil '{profile}' a un nuevo perfil '{copy}', convertir sus velocidades y asignarlo a {channel}.\n\nConvierte solo velocidades que definiste antes de calibrar este ventilador. Convertir dos veces hace que el ventilador gire a una velocidad incorrecta. El original queda intacto.",
                     confirmManual:
                         'Convertir el ciclo manual de {channel} para que el ventilador mantenga la velocidad que tenía antes de la calibración.\n\nConvierte solo un valor que definiste antes de calibrar este ventilador. Convertirlo dos veces hace que el ventilador gire a una velocidad incorrecta.',
+                    nameQualifier: 'calibrado',
                     accept: 'Convertir',
                     successProfile:
                         "Se asignó '{profile}' a {channel} con las velocidades convertidas.",

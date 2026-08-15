@@ -424,7 +424,7 @@ const convertForCalibration = async (): Promise<void> => {
     const confirmed = await confirmConvert(
         t('layout.shell.coolingPage.convert.confirmProfile', {
             profile: source.name,
-            copy: conversion.forkName(source.name),
+            copy: conversion.convertedName(source.name),
             channel: channelLabel.value,
         }),
     )

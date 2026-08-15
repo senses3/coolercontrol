@@ -179,6 +179,7 @@ export default {
                 notShared: 'Ce ventilateur uniquement',
                 notSharedTooltip: 'Ce profil ne pilote que ce canal.',
                 forkForFan: 'Dupliquer pour ce ventilateur',
+                forkQualifier: 'copie de {channel}',
                 fork: {
                     confirmHeader: 'Dupliquer pour ce ventilateur',
                     confirmMessage:
@@ -194,6 +195,7 @@ export default {
                         "Copier le profil « {profile} » vers un nouveau profil « {copy} », convertir ses vitesses et l'affecter à {channel}.\n\nNe convertissez que des vitesses définies avant la calibration de ce ventilateur. Une double conversion fait tourner le ventilateur à la mauvaise vitesse. L'original reste intact.",
                     confirmManual:
                         "Convertir le rapport cyclique manuel de {channel} pour que le ventilateur conserve la vitesse qu'il avait avant la calibration.\n\nNe convertissez qu'une valeur définie avant la calibration de ce ventilateur. Une double conversion fait tourner le ventilateur à la mauvaise vitesse.",
+                    nameQualifier: 'étalonné',
                     accept: 'Convertir',
                     successProfile:
                         '« {profile} » a été affecté à {channel} avec les vitesses converties.',
