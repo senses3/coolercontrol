@@ -25,11 +25,7 @@
 Powerful cooling control and monitoring for Linux 🐧
 </p>
 
-<!-- trunk-ignore-begin(markdownlint/MD045): links with emojis -->
-
-![](screenshots/coolercontrol.webm)
-
-<!-- trunk-ignore-end(markdownlint/MD045): links with emojis -->
+![CoolerControl on desktop and mobile](screenshots/coolercontrol-collage.webp)
 
 <!-- <img src="screenshots/coolercontrol-overview.png" alt="Screenshot" width="700"/> -->
 
