@@ -7,8 +7,6 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
-    mdiArrowCollapse,
-    mdiArrowExpand,
     mdiArrowLeft,
     mdiBellOutline,
     mdiBellRingOutline,
@@ -17,6 +15,8 @@ import {
     mdiBookmarkOutline,
     mdiDockLeft,
     mdiDotsVertical,
+    mdiLayersOutline,
+    mdiLayersTripleOutline,
     mdiTune,
 } from '@mdi/js'
 import { DropdownMenuItem, DropdownMenuSeparator } from 'reka-ui'
@@ -205,7 +205,7 @@ const isMobile = computed(() => width.value < 768)
             >
                 <svg-icon
                     type="mdi"
-                    :path="settingsStore.isSimpleMode ? mdiArrowExpand : mdiArrowCollapse"
+                    :path="settingsStore.isSimpleMode ? mdiLayersTripleOutline : mdiLayersOutline"
                     :size="deviceStore.getREMSize(1.1)"
                 />
                 <!-- The narrow header already carries Modes and the overflow menu,
