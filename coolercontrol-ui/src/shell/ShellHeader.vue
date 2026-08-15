@@ -7,6 +7,8 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import {
+    mdiArrowCollapse,
+    mdiArrowExpand,
     mdiArrowLeft,
     mdiBellOutline,
     mdiBellRingOutline,
@@ -26,6 +28,7 @@ import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { PLUGINS_SECTION } from '@/shell/sections.ts'
+import { UiMode } from '@/models/UISettings.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
@@ -62,6 +65,18 @@ const hasActiveAlert = computed(() => settingsStore.anyActiveUnsilencedAlert)
 
 const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
+)
+
+// One half of the mode switch, sat next to Modes because that is the other
+// control over what the whole interface is showing; Settings carries the other
+// half. The label says where it goes, not where you are.
+const toggleUiMode = (): void => {
+    settingsStore.uiMode = settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE
+}
+const uiModeLabel = computed(() =>
+    settingsStore.isSimpleMode
+        ? t('layout.shell.fullInterface')
+        : t('layout.shell.simpleInterface'),
 )
 
 // Provided by ShellLayout; toggles the reka splitter panel (desktop only).
@@ -181,6 +196,25 @@ const isMobile = computed(() => width.value < 768)
                 {{ t('layout.shell.manageModes') }}
             </DropdownMenuItem>
         </UiDropdownMenu>
+        <!-- The tooltip says what the two modes are; the label says which one the
+             button goes to, so neither repeats the other. -->
+        <UiTooltip :text="t('layout.settings.tooltips.uiMode')">
+            <UiButton
+                id="ui-mode-switch"
+                variant="outline"
+                :size="isMobile ? 'icon' : 'md'"
+                @click="toggleUiMode"
+            >
+                <svg-icon
+                    type="mdi"
+                    :path="settingsStore.isSimpleMode ? mdiArrowExpand : mdiArrowCollapse"
+                    :size="deviceStore.getREMSize(1.1)"
+                />
+                <!-- The narrow header already carries Modes and the overflow menu,
+                     so the glyph and its tooltip stand alone there. -->
+                <span v-if="!isMobile">{{ uiModeLabel }}</span>
+            </UiButton>
+        </UiTooltip>
         <!-- Mobile has no rail, so its Plugins/Access/Power entries live here.
              Simple mode has no Plugins section, so only Access/Power remain. -->
         <UiDropdownMenu v-if="isMobile">
