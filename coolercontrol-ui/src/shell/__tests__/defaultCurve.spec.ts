@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from 'vitest'
-import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
+import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 
 describe('default graph curve', () => {
     // What the profile editor draws when a Graph profile has no points yet, and
@@ -36,5 +36,19 @@ describe('default graph curve', () => {
         const curve = defaultGraphCurve(30, 90, 2, 17)
         expect(curve[0]).toEqual([30, 0])
         expect(curve.at(-1)).toEqual([90, 100])
+    })
+})
+
+describe('placeholder graph curve', () => {
+    // Drawn when no temp source has been chosen, so it has no device range to
+    // follow. It once stepped to 1875C, which is nowhere near the chart.
+    it('stays on the default axis', () => {
+        expect(placeholderGraphCurve()).toEqual([
+            [0, 0],
+            [25, 25],
+            [50, 50],
+            [75, 75],
+            [100, 100],
+        ])
     })
 })

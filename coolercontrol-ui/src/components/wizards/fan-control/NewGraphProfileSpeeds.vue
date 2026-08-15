@@ -47,7 +47,7 @@ import _ from 'lodash'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
-import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
+import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 
 echarts.use([
     GridComponent,
@@ -264,10 +264,9 @@ const defaultDataValues = (): Array<PointData> => {
             })
         }
     } else {
-        for (let i = 0; i < 100; i = i + 25) {
-            const value = 25 * i
+        for (const [temp, duty] of placeholderGraphCurve()) {
             result.push({
-                value: [value, value],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,

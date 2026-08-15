@@ -15,6 +15,10 @@
 /** Point count, when the device's own limits leave room for it. */
 const PREFERRED_POINTS = 5
 
+/** The editors' default temp axis, which is what a placeholder curve spans. */
+const PLACEHOLDER_TEMP_MIN = 0
+const PLACEHOLDER_TEMP_MAX = 100
+
 const round = (value: number, precision: number): number => {
     const multiplier = Math.pow(10, precision)
     return Math.round(value * multiplier) / multiplier
@@ -53,4 +57,19 @@ export function defaultGraphCurve(
     const temps = lineSpace(tempMin, tempMax, points, 1)
     const duties = lineSpace(0, 100, points, 0)
     return temps.map((temp, index): [number, number] => [temp, duties[index]])
+}
+
+/**
+ * The curve an editor draws before a temp source has been chosen: the same ramp
+ * across the default axis, since no device has named a range or a point limit
+ * yet. A placeholder still has to land on the chart, so it stays inside the axis
+ * the editor opens with.
+ */
+export function placeholderGraphCurve(): Array<[number, number]> {
+    return defaultGraphCurve(
+        PLACEHOLDER_TEMP_MIN,
+        PLACEHOLDER_TEMP_MAX,
+        PREFERRED_POINTS,
+        PREFERRED_POINTS,
+    )
 }

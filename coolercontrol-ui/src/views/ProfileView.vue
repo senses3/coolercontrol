@@ -78,7 +78,7 @@ import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vu
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import { Emitter, EventType } from 'mitt'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
-import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
+import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 import HealthWarning from '@/components/HealthWarning.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
@@ -485,10 +485,9 @@ const defaultDataValues = (): Array<PointData> => {
             })
         }
     } else {
-        for (let i = 0; i < 100; i = i + 25) {
-            const value = 25 * i
+        for (const [temp, duty] of placeholderGraphCurve()) {
             result.push({
-                value: [value, value],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
