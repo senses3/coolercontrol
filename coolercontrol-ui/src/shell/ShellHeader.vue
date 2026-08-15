@@ -27,6 +27,7 @@ import { useI18n } from 'vue-i18n'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { hasBrowserChrome } from '@/shell/displayMode.ts'
 import { PLUGINS_SECTION } from '@/shell/sections.ts'
 import { getUiModeDisplayName, UiMode } from '@/models/UISettings.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
@@ -89,9 +90,13 @@ const isMobile = computed(() => width.value < 768)
 
 <template>
     <header class="flex h-12 shrink-0 items-center gap-2.5 px-3">
-        <!-- The Qt app has no browser back button, so provide one. It sits at the
-             far left, where a browser's back button would be. -->
-        <UiTooltip v-if="deviceStore.isQtApp()" :text="t('layout.topbar.back')">
+        <!-- Neither the Qt window nor an installed app window has a browser back
+             button, so provide one. It sits at the far left, where a browser's
+             back button would be. -->
+        <UiTooltip
+            v-if="deviceStore.isQtApp() || !hasBrowserChrome"
+            :text="t('layout.topbar.back')"
+        >
             <button
                 type="button"
                 class="flex items-center justify-center rounded-lg p-1.5 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
