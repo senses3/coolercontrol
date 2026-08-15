@@ -393,6 +393,63 @@ export const THEME_CSS_VAR_NAMES: string[] = [
     '--colors-surface-hover',
 ]
 
+/** The id the System theme applies its palette under. Never persisted: the theme
+ * mode stays `system`, and the palette behind it is whatever the desktop says today. */
+export const SYSTEM_THEME_ID = 'system'
+
+/**
+ * The desktop's own colors, as the Qt app reads them. A browser tab has none, and
+ * neither does a desktop that publishes nothing.
+ *
+ * `tokens` arrives all or nothing. KDE writes its resolved palette to a file any
+ * process can read, so the whole set is available there; everywhere else only an
+ * accent and a light/dark preference are, because the rest lives inside GTK.
+ */
+export interface SystemPalette {
+    variant?: 'dark' | 'light'
+    accent?: string
+    tokens?: ThemeTokens
+}
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/
+
+/**
+ * Parses what the Qt app sends. Anything malformed is dropped rather than let
+ * through to a CSS variable, since this is the one palette the UI does not ship
+ * and cannot check at build time. Null when nothing usable survives.
+ */
+export const parseSystemPalette = (json: string): SystemPalette | null => {
+    let raw: unknown
+    try {
+        raw = JSON.parse(json)
+    } catch {
+        return null
+    }
+    if (raw == null || typeof raw !== 'object') return null
+    const source = raw as Record<string, unknown>
+    const palette: SystemPalette = {}
+    if (source.variant === 'dark' || source.variant === 'light') {
+        palette.variant = source.variant
+    }
+    if (typeof source.accent === 'string' && HEX_COLOR.test(source.accent)) {
+        palette.accent = source.accent
+    }
+    if (source.tokens != null && typeof source.tokens === 'object') {
+        const candidate = source.tokens as Record<string, unknown>
+        // A half-filled palette would draw desktop colors over ours, which reads
+        // worse than either on its own, so a single bad token drops the set.
+        const complete = THEME_TOKEN_KEYS.every(
+            (key) => typeof candidate[key] === 'string' && HEX_COLOR.test(candidate[key] as string),
+        )
+        if (complete) {
+            palette.tokens = Object.fromEntries(
+                THEME_TOKEN_KEYS.map((key) => [key, candidate[key]]),
+            ) as unknown as ThemeTokens
+        }
+    }
+    return Object.keys(palette).length > 0 ? palette : null
+}
+
 /**
  * The hover tint for an arbitrary background, used by custom themes where the
  * variant is not declared: a light background darkens, a dark one lightens.
