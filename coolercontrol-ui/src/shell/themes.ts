@@ -296,6 +296,50 @@ export const INSTALLED_THEMES: InstalledTheme[] = [
             info: '#218a82', // nudged from #2aa198
         },
     },
+    {
+        // No upstream project to follow: a green phosphor terminal, built here.
+        // Kept off pure black so it reads as a CRT rather than True Black tinted
+        // green, and the text green is pulled well back from the accent so a
+        // whole page of it is not the same shout as a highlight.
+        id: 'hackerman',
+        name: 'Hackerman',
+        variant: 'dark',
+        tokens: {
+            accent: '#00ff41',
+            accentGradientTo: '#00e5ff', // terminal cyan
+            bgOne: '#020a02',
+            bgTwo: '#0b160b',
+            borderOne: '#1c3a1c',
+            textColor: '#b8ffc8',
+            textColorSecondary: '#5fbf6f',
+            success: '#00ff41',
+            warning: '#ffd700',
+            error: '#ff5f5f',
+            info: '#00e5ff',
+        },
+    },
+    {
+        // No upstream project to follow either: a muted slate palette for people
+        // who want the UI to sit still. Every foreground is desaturated on
+        // purpose, so the status colors carry their meaning by hue alone and
+        // nothing on the page competes with the live readings.
+        id: 'solitude',
+        name: 'Solitude',
+        variant: 'dark',
+        tokens: {
+            accent: '#8fa3d9',
+            accentGradientTo: '#b99ad4', // muted mauve
+            bgOne: '#1c1f26',
+            bgTwo: '#252932',
+            borderOne: '#363b47',
+            textColor: '#d5d8e0',
+            textColorSecondary: '#8b93a7',
+            success: '#8fbf9f',
+            warning: '#d9bc8c',
+            error: '#d98a8a',
+            info: '#8fb8d9',
+        },
+    },
 ]
 
 const THEMES_BY_ID = new Map(INSTALLED_THEMES.map((theme) => [theme.id, theme]))
