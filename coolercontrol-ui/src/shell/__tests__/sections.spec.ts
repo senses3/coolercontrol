@@ -94,7 +94,7 @@ describe('shell sections', () => {
 
     // ctrl+N is the Nth entry of this list, so a gap or a reorder silently
     // rebinds a digit.
-    it('numbers the hotkey sections per mode, plugins last', () => {
+    it('numbers the hotkey sections per interface, plugins last', () => {
         expect(hotkeySections(UiMode.FULL).map((s) => s.id)).toEqual([
             'home',
             'cooling',

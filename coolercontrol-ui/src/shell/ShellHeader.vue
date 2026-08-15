@@ -67,8 +67,8 @@ const activeModeName = computed<string | undefined>(
     () => settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent)?.name,
 )
 
-// One half of the mode switch, sat next to Modes because that is the other
-// control over what the whole interface is showing; Settings carries the other
+// One half of the interface switch, sat next to Modes because that is the other
+// control over what the whole window is showing; Settings carries the other
 // half. The label says where it goes, not where you are.
 const toggleUiMode = (): void => {
     settingsStore.setUiMode(settingsStore.isSimpleMode ? UiMode.FULL : UiMode.SIMPLE)

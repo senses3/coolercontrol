@@ -6,7 +6,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { UiMode } from '@/models/UISettings.ts'
-import { routeAfterModeSwitch } from '@/shell/simple/modeRoute.ts'
+import { routeAfterUiModeSwitch } from '@/shell/simple/uiModeRoute.ts'
 import { sectionsFor } from '@/shell/sections.ts'
 
 const routerSource = import.meta.glob('../../router/index.ts', {
@@ -15,39 +15,41 @@ const routerSource = import.meta.glob('../../router/index.ts', {
     eager: true,
 })['../../router/index.ts'] as string
 
-describe('route after a mode switch', () => {
+describe('route after an interface switch', () => {
     // Every page simple mode owns exists in the full interface too, so switching
     // up never has to move the user.
     it('never moves the user when switching to the full interface', () => {
-        expect(routeAfterModeSwitch(UiMode.FULL, { section: 'devices' })).toBeUndefined()
-        expect(routeAfterModeSwitch(UiMode.FULL, { section: 'plugins' })).toBeUndefined()
-        expect(routeAfterModeSwitch(UiMode.FULL, {})).toBeUndefined()
+        expect(routeAfterUiModeSwitch(UiMode.FULL, { section: 'devices' })).toBeUndefined()
+        expect(routeAfterUiModeSwitch(UiMode.FULL, { section: 'plugins' })).toBeUndefined()
+        expect(routeAfterUiModeSwitch(UiMode.FULL, {})).toBeUndefined()
     })
 
     it('keeps a page the simple interface owns', () => {
         expect(
-            routeAfterModeSwitch(UiMode.SIMPLE, { section: 'cooling', simple: true }),
+            routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'cooling', simple: true }),
         ).toBeUndefined()
         expect(
-            routeAfterModeSwitch(UiMode.SIMPLE, { section: 'settings', simple: true }),
+            routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'settings', simple: true }),
         ).toBeUndefined()
     })
 
     // Alerts and Modes are full-shell pages, but their sections survive the
     // switch under other names, so the user lands somewhere related.
     it('falls back to the section landing when the section survives', () => {
-        expect(routeAfterModeSwitch(UiMode.SIMPLE, { section: 'monitoring' })).toBe(
+        expect(routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'monitoring' })).toBe(
             'section-monitoring',
         )
-        expect(routeAfterModeSwitch(UiMode.SIMPLE, { section: 'cooling' })).toBe('section-cooling')
-        expect(routeAfterModeSwitch(UiMode.SIMPLE, { section: 'home' })).toBe('section-home')
+        expect(routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'cooling' })).toBe(
+            'section-cooling',
+        )
+        expect(routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'home' })).toBe('section-home')
     })
 
     it('falls back to home when the section is gone as well', () => {
-        expect(routeAfterModeSwitch(UiMode.SIMPLE, { section: 'devices' })).toBe('section-home')
-        expect(routeAfterModeSwitch(UiMode.SIMPLE, { section: 'plugins' })).toBe('section-home')
+        expect(routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'devices' })).toBe('section-home')
+        expect(routeAfterUiModeSwitch(UiMode.SIMPLE, { section: 'plugins' })).toBe('section-home')
         // A route with no section at all, such as not-found.
-        expect(routeAfterModeSwitch(UiMode.SIMPLE, {})).toBe('section-home')
+        expect(routeAfterUiModeSwitch(UiMode.SIMPLE, {})).toBe('section-home')
     })
 })
 

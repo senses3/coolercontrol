@@ -9,8 +9,8 @@ import ShellLayout from '@/shell/ShellLayout.vue'
 // the settings section reuses the existing settings route.
 //
 // `meta.simple` marks the pages the simple interface owns. Static data, not a
-// guard: every route stays reachable in both modes, and only an explicit mode
-// switch consults this (see shell/simple/modeRoute.ts).
+// guard: every route stays reachable in either interface, and only an explicit
+// interface switch consults this (see shell/simple/uiModeRoute.ts).
 const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'home',

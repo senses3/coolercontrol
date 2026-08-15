@@ -38,7 +38,7 @@ import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
 import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
 import { channelRoute } from '@/shell/channelRoute.ts'
 import { firstRunUiMode } from '@/shell/simple/firstRun.ts'
-import { routeAfterModeSwitch } from '@/shell/simple/modeRoute.ts'
+import { routeAfterUiModeSwitch } from '@/shell/simple/uiModeRoute.ts'
 import router from '@/router'
 import type { AllDaemonDeviceSettings } from '@/models/DaemonSettings'
 import type { NameOverrides } from '@/models/NameOverrides'
@@ -270,14 +270,14 @@ export const useSettingsStore = defineStore('settings', () => {
     const isSimpleMode = computed(() => uiMode.value === UiMode.SIMPLE)
     /**
      * Switches the interface. The only way to change `uiMode` from a user
-     * action: the page has to move with it when the mode being left behind is
-     * the one that owned it. The first-run default assigns the ref directly,
+     * action: the page has to move with it when the interface being left behind
+     * is the one that owned it. The first-run default assigns the ref directly,
      * since nothing is on screen yet.
      */
-    function setUiMode(mode: UiMode): void {
-        if (uiMode.value === mode) return
-        uiMode.value = mode
-        const target = routeAfterModeSwitch(mode, router.currentRoute.value.meta)
+    function setUiMode(chosen: UiMode): void {
+        if (uiMode.value === chosen) return
+        uiMode.value = chosen
+        const target = routeAfterUiModeSwitch(chosen, router.currentRoute.value.meta)
         if (target != null) router.push({ name: target })
     }
     const tags: Ref<Map<string, TagSettings>> = ref(new Map<string, TagSettings>())
