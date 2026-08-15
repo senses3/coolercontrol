@@ -522,7 +522,12 @@ onMounted(async () => {
                                 <p class="mt-4 text-base text-text-color-secondary leading-relaxed">
                                     {{ t('components.onboarding.gettingStartedIntro') }}
                                 </p>
+                                <!-- Guided Setup, Profiles and Auto-Create are all
+                                     full-interface machinery, and the simple walk's
+                                     own Fans step already says how a curve is made
+                                     there, so this drops out with the interface. -->
                                 <div
+                                    v-if="!settingsStore.isSimpleMode"
                                     class="mt-4 p-3 rounded-md bg-accent/10 border-l-4 border-accent"
                                 >
                                     <p class="text-text-color-secondary font-semibold leading-snug">
