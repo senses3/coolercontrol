@@ -87,6 +87,19 @@ export default {
             simple: {
                 fans: 'Ventoinhas',
                 sensors: 'Sensores',
+                modeCurve: 'Curva',
+                modeFixed: 'Velocidade fixa',
+                useCurve: 'Usar uma curva simples',
+                useCurveAccept: 'Criar curva',
+                forkMessage:
+                    "Copiar esta curva para uma nova, '{copy}', usada somente por {channel}.\n\nAs ventoinhas que compartilham a original a mantêm.",
+                seedMessage:
+                    'Criar uma curva para {channel} começando na velocidade atual de {duty}%.\n\nAjuste o formato no editor abaixo.',
+                sharedSummary:
+                    'Esta curva controla apenas esta ventoinha | Esta curva também controla mais {count} ventoinha, então editá-la aqui mudaria essa também. | Esta curva também controla mais {count} ventoinhas, então editá-la aqui mudaria essas também.',
+                otherSummary: '{profile} controla esta ventoinha e não é uma curva simples.',
+                noCurveSummary: 'Esta ventoinha ainda não tem curva.',
+                curveNameSuffix: ' Curva',
             },
             supportWizards: {
                 summary: 'Magos do suporte ativados!',

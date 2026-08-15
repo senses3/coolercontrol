@@ -85,6 +85,19 @@ export default {
             simple: {
                 fans: 'Fans',
                 sensors: 'Sensors',
+                modeCurve: 'Curve',
+                modeFixed: 'Fixed speed',
+                useCurve: 'Use a simple curve',
+                useCurveAccept: 'Create curve',
+                forkMessage:
+                    "Copy this curve to a new one, '{copy}', used by {channel} alone.\n\nThe fans that share the original keep it.",
+                seedMessage:
+                    'Create a curve for {channel} that starts at its current speed of {duty}%.\n\nShape it in the editor below.',
+                sharedSummary:
+                    'This curve drives only this fan | This curve also drives {count} other fan, so editing it here would change that one too. | This curve also drives {count} other fans, so editing it here would change them too.',
+                otherSummary: '{profile} controls this fan, and it is not a plain curve.',
+                noCurveSummary: 'This fan has no curve yet.',
+                curveNameSuffix: ' Curve',
             },
             supportWizards: {
                 summary: 'Support Wizards Activated!',

@@ -85,6 +85,19 @@ export default {
             simple: {
                 fans: 'ファン',
                 sensors: 'センサー',
+                modeCurve: 'カーブ',
+                modeFixed: '固定速度',
+                useCurve: 'シンプルなカーブを使う',
+                useCurveAccept: 'カーブを作成',
+                forkMessage:
+                    'このカーブを新しいカーブ「{copy}」にコピーし、{channel} だけで使用します。\n\n元のカーブを共有しているファンはそのままです。',
+                seedMessage:
+                    '{channel} 用のカーブを、現在の速度 {duty}% から作成します。\n\n下のエディターで形を整えてください。',
+                sharedSummary:
+                    'このカーブはこのファンだけを制御しています | このカーブは他に {count} 台のファンも制御しているため、ここで編集するとそれらも変わります。 | このカーブは他に {count} 台のファンも制御しているため、ここで編集するとそれらも変わります。',
+                otherSummary: '{profile} がこのファンを制御しており、単純なカーブではありません。',
+                noCurveSummary: 'このファンにはまだカーブがありません。',
+                curveNameSuffix: ' カーブ',
             },
             supportWizards: {
                 summary: 'サポートの魔法使いを召喚！',

@@ -13,8 +13,7 @@ import {
     mdiShareVariantOutline,
     mdiSourceFork,
 } from '@mdi/js'
-import { storeToRefs } from 'pinia'
-import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useConfirm } from '@/shell/confirm'
 import { useToast } from '@/shell/toast'
@@ -29,17 +28,13 @@ import HealthWarning from '@/components/HealthWarning.vue'
 import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
 import TimeChart from '@/components/TimeChart.vue'
 import { Dashboard, DashboardDeviceChannel } from '@/models/Dashboard.ts'
-import {
-    DeviceSettingWriteManualDTO,
-    DeviceSettingWriteProfileDTO,
-} from '@/models/DaemonSettings.ts'
-import type { Device, UID } from '@/models/Device.ts'
+import type { UID } from '@/models/Device.ts'
 import { DeviceType } from '@/models/Device.ts'
 import type { CustomSensor } from '@/models/CustomSensor.ts'
-import { Profile } from '@/models/Profile.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
+import { useChannelControl } from '@/shell/cooling/useChannelControl.ts'
 import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
 import ControlFlowTree from '@/shell/cooling/ControlFlowTree.vue'
 import { controlFlowExpanded as flowExpanded } from '@/shell/cooling/controlFlowState.ts'
@@ -58,8 +53,6 @@ import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
 // The original, fully featured profile editor, embedded with a fixed height.
 const ProfileEditor = defineAsyncComponent(() => import('@/views/ProfileView.vue'))
 
-type ControlMode = 'automatic' | 'manual' | 'unmanaged'
-
 const props = defineProps<{ deviceUID: UID; channelName: string }>()
 
 const { t } = useI18n()
@@ -67,98 +60,35 @@ const toast = useToast()
 const confirm = useConfirm()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
-const { currentDeviceStatus } = storeToRefs(deviceStore)
 
-const device = computed<Device | undefined>(() => {
-    for (const candidate of deviceStore.allDevices()) {
-        if (candidate.uid === props.deviceUID) return candidate
-    }
-    return undefined
-})
-const channelInfo = computed(() => device.value?.info?.channels.get(props.channelName))
-const speedOptions = computed(() => channelInfo.value?.speed_options)
-const controllable = computed(() => speedOptions.value?.fixed_enabled ?? false)
-
-const uiSetting = computed(() =>
-    settingsStore.allUIDeviceSettings
-        .get(props.deviceUID)
-        ?.sensorsAndChannels.get(props.channelName),
-)
-const channelLabel = computed(() => uiSetting.value?.name ?? props.channelName)
-const defaultLabel = computed(() =>
-    settingsStore.defaultChannelLabel(props.deviceUID, props.channelName),
-)
-const saveChannelName = async (newName: string): Promise<boolean> =>
-    await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
-const deviceLabel = computed(
-    () => settingsStore.allUIDeviceSettings.get(props.deviceUID)?.name ?? '',
-)
-
-const daemonSetting = computed(() =>
-    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName),
-)
-
-const liveDuty = computed(
-    () => currentDeviceStatus.value.get(props.deviceUID)?.get(props.channelName)?.duty,
-)
-const liveRpm = computed(
-    () => currentDeviceStatus.value.get(props.deviceUID)?.get(props.channelName)?.rpm,
-)
-
-// ----- control mode state -----
-const controlModeOf = (): ControlMode => {
-    if (daemonSetting.value?.speed_fixed != null) return 'manual'
-    if (daemonSetting.value?.profile_uid != null && daemonSetting.value.profile_uid !== '0') {
-        return 'automatic'
-    }
-    return 'unmanaged'
-}
-const manualDutyOf = (): number =>
-    daemonSetting.value?.speed_fixed ?? Number(liveDuty.value ?? '50')
-const profileUIDOf = (): UID | undefined =>
-    daemonSetting.value?.profile_uid !== '0' ? daemonSetting.value?.profile_uid : undefined
-
-const controlMode = ref<ControlMode>(controlModeOf())
-const manualDuty = ref<number>(manualDutyOf())
-const selectedProfileUID = ref<UID | undefined>(profileUIDOf())
-
-// Activating a Mode rewrites this channel's setting while the page stays mounted,
-// as does any other client. The state above is seeded once, so follow the daemon
-// whenever its setting really changes. Separate sources, not one array getter: the
-// DTO is a new object after every reload, so only per-value comparison stays quiet
-// on reloads that left this channel alone.
-watch(
-    [() => daemonSetting.value?.profile_uid, () => daemonSetting.value?.speed_fixed],
-    (): void => {
-        controlMode.value = controlModeOf()
-        manualDuty.value = manualDutyOf()
-        selectedProfileUID.value = profileUIDOf()
-    },
-)
+const {
+    speedOptions,
+    controllable,
+    uiSetting,
+    channelLabel,
+    defaultLabel,
+    deviceLabel,
+    saveChannelName,
+    liveDuty,
+    liveRpm,
+    controlMode,
+    manualDuty,
+    selectedProfileUID,
+    selectedProfile,
+    sharedChannels,
+    applying,
+    editorRef,
+    extensionSettingsRef,
+    editorDirty,
+    canApply,
+    apply,
+} = useChannelControl(props.deviceUID, props.channelName)
 
 const controlModeOptions = computed(() => [
     { label: t('layout.shell.coolingPage.modeProfile'), value: 'automatic' },
     { label: t('layout.shell.coolingPage.modeManual'), value: 'manual' },
     { label: t('layout.shell.coolingPage.modeUnmanaged'), value: 'unmanaged' },
 ])
-
-const selectedProfile = computed<Profile | undefined>(() =>
-    settingsStore.profiles.find((profile) => profile.uid === selectedProfileUID.value),
-)
-
-// channels (other than this one) also driven by the selected profile
-const sharedChannels = computed<Array<{ deviceUID: UID; channelName: string }>>(() => {
-    if (selectedProfileUID.value == null) return []
-    const users: Array<{ deviceUID: UID; channelName: string }> = []
-    for (const [devUID, deviceSettings] of settingsStore.allDaemonDeviceSettings) {
-        for (const [chName, setting] of deviceSettings.settings) {
-            if (setting.profile_uid !== selectedProfileUID.value) continue
-            if (devUID === props.deviceUID && chName === props.channelName) continue
-            users.push({ deviceUID: devUID, channelName: chName })
-        }
-    }
-    return users
-})
 
 const profileOptions = computed<UiSelectOption[]>(() =>
     settingsStore.profiles
@@ -267,70 +197,7 @@ const flowTree = computed<FlowNode | null>(() => {
 const flowRows = computed(() => (flowTree.value != null ? flattenFlow(flowTree.value) : []))
 const flowExpandable = computed(() => flowTree.value != null && isFlowExpandable(flowTree.value))
 
-// ----- apply / fork -----
-const applying = ref(false)
-const extensionSettingsRef = ref()
-const editorRef = ref()
-const editorDirty = computed<boolean>(() => editorRef.value?.contextIsDirty === true)
-
-const assignmentDirty = computed<boolean>(() => {
-    if (controlMode.value === 'manual') {
-        return daemonSetting.value?.speed_fixed !== manualDuty.value
-    }
-    if (controlMode.value === 'unmanaged') {
-        return (
-            daemonSetting.value?.speed_fixed != null ||
-            (daemonSetting.value?.profile_uid != null && daemonSetting.value.profile_uid !== '0')
-        )
-    }
-    return daemonSetting.value?.profile_uid !== selectedProfileUID.value
-})
-
-const canApply = computed<boolean>(() => {
-    if (!controllable.value || applying.value) return false
-    if (controlMode.value === 'automatic') {
-        if (selectedProfileUID.value == null) return false
-        return assignmentDirty.value || editorDirty.value
-    }
-    return assignmentDirty.value
-})
-
-const apply = async (): Promise<void> => {
-    if (applying.value) return
-    applying.value = true
-    try {
-        if (controlMode.value === 'manual') {
-            await settingsStore.saveDaemonDeviceSettingManual(
-                props.deviceUID,
-                props.channelName,
-                new DeviceSettingWriteManualDTO(manualDuty.value),
-            )
-        } else if (controlMode.value === 'unmanaged') {
-            await settingsStore.saveDaemonDeviceSettingProfile(
-                props.deviceUID,
-                props.channelName,
-                new DeviceSettingWriteProfileDTO('0'),
-            )
-        } else if (selectedProfileUID.value != null) {
-            if (editorDirty.value) {
-                await editorRef.value?.saveProfileState?.()
-                // still dirty means the editor's validation rejected the save
-                if (editorDirty.value) return
-            }
-            if (assignmentDirty.value) {
-                await settingsStore.saveDaemonDeviceSettingProfile(
-                    props.deviceUID,
-                    props.channelName,
-                    new DeviceSettingWriteProfileDTO(selectedProfileUID.value),
-                )
-            }
-        }
-        extensionSettingsRef.value?.saveChannelExtensionSettings?.()
-    } finally {
-        applying.value = false
-    }
-}
-
+// ----- fork -----
 const confirmAction = async (
     header: string,
     message: string,
@@ -523,7 +390,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                     </template>
                 </ChannelSetupMenu>
                 <ChannelExtensionSettings
-                    ref="extensionSettingsRef"
+                    :ref="extensionSettingsRef"
                     :device-u-i-d="deviceUID"
                     :channel-name="channelName"
                     :chosen-profile="controlMode === 'automatic' ? selectedProfile : undefined"
@@ -667,7 +534,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
 
                 <div v-if="selectedProfileUID != null" class="rounded-lg border border-border-one">
                     <ProfileEditor
-                        ref="editorRef"
+                        :ref="editorRef"
                         :key="selectedProfileUID"
                         :profile-u-i-d="selectedProfileUID"
                         :channel-device-u-i-d="deviceUID"

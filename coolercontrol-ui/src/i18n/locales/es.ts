@@ -87,6 +87,19 @@ export default {
             simple: {
                 fans: 'Ventiladores',
                 sensors: 'Sensores',
+                modeCurve: 'Curva',
+                modeFixed: 'Velocidad fija',
+                useCurve: 'Usar una curva simple',
+                useCurveAccept: 'Crear curva',
+                forkMessage:
+                    "Copiar esta curva a una nueva, '{copy}', que solo usará {channel}.\n\nLos ventiladores que comparten la original la conservan.",
+                seedMessage:
+                    'Crear una curva para {channel} que empieza en su velocidad actual del {duty}%.\n\nDele forma en el editor de abajo.',
+                sharedSummary:
+                    'Esta curva solo controla este ventilador | Esta curva también controla {count} ventilador más, así que editarla aquí también lo cambiaría. | Esta curva también controla {count} ventiladores más, así que editarla aquí también los cambiaría.',
+                otherSummary: '{profile} controla este ventilador y no es una curva simple.',
+                noCurveSummary: 'Este ventilador aún no tiene curva.',
+                curveNameSuffix: ' Curva',
             },
             supportWizards: {
                 summary: '¡Magos del soporte activados!',

@@ -88,6 +88,19 @@ export default {
             simple: {
                 fans: 'Ventilateurs',
                 sensors: 'Capteurs',
+                modeCurve: 'Courbe',
+                modeFixed: 'Vitesse fixe',
+                useCurve: 'Utiliser une courbe simple',
+                useCurveAccept: 'Créer la courbe',
+                forkMessage:
+                    "Copier cette courbe vers une nouvelle, '{copy}', utilisée par {channel} seul.\n\nLes ventilateurs qui partagent l'originale la conservent.",
+                seedMessage:
+                    "Créer une courbe pour {channel} qui démarre à sa vitesse actuelle de {duty}%.\n\nFaçonnez-la dans l'éditeur ci-dessous.",
+                sharedSummary:
+                    'Cette courbe ne pilote que ce ventilateur | Cette courbe pilote aussi {count} autre ventilateur, la modifier ici le changerait aussi. | Cette courbe pilote aussi {count} autres ventilateurs, la modifier ici les changerait aussi.',
+                otherSummary: "{profile} pilote ce ventilateur et n'est pas une simple courbe.",
+                noCurveSummary: "Ce ventilateur n'a pas encore de courbe.",
+                curveNameSuffix: ' Courbe',
             },
             supportWizards: {
                 summary: 'Magiciens du support activés !',

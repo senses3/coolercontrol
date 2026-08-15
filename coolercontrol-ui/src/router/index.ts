@@ -35,7 +35,7 @@ const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'cooling/:deviceUID/:channelName',
         name: 'cooling-channel',
-        component: () => import('@/shell/cooling/ChannelPage.vue'),
+        component: () => import('@/shell/simple/CoolingChannelRoute.vue'),
         props: true,
         meta: { section: 'cooling' },
     },

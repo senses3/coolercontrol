@@ -85,6 +85,19 @@ export default {
             simple: {
                 fans: '風扇',
                 sensors: '感測器',
+                modeCurve: '曲線',
+                modeFixed: '固定轉速',
+                useCurve: '使用簡單曲線',
+                useCurveAccept: '建立曲線',
+                forkMessage:
+                    '將此曲線複製為新曲線「{copy}」，僅供 {channel} 使用。\n\n共用原曲線的風扇維持不變。',
+                seedMessage:
+                    '為 {channel} 建立一條曲線，從目前轉速 {duty}% 開始。\n\n在下方編輯器中調整形狀。',
+                sharedSummary:
+                    '此曲線僅控制此風扇 | 此曲線還控制另外 {count} 個風扇，在此編輯也會改變它們。 | 此曲線還控制另外 {count} 個風扇，在此編輯也會改變它們。',
+                otherSummary: '{profile} 控制此風扇，且不是簡單曲線。',
+                noCurveSummary: '此風扇尚未有曲線。',
+                curveNameSuffix: ' 曲線',
             },
             supportWizards: {
                 summary: '支援魔法師已啟動！',

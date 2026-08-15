@@ -85,6 +85,19 @@ export default {
             simple: {
                 fans: '팬',
                 sensors: '센서',
+                modeCurve: '커브',
+                modeFixed: '고정 속도',
+                useCurve: '간단한 커브 사용',
+                useCurveAccept: '커브 만들기',
+                forkMessage:
+                    "이 커브를 새 커브 '{copy}'로 복사하여 {channel}에서만 사용합니다.\n\n원본을 공유하는 팬은 그대로 유지됩니다.",
+                seedMessage:
+                    '{channel}의 현재 속도 {duty}%에서 시작하는 커브를 만듭니다.\n\n아래 편집기에서 모양을 조정하세요.',
+                sharedSummary:
+                    '이 커브는 이 팬만 제어합니다 | 이 커브는 다른 팬 {count}개도 제어하므로 여기서 편집하면 그 팬도 바뀝니다. | 이 커브는 다른 팬 {count}개도 제어하므로 여기서 편집하면 그 팬들도 바뀝니다.',
+                otherSummary: '{profile}이(가) 이 팬을 제어하며 단순한 커브가 아닙니다.',
+                noCurveSummary: '이 팬에는 아직 커브가 없습니다.',
+                curveNameSuffix: ' 커브',
             },
             supportWizards: {
                 summary: '지원 마법사 활성화!',

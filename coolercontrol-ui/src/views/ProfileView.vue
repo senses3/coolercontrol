@@ -107,6 +107,10 @@ interface Props {
     // Hides the internal save button; the host page saves via the exposed
     // saveProfileState (e.g. the channel page's Apply button).
     hideSave?: boolean
+    // Plain curve editor: no profile type picker (Graph only), no function
+    // selector, no profile name. Simple mode embeds the editor this way, where
+    // profiles and functions are not entities the user manages.
+    graphOnly?: boolean
     // Channel context when embedded in a channel page; lets charts show the
     // channel's live Actual duty next to the calculated Target.
     channelDeviceUID?: string
@@ -133,7 +137,9 @@ const tableDataKey: Ref<number> = ref(0)
 const currentProfile = computed(
     () => settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
 )
-const selectedType: Ref<ProfileType> = ref(currentProfile.value.p_type)
+const selectedType: Ref<ProfileType> = ref(
+    props.graphOnly ? ProfileType.Graph : currentProfile.value.p_type,
+)
 const profileTypeOptions = computed(() => {
     return [...$enum(ProfileType).values()].map((type) => ({
         value: type,
@@ -2385,6 +2391,7 @@ defineExpose({ saveProfileState, contextIsDirty })
 <template>
     <div id="control-panel" class="flex flex-wrap items-center justify-between px-2 pt-2">
         <entity-title-rename
+            v-if="!graphOnly"
             :current-name="currentProfile.name"
             :save-name-function="saveNameFunction"
         />
@@ -2428,7 +2435,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                     />
                 </UiButton>
             </template>
-            <div class="p-2 pr-0">
+            <div v-if="!graphOnly" class="p-2 pr-0">
                 <span
                     v-tooltip.top="{
                         escape: false,
@@ -2506,7 +2513,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                         />
                     </span>
                 </div>
-                <div class="p-2 pr-0">
+                <div v-if="!graphOnly" class="p-2 pr-0">
                     <span v-tooltip.top="t('views.profiles.functionToApply')">
                         <UiSelect
                             v-model="chosenFunctionUid"
