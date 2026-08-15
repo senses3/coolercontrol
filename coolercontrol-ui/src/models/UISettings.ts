@@ -180,6 +180,10 @@ export class SensorAndChannelSettings {
     @Type(() => Dashboard)
     channelDashboard?: Dashboard
     tags: Array<string> = []
+    // The profile last seen driving this channel. A fixed speed or an unmanaged
+    // channel carries no profile in the daemon's setting, so this is the only
+    // record of what to offer back when the channel returns to one.
+    lastProfileUID?: UID
 
     constructor(defaultColor: Color = '#568af2') {
         this.defaultColor = defaultColor

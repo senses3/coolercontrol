@@ -14,6 +14,7 @@ import { ChannelInfo } from '@/models/ChannelInfo.ts'
 import { Device, DeviceType } from '@/models/Device.ts'
 import { DeviceInfo } from '@/models/DeviceInfo.ts'
 import { SpeedOptions } from '@/models/SpeedOptions.ts'
+import { DeviceUISettings, SensorAndChannelSettings } from '@/models/UISettings.ts'
 
 const DEVICE = 'dev-1'
 const CHANNEL = 'fan1'
@@ -36,7 +37,9 @@ const useFakeDeviceStore = defineStore('fake-devices', () => {
 
 const useFakeSettingsStore = defineStore('fake-settings', () => {
     const allDaemonDeviceSettings = ref(new Map<string, DaemonDeviceSettings>())
-    const allUIDeviceSettings = ref(new Map<string, never>())
+    const deviceUISettings = new DeviceUISettings()
+    deviceUISettings.sensorsAndChannels.set(CHANNEL, new SensorAndChannelSettings())
+    const allUIDeviceSettings = ref(new Map([[DEVICE, deviceUISettings]]))
     const profiles = ref<Array<{ uid: string; name: string }>>([])
 
     // Mirrors loadDaemonDeviceSettings: fresh DTOs on every reload, changed or not.
@@ -196,6 +199,73 @@ describe('channel control', () => {
             channelName: CHANNEL,
             profileUID: 'profile-a',
         })
+    })
+
+    // A fixed speed and an unmanaged channel carry no profile in the daemon's
+    // setting, so the channel's own UI settings are the only record of what it
+    // last ran.
+    it('remembers the profile the daemon has driving the channel', async () => {
+        const settings = useFakeSettingsStore()
+        settings.reload([[CHANNEL, reading({ profile_uid: 'profile-a' })]])
+        const control = useChannelControl(DEVICE, CHANNEL)
+        const uiSetting = () =>
+            settings.allUIDeviceSettings.get(DEVICE)?.sensorsAndChannels.get(CHANNEL)
+
+        // Recorded up front, or the switch that drops it would be the first
+        // thing seen and there would be nothing left to remember.
+        expect(uiSetting()?.lastProfileUID).toBe('profile-a')
+
+        settings.reload([[CHANNEL, reading({ speed_fixed: 40 })]])
+        await nextTick()
+        expect(control.controlMode.value).toBe('manual')
+        expect(uiSetting()?.lastProfileUID).toBe('profile-a')
+
+        settings.reload([[CHANNEL, reading({ profile_uid: 'profile-b' })]])
+        await nextTick()
+        expect(uiSetting()?.lastProfileUID).toBe('profile-b')
+    })
+
+    it('offers the remembered profile back when the channel returns to one', async () => {
+        const settings = useFakeSettingsStore()
+        settings.profiles.push({ uid: 'profile-a', name: 'Quiet' })
+        settings.reload([[CHANNEL, reading({ profile_uid: 'profile-a' })]])
+        const control = useChannelControl(DEVICE, CHANNEL)
+
+        settings.reload([[CHANNEL, reading({ speed_fixed: 40 })]])
+        await nextTick()
+        expect(control.selectedProfileUID.value).toBeUndefined()
+
+        control.controlMode.value = 'automatic'
+        await nextTick()
+        expect(control.selectedProfileUID.value).toBe('profile-a')
+    })
+
+    it('offers nothing back when the remembered profile is gone', async () => {
+        const settings = useFakeSettingsStore()
+        settings.reload([[CHANNEL, reading({ profile_uid: 'profile-a' })]])
+        const control = useChannelControl(DEVICE, CHANNEL)
+        settings.reload([[CHANNEL, reading({ speed_fixed: 40 })]])
+        await nextTick()
+
+        // profiles never held profile-a, so it has since been deleted.
+        control.controlMode.value = 'automatic'
+        await nextTick()
+        expect(control.selectedProfileUID.value).toBeUndefined()
+    })
+
+    // An edit in progress outranks the memory: the user picked that one.
+    it('leaves a profile the user has already picked alone', async () => {
+        const settings = useFakeSettingsStore()
+        settings.profiles.push({ uid: 'profile-a', name: 'Quiet' })
+        settings.reload([[CHANNEL, reading({ profile_uid: 'profile-a' })]])
+        const control = useChannelControl(DEVICE, CHANNEL)
+        settings.reload([[CHANNEL, reading({ speed_fixed: 40 })]])
+        await nextTick()
+
+        control.selectedProfileUID.value = 'profile-b'
+        control.controlMode.value = 'automatic'
+        await nextTick()
+        expect(control.selectedProfileUID.value).toBe('profile-b')
     })
 
     // The embedded profile editor saves through the page's apply, and a save its

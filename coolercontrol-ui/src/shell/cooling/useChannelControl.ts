@@ -84,6 +84,30 @@ export function useChannelControl(deviceUID: UID, channelName: string) {
         },
     )
 
+    // Remember whichever profile the daemon has driving this channel, taken from
+    // its setting rather than from applying here, so every path counts: this
+    // page, a wizard, a Mode, another client. Recorded up front as well, or the
+    // switch that drops the assignment would be the first thing observed and
+    // there would be nothing left to remember.
+    const rememberProfile = (): void => {
+        const uid = profileUIDOf()
+        if (uid != null && uiSetting.value != null) uiSetting.value.lastProfileUID = uid
+    }
+    rememberProfile()
+    watch(() => daemonSetting.value?.profile_uid, rememberProfile)
+
+    // Returning a channel to a profile offers back the one it last ran, instead
+    // of an empty picker (or, in the simple interface, no picker at all). Only
+    // a preselection: nothing is written until apply.
+    watch(controlMode, (mode) => {
+        if (mode !== 'automatic' || selectedProfileUID.value != null) return
+        const remembered = uiSetting.value?.lastProfileUID
+        if (remembered == null) return
+        if (settingsStore.profiles.some((profile) => profile.uid === remembered)) {
+            selectedProfileUID.value = remembered
+        }
+    })
+
     const selectedProfile = computed<Profile | undefined>(() =>
         settingsStore.profiles.find((profile) => profile.uid === selectedProfileUID.value),
     )

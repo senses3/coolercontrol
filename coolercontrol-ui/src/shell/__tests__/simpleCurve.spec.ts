@@ -9,7 +9,7 @@ import { DeviceInfo } from '@/models/DeviceInfo.ts'
 import { Profile, ProfileTempSource, ProfileType } from '@/models/Profile.ts'
 import { Status, TempStatus } from '@/models/Status.ts'
 import { TempInfo } from '@/models/TempInfo.ts'
-import { curveOwnership, findOwnCurve, seedTempSource } from '@/shell/simple/simpleCurve.ts'
+import { curveOwnership, seedTempSource } from '@/shell/simple/simpleCurve.ts'
 
 const graph = (uid: string): Profile => {
     const profile = new Profile('curve', ProfileType.Graph)
@@ -46,32 +46,6 @@ describe('simple curve ownership', () => {
     it('treats no profile and the default profile as none', () => {
         expect(curveOwnership(undefined, 0)).toBe('none')
         expect(curveOwnership(Profile.createDefault(), 0)).toBe('none')
-    })
-})
-
-describe('finding a fans own curve', () => {
-    const named = (uid: string, name: string, type = ProfileType.Graph): Profile => {
-        const profile = new Profile(name, type)
-        profile.uid = uid
-        return profile
-    }
-
-    // Switching to a fixed speed drops the assignment, so this is how the curve
-    // is offered back instead of the user drawing a second one.
-    it('finds the graph profile carrying the fans curve name', () => {
-        const profiles = [named('p1', 'Other'), named('p2', 'CPU Fan Curve')]
-        expect(findOwnCurve(profiles, 'CPU Fan Curve')?.uid).toBe('p2')
-    })
-
-    // The name alone is not enough: only a graph is a curve this page can edit.
-    it('ignores a profile of another type with the same name', () => {
-        const profiles = [named('p1', 'CPU Fan Curve', ProfileType.Fixed)]
-        expect(findOwnCurve(profiles, 'CPU Fan Curve')).toBeUndefined()
-    })
-
-    it('reports nothing when no curve carries the name', () => {
-        expect(findOwnCurve([named('p1', 'Other')], 'CPU Fan Curve')).toBeUndefined()
-        expect(findOwnCurve([], 'CPU Fan Curve')).toBeUndefined()
     })
 })
 
