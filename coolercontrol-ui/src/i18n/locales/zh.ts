@@ -914,8 +914,22 @@ export default {
         },
         onboarding: {
             welcome: '欢迎使用CoolerControl！',
+            simpleHome: '主页',
+            simpleHomeDesc:
+                '一目了然的守护进程状态和设备健康情况，还有日志以及在设备未被识别时可发送的硬件报告。',
+            simpleFans: '风扇',
+            simpleFansDesc:
+                'CoolerControl 可控制的所有风扇和水泵。打开其中一个即可设置曲线、保持固定转速，或交给固件处理。',
+            simpleSensors: '传感器',
+            simpleSensorsDesc: '系统的所有温度、风扇和功耗读数。打开其中一个即可查看近期历史。',
+            interfaceMode: '界面',
+            interfaceModeDesc:
+                '随时在此切换简洁界面与完整界面。两者驱动相同的设置，切换不会丢失任何内容。',
+            chooseInterface: '您想使用哪个界面？',
+            simpleChoiceDesc: '只有风扇曲线和传感器。',
+            fullChoiceDesc: '全部功能：配置文件、函数、仪表板、警报、模式、灯光等。',
             gettingStartedIntro: '通过快速导览来熟悉应用。它会介绍导航栏和应用的主要区域。',
-            startTourAgain: '您可以随时从主页重新启动此导览。',
+            startTourAgain: '您可以随时从设置中重新开始此导览。',
             startTour: '开始导览',
             maybeLater: '稍后',
             openGettingStarted: '打开入门文档',

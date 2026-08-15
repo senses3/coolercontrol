@@ -961,10 +961,26 @@ export default {
         },
         onboarding: {
             welcome: '¡Bienvenido a CoolerControl!',
+            simpleHome: 'Inicio',
+            simpleHomeDesc:
+                'Estado del servicio y salud de los dispositivos de un vistazo, además de los registros y el informe de hardware para enviar cuando algo no se detecta.',
+            simpleFans: 'Ventiladores',
+            simpleFansDesc:
+                'Todos los ventiladores y bombas que CoolerControl puede controlar. Abra uno para darle una curva, mantener una velocidad fija o dejarlo al firmware.',
+            simpleSensors: 'Sensores',
+            simpleSensorsDesc:
+                'Todas las lecturas de temperatura, ventilador y potencia del sistema. Abra una para ver su historial reciente.',
+            interfaceMode: 'Interfaz',
+            interfaceModeDesc:
+                'Cambie entre la interfaz simple y la completa aquí en cualquier momento. No se pierde nada: ambas controlan la misma configuración.',
+            chooseInterface: '¿Qué interfaz prefiere?',
+            simpleChoiceDesc: 'Curvas de ventilador y sensores, nada más.',
+            fullChoiceDesc:
+                'Todo: perfiles, funciones, paneles, alertas, modos, iluminación y más.',
             gettingStartedIntro:
                 'Haga un recorrido rápido para orientarse. Recorre la barra de navegación y las áreas principales de la aplicación.',
             startTourAgain:
-                'Puede iniciar este recorrido de nuevo en cualquier momento desde la página Inicio.',
+                'Puede volver a iniciar este recorrido en cualquier momento desde Configuración.',
             startTour: 'Iniciar Recorrido',
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',

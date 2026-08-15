@@ -233,8 +233,9 @@ export class DeviceUISettings {
 }
 
 // Bump when the tour changes enough that everyone should see it again. 1 was
-// the original tour; 2 reworked it for the new shell.
-export const ONBOARDING_TOUR_VERSION = 2
+// the original tour; 2 reworked it for the new shell; 3 split it per interface
+// and put the interface choice in the welcome, which everyone should be asked.
+export const ONBOARDING_TOUR_VERSION = 3
 
 /**
  * A DTO Class to hold all the UI settings to be persisted by the daemon.

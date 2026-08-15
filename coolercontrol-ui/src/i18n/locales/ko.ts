@@ -941,9 +941,24 @@ export default {
         },
         onboarding: {
             welcome: 'CoolerControl에 오신 것을 환영합니다!',
+            simpleHome: '홈',
+            simpleHomeDesc:
+                '데몬 상태와 장치 상태를 한눈에 볼 수 있고, 로그와 무언가 감지되지 않을 때 보낼 하드웨어 보고서도 있습니다.',
+            simpleFans: '팬',
+            simpleFansDesc:
+                'CoolerControl이 제어할 수 있는 모든 팬과 펌프입니다. 하나를 열어 커브를 주거나, 고정 속도로 두거나, 펌웨어에 맡기세요.',
+            simpleSensors: '센서',
+            simpleSensorsDesc:
+                '시스템의 모든 온도, 팬, 전력 값입니다. 하나를 열면 최근 기록을 볼 수 있습니다.',
+            interfaceMode: '인터페이스',
+            interfaceModeDesc:
+                '여기서 언제든지 간단한 인터페이스와 전체 인터페이스를 전환할 수 있습니다. 둘 다 같은 설정을 사용하므로 잃는 것은 없습니다.',
+            chooseInterface: '어떤 인터페이스를 사용하시겠습니까?',
+            simpleChoiceDesc: '팬 커브와 센서만.',
+            fullChoiceDesc: '프로필, 함수, 대시보드, 알림, 모드, 조명 등 모든 것.',
             gettingStartedIntro:
                 '간단한 둘러보기로 앱을 익혀 보세요. 내비게이션 바와 앱의 주요 영역을 안내합니다.',
-            startTourAgain: '이 둘러보기는 홈 페이지에서 언제든지 다시 시작할 수 있습니다.',
+            startTourAgain: '이 둘러보기는 설정에서 언제든지 다시 시작할 수 있습니다.',
             startTour: '투어 시작',
             maybeLater: '나중에',
             openGettingStarted: '시작하기 문서 열기',
