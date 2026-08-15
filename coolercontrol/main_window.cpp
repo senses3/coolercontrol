@@ -402,6 +402,13 @@ void MainWindow::initWebUI() {
       displayAddressWizard();
       notifyDaemonConnectionError();
     } else {
+      // Blanking the page is deliberate, and that load reports success. Treating it as a
+      // loaded UI cleared the stop flag a refused certificate had just set, logged a false
+      // success and restarted the retry timer, which left m_startup set and closeEvent
+      // ignoring every close for the rest of the process.
+      if (m_view->url().toString() == QStringLiteral("about:blank")) {
+        return;
+      }
       m_uiLoadingStopped = false;
       m_uiLoadRetryCount = 0;
       qInfo() << "Successfully loaded UI at: " << getDaemonUrl().url();
@@ -1051,6 +1058,11 @@ void MainWindow::applyDaemonConnection(const connections::Connection connection)
   }
   qInfo() << "Switching to daemon" << connections::displayName(connection);
   connections::setCurrent(connection);
+  // Stop before yielding: delay() spins a nested event loop, and a retry tick inside it
+  // probes the new address while the old per-daemon state is still live. A 200 took the
+  // reconnect branch, announced a false "Connection Restored" and opened an SSE stream
+  // that the startup path below then opened a second time.
+  m_retryTimer->stop();
   m_changeAddress = true;
   emit dropConnections();
   delay(300);  // give signals a moment to process.
@@ -1094,6 +1106,10 @@ void MainWindow::resetPerDaemonState() {
   m_uiLoadingStopped = false;
   m_reloadOnShow = false;
   m_startup = true;
+  // Re-arming m_startup without this leaves the guards that pair the two dead for the new
+  // daemon's load: hideEvent and closeEvent both test m_startup && !m_webLoadFinished, and
+  // the flag is only ever set true once the first page finishes.
+  m_webLoadFinished = false;
 }
 
 void MainWindow::displayAddressWizard() const {

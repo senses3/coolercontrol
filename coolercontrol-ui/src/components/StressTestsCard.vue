@@ -52,8 +52,19 @@ const availableDrives = ref<Array<{ device_path: string; model?: string; size_by
 const selectedDrive = ref<string | undefined>(undefined)
 let statusPollInterval: ReturnType<typeof setInterval> | null = null
 
+// Bumped whenever this component sets an active flag itself. A status request already in
+// flight then describes the world before that change, and applying it would undo the flag
+// and tear down the interval, leaving a running test reading "Inactive" with nothing
+// polling to correct it and a Start button that launches a second concurrent run.
+let statusGeneration = 0
+const invalidatePendingStatus = (): void => {
+    statusGeneration++
+}
+
 const pollStatus = async () => {
+    const generation = statusGeneration
     const status = await deviceStore.daemonClient.stressTestStatus()
+    if (generation !== statusGeneration) return
     cpuActive.value = status.cpu_active
     gpuActive.value = status.gpu_active
     ramActive.value = status.ram_active
@@ -111,6 +122,7 @@ const cpuLoad = computed(() => liveLoad([DeviceType.CPU]))
 const gpuLoad = computed(() => liveLoad([DeviceType.GPU]))
 
 const startPolling = () => {
+    invalidatePendingStatus()
     if (!statusPollInterval) {
         statusPollInterval = setInterval(pollStatus, 2000)
     }
@@ -148,7 +160,12 @@ const doCpuStress = async () => {
     )
     cpuLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'CPU Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.cpuStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         cpuActive.value = true
         startPolling()
@@ -161,6 +178,7 @@ const stopCpuStress = async () => {
     await deviceStore.daemonClient.stopCpuStress()
     cpuLoading.value = false
     cpuActive.value = false
+    invalidatePendingStatus()
 }
 
 const doGpuStress = async () => {
@@ -171,7 +189,12 @@ const doGpuStress = async () => {
     )
     gpuLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'GPU Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.gpuStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         gpuActive.value = true
         startPolling()
@@ -184,6 +207,7 @@ const stopGpuStress = async () => {
     await deviceStore.daemonClient.stopGpuStress()
     gpuLoading.value = false
     gpuActive.value = false
+    invalidatePendingStatus()
 }
 
 const doRamStress = async () => {
@@ -194,7 +218,12 @@ const doRamStress = async () => {
     )
     ramLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'RAM Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.ramStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         ramActive.value = true
         startPolling()
@@ -207,6 +236,7 @@ const stopRamStress = async () => {
     await deviceStore.daemonClient.stopRamStress()
     ramLoading.value = false
     ramActive.value = false
+    invalidatePendingStatus()
 }
 
 const driveOptions = computed(() =>
@@ -229,7 +259,12 @@ const doDriveStress = async () => {
     )
     driveLoading.value = false
     if (err) {
-        toast.add({ severity: 'error', summary: 'Drive Stress', detail: err.error, life: 5000 })
+        toast.add({
+            severity: 'error',
+            summary: t('views.appInfo.driveStress'),
+            detail: err.error,
+            life: 5000,
+        })
     } else {
         driveActive.value = true
         startPolling()
@@ -242,6 +277,7 @@ const stopDriveStress = async () => {
     await deviceStore.daemonClient.stopDriveStress()
     driveLoading.value = false
     driveActive.value = false
+    invalidatePendingStatus()
 }
 
 const stopAllStress = async () => {
@@ -258,6 +294,7 @@ const stopAllStress = async () => {
     gpuActive.value = false
     ramActive.value = false
     driveActive.value = false
+    invalidatePendingStatus()
 }
 
 onBeforeUnmount(() => {

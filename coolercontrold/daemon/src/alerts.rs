@@ -49,12 +49,14 @@ pub type AlertName = String;
 pub type AlertLogMessage = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+// The bools are independent user toggles persisted in alerts.json, not a state machine
+// that could be folded into an enum: each one is set on its own in the UI.
 #[allow(clippy::struct_excessive_bools)]
 pub struct Alert {
     pub uid: UID,
     pub name: AlertName,
 
-    /// DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): 4.3.x hard-requires a single
+    /// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): 4.3.x hard-requires a single
     /// `channel_source` in alerts.json; kept written as `channel_sources[0]`.
     pub channel_source: ChannelSource,
 
@@ -147,10 +149,23 @@ impl Alert {
         } else {
             self.channel_source = self.channel_sources[0].clone();
         }
+        // The API rejects an over-long list, but a hand-edited alerts.json reaches this
+        // without passing it, and every tick walks these sources. Trim rather than refuse
+        // the file: one malformed alert must not stop the daemon from loading the rest.
+        if self.channel_sources.len() > MAX_ALERT_SOURCES {
+            warn!(
+                "Alert {} lists {} sources, above the maximum of {MAX_ALERT_SOURCES}. \
+                 Keeping the first {MAX_ALERT_SOURCES}.",
+                self.name,
+                self.channel_sources.len()
+            );
+            self.channel_sources.truncate(MAX_ALERT_SOURCES);
+        }
         if self.source_states.len() != self.channel_sources.len() {
             self.source_states = vec![AlertState::Inactive; self.channel_sources.len()];
         }
         assert!(self.channel_sources.is_empty().not());
+        assert!(self.channel_sources.len() <= MAX_ALERT_SOURCES);
         assert_eq!(self.source_states.len(), self.channel_sources.len());
     }
 
@@ -373,6 +388,9 @@ enum AlertEventKind {
 
 /// One coalesced, fully-decided outcome for an alert on one tick.
 /// Built by the evaluation pass; executed verbatim by `send_notifications`.
+// Each bool is a separate decision the evaluation pass already made, which
+// `send_notifications` then executes verbatim; collapsing them would re-introduce the
+// branching this type exists to remove.
 #[allow(clippy::struct_excessive_bools)]
 struct AlertEvent {
     alert: Alert,
@@ -736,21 +754,36 @@ impl AlertController {
 
     /// Collects one fully-decided event per alert that needs firing this tick.
     fn process_and_collect_alerts_to_fire(&self) -> Vec<AlertEvent> {
-        let mut events = Vec::new();
-        for alert in self.alerts.borrow_mut().values_mut() {
+        let mut alerts = self.alerts.borrow_mut();
+        // Runs every tick and at most one event per alert is produced, so the exact
+        // capacity is known up front.
+        let mut events = Vec::with_capacity(alerts.len());
+        for alert in alerts.values_mut() {
             if alert.enabled.not() {
                 continue;
             }
             let outcomes = self.evaluate_sources(alert);
-            if let Some(event) = Self::build_transition_event(alert, &outcomes) {
-                events.push(event);
-            } else if let Some(event) = Self::build_suppression_event(alert, &outcomes) {
-                events.push(event);
-            } else if let Some(event) = Self::build_quiet_event(alert, &outcomes) {
+            if let Some(event) = Self::process_alert(alert, &outcomes) {
                 events.push(event);
             }
         }
         events
+    }
+
+    /// Refreshes the aggregate state from the source states, then produces this tick's
+    /// event, if any. The two belong together: the aggregate must follow the sources on
+    /// every tick, including the silent timer hops (`Error` -> `WarmUp`, `WarmUp` ->
+    /// `Inactive`) that produce no event. Recomputing inside the event builders instead
+    /// stranded `state` at its last announced value in `GET /alerts` and the UI badge.
+    fn process_alert(alert: &mut Alert, outcomes: &SourceOutcomes) -> Option<AlertEvent> {
+        alert.state = alert.worst_of_visible();
+        if let Some(event) = Self::build_transition_event(alert, outcomes) {
+            return Some(event);
+        }
+        if let Some(event) = Self::build_suppression_event(alert, outcomes) {
+            return Some(event);
+        }
+        Self::build_quiet_event(alert, outcomes)
     }
 
     /// Advances every source state machine one tick and collects the
@@ -814,6 +847,8 @@ impl AlertController {
     }
 
     /// Files the message for one source's tick outcome into the right bucket.
+    // Every argument is a distinct part of one tick's outcome. Grouping them into a
+    // struct would only move the same fields behind another name for a single call site.
     #[allow(clippy::too_many_arguments)]
     fn collect_source_messages(
         &self,
@@ -914,7 +949,6 @@ impl AlertController {
         if outcomes.has_transitions().not() {
             return None;
         }
-        alert.state = alert.worst_of_visible();
         let silenced = alert.is_silenced();
         let kind = if outcomes.fired.is_empty().not() {
             AlertEventKind::Triggered
@@ -926,12 +960,11 @@ impl AlertController {
         let mut fire_shutdown = false;
         let mut cancel_shutdown = false;
         if silenced.not() {
-            if alert.shutdown_on_activation
-                && alert.shutdown_scheduled.not()
-                && alert.any_source_visible_active()
-            {
-                fire_shutdown = true;
-                alert.shutdown_scheduled = true;
+            if alert.shutdown_on_activation && alert.shutdown_scheduled.not() {
+                if alert.any_source_visible_active() {
+                    fire_shutdown = true;
+                    alert.shutdown_scheduled = true;
+                }
             }
             if alert.shutdown_scheduled && alert.state == AlertState::Inactive {
                 cancel_shutdown = true;
@@ -990,7 +1023,6 @@ impl AlertController {
         if outcomes.suppressed.not() {
             return None;
         }
-        alert.state = alert.worst_of_visible();
         if alert.state != AlertState::Inactive {
             return None;
         }
@@ -1621,6 +1653,27 @@ mod tests {
         assert_eq!(alert.source_states.len(), 2);
     }
 
+    #[test]
+    fn normalize_sources_trims_beyond_the_source_maximum() {
+        // Goal: the cap has to hold on the load path, not only at the API. A hand-edited
+        // alerts.json never passes the API's check, and every tick walks these sources.
+        // Method: hand an alert twice the maximum and assert it is trimmed rather than
+        // rejected, since one malformed alert must not stop the rest of the file loading.
+        let mut alert = make_alert("a", 0.0, 1000.0, AlertState::Inactive);
+        alert.channel_sources = (0..MAX_ALERT_SOURCES * 2)
+            .map(|i| make_source(&format!("fan{i}"), ChannelMetric::RPM))
+            .collect();
+
+        alert.normalize_sources();
+
+        assert_eq!(alert.channel_sources.len(), MAX_ALERT_SOURCES);
+        assert_eq!(alert.source_states.len(), MAX_ALERT_SOURCES);
+        assert_eq!(
+            alert.channel_source, alert.channel_sources[0],
+            "the legacy mirror still tracks the first surviving source"
+        );
+    }
+
     // -- build_transition_event tests --
 
     #[test]
@@ -1648,7 +1701,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(matches!(event.kind, AlertEventKind::Triggered));
         assert_eq!(event.message, "fan1: 0 too low; fan2: 10 too low");
         assert_eq!(event.alert.state, AlertState::Active);
@@ -1697,7 +1750,7 @@ mod tests {
         assert_eq!(event.alert.state, AlertState::Active);
         assert!(alert.notified, "episode continues until all sources clear");
         assert!(
-            !event.notify_desktop,
+            event.notify_desktop.not(),
             "a partial recovery must not announce resolved while still firing"
         );
         assert!(event.log, "the per-source recovery still reaches the log");
@@ -1740,7 +1793,7 @@ mod tests {
             resolved: vec!["temp1: back in range".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(matches!(event.kind, AlertEventKind::Resolved));
         assert_eq!(event.alert.state, AlertState::Inactive);
         assert!(event.notify_desktop);
@@ -1781,7 +1834,7 @@ mod tests {
         assert!(!event.fire_shutdown);
         assert!(!alert.shutdown_scheduled);
         assert!(
-            !alert.notified,
+            alert.notified.not(),
             "a silenced fire leaves the catch-up pending"
         );
         assert!(event.log);
@@ -1798,7 +1851,7 @@ mod tests {
             fired: vec!["temp1: 90 too high".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(event.fire_shutdown);
         assert!(alert.shutdown_scheduled);
 
@@ -1822,7 +1875,7 @@ mod tests {
             resolved: vec!["temp1: back in range".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(event.cancel_shutdown);
         assert!(!alert.shutdown_scheduled);
     }
@@ -1837,10 +1890,42 @@ mod tests {
             errors: vec!["temp1: Device not found".to_string()],
             ..Default::default()
         };
-        let event = AlertController::build_transition_event(&mut alert, &outcomes).unwrap();
+        let event = AlertController::process_alert(&mut alert, &outcomes).unwrap();
         assert!(matches!(event.kind, AlertEventKind::SourceError));
         assert_eq!(event.alert.state, AlertState::Error);
         assert!(event.notify_desktop);
+    }
+
+    #[test]
+    fn process_alert_clears_error_state_over_silent_transitions() {
+        // Goal: an alert whose source recovers through the silent timer hops must not
+        // strand its aggregate state at Error. `transition_kind` classifies both
+        // Error -> WarmUp and WarmUp -> Inactive as silent, so neither tick produces an
+        // event; the aggregate has to follow the source states regardless. Method: drive
+        // the source through the three states with empty outcomes and assert the
+        // aggregate tracks each one.
+        let mut alert = make_alert("a", 20.0, 80.0, AlertState::Error);
+        alert.source_states = vec![AlertState::Error];
+        let quiet = SourceOutcomes::default();
+
+        // The unreadable tick: aggregate reports Error, as the source does.
+        assert!(AlertController::process_alert(&mut alert, &quiet).is_none());
+        assert_eq!(alert.state, AlertState::Error);
+
+        // Reading resumes out of range: the source starts its warm-up, which is
+        // wire-visible as Inactive. Silent hop, no event.
+        alert.source_states = vec![AlertState::WarmUp(Local::now())];
+        assert!(AlertController::process_alert(&mut alert, &quiet).is_none());
+        assert_eq!(
+            alert.state,
+            AlertState::Inactive,
+            "aggregate stranded at Error across a silent hop"
+        );
+
+        // Back in range for good.
+        alert.source_states = vec![AlertState::Inactive];
+        assert!(AlertController::process_alert(&mut alert, &quiet).is_none());
+        assert_eq!(alert.state, AlertState::Inactive);
     }
 
     // -- build_quiet_event tests (silence expiry, shutdown re-arm, repeat) --
@@ -2129,7 +2214,7 @@ mod tests {
         };
         let json = serde_json::to_string(&config).unwrap();
         assert!(
-            !json.contains("\"logs\""),
+            json.contains("\"logs\"").not(),
             "logs must not appear in config JSON"
         );
         let parsed: AlertConfigFile = serde_json::from_str(&json).unwrap();

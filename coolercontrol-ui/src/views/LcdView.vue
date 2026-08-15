@@ -487,10 +487,13 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
     })
 }
 
-onMounted(async () => {
+onMounted(() => {
     onBeforeRouteUpdate(checkForUnsavedChanges)
     onBeforeRouteLeave(checkForUnsavedChanges)
-    await loadSavedImage()
+    // Every watch below is registered synchronously. A watch() created after an await sits
+    // outside the component's effect scope, so it is never stopped on unmount: each visit
+    // to an LCD channel left another live watcher calling updateTemps() on every status
+    // tick, against an orphaned tempSources snapshot it then threw on.
     watch(rawStore.currentDeviceStatus, () => {
         updateTemps()
     })
@@ -511,10 +514,16 @@ onMounted(async () => {
             contextIsDirty.value = true
         },
     )
-
-    addScrollEventListeners()
     watch(selectedLcdMode, (): void => {
         nextTick(addScrollEventListeners)
+    })
+
+    void loadSavedImage().then(async (): Promise<void> => {
+        addScrollEventListeners()
+        await nextTick()
+        // Seeding the saved image pushes a data URL, which the watcher above reads as an
+        // edit. The page matches the daemon at this point, so that flag is stale.
+        contextIsDirty.value = false
     })
 })
 

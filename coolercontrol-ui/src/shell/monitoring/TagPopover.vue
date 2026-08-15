@@ -129,7 +129,7 @@ const deleteTag = (tagName: string): void => {
 }
 
 const inputClasses =
-    'h-8 min-w-0 flex-1 rounded-lg border border-border-one bg-bg-one px-2 text-sm text-text-color outline-none focus:ring-2 focus:ring-accent'
+    'h-8 min-w-0 flex-1 rounded-lg border border-border-one bg-control px-2 text-sm text-text-color outline-none focus:ring-2 focus:ring-accent'
 </script>
 
 <template>

@@ -4,9 +4,13 @@
 // Every static translation key used by shell code must resolve in the
 // english locale. Template-literal (dynamic) keys are not covered.
 
+// devices.ts pulls in Device.ts, whose class-transformer decorators need the polyfill.
+import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
 import { TOUR_KEY_PREFIX, TOUR_STEPS } from '@/shell/tour.ts'
+import { SENSOR_LINK_KINDS } from '@/shell/devices/devices.ts'
+import { CHAIN_PILL_KINDS } from '@/shell/cooling/channels.ts'
 
 const shellFiles = import.meta.glob('../**/*.{ts,vue}', {
     query: '?raw',
@@ -119,6 +123,28 @@ describe('shell i18n keys', () => {
             'models.interfaceFont.bundled',
             'models.interfaceFont.system',
         ]
+        const missing: string[] = []
+        for (const [path, module] of locales) {
+            for (const key of keys) {
+                if (!resolves(module.default, key)) missing.push(`${path}: ${key}`)
+            }
+        }
+        expect(missing).toEqual([])
+    })
+
+    // ChainStrip and DevicePage build these keys as template literals, so the static sweep
+    // above cannot see them and neither can an unused-key prune. Both sets are driven from
+    // the same exported arrays the components use, so the check cannot drift from the code.
+    it('resolves every dynamic chain and sensor destination key in every locale', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        expect(locales).toHaveLength(LOCALE_COUNT)
+
+        const keys = [
+            ...CHAIN_PILL_KINDS.map((kind) => `layout.shell.coolingPage.chain.${kind}`),
+            ...SENSOR_LINK_KINDS.map((kind) => `layout.shell.sensorDest.${kind}`),
+        ]
+        expect(keys.length).toBe(CHAIN_PILL_KINDS.length + SENSOR_LINK_KINDS.length)
+
         const missing: string[] = []
         for (const [path, module] of locales) {
             for (const key of keys) {

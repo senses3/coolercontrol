@@ -9,7 +9,7 @@ import SvgIcon from '@jamescoyle/vue-icon'
 import { Function, FunctionType } from '@/models/Profile'
 import { type UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { computed, inject, nextTick, onMounted, onUnmounted, ref, type Ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, type Ref, watch } from 'vue'
 import { useToast } from '@/shell/toast'
 import {
     mdiAlertOutline,
@@ -141,54 +141,6 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     return false
 }
 
-const minDutyScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenStepDutyMinimum.value < chosenStepDutyMaximum.value)
-            chosenStepDutyMinimum.value += 1
-    } else {
-        if (chosenStepDutyMinimum.value > dutyMin) chosenStepDutyMinimum.value -= 1
-    }
-}
-const maxDutyScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenStepDutyMaximum.value < dutyMax) chosenStepDutyMaximum.value += 1
-    } else {
-        if (chosenStepDutyMaximum.value > chosenStepDutyMinimum.value)
-            chosenStepDutyMaximum.value -= 1
-    }
-}
-const stepMinDecreaseScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenStepSizeMinDecreasing.value < chosenStepSizeMaxDecreasing.value)
-            chosenStepSizeMinDecreasing.value += 1
-    } else {
-        if (chosenStepSizeMinDecreasing.value > dutyMin) chosenStepSizeMinDecreasing.value -= 1
-    }
-}
-
-const stepMaxDecreaseScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenStepSizeMaxDecreasing.value < dutyMax) chosenStepSizeMaxDecreasing.value += 1
-    } else {
-        if (chosenStepSizeMaxDecreasing.value > chosenStepSizeMinDecreasing.value)
-            chosenStepSizeMaxDecreasing.value -= 1
-    }
-}
-const devianceScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenDeviance.value < devianceMax) chosenDeviance.value += 0.1
-    } else {
-        if (chosenDeviance.value > devianceMin) chosenDeviance.value -= 0.1
-    }
-}
-const delayScrolled = (event: WheelEvent) => {
-    if (event.deltaY < 0) {
-        if (chosenDelay.value < delayMax) chosenDelay.value += 1
-    } else {
-        if (chosenDelay.value > delayMin) chosenDelay.value -= 1
-    }
-}
-
 // const inputArea = ref()
 // nextTick(async () => {
 //     const delay = () => new Promise((resolve) => setTimeout(resolve, 100))
@@ -204,10 +156,6 @@ const updateFixedStepSize = () => {
         if (chosenStepSizeMaxDecreasing.value < chosenStepSizeMinDecreasing.value) {
             chosenStepSizeMaxDecreasing.value = chosenStepSizeMinDecreasing.value
         }
-        nextTick(() => {
-            removeScrollEventListeners()
-            addScrollEventListeners()
-        })
     }
 }
 const updateSymmetricStepSize = () => {
@@ -217,49 +165,7 @@ const updateSymmetricStepSize = () => {
         }
         if (chosenStepSizeMinDecreasing.value === 0) chosenStepSizeMinDecreasing.value = 2
         if (chosenStepSizeMaxDecreasing.value === 0) chosenStepSizeMaxDecreasing.value = dutyMax
-        nextTick(() => {
-            removeScrollEventListeners()
-            addScrollEventListeners()
-        })
     }
-}
-
-const addScrollEventListeners = (): void => {
-    // @ts-ignore
-    document?.querySelector('.min-duty-input')?.addEventListener('wheel', minDutyScrolled)
-    // @ts-ignore
-    document?.querySelector('.max-duty-input')?.addEventListener('wheel', maxDutyScrolled)
-    document
-        ?.querySelector('.step-min-decrease-input')
-        // @ts-ignore
-        ?.addEventListener('wheel', stepMinDecreaseScrolled)
-    document
-        ?.querySelector('.step-max-decrease-input')
-        // @ts-ignore
-        ?.addEventListener('wheel', stepMaxDecreaseScrolled)
-    // @ts-ignore
-    document?.querySelector('.deviance-input')?.addEventListener('wheel', devianceScrolled)
-    // @ts-ignore
-    document?.querySelector('.delay-input')?.addEventListener('wheel', delayScrolled)
-}
-
-const removeScrollEventListeners = (): void => {
-    // @ts-ignore
-    document?.querySelector('.min-duty-input')?.removeEventListener('wheel', minDutyScrolled)
-    // @ts-ignore
-    document?.querySelector('.max-duty-input')?.removeEventListener('wheel', maxDutyScrolled)
-    document
-        ?.querySelector('.step-min-decrease-input')
-        // @ts-ignore
-        ?.removeEventListener('wheel', stepMinDecreaseScrolled)
-    document
-        ?.querySelector('.step-max-decrease-input')
-        // @ts-ignore
-        ?.removeEventListener('wheel', stepMaxDecreaseScrolled)
-    // @ts-ignore
-    document?.querySelector('.deviance-input')?.removeEventListener('wheel', devianceScrolled)
-    // @ts-ignore
-    document?.querySelector('.delay-input')?.removeEventListener('wheel', delayScrolled)
 }
 
 const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
@@ -302,8 +208,22 @@ const duplicateFunction = async (): Promise<void> => {
     newFunction.step_size_max_decreasing = source.step_size_max_decreasing
     newFunction.threshold_hopping = source.threshold_hopping
     newFunction.bypass_min_at_extremes = source.bypass_min_at_extremes
+    // saveFunction looks its subject up in the store, so the copy has to be pushed before
+    // it can be persisted. Take it back out when the save fails: a phantom entry would
+    // otherwise sit in the sidebar until a reload, and editing it would call
+    // updateFunction against a UID the daemon has never seen.
     settingsStore.functions.push(newFunction)
-    await settingsStore.saveFunction(newFunction.uid)
+    if (!(await settingsStore.saveFunction(newFunction.uid))) {
+        const index = settingsStore.functions.findIndex((fn) => fn.uid === newFunction.uid)
+        if (index >= 0) settingsStore.functions.splice(index, 1)
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: t('views.functions.functionError'),
+            life: 3000,
+        })
+        return
+    }
     toast.add({
         severity: 'success',
         summary: t('common.success'),
@@ -358,7 +278,6 @@ const usedByProfiles = computed(
 )
 
 onMounted(async () => {
-    addScrollEventListeners()
     watch(
         [
             chosenFixedStepSize,
@@ -379,9 +298,6 @@ onMounted(async () => {
     )
     onBeforeRouteUpdate(checkForUnsavedChanges)
     onBeforeRouteLeave(checkForUnsavedChanges)
-})
-onUnmounted(() => {
-    removeScrollEventListeners()
 })
 </script>
 

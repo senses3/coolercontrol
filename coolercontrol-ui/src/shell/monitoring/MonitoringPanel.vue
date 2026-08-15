@@ -6,6 +6,7 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { v4 as uuidV4 } from 'uuid'
 import {
     mdiAlert,
     mdiBellOffOutline,
@@ -186,10 +187,13 @@ const createAlert = (sensor: MonitoringSensor): void => {
     }
     router.push({
         name: 'monitoring-alert-new',
+        // `key` forces a remount: the path is identical between two create-alert clicks,
+        // so without it the editor keeps the previous sensor's prefill.
         query: {
             device: sensor.deviceUID,
             channel: sensor.channelName,
             metric: ChannelMetric.Temp,
+            key: uuidV4(),
         },
     })
 }

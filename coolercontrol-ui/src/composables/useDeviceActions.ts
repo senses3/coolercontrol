@@ -64,19 +64,31 @@ export function useDeviceActions() {
         })
     }
 
+    // A rejected save has to put the store back, as switchToHwmon already does. The
+    // caller compares its control against this value to decide what is pending, so
+    // leaving the refused value in place both strands the control in its new position
+    // and lets the next successful save from any surface persist the change silently.
     const setDirectAccess = (deviceUID: UID, value: boolean, onReject: () => void): void => {
         confirmRestart(async () => {
             const ccSetting = settingsStore.ccDeviceSettings.get(deviceUID)!
+            const previous = ccSetting.extensions.direct_access
             ccSetting.extensions.direct_access = value
-            await saveAndRestart(ccSetting)
+            if (!(await saveAndRestart(ccSetting))) {
+                ccSetting.extensions.direct_access = previous
+                onReject()
+            }
         }, onReject)
     }
 
     const setDelayMillis = (deviceUID: UID, value: number, onReject: () => void): void => {
         confirmRestart(async () => {
             const ccSetting = settingsStore.ccDeviceSettings.get(deviceUID)!
+            const previous = ccSetting.extensions.delay_millis
             ccSetting.extensions.delay_millis = value
-            await saveAndRestart(ccSetting)
+            if (!(await saveAndRestart(ccSetting))) {
+                ccSetting.extensions.delay_millis = previous
+                onReject()
+            }
         }, onReject)
     }
 
@@ -154,6 +166,41 @@ export function useDeviceActions() {
         return ccSetting
     }
 
+    // What one device's enable state looked like before `writeDeviceEnableState` touched
+    // it, so an edit the daemon refuses can be taken back out of the store.
+    type DeviceEnableSnapshot = {
+        deviceUID: UID
+        disable: boolean
+        channelDisabled: Map<string, boolean>
+    }
+
+    const snapshotDeviceEnableState = (deviceUID: UID): DeviceEnableSnapshot | null => {
+        const ccSetting = settingsStore.ccDeviceSettings.get(deviceUID)
+        if (ccSetting == null) return null
+        const channelDisabled = new Map<string, boolean>()
+        for (const [channelName, channelSettings] of ccSetting.channel_settings) {
+            channelDisabled.set(channelName, channelSettings.disabled)
+        }
+        return { deviceUID, disable: ccSetting.disable, channelDisabled }
+    }
+
+    const restoreDeviceEnableState = (snapshot: DeviceEnableSnapshot): void => {
+        const ccSetting = settingsStore.ccDeviceSettings.get(snapshot.deviceUID)
+        if (ccSetting == null) return
+        ccSetting.disable = snapshot.disable
+        for (const channelName of [...ccSetting.channel_settings.keys()]) {
+            // Entries writeDeviceEnableState created for this attempt were not persisted
+            // before, so they go rather than being reset.
+            if (!snapshot.channelDisabled.has(channelName)) {
+                ccSetting.channel_settings.delete(channelName)
+            }
+        }
+        for (const [channelName, disabled] of snapshot.channelDisabled) {
+            const channelSettings = ccSetting.channel_settings.get(channelName)
+            if (channelSettings != null) channelSettings.disabled = disabled
+        }
+    }
+
     // Batch sensor/device enable/disable across any number of devices,
     // preserving the old settings Device tab semantics: one confirm, then each
     // changed device is saved, then a single daemon restart on success. On
@@ -169,24 +216,39 @@ export function useDeviceActions() {
             icon: mdiAlertOutline,
             accept: async () => {
                 const settingsToSave: CoolerControlDeviceSettingsDTO[] = []
+                // Snapshots stay in step with settingsToSave, so a failure at index i
+                // knows exactly which devices were never persisted.
+                const snapshots: DeviceEnableSnapshot[] = []
                 for (const [deviceUID, edit] of edits) {
+                    const snapshot = snapshotDeviceEnableState(deviceUID)
                     const ccSetting = writeDeviceEnableState(
                         deviceUID,
                         edit.deviceEnabled,
                         edit.channelStates,
                     )
-                    if (ccSetting != null) settingsToSave.push(ccSetting)
+                    if (ccSetting != null && snapshot != null) {
+                        settingsToSave.push(ccSetting)
+                        snapshots.push(snapshot)
+                    }
                 }
                 if (settingsToSave.length === 0) {
                     onDone('failed')
                     return
                 }
-                for (const ccSetting of settingsToSave) {
+                for (const [index, ccSetting] of settingsToSave.entries()) {
                     const result = await deviceStore.daemonClient.saveCCDeviceSettings(
                         ccSetting.uid,
                         ccSetting,
                     )
                     if (result instanceof ErrorResponse) {
+                        // Only what was not persisted goes back: the devices saved before
+                        // this one are live in the daemon and the store must keep matching
+                        // them. Without this the caller re-seeds from a store holding
+                        // edits the daemon refused, showing them as current and computing
+                        // no pending changes.
+                        for (const stale of snapshots.slice(index)) {
+                            restoreDeviceEnableState(stale)
+                        }
                         toast.add({
                             severity: 'error',
                             summary: t('common.error'),

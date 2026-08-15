@@ -85,6 +85,7 @@ use bitflags::bitflags;
 use heck::ToTitleCase;
 use log::{debug, error, info, log, trace, warn};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::mem;
@@ -1304,7 +1305,8 @@ fn drop_ignored_channels(
 ) -> Vec<ChannelName> {
     let mut dropped = Vec::new();
     channels.retain(|channel| {
-        let Some(source) = overrides.sensors_conf_ignore_source(chip, &channel.name) else {
+        let feature = sensors_feature_name(channel);
+        let Some(source) = overrides.sensors_conf_ignore_source(chip, &feature) else {
             return true;
         };
         // `chip` is Some here: without it there is no configuration to match against.
@@ -1345,11 +1347,23 @@ fn resolve_channel_label(
     chip: Option<&ChipName>,
     channel: &HwmonChannelInfo,
 ) -> Option<String> {
-    if let Some((label, source)) = overrides.sensors_conf_label_source(chip, &channel.name) {
-        log_applied_label(chip, &channel.name, label, source);
+    let feature = sensors_feature_name(channel);
+    if let Some((label, source)) = overrides.sensors_conf_label_source(chip, &feature) {
+        log_applied_label(chip, &feature, label, source);
         return Some(label.to_owned());
     }
     channel.label.clone()
+}
+
+/// The libsensors feature name a sensors.conf statement matches against. Temps and fans
+/// already carry it as their channel name, but a power channel is named after the raw
+/// sysfs file it reads (`power1_average`, `power1_input`), whose feature name is `power1`.
+/// Matching on the file name meant the canonical `ignore power1` silently did nothing.
+fn sensors_feature_name(channel: &HwmonChannelInfo) -> Cow<'_, str> {
+    match channel.hwmon_type {
+        HwmonChannelType::Power => Cow::Owned(format!("power{}", channel.number)),
+        _ => Cow::Borrowed(&channel.name),
+    }
 }
 
 /// Reports a label applied from the user's lm-sensors configuration, naming the file that set it
@@ -5730,6 +5744,53 @@ mod sensors_conf_tests {
             name: name.to_owned(),
             ..Default::default()
         }
+    }
+
+    /// A power channel is named after the sysfs file it reads, not its feature.
+    fn power_channel(number: u8, file_name: &str) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Power,
+            number,
+            name: file_name.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    /// Goal: `ignore power1` must drop the power channel. A power channel carries the raw
+    /// sysfs file name (`power1_average`), so matching the channel name against the feature
+    /// name never hit and the canonical statement silently did nothing, while the same
+    /// statement worked for fans and temps on the same chip.
+    #[test]
+    fn an_ignored_power_channel_is_dropped_by_its_feature_name() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n ignore power1\n",
+        ));
+        let mut channels = vec![
+            power_channel(1, "power1_average"),
+            power_channel(2, "power2_input"),
+            fan_channel("fan1"),
+        ];
+
+        let dropped = drop_ignored_channels(&overrides, Some(&nct6687()), &mut channels);
+
+        assert_eq!(dropped, vec!["power1_average".to_string()]);
+        let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["power2_input", "fan1"]);
+    }
+
+    /// Goal: the same feature-name resolution applies to labels, so a `label power1 "..."`
+    /// reaches the power channel it names.
+    #[test]
+    fn a_power_channel_label_resolves_by_its_feature_name() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label power1 \"Package\"\n",
+        ));
+        let power = power_channel(1, "power1_average");
+
+        assert_eq!(
+            resolve_channel_label(&overrides, Some(&nct6687()), &power),
+            Some("Package".to_owned())
+        );
     }
 
     /// Goal: an `ignore` statement must remove exactly the channel it names, and say how many it

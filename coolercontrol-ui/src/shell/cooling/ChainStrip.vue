@@ -18,9 +18,10 @@ import {
 } from '@mdi/js'
 import { useI18n } from 'vue-i18n'
 import type { RouteLocationRaw } from 'vue-router'
+import type { ChainPillKind } from '@/shell/cooling/channels.ts'
 
 export interface ChainPill {
-    kind: 'tempSource' | 'profile' | 'function'
+    kind: ChainPillKind
     label: string
     to?: RouteLocationRaw
     /** The sensor's own chart color, so the chain reads as the same entity. */

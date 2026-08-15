@@ -68,7 +68,12 @@ export function deviceChannelLinks(device: Device): DeviceChannelLink[] {
 // Where a device channel/sensor is viewed or controlled. Read-only sensors go
 // to Monitoring; controllable channels to Cooling; lighting and LCD to their
 // own editors.
-export type SensorLinkKind = 'monitoring' | 'cooling' | 'lighting' | 'lcd'
+// Enumerable at runtime on purpose: each kind names a `layout.shell.sensorDest.*`
+// translation key that only ever appears as a template literal, which an unused-key
+// sweep cannot see. The i18n spec walks this array so a prune cannot silently drop them.
+export const SENSOR_LINK_KINDS = ['monitoring', 'cooling', 'lighting', 'lcd'] as const
+
+export type SensorLinkKind = (typeof SENSOR_LINK_KINDS)[number]
 
 export interface DeviceSensorLink {
     channelName: string

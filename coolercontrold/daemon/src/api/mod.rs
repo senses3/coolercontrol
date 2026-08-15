@@ -1352,7 +1352,10 @@ mod tests {
                 .unwrap_or_default()
         };
         let (in_file, in_daemon) = (paths(&checked_in), paths(&generated));
-        let only_in_daemon: Vec<_> = in_daemon.iter().filter(|p| !in_file.contains(p)).collect();
+        let only_in_daemon: Vec<_> = in_daemon
+            .iter()
+            .filter(|p| in_file.contains(p).not())
+            .collect();
         let only_in_file: Vec<_> = in_file.iter().filter(|p| !in_daemon.contains(p)).collect();
         panic!(
             "openapi/openapi.json is out of date. Regenerate it with `make openapi`.\n\

@@ -37,7 +37,7 @@ const copyResetCommand = async (): Promise<void> => {
         })
     } catch {
         // Clipboard write may fail (insecure context, permissions); silently
-        // ignore — the command is still visible for manual selection.
+        // ignore: the command is still visible for manual selection.
     }
 }
 

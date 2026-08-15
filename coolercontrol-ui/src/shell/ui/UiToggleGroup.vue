@@ -36,7 +36,7 @@ const groupModel = computed<string>({
             :key="option.value"
             :value="option.value"
             :disabled="option.disabled"
-            class="cursor-pointer whitespace-nowrap rounded-md px-3 py-1 text-base text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:bg-accent data-[state=on]:text-bg-one data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            class="cursor-pointer whitespace-nowrap rounded-md px-3 py-1 text-base text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent data-[state=on]:bg-accent data-[state=on]:text-accent-fg data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
         >
             {{ option.label }}
         </ToggleGroupItem>
