@@ -7,7 +7,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiSourceFork } from '@mdi/js'
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useConfirm } from '@/shell/confirm'
 import { useCalibrationConversion } from '@/composables/useCalibrationConversion.ts'
@@ -18,7 +18,7 @@ import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
 import { useChannelControl } from '@/shell/cooling/useChannelControl.ts'
 import { fitProfileName } from '@/shell/cooling/profileNames.ts'
 import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
-import { curveOwnership, seedTempSource } from '@/shell/simple/simpleCurve.ts'
+import { curveOwnership, findOwnCurve, seedTempSource } from '@/shell/simple/simpleCurve.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import type { UID } from '@/models/Device.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
@@ -67,6 +67,21 @@ const controlModeOptions = computed(() => [
 ])
 
 const ownership = computed(() => curveOwnership(selectedProfile.value, sharedChannels.value.length))
+
+// The name a curve made here carries, and so how one made here earlier is found
+// again. The suffix carries its own leading separator, for locales to word.
+const ownCurveName = computed(() =>
+    fitProfileName(channelLabel.value, t('layout.shell.simple.curveNameSuffix')),
+)
+
+// Turning a fan back to a curve picks up the one it had, rather than asking for
+// another: a fixed speed drops the assignment, and there is no picker here to
+// put it back. Nothing is written until Apply.
+watch(controlMode, (mode) => {
+    if (mode !== 'automatic' || selectedProfileUID.value != null) return
+    const own = findOwnCurve(settingsStore.profiles, ownCurveName.value)
+    if (own != null) selectedProfileUID.value = own.uid
+})
 
 const conversion = useCalibrationConversion(
     props.deviceUID,
@@ -134,8 +149,7 @@ const createSeededCurve = async (): Promise<Profile | undefined> => {
     )?.info
     if (info == null) return undefined
     const profile = new Profile(
-        // The suffix carries its own leading separator so each locale can word it.
-        fitProfileName(channelLabel.value, t('layout.shell.simple.curveNameSuffix')),
+        ownCurveName.value,
         ProfileType.Graph,
         undefined,
         tempSource,

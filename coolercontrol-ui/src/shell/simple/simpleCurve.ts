@@ -33,6 +33,23 @@ export function curveOwnership(
 }
 
 /**
+ * The curve this fan made for itself, found by the name one made here carries.
+ *
+ * Switching a fan to a fixed speed drops its profile assignment, and the simple
+ * interface has no profile picker to get it back with, so without this the
+ * curve is stranded and the user draws another one. Matching on the name is
+ * what there is to match on: the daemon records no history of what a channel
+ * used to run. A renamed fan or a renamed curve therefore parts with it, which
+ * costs a new curve rather than anything already applied.
+ */
+export function findOwnCurve(profiles: Iterable<Profile>, name: string): Profile | undefined {
+    for (const profile of profiles) {
+        if (profile.p_type === ProfileType.Graph && profile.name === name) return profile
+    }
+    return undefined
+}
+
+/**
  * The temp a new curve follows: the one the fan already follows, else a temp on
  * the fan's own device (an AIO's liquid temp, a GPU's core temp), else the
  * CPU's, else whatever the system has. A Graph profile the daemon will accept
