@@ -16,6 +16,10 @@ Release notes are automatically generated from this file and git tags.
 
 - Rebuilt application UI shell: Home, Cooling, Monitoring, Devices, Plugins and Settings sections,
   with a persistent icon rail, per-section side panels, and landing pages for each area
+- A Simple interface alongside the full one: a slim Home, a Fans section with a per-fan curve editor
+  and no visible profile or function management, and a Sensors section. It is switched from the
+  header, has its own product tour, and is the default for fresh configurations; existing
+  configurations stay on the full interface and switching either way is lossless
 - Mobile layout with bottom navigation, a header overflow menu for the Access, Power and Plugins
   menus, a dashboard switcher, and responsive editors throughout
 - Consolidated channel page in the Cooling section: embedded profile editor, mini curve previews,
@@ -30,6 +34,10 @@ Release notes are automatically generated from this file and git tags.
   their curves are mapped through calibration, and sweeps skip the clamped duty band
 - Calibration state and firmware-curve status are shown on cooling channel cards, with the curve
   dialog acting as the calibration hub
+- A calibrated fan's settings can be converted to true duty from its channel page, backed by a new
+  daemon duty-map endpoint, asking for confirmation before forking a shared profile and showing fork
+  and sharing state on every channel
+- Progress bars in the calibration wizard
 - Device health tracking: a daemon-side registry of failsafed channels and missing or stale temp
   sources, surfaced as menu badges, a health panel, entity-page warnings, and a Home status dot,
   split into permanently unsupported and currently degraded sections
@@ -64,6 +72,11 @@ Release notes are automatically generated from this file and git tags.
 - Backup CLI: archive, restore, list, rotated backup and config-check subcommands
 - Bulk device and sensor enable/disable editor
 - Target versus actual duty in the Mix profile editor
+- Actual fan duty drawn alongside the curve on Graph profile charts, live duty lines on the profile
+  overlay chart, and a points-table corner remembered per profile
+- A reconnecting screen when the daemon connection drops, with the wait scaled to the poll rate and
+  a desktop-app notification once the daemon has been unreachable for ten seconds
+- Channels remember the profile they last ran, and offer it back after a spell at a fixed speed
 - Temperature and power readings shown during stress tests
 - Per-channel failsafes for service plugin devices
 - Section hotkeys, a configurable startup page, and a menu collapse button in the header
@@ -104,6 +117,12 @@ Release notes are automatically generated from this file and git tags.
 - Idle liqctld connections are reaped, and NVML is released when all GPUs are disabled or none are
   detected
 - NVAPI thermal lookups and PCI bus lookups are cached
+- LCD frames are packed in C and sent in a single transfer, the per-apply re-initialize was dropped,
+  and single-temp images are rendered off the async runtime, so an LCD update costs far less
+- Sysfs descriptors are held across ticks, sysfs values are read without heap allocation, and Time
+  Average and EMA custom sensors keep a cached sample window, lowering per-tick overhead
+- liqctld reports each LCD's model, device path and framebuffer packing, and logs why a frame skips
+  the rotation
 - Live chart animation is throttled and paused off-screen
 - The Makefiles were split and documented behind `make help`
 - protoc is no longer a build dependency; protox generates the gRPC code
@@ -125,6 +144,13 @@ Release notes are automatically generated from this file and git tags.
 - GPU stress tests now run off the async runtime and are judged by power draw, fixing newer cards
 - Settings are skipped for channels a device no longer offers, instead of erroring
 - Generated curve floors are clamped to the channel minimum so a low floor cannot stall a fan
+- Kraken LCD writes could take a stale HID report as their answer, which surfaced as missing
+  messages and bucket-switch errors while an image was uploading
+- Single-temp LCD images were rendered to one shared file, so two LCD channels could tear each
+  other's image or display the wrong sensor
+- Deleting a child custom sensor stripped its parent's other sources
+- Calibration trusts a fan's RPM over a sub-floor stall reading, derives the sustain floor across
+  misaligned sweeps, and corrects the inverse duty map's boundaries
 - Duplicate device UIDs no longer drop devices from AMD and liquidctl repositories
 - Name overrides survive a save error instead of losing the cascade
 - REST and gRPC server startup are decoupled, so one failing does not block the other
