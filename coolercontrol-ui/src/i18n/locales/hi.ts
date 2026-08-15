@@ -190,6 +190,8 @@ export default {
                     'यह चैनल डिवाइस या उसके फर्मवेयर द्वारा नियंत्रित होता है। CoolerControl कोई गति कमांड नहीं भेजेगा।',
                 apply: 'लागू करें',
                 saveAndApply: 'सहेजें और लागू करें',
+                unsavedChanges: 'इस चैनल में ऐसे परिवर्तन हैं जो लागू नहीं किए गए हैं।',
+                unsavedChangesHeader: 'सहेजे नहीं गए परिवर्तन',
                 selectProfile: 'एक प्रोफ़ाइल चुनें',
                 sharedWith: '{count} अन्य के साथ साझा',
                 sharedTooltip: 'यह प्रोफ़ाइल अन्य चैनलों को भी चलाती है।',

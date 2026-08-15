@@ -194,6 +194,8 @@ export default {
                     "L'appareil ou son firmware contrôle ce canal. CoolerControl n'enverra aucune commande de vitesse.",
                 apply: 'Appliquer',
                 saveAndApply: 'Enregistrer et appliquer',
+                unsavedChanges: "Des modifications de ce canal n'ont pas été appliquées.",
+                unsavedChangesHeader: 'Modifications non enregistrées',
                 selectProfile: 'Sélectionner un profil',
                 sharedWith: 'Partagé avec {count} autres',
                 sharedTooltip: "Ce profil pilote également d'autres canaux.",

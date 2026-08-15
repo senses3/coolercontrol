@@ -189,6 +189,8 @@ export default {
                     'The device or its firmware controls this channel. CoolerControl will not send any speed commands.',
                 apply: 'Apply',
                 saveAndApply: 'Save & Apply',
+                unsavedChanges: 'There are changes to this channel that have not been applied.',
+                unsavedChangesHeader: 'Unsaved Changes',
                 selectProfile: 'Select a profile',
                 sharedWith: 'Shared with {count} more',
                 sharedTooltip: 'This profile also drives other channels.',

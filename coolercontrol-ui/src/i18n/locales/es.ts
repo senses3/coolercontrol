@@ -192,6 +192,8 @@ export default {
                     'El dispositivo o su firmware controla este canal. CoolerControl no enviará ningún comando de velocidad.',
                 apply: 'Aplicar',
                 saveAndApply: 'Guardar y Aplicar',
+                unsavedChanges: 'Hay cambios en este canal que no se han aplicado.',
+                unsavedChangesHeader: 'Cambios sin guardar',
                 selectProfile: 'Seleccionar un perfil',
                 sharedWith: 'Compartido con {count} más',
                 sharedTooltip: 'Este perfil también controla otros canales.',

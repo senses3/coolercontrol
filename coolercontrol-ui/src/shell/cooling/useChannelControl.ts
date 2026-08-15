@@ -159,14 +159,21 @@ export function useChannelControl(deviceUID: UID, channelName: string) {
         return daemonSetting.value?.profile_uid !== selectedProfileUID.value
     })
 
-    const canApply = computed<boolean>(() => {
-        if (!controllable.value || applying.value) return false
+    // Everything apply would write. A control mode is chosen on the page and
+    // only reaches the daemon on apply, so this is also what makes leaving the
+    // page a loss.
+    const isDirty = computed<boolean>(() => {
+        if (!controllable.value) return false
         if (controlMode.value === 'automatic') {
+            // Curve mode with nothing chosen has nothing to write, so there is
+            // nothing to lose either.
             if (selectedProfileUID.value == null) return false
             return assignmentDirty.value || editorDirty.value
         }
         return assignmentDirty.value
     })
+
+    const canApply = computed<boolean>(() => isDirty.value && !applying.value)
 
     const apply = async (): Promise<void> => {
         if (applying.value) return
@@ -228,6 +235,7 @@ export function useChannelControl(deviceUID: UID, channelName: string) {
         setExtensionSettingsRef,
         editorDirty,
         assignmentDirty,
+        isDirty,
         canApply,
         apply,
     }

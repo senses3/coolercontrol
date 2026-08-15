@@ -35,6 +35,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChainStrip, { type ChainPill } from '@/shell/cooling/ChainStrip.vue'
 import { useChannelControl } from '@/shell/cooling/useChannelControl.ts'
+import { useUnappliedGuard } from '@/shell/cooling/useUnappliedGuard.ts'
 import ChannelSetupMenu from '@/shell/cooling/ChannelSetupMenu.vue'
 import ControlFlowTree from '@/shell/cooling/ControlFlowTree.vue'
 import { controlFlowExpanded as flowExpanded } from '@/shell/cooling/controlFlowState.ts'
@@ -80,9 +81,12 @@ const {
     setEditorRef,
     setExtensionSettingsRef,
     editorDirty,
+    isDirty,
     canApply,
     apply,
 } = useChannelControl(props.deviceUID, props.channelName)
+
+useUnappliedGuard(isDirty)
 
 const controlModeOptions = computed(() => [
     { label: t('layout.shell.coolingPage.modeProfile'), value: 'automatic' },
@@ -412,7 +416,7 @@ if (channelDashboard.value.dataTypes.length > 0) {
                 />
                 <UiButton
                     class="ml-auto"
-                    :class="{ 'animate-pulse-fast': editorDirty }"
+                    :class="{ 'animate-pulse-fast': isDirty }"
                     :disabled="!canApply"
                     @click="apply"
                 >

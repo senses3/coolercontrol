@@ -189,6 +189,8 @@ export default {
                     'デバイスまたはそのファームウェアがこのチャンネルを制御します。CoolerControlは速度コマンドを送信しません。',
                 apply: '適用',
                 saveAndApply: '保存して適用',
+                unsavedChanges: 'このチャンネルには適用されていない変更があります。',
+                unsavedChangesHeader: '未保存の変更',
                 selectProfile: 'プロファイルを選択',
                 sharedWith: '他{count}件と共有中',
                 sharedTooltip: 'このプロファイルは他のチャンネルも制御しています。',

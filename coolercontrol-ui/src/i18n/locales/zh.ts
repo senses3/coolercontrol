@@ -188,6 +188,8 @@ export default {
                 unmanagedHint: '该设备或其固件控制此通道。CoolerControl 将不会发送任何速度命令。',
                 apply: '应用',
                 saveAndApply: '保存并应用',
+                unsavedChanges: '此通道有尚未应用的更改。',
+                unsavedChangesHeader: '未保存的更改',
                 selectProfile: '选择配置文件',
                 sharedWith: '另与 {count} 个共享',
                 sharedTooltip: '此配置文件还驱动其他通道。',

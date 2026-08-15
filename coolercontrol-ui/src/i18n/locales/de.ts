@@ -193,6 +193,8 @@ export default {
                     'Das Gerät oder seine Firmware steuert diesen Kanal. CoolerControl sendet keine Drehzahlbefehle.',
                 apply: 'Anwenden',
                 saveAndApply: 'Speichern & Anwenden',
+                unsavedChanges: 'An diesem Kanal gibt es Änderungen, die nicht angewendet wurden.',
+                unsavedChangesHeader: 'Nicht gespeicherte Änderungen',
                 selectProfile: 'Profil auswählen',
                 sharedWith: 'Geteilt mit {count} weiteren',
                 sharedTooltip: 'Dieses Profil steuert auch andere Kanäle.',

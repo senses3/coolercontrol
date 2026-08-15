@@ -16,6 +16,7 @@ import HealthWarning from '@/components/HealthWarning.vue'
 import SpeedFixedChart from '@/components/SpeedFixedChart.vue'
 import ChannelVerdictNotice from '@/shell/cooling/ChannelVerdictNotice.vue'
 import { useChannelControl } from '@/shell/cooling/useChannelControl.ts'
+import { useUnappliedGuard } from '@/shell/cooling/useUnappliedGuard.ts'
 import { fitProfileName } from '@/shell/cooling/profileNames.ts'
 import { defaultGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 import { curveOwnership, seedTempSource } from '@/shell/simple/simpleCurve.ts'
@@ -56,9 +57,12 @@ const {
     applying,
     setEditorRef,
     editorDirty,
+    isDirty,
     canApply,
     apply,
 } = useChannelControl(props.deviceUID, props.channelName)
+
+useUnappliedGuard(isDirty)
 
 const controlModeOptions = computed(() => [
     { label: t('layout.shell.simple.modeCurve'), value: 'automatic' },
@@ -203,7 +207,7 @@ const onPageWheelCapture = (event: WheelEvent): void => {
                 <UiToggleGroup v-model="controlMode" :options="controlModeOptions" />
                 <UiButton
                     class="ml-auto"
-                    :class="{ 'animate-pulse-fast': editorDirty }"
+                    :class="{ 'animate-pulse-fast': isDirty }"
                     :disabled="!canApply"
                     @click="apply"
                 >

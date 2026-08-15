@@ -268,6 +268,38 @@ describe('channel control', () => {
         expect(control.selectedProfileUID.value).toBe('profile-b')
     })
 
+    // Choosing a control mode writes nothing on its own, so the page has to
+    // report that there is something to apply. Without it a user sets a fixed
+    // speed, leaves, and the fan carries on as it was.
+    it('counts a control mode change as something to apply', async () => {
+        const settings = useFakeSettingsStore()
+        settings.profiles.push({ uid: 'profile-a', name: 'Quiet' })
+        settings.reload([[CHANNEL, reading({ profile_uid: 'profile-a' })]])
+        const control = useChannelControl(DEVICE, CHANNEL)
+        expect(control.isDirty.value).toBe(false)
+
+        control.controlMode.value = 'manual'
+        expect(control.isDirty.value).toBe(true)
+
+        control.controlMode.value = 'unmanaged'
+        expect(control.isDirty.value).toBe(true)
+
+        control.controlMode.value = 'automatic'
+        await nextTick()
+        expect(control.isDirty.value).toBe(false)
+    })
+
+    it('has nothing to apply when curve mode has no curve to write', async () => {
+        const settings = useFakeSettingsStore()
+        settings.reload([[CHANNEL, reading({ speed_fixed: 40 })]])
+        const control = useChannelControl(DEVICE, CHANNEL)
+
+        control.controlMode.value = 'automatic'
+        await nextTick()
+        expect(control.selectedProfileUID.value).toBeUndefined()
+        expect(control.isDirty.value).toBe(false)
+    })
+
     // The embedded profile editor saves through the page's apply, and a save its
     // own validation rejected must not be followed by an assignment.
     it('saves a dirty editor first and stops when the save was rejected', async () => {

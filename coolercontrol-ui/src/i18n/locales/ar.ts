@@ -189,6 +189,8 @@ export default {
                     'يتحكم الجهاز أو برنامجه الثابت في هذه القناة. لن يرسل CoolerControl أي أوامر سرعة.',
                 apply: 'تطبيق',
                 saveAndApply: 'حفظ وتطبيق',
+                unsavedChanges: 'توجد تغييرات على هذه القناة لم يتم تطبيقها.',
+                unsavedChangesHeader: 'تغييرات غير محفوظة',
                 selectProfile: 'اختر ملفًا شخصيًا',
                 sharedWith: 'مُشترَك مع {count} أخرى',
                 sharedTooltip: 'يشغّل هذا الملف الشخصي قنوات أخرى أيضًا.',

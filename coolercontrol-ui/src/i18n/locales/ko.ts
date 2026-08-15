@@ -189,6 +189,8 @@ export default {
                     '장치 또는 펌웨어가 이 채널을 제어합니다. CoolerControl은 속도 명령을 전송하지 않습니다.',
                 apply: '적용',
                 saveAndApply: '저장 및 적용',
+                unsavedChanges: '이 채널에 적용되지 않은 변경 사항이 있습니다.',
+                unsavedChangesHeader: '저장하지 않은 변경 사항',
                 selectProfile: '프로파일 선택',
                 sharedWith: '다른 {count}개와 공유됨',
                 sharedTooltip: '이 프로파일은 다른 채널도 구동합니다.',

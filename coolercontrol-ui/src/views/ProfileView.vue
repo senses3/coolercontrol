@@ -2343,8 +2343,12 @@ onMounted(async () => {
         if (selectedType.value !== ProfileType.Fixed) return
         if (duty !== currentProfile.value.speed_fixed) contextIsDirty.value = true
     })
-    onBeforeRouteUpdate(checkForUnsavedChanges)
-    onBeforeRouteLeave(checkForUnsavedChanges)
+    // An embedded editor saves through its host page (hideSave), which prompts
+    // for its changes along with its own. Two guards would ask twice.
+    if (!props.hideSave) {
+        onBeforeRouteUpdate(checkForUnsavedChanges)
+        onBeforeRouteLeave(checkForUnsavedChanges)
+    }
 })
 onUnmounted(() => {
     window.removeEventListener('resize', updateResponsiveGraphHeight)
