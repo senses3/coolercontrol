@@ -61,6 +61,8 @@ QString IPC::directoryPathDialog(const QString& title) const {
                                            QFileDialog::ShowDirsOnly);
 }
 
+QString IPC::getSystemPalette() const { return m_mainWindow->systemPaletteJson(); }
+
 void IPC::setStartInTray(const bool startInTray) const {
   m_settings->setValue(SETTING_START_IN_TRAY.data(), startInTray);
 }
