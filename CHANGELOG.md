@@ -50,6 +50,10 @@ Release notes are automatically generated from this file and git tags.
   daemon certificate and a manager for the ones already trusted
 - Pinned sensor readings in the tray menu, colored to match the UI and clickable to open their page,
   grouped into a submenu when many are pinned
+- The desktop app asks once, the first time closing its window would send it to the tray instead of
+  quitting
+- The desktop app's connection wizard shows the last connection error, so a stopped service, a wrong
+  port and a refused certificate are told apart
 - The desktop app's tray, connection wizard and dialogs are now translated, using strings pushed
   from the UI
 - A single multiplexed `GET /sse` endpoint carrying every event kind on one connection, with an
@@ -59,8 +63,12 @@ Release notes are automatically generated from this file and git tags.
   `config-ui.json`
 - lm-sensors `sensors.conf` support: applies its labels and honors `ignore` for hwmon channels
   (#334)
-- Installed color themes: True Black, Dracula, Gruvbox, One, Catppuccin, Tokyo Night, Monokai, Nord
-  and Solarized, in light and dark variants, chosen from a preview dropdown with color swatches
+- Installed color themes: True Black, Dracula, Gruvbox, One, Catppuccin, Tokyo Night, Monokai, Nord,
+  Solarized, Hackerman and Solitude, in light and dark variants where the palette has both, chosen
+  from a preview dropdown with color swatches
+- The System theme follows the desktop's own color palette when running in the desktop app, rather
+  than only switching between light and dark, and the settings preview shows the colors that will
+  actually land
 - Custom themes gained success, warning, error and info colors, carried by a new `cct2:` theme code
 - Multi-source alerts with per-source state, timed silencing with notify-on-expiry, and a per-alert
   log table on each alert page
@@ -88,6 +96,8 @@ Release notes are automatically generated from this file and git tags.
 - Hotspot temperature for NVIDIA Blackwell (RTX 50xx) cards, read from an NVAPI register
 - Firmware-reclaimed fan control is detected and re-asserted, so a fan taken back by the board
   firmware returns to CoolerControl
+- The web UI can be installed as an app from the browser, carrying a web app manifest and icons; an
+  installed window gets the in-app back button that the desktop app already has
 - Debian and Ubuntu packages are published to `apt.coolercontrol.org`, including Ubuntu arm64 builds
 - `make pr-check` pre-PR gate and a gated-tests feature for the daemon test suite
 
@@ -106,6 +116,7 @@ Release notes are automatically generated from this file and git tags.
 - Names are resolved once in the daemon and used consistently in logs, alerts and failsafe messages
 - Settings moved from tabs to an anchored card grid
 - Info and Tools was dissolved into the Home section
+- Alert thresholds accept fan speeds up to 30000 RPM
 - Warning and success colors darken on light themes to stay legible, and status colors are now
   checked for contrast in the test suite
 - The desktop app authenticates with its own bearer token per connection instead of a shared
@@ -161,6 +172,8 @@ Release notes are automatically generated from this file and git tags.
   curve apply is aborted instead of half-written, and an EIO now says what caused it
 - The desktop app no longer loops on reconnect notifications, applies certificate validation without
   a restart, and raises its window when tray-mode authentication fails
+- The desktop app keeps only one daemon health probe in flight and restarts its connection loop when
+  the event stream answers 401, instead of sitting on a dead session
 - Korean locale detection, translations synced across all supported locales, and translations that
   had drifted from the English source refreshed
 - Disabled IP family is logged at info instead of warning
@@ -178,6 +191,7 @@ Release notes are automatically generated from this file and git tags.
 ### Security
 
 - Device and channel name overrides reject injection-capable characters
+- Sensor and channel labels are escaped in the chart tooltip, which is built as markup
 - The desktop app pins and validates the daemon's TLS certificate and confines its web engine to the
   daemon it is connected to
 - The desktop app's settings file is owner-only, and superseded access tokens are deleted
