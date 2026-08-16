@@ -44,6 +44,7 @@ mod device_health;
 mod device_listener;
 mod device_uid;
 mod engine;
+mod env_vars;
 mod grpc_api;
 mod hardware_report;
 mod hardware_support;
@@ -538,6 +539,8 @@ enum SubCommands {
     List,
     /// Validate all configuration files
     Check,
+    /// Print the environment variables the daemon reads
+    Env,
     /// Print the `OpenAPI` spec to stdout. Generated from the route table, so it needs
     /// neither root nor a running daemon. See `make openapi`.
     #[command(name = "openapi", hide = true)]
@@ -579,6 +582,10 @@ fn handle_non_root_commands(args: &Args) -> Result<()> {
         // Pretty-printed: the file is checked in, so a merge request diff has to be
         // readable. Whitespace compresses away to a couple of KB on the wire.
         println!("{}", serde_json::to_string_pretty(&api::openapi_spec())?);
+        exit_successfully();
+    }
+    if let Some(SubCommands::Env) = &args.command {
+        env_vars::print_table();
         exit_successfully();
     }
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {
