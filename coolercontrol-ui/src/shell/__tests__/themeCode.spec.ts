@@ -102,6 +102,26 @@ describe('decodeThemeCode', () => {
         expect(decodeThemeCode('cct2:' + 'ab'.repeat(30))).toBeNull()
     })
 
+    /// Goal: body length is enforced by explicit comparison rather than by a count
+    /// inside the pattern, so an off-by-one body must still be rejected. Method:
+    /// take a valid body and add or drop a single character.
+    it('rejects a body one character off the expected length', () => {
+        const body = encodeThemeCode(tokens).slice('cct2:'.length, -2)
+        expect(decodeThemeCode('cct2:' + body + 'a')).toBeNull()
+        expect(decodeThemeCode('cct2:' + body.slice(0, -1))).toBeNull()
+    })
+
+    /// Goal: a body of exactly the right length but outside the hex alphabet is
+    /// rejected, which is the half of the check the pattern still owns. Method:
+    /// swap one character of a valid body for a non-hex one, with and without the
+    /// checksum suffix present.
+    it('rejects a full-length body holding a non-hex character', () => {
+        const code = encodeThemeCode(tokens)
+        const body = code.slice('cct2:'.length, -2)
+        expect(decodeThemeCode('cct2:' + body.slice(0, -1) + 'g')).toBeNull()
+        expect(decodeThemeCode('cct2:' + body.slice(0, -1) + 'g' + code.slice(-2))).toBeNull()
+    })
+
     /// Goal: codes are shareable as pasted, including with stray whitespace
     /// or uppercase from a chat client.
     it('normalizes case and surrounding whitespace', () => {
