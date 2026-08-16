@@ -37,6 +37,10 @@ class IPC final : public QObject {
 
   Q_INVOKABLE [[nodiscard]] QString directoryPathDialog(const QString& title) const;
 
+  // The desktop's own colors as JSON, or empty when it exposes none. Pulled once on
+  // load; later changes arrive through systemPaletteChanged.
+  Q_INVOKABLE [[nodiscard]] QString getSystemPalette() const;
+
   /*
       Slots are invoked from the JS client side and are processed on the server side.
   */
@@ -86,6 +90,8 @@ class IPC final : public QObject {
   void forceWindowShow() const;
 
   void fullScreenToggled(bool fullScreen) const;
+
+  void systemPaletteChanged(const QString& paletteJson) const;
 
  private:
   QSettings* m_settings;

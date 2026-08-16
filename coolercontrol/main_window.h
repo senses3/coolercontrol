@@ -102,12 +102,19 @@ class MainWindow final : public QMainWindow {
   QWebEnginePage* m_page;
   QWebChannel* m_channel;
   IPC* m_ipc;
+
+ public:
+  [[nodiscard]] QString systemPaletteJson() const { return m_systemPaletteJson; }
+
+ private:
   QSystemTrayIcon* m_sysTrayIcon;
   QMenu* m_trayIconMenu;
   QMenu* m_modesTrayMenu;
   // Hidden while only one daemon is saved, which is nearly every install.
   QMenu* m_daemonsTrayMenu;
   QActionGroup* m_daemonsActionGroup{nullptr};
+  // Last palette pushed to the UI, kept so a repeat read does not re-emit.
+  QString m_systemPaletteJson;
   // One disabled row per pinned sensor. Rebuilt only when the pinned set changes, so
   // the menu layout stays stable for hosts that cache it over DBusMenu.
   struct TraySensor {
@@ -205,6 +212,8 @@ class MainWindow final : public QMainWindow {
 
   // One checkable row per saved daemon, the live one checked.
   void rebuildDaemonsTrayMenu();
+
+  void refreshSystemPalette();
 
   // Saves the connection and, when it addresses a different daemon than the live one,
   // switches to it. Shared by the wizard's Apply and the tray's daemon entries.

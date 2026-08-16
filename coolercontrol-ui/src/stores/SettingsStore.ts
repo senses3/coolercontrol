@@ -23,8 +23,12 @@ import {
     UISettingsDTO,
 } from '@/models/UISettings'
 import {
+    hexToTriplet,
     installedTheme,
+    parseSystemPalette,
     surfaceTintFor,
+    SYSTEM_THEME_ID,
+    type SystemPalette,
     THEME_CSS_VAR_NAMES,
     THEME_TOKEN_KEYS,
     THEME_TOKEN_VARS,
@@ -200,6 +204,9 @@ export const useSettingsStore = defineStore('settings', () => {
     const closeToSystemTray: Ref<boolean> = ref(false)
     const desktopStartupDelay: Ref<number> = ref(0)
     const themeMode: Ref<string> = ref(ThemeMode.SYSTEM)
+    // The desktop's own colors, pushed by the Qt app. Null in a browser and on any
+    // desktop that publishes none, and read only while themeMode is System.
+    const systemPalette: Ref<SystemPalette | null> = ref(null)
     const uiScale: Ref<number> = ref(100)
     const time24: Ref<boolean> = ref(false)
     const menuOrder: Ref<Array<MenuOrderIds>> = ref([])
@@ -374,6 +381,15 @@ export const useSettingsStore = defineStore('settings', () => {
                 desktopStartupDelay.value = await ipc.getStartupDelay()
                 closeToSystemTray.value = await ipc.getCloseToTray()
                 uiScale.value = (await ipc.getZoomFactor()) * 100
+                // Optional throughout: a Qt app older than this feature has neither
+                // the getter nor the signal, and must not fail the whole block.
+                systemPalette.value = parseSystemPalette((await ipc.getSystemPalette?.()) ?? '')
+                // The accent and the light/dark preference can both change while
+                // the app runs, so follow them rather than reading once.
+                ipc.systemPaletteChanged?.connect((paletteJson: string) => {
+                    systemPalette.value = parseSystemPalette(paletteJson)
+                    applyThemeMode()
+                })
             } catch (err: any) {
                 console.error('Failed to get desktop setting: ', err)
             }
@@ -1417,22 +1433,48 @@ export const useSettingsStore = defineStore('settings', () => {
         }
 
         if (themeMode.value === ThemeMode.SYSTEM) {
-            // considered Alpha and doesn't always work as expected:
-            // document.documentElement.classList.add('system-theme')
-            if (
-                window.matchMedia('(prefers-color-scheme: dark) and (prefers-contrast: more)')
-                    .matches
-            ) {
-                document.documentElement.classList.add('high-contrast-dark')
-            } else if (
-                window.matchMedia('(prefers-color-scheme: light) and (prefers-contrast: more)')
-                    .matches
-            ) {
-                document.documentElement.classList.add('high-contrast-light')
-            } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
-                document.documentElement.classList.add('light-theme')
+            const palette = systemPalette.value
+            // A desktop that publishes its whole palette gets applied exactly like
+            // an installed theme: same variables, same neutral class.
+            if (palette?.tokens != null) {
+                document.documentElement.classList.add('installed-theme')
+                const asTheme = {
+                    id: SYSTEM_THEME_ID,
+                    name: 'System',
+                    variant: palette.variant ?? 'dark',
+                    tokens: palette.tokens,
+                } as const
+                for (const [cssVar, value] of themeCssVars(asTheme)) {
+                    document.documentElement.style.setProperty(cssVar, value)
+                }
+                return
+            }
+            // The desktop's own answer beats the media query: Chromium's light/dark
+            // detection is unreliable under GNOME, where it reports light on a dark
+            // session. The query is still the fallback for browsers and for a
+            // desktop that states no preference.
+            const prefersDark =
+                palette?.variant != null
+                    ? palette.variant === 'dark'
+                    : !window.matchMedia('(prefers-color-scheme: light)').matches
+            if (window.matchMedia('(prefers-contrast: more)').matches) {
+                document.documentElement.classList.add(
+                    prefersDark ? 'high-contrast-dark' : 'high-contrast-light',
+                )
             } else {
-                document.documentElement.classList.add('dark-theme')
+                document.documentElement.classList.add(prefersDark ? 'dark-theme' : 'light-theme')
+            }
+            // Only an accent is available here, so it is layered over the compiled
+            // theme. Both ends of the gradient take it: the desktop has no second
+            // brand color to give. The accent foreground recomputes on its own, off
+            // the style change this makes (see ThemeColorsStore).
+            if (palette?.accent != null) {
+                const accent = hexToTriplet(palette.accent)
+                document.documentElement.style.setProperty(THEME_TOKEN_VARS.accent, accent)
+                document.documentElement.style.setProperty(
+                    THEME_TOKEN_VARS.accentGradientTo,
+                    accent,
+                )
             }
         } else if (themeMode.value === ThemeMode.HIGH_CONTRAST_DARK) {
             document.documentElement.classList.add('high-contrast-dark')
@@ -1719,6 +1761,7 @@ export const useSettingsStore = defineStore('settings', () => {
         closeToSystemTray,
         desktopStartupDelay,
         themeMode,
+        systemPalette,
         uiScale,
         time24,
         menuOrder,

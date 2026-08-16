@@ -43,6 +43,7 @@
 #include "notifier.h"
 #include "origin_filter.h"
 #include "sse_parser.h"
+#include "system_palette.h"
 #include "tls_trust.h"
 #include "translations.h"
 
@@ -177,6 +178,11 @@ MainWindow::MainWindow(QWidget* parent)
           });
   m_channel->registerObject("ipc", m_ipc);
   m_page->setWebChannel(m_channel);
+  // Read once up front so the first page load can pull it, then follow changes.
+  refreshSystemPalette();
+  const auto paletteWatcher = new system_palette::Watcher(this);
+  connect(paletteWatcher, &system_palette::Watcher::changed, this,
+          &MainWindow::refreshSystemPalette);
   // This allows external links in our app to be opened by the external browser:
   connect(m_page, &QWebEnginePage::newWindowRequested,
           [](QWebEngineNewWindowRequest const& request) {
@@ -1103,6 +1109,21 @@ void MainWindow::applyDaemonConnection(const connections::Connection connection)
   m_originFilter->setDaemonUrl(getDaemonUrl());  // the address just changed
   loadVerifiedDaemonUi();
   rebuildDaemonsTrayMenu();  // moves the checked row
+}
+
+/*
+  Pushes the desktop's colors to the UI, which uses them only while its theme is
+  set to System. Sent rather than pulled because the accent and the light/dark
+  preference can change while the app is running, and compared first because the
+  portal announces every appearance key, most of which are not colors.
+*/
+void MainWindow::refreshSystemPalette() {
+  const auto palette = system_palette::readAsJson();
+  if (palette == m_systemPaletteJson) {
+    return;
+  }
+  m_systemPaletteJson = palette;
+  emit m_ipc->systemPaletteChanged(palette);
 }
 
 void MainWindow::resetPerDaemonState() {

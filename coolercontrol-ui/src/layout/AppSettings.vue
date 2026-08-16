@@ -49,6 +49,7 @@ import {
     probeCompiledSwatch,
     surfaceTintFor,
     swatchFor,
+    SYSTEM_THEME_ID,
     THEME_TOKEN_KEYS,
     THEME_TOKEN_VARS,
     type ThemeSwatch,
@@ -143,10 +144,26 @@ const COMPILED_THEME_CLASSES: Record<string, string> = {
 }
 const builtInSwatch = (mode: string): ThemeSwatch => {
     if (mode === ThemeMode.SYSTEM) {
-        const systemClass = window.matchMedia('(prefers-color-scheme: light)').matches
-            ? 'light-theme'
-            : 'dark-theme'
-        return probeCompiledSwatch(systemClass)
+        // Preview what System will actually apply. Falling back to the media query
+        // here would advertise our own colors while the desktop's are what land.
+        const palette = settingsStore.systemPalette
+        if (palette?.tokens != null) {
+            return swatchFor({
+                id: SYSTEM_THEME_ID,
+                name: 'System',
+                variant: palette.variant ?? 'dark',
+                tokens: palette.tokens,
+            })
+        }
+        const prefersDark =
+            palette?.variant != null
+                ? palette.variant === 'dark'
+                : !window.matchMedia('(prefers-color-scheme: light)').matches
+        const swatch = probeCompiledSwatch(prefersDark ? 'dark-theme' : 'light-theme')
+        if (palette?.accent != null) {
+            swatch[2] = palette.accent
+        }
+        return swatch
     }
     return probeCompiledSwatch(COMPILED_THEME_CLASSES[mode] ?? 'dark-theme')
 }
