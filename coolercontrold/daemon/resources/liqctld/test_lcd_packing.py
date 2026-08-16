@@ -35,8 +35,25 @@ from liquidctl.driver.kraken3 import KrakenZ3  # noqa: E402
 from PIL import Image  # noqa: E402
 
 # liquidctl's implementations, captured before any test installs a replacement.
+# `_prepare_static_file_rgb16` arrived with Kraken 2023 firmware 2.x support and is
+# missing from older liquidctl, such as the one Debian bookworm ships. Read it the way
+# `main.patch_kraken_lcd_packing` does, so an old liquidctl skips the comparison
+# against it rather than failing the whole module at import.
 ORIGINAL_PACKING = KrakenZ3._prepare_static_file
-ORIGINAL_PACKING_RGB16 = KrakenZ3._prepare_static_file_rgb16
+ORIGINAL_PACKING_RGB16 = getattr(KrakenZ3, "_prepare_static_file_rgb16", None)
+HAS_LIQUIDCTL_RGB16 = ORIGINAL_PACKING_RGB16 is not None
+NO_RGB16_REASON = "liquidctl has no KrakenZ3._prepare_static_file_rgb16"
+
+# liquidctl's own packing changed after the 1.11 Debian bookworm ships: it now honors
+# `lcd_resolution` and converts to RGB before indexing pixels. The C path reproduces the
+# current implementation, so against an older liquidctl the guard declines to install and
+# the stock path stays in use. That is a supported outcome, not a defect, so the
+# byte-for-byte comparisons only run where the two are meant to agree. Detected by asking
+# the same guard the daemon uses, rather than pinning a version number here.
+LIQUIDCTL_MATCHES_C_PATH = main._packing_matches(
+    ORIGINAL_PACKING, main._packed_static_file
+)
+STOCK_PACKING_REASON = "liquidctl's own packing predates the C replacement"
 
 
 class _Screen:
@@ -61,6 +78,7 @@ def encoded_image(size, mode="RGB"):
 
 
 class TestLcdPacking(unittest.TestCase):
+    @unittest.skipUnless(LIQUIDCTL_MATCHES_C_PATH, STOCK_PACKING_REASON)
     def test_matches_liquidctl_byte_for_byte(self):
         """Goal: the replacement must be indistinguishable from liquidctl's loop, at
         every rotation and at the resolutions liquidctl supports. Method: pack the same
@@ -88,6 +106,7 @@ class TestLcdPacking(unittest.TestCase):
         self.assertEqual(len(packed), 320 * 320 * 4)
         self.assertEqual(set(packed[3::4]), {0})
 
+    @unittest.skipUnless(LIQUIDCTL_MATCHES_C_PATH, STOCK_PACKING_REASON)
     def test_greyscale_and_rgba_sources_still_match(self):
         """Goal: users pick arbitrary images, so a source that is not already RGB must
         convert the same way in both implementations. Method: pack greyscale and RGBA
@@ -105,6 +124,7 @@ class TestLcdPacking(unittest.TestCase):
             actual = bytes(main._packed_static_file(screen, source, 0))
             self.assertEqual(actual, expected, f"packing differs for a {mode} source")
 
+    @unittest.skipUnless(HAS_LIQUIDCTL_RGB16, NO_RGB16_REASON)
     def test_rgb16_matches_liquidctl_byte_for_byte(self):
         """Goal: the Kraken 2023 firmware 2.x path packs RGB565 rather than RGBX, and it has
         no device here to catch a mistake, so it must be indistinguishable from liquidctl's
@@ -150,6 +170,7 @@ class TestLcdPacking(unittest.TestCase):
         packed = main._packed_static_file_rgb16(screen, encoded_image(240), 0)
         self.assertEqual(len(packed), 240 * 240 * 2)
 
+    @unittest.skipUnless(LIQUIDCTL_MATCHES_C_PATH, STOCK_PACKING_REASON)
     def test_verification_accepts_the_replacement(self):
         """Goal: the guard that runs before patching must accept the real replacement,
         otherwise the patch silently never installs. Method: run the guard."""
@@ -185,20 +206,30 @@ class TestLcdPacking(unittest.TestCase):
             )
 
     def test_patch_installs_and_is_idempotent(self):
-        """Goal: patching must replace the method and stay correct if applied twice (the
-        service may restart the patch path). Method: patch, check the bound method, patch
-        again, then restore so later tests see liquidctl's original."""
+        """Goal: where liquidctl's packing is the one the C path reproduces, patching must
+        replace the method and stay correct if applied twice, since the service may run the
+        patch path again. Where it is not, the guard must leave liquidctl's own loop in
+        place rather than risk wrong bytes on a screen. Method: patch, check what actually
+        landed, patch again, then restore. The end state is asserted rather than the return
+        value, which the caller discards."""
+        landed = (
+            main._packed_static_file if LIQUIDCTL_MATCHES_C_PATH else ORIGINAL_PACKING
+        )
         try:
-            self.assertTrue(main.patch_kraken_lcd_packing())
-            self.assertIs(KrakenZ3._prepare_static_file, main._packed_static_file)
-            self.assertIs(
-                KrakenZ3._prepare_static_file_rgb16, main._packed_static_file_rgb16
-            )
-            self.assertTrue(main.patch_kraken_lcd_packing())
-            self.assertIs(KrakenZ3._prepare_static_file, main._packed_static_file)
+            main.patch_kraken_lcd_packing()
+            self.assertIs(KrakenZ3._prepare_static_file, landed)
+            if HAS_LIQUIDCTL_RGB16 and LIQUIDCTL_MATCHES_C_PATH:
+                self.assertIs(
+                    KrakenZ3._prepare_static_file_rgb16, main._packed_static_file_rgb16
+                )
+            main.patch_kraken_lcd_packing()
+            self.assertIs(KrakenZ3._prepare_static_file, landed)
         finally:
             KrakenZ3._prepare_static_file = ORIGINAL_PACKING
-            KrakenZ3._prepare_static_file_rgb16 = ORIGINAL_PACKING_RGB16
+            # Only restore what was there: assigning None would leave a bogus attribute
+            # on a liquidctl that never had one.
+            if HAS_LIQUIDCTL_RGB16:
+                KrakenZ3._prepare_static_file_rgb16 = ORIGINAL_PACKING_RGB16
 
 
 if __name__ == "__main__":
