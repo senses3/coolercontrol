@@ -505,6 +505,11 @@ def patch_kraken_lcd_packing() -> bool:
     Two layouts: RGBX for every Kraken with a screen, and RGB565 for the Kraken 2023 on
     firmware 2.x. Each is checked against liquidctl's own implementation before being
     installed, so a mismatch costs CPU rather than putting wrong bytes on a screen.
+
+    A liquidctl older than the one the C path reproduces will not match, and will not
+    carry the RGB565 method at all. Both are supported: the stock implementation is used
+    and everything still works, which is why neither reports as a warning.
+
     Returns whether both were installed.
     """
     replacements = (
@@ -515,14 +520,19 @@ def patch_kraken_lcd_packing() -> bool:
     for name, replacement in replacements:
         original = getattr(KrakenZ3, name, None)
         if original is None:
-            log.warning(
-                "liquidctl has no KrakenZ3.%s; that LCD packing is unpatched", name
+            log.info(
+                "This liquidctl has no KrakenZ3.%s, so that LCD packing stays on "
+                "liquidctl's own code. Expected on liquidctl older than its Kraken "
+                "2023 firmware 2.x support, such as the one Debian bookworm ships.",
+                name,
             )
             continue
         if not _packing_matches(original, replacement):
-            log.warning(
-                "LCD framebuffer packing for %s differs from liquidctl's; keeping "
-                "liquidctl's implementation. LCD updates will use more CPU.",
+            log.info(
+                "This liquidctl packs %s differently to the implementation the C path "
+                "reproduces, so liquidctl's own code stays in use. Expected on older "
+                "liquidctl, such as the one Debian bookworm ships. The only effect is "
+                "that LCD updates cost more CPU.",
                 name,
             )
             continue
