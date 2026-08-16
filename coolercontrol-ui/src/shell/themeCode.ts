@@ -51,13 +51,19 @@ export const encodeThemeCode = (theme: ThemeHexTokens): string => {
     return PREFIX + hex + checksum(hex)
 }
 
+/**
+ * Alphabet check only. Every caller has already fixed the length by comparison or
+ * by slicing, so building a pattern per call just to carry a `{n}` count would
+ * restate a check that already happened.
+ */
+const HEX_ONLY = /^[0-9a-f]*$/
+
 /** Strips an optional CRC-8 suffix, rejecting a body that fails it. */
 const bodyOf = (body: string, hexLength: number): string | null => {
-    const pattern = new RegExp(`^[0-9a-f]{${hexLength}}$`)
-    if (body.length === hexLength) return pattern.test(body) ? body : null
+    if (body.length === hexLength) return HEX_ONLY.test(body) ? body : null
     if (body.length !== hexLength + 2) return null
     const hex = body.slice(0, hexLength)
-    if (!pattern.test(hex)) return null
+    if (!HEX_ONLY.test(hex)) return null
     return checksum(hex) === body.slice(hexLength) ? hex : null
 }
 
