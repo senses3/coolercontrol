@@ -66,9 +66,10 @@ Release notes are automatically generated from this file and git tags.
 - Installed color themes: True Black, Dracula, Gruvbox, One, Catppuccin, Tokyo Night, Monokai, Nord,
   Solarized, Hackerman and Solitude, in light and dark variants where the palette has both, chosen
   from a preview dropdown with color swatches
-- The System theme follows the desktop's own color palette when running in the desktop app, rather
-  than only switching between light and dark, and the settings preview shows the colors that will
-  actually land
+- The System theme follows the desktop's own colors in the desktop app, as far as the desktop
+  exposes them: the full palette on KDE, otherwise the accent color and light or dark preference
+  from the XDG desktop portal, and the built-in light and dark themes when neither is available. The
+  settings preview shows whichever of those will land
 - Custom themes gained success, warning, error and info colors, carried by a new `cct2:` theme code
 - Multi-source alerts with per-source state, timed silencing with notify-on-expiry, and a per-alert
   log table on each alert page
