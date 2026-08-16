@@ -51,19 +51,27 @@ export const encodeThemeCode = (theme: ThemeHexTokens): string => {
     return PREFIX + hex + checksum(hex)
 }
 
+const HEX_DIGITS = '0123456789abcdef'
+
 /**
- * Alphabet check only. Every caller has already fixed the length by comparison or
- * by slicing, so building a pattern per call just to carry a `{n}` count would
- * restate a check that already happened.
+ * Alphabet check only. Every caller has already fixed the length by comparison or by
+ * slicing, so a pattern carrying a `{n}` count would restate a check that already
+ * happened. Written as a scan rather than a regex: a fixed 16-character alphabet needs
+ * no regex engine, and a plain loop is visibly linear in the length of the input.
  */
-const HEX_ONLY = /^[0-9a-f]*$/
+const isHex = (text: string): boolean => {
+    for (const char of text) {
+        if (!HEX_DIGITS.includes(char)) return false
+    }
+    return true
+}
 
 /** Strips an optional CRC-8 suffix, rejecting a body that fails it. */
 const bodyOf = (body: string, hexLength: number): string | null => {
-    if (body.length === hexLength) return HEX_ONLY.test(body) ? body : null
+    if (body.length === hexLength) return isHex(body) ? body : null
     if (body.length !== hexLength + 2) return null
     const hex = body.slice(0, hexLength)
-    if (!HEX_ONLY.test(hex)) return null
+    if (!isHex(hex)) return null
     return checksum(hex) === body.slice(hexLength) ? hex : null
 }
 
