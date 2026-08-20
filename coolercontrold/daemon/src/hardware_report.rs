@@ -18,12 +18,15 @@ use crate::hardware_support::{
 };
 use crate::repositories::hwmon::fans;
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo};
-use crate::{cc_fs, VERSION};
+use crate::{cc_fs, rt, VERSION};
+use log::warn;
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::future::Future;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 const HWMON_CLASS_PATH: &str = "/sys/class/hwmon";
 
@@ -47,6 +50,28 @@ const COMPACT_TRIM_TARGET: usize = COMPACT_CHARACTER_BUDGET - CODE_FENCE_RESERVE
 
 const _: () = assert!(COMPACT_TRIM_TARGET < COMPACT_CHARACTER_BUDGET);
 
+/// What one device's sysfs reads may take before the report gives up on it.
+///
+/// Sized off the worst honest case measured: an Aquacomputer Octo answers each
+/// `pwmN` over its own HID round trip at 200-400ms, so its eight channels cost
+/// a legitimate 1.5-3s. Past this a driver is not slow, it is not answering.
+const DEVICE_READ_BUDGET: Duration = Duration::from_secs(5);
+
+/// What every device's reads may take together.
+///
+/// Kept under the actor's own `GENERATE_TIMEOUT` so a machine with several
+/// slow devices still returns a report naming them. The actor's notice is the
+/// last resort and tells the user nothing about which device is at fault.
+const REPORT_READ_BUDGET: Duration = Duration::from_secs(15);
+
+const _: () = assert!(DEVICE_READ_BUDGET.as_millis() < REPORT_READ_BUDGET.as_millis());
+
+/// Stands in for a device's channels when its driver stopped answering.
+///
+/// Naming the device is the whole point: this is the line a maintainer needs,
+/// and it is the one thing an all-or-nothing timeout cannot produce.
+const UNRESPONSIVE_NOTE: &str = "did not answer in time, the driver may be stuck";
+
 /// One hwmon device as the report sees it.
 struct ReportDevice {
     path: PathBuf,
@@ -62,6 +87,69 @@ struct ReportDevice {
     /// Channels of this device the daemon dropped individually, by name. Empty
     /// for a device that was dropped whole: its channels were never reached.
     excluded_channels: HashMap<ChannelName, ChannelExclusion>,
+    /// Set when the device ran out of read budget, which leaves `fans` empty
+    /// for a reason that has nothing to do with the device having no fans.
+    unresponsive: bool,
+}
+
+/// The report's remaining time for sysfs reads.
+///
+/// One budget spans every stage, so a device that stalls the scan cannot then
+/// spend the full tree's time as well. Copied rather than borrowed: it is two
+/// words and every stage reads it independently.
+#[derive(Clone, Copy)]
+struct ReadBudget {
+    deadline: Instant,
+}
+
+impl ReadBudget {
+    fn starting_now() -> Self {
+        Self {
+            deadline: Instant::now() + REPORT_READ_BUDGET,
+        }
+    }
+
+    /// How long the next device may take: its own cap, or whatever is left of
+    /// the report's, whichever is smaller. `None` once the budget is spent.
+    fn for_device(self) -> Option<Duration> {
+        let remaining = self.deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return None;
+        }
+        Some(remaining.min(DEVICE_READ_BUDGET))
+    }
+}
+
+/// Bounds one device's sysfs reads by what is left of the report's budget.
+///
+/// `None` means the device did not answer in time, which every caller turns
+/// into a line naming it. A driver that stops answering must cost the report
+/// that one device and nothing else.
+///
+/// Only the awaited value reads are bounded. `read_dir`, `exists` and
+/// `canonicalize` are synchronous and cannot be interrupted, but they are
+/// served by the VFS rather than by the device, so they do not wait on a bus.
+async fn within_budget<T>(
+    budget: ReadBudget,
+    name: &str,
+    path: &Path,
+    work: impl Future<Output = T>,
+) -> Option<T> {
+    let Some(allowed) = budget.for_device() else {
+        warn!(
+            "Hardware report read budget was spent before reaching {name} at {}",
+            path.display()
+        );
+        return None;
+    };
+    let Ok(value) = rt::timeout(allowed, work).await else {
+        warn!(
+            "Hardware report gave up on {name} at {} after {allowed:?}",
+            path.display()
+        );
+        return None;
+    };
+    Some(value)
 }
 
 /// Builds the report. `full` adds the whole hwmon tree with per-channel state.
@@ -77,20 +165,21 @@ pub async fn generate(
     hidden: &HiddenHardware,
     retained: &[Rc<HwmonDriverInfo>],
 ) -> String {
+    let budget = ReadBudget::starting_now();
     let system_info = SystemInfo::read().await;
     let devices = if full {
-        scan_hwmon(hidden).await
+        scan_hwmon(hidden, budget).await
     } else {
-        collect_retained(retained, hidden).await
+        collect_retained(retained, hidden, budget).await
     };
     let mut report = String::with_capacity(if full { 8192 } else { COMPACT_CHARACTER_BUDGET });
     write_header(&mut report, &system_info);
     write_probe_summary(&mut report, detection, full, cc_detect::DETECTION_SUPPORTED);
-    write_fan_summary(&mut report, &devices).await;
+    write_fan_summary(&mut report, &devices, budget).await;
     write_device_sections(&mut report, devices_other);
     write_findings(&mut report, detection, cc_detect::DETECTION_SUPPORTED);
     if full {
-        write_full_tree(&mut report, &devices).await;
+        write_full_tree(&mut report, &devices, budget).await;
         return report;
     }
     trim_to_budget(report)
@@ -167,10 +256,23 @@ fn write_probe_summary(
 /// the compact report past the paste budget on an ordinary desktop. Restricted
 /// this way it costs nothing on a healthy machine and a couple of lines on a
 /// broken one, which removes a round trip for the common support case.
-async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
+async fn write_fan_summary(report: &mut String, devices: &[ReportDevice], budget: ReadBudget) {
     let _ = writeln!(report, "\nHWMon Fan Channels");
     let mut any = false;
     for device in devices {
+        if device.unresponsive {
+            // Its `fans` is empty because the scan gave up, not because the
+            // device has none. Skipping it here would hide the one device the
+            // reader most needs to see.
+            any = true;
+            let _ = writeln!(
+                report,
+                "  {} [{}]  {UNRESPONSIVE_NOTE}",
+                device.name,
+                device.driver.as_deref().unwrap_or("no driver link")
+            );
+            continue;
+        }
         if scan_is_safe(device.excluded).not() {
             // Listed but not inspected. Saying so beats omitting it, which
             // would read as the report having missed the device entirely.
@@ -207,25 +309,39 @@ async fn write_fan_summary(report: &mut String, devices: &[ReportDevice]) {
             hidden_channel_suffix(hidden_fans),
             exclusion_suffix(device)
         );
-        for fan in &device.fans {
-            let verdict = verdict_for(device, fan);
-            let hidden = device.excluded_channels.get(&fan.name).copied();
-            // A hidden channel earns a line even when it is perfectly
-            // drivable: that it is missing from the app is the whole point.
-            if verdict.is_controllable() && hidden.is_none() {
-                continue;
+        // Built into its own string under the budget, so a device that stops
+        // answering partway through cannot leave half a line in the report.
+        match within_budget(budget, &device.name, &device.path, summary_notes(device)).await {
+            Some(notes) => report.push_str(&notes),
+            None => {
+                let _ = writeln!(report, "    {UNRESPONSIVE_NOTE}");
             }
-            let _ = writeln!(
-                report,
-                "    {}: {}",
-                channel_title(fan),
-                channel_notes(device, fan, verdict, hidden).await
-            );
         }
     }
     if any.not() {
         let _ = writeln!(report, "  none found");
     }
+}
+
+/// One line per channel the reader needs told about, and nothing for the rest.
+async fn summary_notes(device: &ReportDevice) -> String {
+    let mut notes = String::new();
+    for fan in &device.fans {
+        let verdict = verdict_for(device, fan);
+        let hidden = device.excluded_channels.get(&fan.name).copied();
+        // A hidden channel earns a line even when it is perfectly drivable:
+        // that it is missing from the app is the whole point.
+        if verdict.is_controllable() && hidden.is_none() {
+            continue;
+        }
+        let _ = writeln!(
+            notes,
+            "    {}: {}",
+            channel_title(fan),
+            channel_notes(device, fan, verdict, hidden).await
+        );
+    }
+    notes
 }
 
 /// One non-hwmon device, reduced to what a maintainer needs.
@@ -416,7 +532,7 @@ fn derive_findings(
     )
 }
 
-async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
+async fn write_full_tree(report: &mut String, devices: &[ReportDevice], budget: ReadBudget) {
     let _ = writeln!(report, "\nFull HWMon Tree");
     for device in devices {
         let _ = writeln!(
@@ -427,27 +543,44 @@ async fn write_full_tree(report: &mut String, devices: &[ReportDevice]) {
             device.path.display(),
             exclusion_suffix(device)
         );
-        for fan in &device.fans {
-            let verdict = verdict_for(device, fan);
-            let pwm = read_attribute(&device.path, &format!("pwm{}", fan.number)).await;
-            let pwm_enable =
-                read_attribute(&device.path, &format!("pwm{}_enable", fan.number)).await;
-            let rpm = read_attribute(&device.path, &format!("fan{}_input", fan.number)).await;
-            let hidden = device
-                .excluded_channels
-                .get(&fan.name)
-                .map_or_else(String::new, |reason| format!(" {}", reason.label()));
-            let _ = writeln!(
-                report,
-                "    {}: verdict={} pwm={pwm} pwm_enable={pwm_enable} rpm={rpm} \
-                 writable={} label={}{hidden}",
-                fan.name,
-                verdict_label(verdict),
-                fan.caps.is_fan_controllable(),
-                fan.label.as_deref().unwrap_or("-")
-            );
+        if device.unresponsive {
+            let _ = writeln!(report, "    {UNRESPONSIVE_NOTE}");
+            continue;
+        }
+        // Built into its own string under the budget, so a driver that stops
+        // answering partway through cannot leave half a line in the report.
+        match within_budget(budget, &device.name, &device.path, channel_lines(device)).await {
+            Some(lines) => report.push_str(&lines),
+            None => {
+                let _ = writeln!(report, "    {UNRESPONSIVE_NOTE}");
+            }
         }
     }
+}
+
+/// One line per fan channel with the raw pwm state behind its verdict.
+async fn channel_lines(device: &ReportDevice) -> String {
+    let mut lines = String::new();
+    for fan in &device.fans {
+        let verdict = verdict_for(device, fan);
+        let pwm = read_attribute(&device.path, &format!("pwm{}", fan.number)).await;
+        let pwm_enable = read_attribute(&device.path, &format!("pwm{}_enable", fan.number)).await;
+        let rpm = read_attribute(&device.path, &format!("fan{}_input", fan.number)).await;
+        let hidden = device
+            .excluded_channels
+            .get(&fan.name)
+            .map_or_else(String::new, |reason| format!(" {}", reason.label()));
+        let _ = writeln!(
+            lines,
+            "    {}: verdict={} pwm={pwm} pwm_enable={pwm_enable} rpm={rpm} \
+             writable={} label={}{hidden}",
+            fan.name,
+            verdict_label(verdict),
+            fan.caps.is_fan_controllable(),
+            fan.label.as_deref().unwrap_or("-")
+        );
+    }
+    lines
 }
 
 /// The raw pwm state behind a verdict. `pwm_enable` in particular is the field
@@ -567,6 +700,7 @@ fn verdict_for(device: &ReportDevice, fan: &HwmonChannelInfo) -> ChannelVerdict 
 async fn collect_retained(
     retained: &[Rc<HwmonDriverInfo>],
     hidden: &HiddenHardware,
+    budget: ReadBudget,
 ) -> Vec<ReportDevice> {
     let mut devices = Vec::with_capacity(retained.len() + hidden.devices.len());
     for driver in retained {
@@ -574,21 +708,30 @@ async fn collect_retained(
         let excluded_channels = canonical
             .as_ref()
             .map_or_else(HashMap::new, |canonical| hidden_channels(hidden, canonical));
-        let fans = if excluded_channels.is_empty() {
-            driver
-                .channels
-                .iter()
-                .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
-                .cloned()
-                .collect()
+        let scanned = if excluded_channels.is_empty() {
+            Some(
+                driver
+                    .channels
+                    .iter()
+                    .filter(|channel| channel.hwmon_type == HwmonChannelType::Fan)
+                    .cloned()
+                    .collect(),
+            )
         } else {
-            read_fans(&driver.path, &driver.name).await
+            within_budget(
+                budget,
+                &driver.name,
+                &driver.path,
+                read_fans(&driver.path, &driver.name),
+            )
+            .await
         };
         devices.push(ReportDevice {
             path: driver.path.clone(),
             name: driver.name.clone(),
             driver: resolve_driver(&driver.path),
-            fans,
+            unresponsive: scanned.is_none(),
+            fans: scanned.unwrap_or_default(),
             excluded: None,
             excluded_channels,
         });
@@ -598,16 +741,17 @@ async fn collect_retained(
             continue;
         };
         let name = name.trim().to_string();
-        let fans = if scan_is_safe(Some(*reason)) {
-            read_fans(path, &name).await
+        let scanned = if scan_is_safe(Some(*reason)) {
+            within_budget(budget, &name, path, read_fans(path, &name)).await
         } else {
-            Vec::new()
+            Some(Vec::new())
         };
         devices.push(ReportDevice {
             path: path.clone(),
             name,
             driver: resolve_driver(path),
-            fans,
+            unresponsive: scanned.is_none(),
+            fans: scanned.unwrap_or_default(),
             excluded: Some(*reason),
             excluded_channels: hidden_channels(hidden, path),
         });
@@ -629,7 +773,7 @@ async fn read_fans(path: &Path, name: &str) -> Vec<HwmonChannelInfo> {
 
 /// Enumerates hwmon and builds each device's fan channels with the exact same
 /// `init_fans` the daemon uses.
-async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
+async fn scan_hwmon(hidden: &HiddenHardware, budget: ReadBudget) -> Vec<ReportDevice> {
     let mut devices = Vec::new();
     let Ok(entries) = cc_fs::read_dir(Path::new(HWMON_CLASS_PATH)) else {
         return devices;
@@ -666,16 +810,17 @@ async fn scan_hwmon(hidden: &HiddenHardware) -> Vec<ReportDevice> {
         // device precisely so it would not be touched; the report has no
         // business overriding that, and the Liquidctl section already carries
         // its fan counts from the repository that actually drives it.
-        let fans = if scan_is_safe(excluded) {
-            read_fans(&path, &name).await
+        let scanned = if scan_is_safe(excluded) {
+            within_budget(budget, &name, &path, read_fans(&path, &name)).await
         } else {
-            Vec::new()
+            Some(Vec::new())
         };
         devices.push(ReportDevice {
             path,
             name,
             driver,
-            fans,
+            unresponsive: scanned.is_none(),
+            fans: scanned.unwrap_or_default(),
             excluded,
             excluded_channels,
         });
@@ -788,6 +933,7 @@ fn available_or_not(value: bool) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     /// Goal: the compact report stays pasteable into Discord *after* the UI
     /// wraps it in a code fence. Method: feed the trimmer a report far over the
@@ -839,6 +985,7 @@ mod tests {
             fans: Vec::new(),
             excluded,
             excluded_channels: HashMap::new(),
+            unresponsive: false,
         }
     }
 
@@ -1018,7 +1165,12 @@ mod tests {
     fn retained_devices_are_not_re_read() {
         let retained = [driver_info("nct6687", &["fan1", "fan2"])];
         let devices = crate::rt::test_runtime(async {
-            collect_retained(&retained, &HiddenHardware::default()).await
+            collect_retained(
+                &retained,
+                &HiddenHardware::default(),
+                ReadBudget::starting_now(),
+            )
+            .await
         });
         assert_eq!(devices.len(), 1);
         assert_eq!(devices[0].name, "nct6687");
@@ -1042,7 +1194,9 @@ mod tests {
         // The retained path does not resolve, so nothing is found to re-read
         // and the fan list comes back empty rather than silently reusing the
         // retained channels.
-        let devices = crate::rt::test_runtime(async { collect_retained(&retained, &hidden).await });
+        let devices = crate::rt::test_runtime(async {
+            collect_retained(&retained, &hidden, ReadBudget::starting_now()).await
+        });
         assert_eq!(devices.len(), 1);
     }
 
@@ -1077,7 +1231,12 @@ mod tests {
         let device = report_device("corsairpsu", Some(HwmonExclusion::DuplicateOfLiquidctl));
         let mut report = String::new();
         crate::rt::test_runtime(async {
-            write_fan_summary(&mut report, std::slice::from_ref(&device)).await;
+            write_fan_summary(
+                &mut report,
+                std::slice::from_ref(&device),
+                ReadBudget::starting_now(),
+            )
+            .await;
         });
         assert!(report.contains("corsairpsu"), "{report}");
         assert!(report.contains("not scanned"), "{report}");
@@ -1165,6 +1324,140 @@ mod tests {
         write_findings(&mut findings, None, true);
         assert!(findings.contains("not determined"));
         assert!(findings.contains("Secure Boot").not());
+    }
+
+    /// Goal: a fresh budget hands a device its own cap, not the whole report's.
+    /// One device must never be able to spend every other device's time.
+    #[test]
+    fn a_fresh_budget_caps_each_device_at_its_own_limit() {
+        let allowed = ReadBudget::starting_now()
+            .for_device()
+            .expect("a fresh budget has time left");
+        assert_eq!(allowed, DEVICE_READ_BUDGET);
+    }
+
+    /// Goal: near the end of the report the remainder is smaller than a device's
+    /// cap, and the smaller of the two has to win. Method: build a budget whose
+    /// deadline is deliberately closer than `DEVICE_READ_BUDGET`. Without this
+    /// the last devices scanned could overrun the actor's own timeout between
+    /// them and lose the whole report.
+    #[test]
+    fn a_nearly_spent_budget_hands_out_only_what_is_left() {
+        let budget = ReadBudget {
+            deadline: Instant::now() + Duration::from_millis(200),
+        };
+        let allowed = budget.for_device().expect("200ms is still time");
+        assert!(allowed <= Duration::from_millis(200), "allowed {allowed:?}");
+        assert!(allowed < DEVICE_READ_BUDGET);
+    }
+
+    /// Goal: a spent budget refuses rather than handing out a zero-length one,
+    /// so the caller reports the device by name instead of silently reading it
+    /// with no time at all.
+    #[test]
+    fn a_spent_budget_hands_out_nothing() {
+        let budget = ReadBudget {
+            deadline: Instant::now() - Duration::from_secs(1),
+        };
+        assert!(budget.for_device().is_none());
+    }
+
+    /// Goal: work that finishes inside the budget is returned untouched. The
+    /// common case must pay nothing for the bound being there.
+    #[test]
+    #[serial]
+    fn work_inside_the_budget_returns_its_value() {
+        cc_fs::test_runtime(async {
+            let budget = ReadBudget::starting_now();
+            let value = within_budget(
+                budget,
+                "nct6687",
+                Path::new("/sys/class/hwmon/hwmon0"),
+                async { 42_u8 },
+            )
+            .await;
+            assert_eq!(value, Some(42));
+        });
+    }
+
+    /// Goal: a driver that stops answering costs the report that one device and
+    /// nothing else. Method: give a sleep far longer than the budget and check
+    /// the helper gives up well inside the sleep, so the caller can carry on
+    /// with the rest of the tree.
+    #[test]
+    #[serial]
+    #[cfg(feature = "gated-tests")]
+    fn work_past_the_budget_is_abandoned() {
+        cc_fs::test_runtime(async {
+            let budget = ReadBudget {
+                deadline: Instant::now() + Duration::from_millis(100),
+            };
+            let started = Instant::now();
+            let value = within_budget(
+                budget,
+                "stuck",
+                Path::new("/sys/class/hwmon/hwmon0"),
+                async {
+                    rt::sleep(Duration::from_secs(5)).await;
+                    42_u8
+                },
+            )
+            .await;
+            assert!(value.is_none(), "expected the read to be abandoned");
+            assert!(
+                started.elapsed() < Duration::from_secs(1),
+                "gave up after {:?}, which is not bounded",
+                started.elapsed()
+            );
+        });
+    }
+
+    /// Goal: the full tree names the device that stopped answering instead of
+    /// dropping the whole report. That line is the entire point of the report,
+    /// and an all-or-nothing timeout is exactly what cannot produce it.
+    #[test]
+    #[serial]
+    fn the_full_tree_names_a_device_that_did_not_answer() {
+        cc_fs::test_runtime(async {
+            let mut stuck = report_device("octo", None);
+            stuck.unresponsive = true;
+            let mut report = String::new();
+            write_full_tree(&mut report, &[stuck], ReadBudget::starting_now()).await;
+            assert!(report.contains("octo"));
+            assert!(report.contains(UNRESPONSIVE_NOTE));
+        });
+    }
+
+    /// Goal: the negative space. A device that answered carries no such note,
+    /// so the marker keeps meaning something when it does appear.
+    #[test]
+    #[serial]
+    fn a_device_that_answered_carries_no_note() {
+        cc_fs::test_runtime(async {
+            let healthy = report_device("nct6687", None);
+            let mut report = String::new();
+            write_full_tree(&mut report, &[healthy], ReadBudget::starting_now()).await;
+            assert!(report.contains("nct6687"));
+            assert!(report.contains(UNRESPONSIVE_NOTE).not());
+        });
+    }
+
+    /// Goal: an unresponsive device stays in the fan summary. Its `fans` is
+    /// empty because the scan gave up, and the summary skips empty devices, so
+    /// without an explicit branch the one device worth reporting is the one
+    /// that vanishes.
+    #[test]
+    #[serial]
+    fn the_fan_summary_keeps_a_device_that_did_not_answer() {
+        cc_fs::test_runtime(async {
+            let mut stuck = report_device("octo", None);
+            stuck.unresponsive = true;
+            let mut report = String::new();
+            write_fan_summary(&mut report, &[stuck], ReadBudget::starting_now()).await;
+            assert!(report.contains("octo"));
+            assert!(report.contains(UNRESPONSIVE_NOTE));
+            assert!(report.contains("none found").not());
+        });
     }
 
     /// Goal: on an architecture with no Super-I/O bus (aarch64), the report says

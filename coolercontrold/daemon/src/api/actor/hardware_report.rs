@@ -25,6 +25,11 @@ use std::time::Duration;
 /// driver that never returns a read would otherwise wedge this actor for good,
 /// taking `GET /detect` down with it, since both share the mailbox. Kept under
 /// the API's own 30s timeout so the client sees the failure rather than a hang.
+///
+/// The last resort, not the working limit: `hardware_report::REPORT_READ_BUDGET`
+/// bounds the reads themselves at 15s and returns a report that names the
+/// device at fault. This fires only for a stall no `timeout` can interrupt,
+/// such as a synchronous `read_dir` on a wedged filesystem.
 const GENERATE_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Returned instead of a partial report, which would read as the whole truth

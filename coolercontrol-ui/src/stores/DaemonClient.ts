@@ -1312,8 +1312,15 @@ export default class DaemonClient {
      */
     async loadHardwareReport(full: boolean): Promise<string> {
         try {
+            // The full tree walks every hwmon device, and a `pwmN` read on a USB
+            // device such as an Aquacomputer Octo costs 200-400ms per channel, so
+            // a machine with a few of them legitimately needs well past the
+            // default 10s. Kept at the daemon's own request timeout so whatever
+            // it produces, report or failure, is what the user is shown.
             const response = await this.getClient().get('/hardware-report', {
                 params: { full },
+                timeout: this.daemonCompleteHistoryTimeout,
+                signal: AbortSignal.timeout(this.daemonCompleteHistoryTimeout),
             })
             this.logDaemonResponse(response, 'Load Hardware Report')
             return (response.data as { report: string }).report
