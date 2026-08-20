@@ -319,7 +319,7 @@ impl LiquidctlRepo {
                 DeviceType::Liquidctl,
                 &device_response.description,
                 &identifier,
-                &distinguisher,
+                &[distinguisher.as_str()],
             );
             let mut device = Device::new(
                 device_response.description,

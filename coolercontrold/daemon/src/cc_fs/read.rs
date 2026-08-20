@@ -171,6 +171,19 @@ pub async fn read_txt(path: impl AsRef<Path>) -> Result<String> {
     }
 }
 
+/// For small sysfs attributes that are not valid UTF-8, so cannot go through `read_sysfs`.
+/// SCSI VPD page 0x80 is the motivating case: it opens with `0x80`, an invalid lead byte.
+pub async fn read_bytes(path: impl AsRef<Path>) -> Result<Vec<u8>> {
+    #[cfg(not(feature = "compio-rt"))]
+    {
+        Ok(tokio::fs::read(path).await?)
+    }
+    #[cfg(feature = "compio-rt")]
+    {
+        Ok(compio::fs::read(path.as_ref()).await?)
+    }
+}
+
 /// Reads the entire contents of a file into a vector of bytes. Tailored for reading images, which
 /// are typically larger than other files.
 ///
