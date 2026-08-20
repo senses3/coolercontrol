@@ -30,8 +30,10 @@ const WATCHDOG_GRACE_SECS: u64 = 10;
 /// GPU driver ioctl). Moving on keeps the actor responsive; the kernel reaps
 /// the zombie when the blocking syscall returns.
 const STOP_REAP_TIMEOUT_SECS: u64 = 5;
-/// Workers for stress-ng's opengl stressor.
-const STRESS_NG_GPU_WORKERS: &str = "1";
+/// Workers for stress-ng's opengl stressor. One worker leaves a modern
+/// card mostly idle: reporters on RTX 4000-series and newer saw hardly
+/// any load until several render contexts ran concurrently.
+const STRESS_NG_GPU_WORKERS: &str = "4";
 /// Where the kernel exposes DRM devices, and the source of the GPU picker's
 /// render nodes. Overridden in tests.
 const DRM_CLASS_PATH: &str = "/sys/class/drm";
@@ -1498,11 +1500,12 @@ mod tests {
     }
 
     #[test]
-    fn stress_ng_gpu_args_without_a_target() {
+    fn stress_ng_gpu_args_use_several_workers() {
+        // A single worker leaves 4000-series and newer cards nearly idle.
         // No --gpu-devnode means stress-ng picks its own default device,
         // which is what "all GPUs" falls back to for this backend.
         let args = stress_ng_gpu_args(60, None).unwrap();
-        assert_eq!(args, ["--gpu", "1", "--timeout", "60s"]);
+        assert_eq!(args, ["--gpu", "4", "--timeout", "60s"]);
     }
 
     #[test]
@@ -1518,7 +1521,7 @@ mod tests {
             args,
             [
                 "--gpu",
-                "1",
+                "4",
                 "--timeout",
                 "30s",
                 "--gpu-devnode",
