@@ -195,9 +195,11 @@ const gpuLabel = (gpu: { id: string; name: string }): string => {
     return `${gpu.name} (${slot})`
 }
 
+// Cards first, discrete ones at the top as the daemon sorted them. "All GPUs"
+// trails the list: it is the fallback, not what most users are reaching for.
 const gpuOptions = computed(() => [
-    { label: t('views.appInfo.allGpus'), value: ALL_GPUS },
     ...availableGpus.value.map((gpu) => ({ label: gpuLabel(gpu), value: gpu.id })),
+    { label: t('views.appInfo.allGpus'), value: ALL_GPUS },
 ])
 
 const doGpuStress = async () => {
