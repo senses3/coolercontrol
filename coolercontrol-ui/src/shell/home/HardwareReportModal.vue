@@ -9,6 +9,9 @@
 // app itself. The daemon excludes serials and uuids when building the text.
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon'
+import { mdiLoading } from '@mdi/js'
 import UiModal from '@/shell/ui/UiModal.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -95,7 +98,8 @@ async function copy(): Promise<void> {
                 class="max-h-[60vh] overflow-auto rounded-lg bg-bg-two p-3 text-sm text-text-color"
                 >{{ report || t('views.appInfo.hardwareReportEmpty') }}</pre
             >
-            <div v-else class="p-3 text-base text-text-color-secondary">
+            <div v-else class="flex items-center gap-2 p-3 text-base text-text-color-secondary">
+                <svg-icon type="mdi" :path="mdiLoading" :size="20" class="animate-spin" />
                 {{ t('common.loading') }}
             </div>
         </div>
