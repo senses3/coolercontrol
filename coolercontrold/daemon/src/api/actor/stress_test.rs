@@ -86,11 +86,14 @@ pub struct GpuAdapter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GpuTarget {
     /// Selection key. The PCI slot (`0000:03:00.0`) when the adapter matched
-    /// a DRM device, else the PCI ID. Slots stay distinct for two identical
-    /// cards, which PCI IDs do not.
+    /// a DRM device, else the PCI ID plus its position. Slots stay distinct
+    /// for two identical cards, which PCI IDs do not.
     pub id: String,
     pub name: String,
     pub discrete: bool,
+    /// Position in the enumerated adapter list, which is how the built-in
+    /// backend picks between two cards of the same model.
+    pub index: usize,
     pub pci_id: String,
     pub render_node: Option<String>,
 }
@@ -1131,8 +1134,9 @@ fn stress_ng_gpu_args(duration_secs: u16, target: Option<&GpuTarget>) -> Result<
     Ok(args)
 }
 
-/// Build the built-in backend's GPU arguments. It filters wgpu adapters by
-/// PCI ID, the only identity wgpu and sysfs share.
+/// Build the built-in backend's GPU arguments. It picks the adapter by
+/// position, because two cards of the same model share a PCI ID; the ID
+/// rides along so the subprocess can reject a list that has since shifted.
 fn builtin_gpu_args(duration_secs: u16, target: Option<&GpuTarget>) -> Vec<String> {
     let mut args = vec![
         "stress-gpu".to_string(),
@@ -1140,6 +1144,8 @@ fn builtin_gpu_args(duration_secs: u16, target: Option<&GpuTarget>) -> Vec<Strin
         duration_secs.to_string(),
     ];
     if let Some(target) = target {
+        args.push("--gpu-index".to_string());
+        args.push(target.index.to_string());
         args.push("--gpu-id".to_string());
         args.push(target.pci_id.clone());
     }
@@ -1238,11 +1244,18 @@ fn find_render_node(device_dir: &Path) -> Option<String> {
 /// Pair each enumerated adapter with its DRM device, discrete cards first.
 ///
 /// Ordering is what the UI preselects from: users stress the card with the
-/// cooler on it, not the iGPU that happens to enumerate first.
+/// cooler on it, not the iGPU that happens to enumerate first. `index` keeps
+/// each target pointing at its original adapter across that reordering.
+///
+/// Cards of the same model are paired positionally, both lists being in PCI
+/// enumeration order. That is the best available: wgpu reports no PCI slot,
+/// so nothing else ties an adapter to a DRM device. A mismatch would swap
+/// two cards of the same model, never reach a different model, and only
+/// affects the built-in backend, since stress-ng is handed the render node.
 fn build_gpu_targets(adapters: Vec<GpuAdapter>, drm_devices: &[DrmDevice]) -> Vec<GpuTarget> {
     let mut claimed = vec![false; drm_devices.len()];
     let mut targets = Vec::with_capacity(adapters.len());
-    for adapter in adapters {
+    for (index, adapter) in adapters.into_iter().enumerate() {
         // Claim each DRM device at most once so two identical cards do not
         // both resolve to the first one's render node.
         let matched = drm_devices
@@ -1254,12 +1267,15 @@ fn build_gpu_targets(adapters: Vec<GpuAdapter>, drm_devices: &[DrmDevice]) -> Ve
                 claimed[i] = true;
                 (drm.slot.clone(), drm.render_node.clone())
             }
-            None => (adapter.pci_id.clone(), None),
+            // No DRM device to name it by. The position keeps the key unique
+            // across identical cards, which the PCI ID alone would not.
+            None => (format!("{}@{index}", adapter.pci_id), None),
         };
         targets.push(GpuTarget {
             id,
             name: adapter.name,
             discrete: adapter.discrete,
+            index,
             pci_id: adapter.pci_id,
             render_node,
         });
@@ -1494,6 +1510,7 @@ mod tests {
             id: id.to_string(),
             name: format!("GPU {id}"),
             discrete,
+            index: 0,
             pci_id: "1002:73df".to_string(),
             render_node: render_node.map(ToString::to_string),
         }
@@ -1539,15 +1556,27 @@ mod tests {
     }
 
     #[test]
-    fn builtin_gpu_args_pass_the_pci_id_only_when_targeted() {
-        // Omitting --gpu-id is what keeps "all GPUs" stressing every adapter.
+    fn builtin_gpu_args_pass_position_and_pci_id_only_when_targeted() {
+        // Omitting the flags is what keeps "all GPUs" stressing every
+        // adapter. When targeted, position picks between cards of the same
+        // model and the PCI ID is the guard against a shifted list.
         assert_eq!(
             builtin_gpu_args(60, None),
             ["stress-gpu", "--timeout", "60"]
         );
+        let mut second_card = target("0000:82:00.0", true, None);
+        second_card.index = 1;
         assert_eq!(
-            builtin_gpu_args(60, Some(&target("0000:03:00.0", true, None))),
-            ["stress-gpu", "--timeout", "60", "--gpu-id", "1002:73df"]
+            builtin_gpu_args(60, Some(&second_card)),
+            [
+                "stress-gpu",
+                "--timeout",
+                "60",
+                "--gpu-index",
+                "1",
+                "--gpu-id",
+                "1002:73df"
+            ]
         );
     }
 
@@ -1593,9 +1622,10 @@ mod tests {
 
     #[test]
     fn gpu_targets_claim_each_drm_device_once() {
-        // Two identical cards share a PCI ID. Matching by ID alone would give
-        // both the first card's render node, so stress-ng would load one card
-        // twice and never touch the other.
+        // Two identical cards share a PCI ID, and multi-GPU rigs usually run
+        // matching cards. Matching by ID alone would give both the first
+        // card's render node, so stress-ng would load one card twice and
+        // never touch the other.
         let targets = build_gpu_targets(
             vec![
                 adapter("10de:2684", "RTX 4090", true),
@@ -1608,17 +1638,53 @@ mod tests {
         );
         assert_eq!(targets.len(), 2);
         assert_eq!(targets[0].id, "0000:01:00.0");
+        assert_eq!(targets[0].index, 0);
+        assert_eq!(
+            targets[0].render_node.as_deref(),
+            Some("/dev/dri/renderD128")
+        );
         assert_eq!(targets[1].id, "0000:02:00.0");
+        assert_eq!(targets[1].index, 1);
+        assert_eq!(
+            targets[1].render_node.as_deref(),
+            Some("/dev/dri/renderD129")
+        );
+    }
+
+    #[test]
+    fn gpu_targets_keep_their_adapter_position_through_the_sort() {
+        // The sort reorders the list the user picks from, but the built-in
+        // backend addresses adapters by their enumeration position. Losing
+        // that link would stress whichever card sorted into the slot.
+        let targets = build_gpu_targets(
+            vec![
+                adapter("8086:a780", "Intel UHD", false),
+                adapter("10de:2684", "RTX 4090", true),
+            ],
+            &[],
+        );
+        assert_eq!(targets[0].name, "RTX 4090");
+        assert_eq!(targets[0].index, 1);
+        assert_eq!(targets[1].name, "Intel UHD");
+        assert_eq!(targets[1].index, 0);
     }
 
     #[test]
     fn gpu_targets_fall_back_to_the_pci_id_when_sysfs_has_no_match() {
         // An adapter with no DRM device is still stressable by the built-in
-        // backend, which selects by PCI ID. It just cannot be handed to
-        // stress-ng, and `stress_ng_gpu_args` is what refuses that.
-        let targets = build_gpu_targets(vec![adapter("1002:73df", "RX 6750 XT", true)], &[]);
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].id, "1002:73df");
+        // backend, which selects by position. It just cannot be handed to
+        // stress-ng, and `stress_ng_gpu_args` is what refuses that. The
+        // position keeps the key unique when two identical cards land here.
+        let targets = build_gpu_targets(
+            vec![
+                adapter("10de:2684", "RTX 4090", true),
+                adapter("10de:2684", "RTX 4090", true),
+            ],
+            &[],
+        );
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].id, "10de:2684@0");
+        assert_eq!(targets[1].id, "10de:2684@1");
         assert_eq!(targets[0].render_node, None);
     }
 

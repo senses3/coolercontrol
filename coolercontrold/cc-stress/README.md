@@ -29,6 +29,7 @@ boosts clocks, and reset CPU affinity to all online cores (overriding any system
 
 ```rust
 use cc_stress::{list_gpu_adapters, run_cpu_stress, run_gpu_stress, run_ram_stress};
+use cc_stress::GpuSelection;
 use cc_stress::{online_cpu_count, available_memory_bytes, RAM_STRESS_ALLOC_FRACTION};
 
 // CPU stress: all cores, 60 seconds
@@ -40,9 +41,11 @@ run_cpu_stress(Some(4), 30).unwrap();
 // GPU stress: every detected GPU, 60 seconds
 run_gpu_stress(60, None).unwrap();
 
-// GPU stress: one card, selected by PCI ID
+// GPU stress: one card, selected by position in the list. Matched pairs
+// share a PCI ID, so the index picks between them and the ID guards it.
 let gpu = list_gpu_adapters().unwrap().remove(0);
-run_gpu_stress(60, Some(gpu.pci_id)).unwrap();
+let selection = GpuSelection { index: 0, pci_id: gpu.pci_id };
+run_gpu_stress(60, Some(selection)).unwrap();
 
 // RAM stress: allocate 80% of available memory, 60 seconds
 let alloc = (available_memory_bytes().unwrap() as f64 * RAM_STRESS_ALLOC_FRACTION) as u64;
@@ -55,7 +58,7 @@ run_ram_stress(alloc, 60).unwrap();
 | --------------------------- | ------------------------------------------------------ |
 | `run_cpu_stress`            | Spawn N threads running FMA+sqrt loops until timeout   |
 | `run_gpu_stress`            | Stress every detected GPU, or one, via wgpu compute    |
-| `list_gpu_adapters`         | List stressable GPUs, with discrete/integrated type    |
+| `list_gpu_adapters`         | List stressable GPUs, one entry per physical card      |
 | `run_ram_stress`            | Streaming memory stress across a large allocation      |
 | `online_cpu_count`          | Count logical CPUs from `/proc/cpuinfo`                |
 | `available_memory_bytes`    | Read `MemAvailable` from `/proc/meminfo`               |

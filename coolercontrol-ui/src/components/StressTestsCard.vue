@@ -185,9 +185,19 @@ const stopCpuStress = async () => {
     invalidatePendingStatus()
 }
 
+// Multi-GPU rigs usually run matching cards, which report the same name.
+// Those get their PCI slot appended so the two can be told apart; a lone
+// card of its model stays on the plain name.
+const gpuLabel = (gpu: { id: string; name: string }): string => {
+    const duplicated = availableGpus.value.filter((other) => other.name === gpu.name).length > 1
+    if (!duplicated) return gpu.name
+    const slot = gpu.id.startsWith('0000:') ? gpu.id.slice(5) : gpu.id
+    return `${gpu.name} (${slot})`
+}
+
 const gpuOptions = computed(() => [
     { label: t('views.appInfo.allGpus'), value: ALL_GPUS },
-    ...availableGpus.value.map((gpu) => ({ label: gpu.name, value: gpu.id })),
+    ...availableGpus.value.map((gpu) => ({ label: gpuLabel(gpu), value: gpu.id })),
 ])
 
 const doGpuStress = async () => {
