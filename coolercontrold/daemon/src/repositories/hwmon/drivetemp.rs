@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use std::cmp::PartialEq;
 use std::ops::Not;
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::rc::Rc;
@@ -175,11 +175,9 @@ impl std::error::Error for BlockingTimeoutError {
 ///   during a spin-up / spin-down. Returns a 0 C placeholder for
 ///   this tick; the in-flight coalesce guard sees a fresh mark and
 ///   the failsafe wall stays clear.
-/// - `Inner`: legacy behaviour (`false`); a drive that doesn't
-///   support the ATA power-state command may still have a working
-///   sysfs temp file. Logged at `info!` exactly once per drive via
-///   `state.ioctl_unsupported_logged` to avoid spam in systems with
-///   many drives.
+/// - `Inner`: legacy behaviour (`false`); a drive answering neither
+///   command may still have a working sysfs temp file. Logged once
+///   per drive via `state.ioctl_unsupported_logged`.
 /// - `Join`: rare panic in the blocking task. Fall through to sysfs
 ///   like `Inner`, logged at `warn!`.
 pub async fn is_suspended(state: &DrivetempState, timeout: Duration) -> bool {
@@ -201,8 +199,9 @@ pub async fn is_suspended(state: &DrivetempState, timeout: Duration) -> bool {
         Err(BlockingTimeoutError::Inner(err)) => {
             if state.ioctl_unsupported_logged.replace(true).not() {
                 info!(
-                    "Drive {} does not support the ATA power-state ioctl \
-                     ({err}); falling back to direct sysfs reads",
+                    "Drive {} does not support any ATA power-state command \
+                     ({err}); falling back to direct sysfs reads, which cannot \
+                     tell a spun-down drive from an awake one",
                     block_device_path.display()
                 );
             }
@@ -251,7 +250,10 @@ async fn drive_power_state(
     // but the caller is released on time and the next poll tick can
     // proceed without the single-threaded runtime being stalled.
     let dev_path = dev_path.to_path_buf();
-    run_blocking_with_timeout(timeout, move || drive_power_state_blocking(&dev_path)).await
+    run_blocking_with_timeout(timeout, move || {
+        drive_power_state_blocking(&dev_path, timeout)
+    })
+    .await
 }
 
 /// Offloads a synchronous fallible closure to the Tokio blocking pool
@@ -277,10 +279,188 @@ where
     }
 }
 
-/// Synchronous body of `drive_power_state`. Opens the block device and
-/// issues the `HDIO_DRIVE_CMD` ioctl to read the ATA power state. Runs
-/// on the Tokio blocking pool via `drive_power_state`.
-fn drive_power_state_blocking(dev_path: &Path) -> Result<PowerState> {
+/// `scsi/sg.h`. Issues a SCSI command on an open block device.
+const IOCTL_SG_IO: libc::c_ulong = 0x2285;
+
+/// SAT opcode wrapping an ATA command in a SCSI CDB, so it survives a transport with no
+/// legacy HDIO ioctls.
+const SCSI_ATA_PASS_THROUGH_16: u8 = 0x85;
+
+/// CDB byte 1: ATA protocol 3 (Non-data) in bits 3:1.
+const SAT_PROTOCOL_NON_DATA: u8 = 3 << 1;
+
+/// CDB byte 2: returns the ATA output registers in sense data even on success. Without it the
+/// power mode is unreadable.
+const SAT_FLAG_CK_COND: u8 = 0x20;
+
+/// Descriptor code for the ATA Status Return descriptor in descriptor-format sense.
+const SENSE_DESC_ATA_RETURN: u8 = 0x09;
+
+/// Declared length of a complete ATA Status Return descriptor, minus its 2 byte header. Less
+/// than this means truncated output registers, so `+5` belongs to whatever follows.
+const SENSE_DESC_ATA_RETURN_LEN: usize = 12;
+
+/// ATA status `ERR` bit. Set means the output registers carry no power mode, so a zero count
+/// must not read as `Standby`.
+const ATA_STATUS_ERR: u8 = 0x01;
+
+/// Descriptor-format sense response codes (current and deferred).
+const SENSE_FORMAT_DESCRIPTOR_CURRENT: u8 = 0x72;
+const SENSE_FORMAT_DESCRIPTOR_DEFERRED: u8 = 0x73;
+
+/// Big enough for the 8 byte sense header plus the 14 byte ATA return descriptor.
+const SENSE_BUFFER_LEN: usize = 32;
+const _: () = assert!(SENSE_BUFFER_LEN >= 22);
+
+/// `sg_io_hdr_t` from `scsi/sg.h`. Field order and types must match the header exactly.
+#[repr(C)]
+struct SgIoHdr {
+    interface_id: libc::c_int,
+    dxfer_direction: libc::c_int,
+    cmd_len: libc::c_uchar,
+    mx_sb_len: libc::c_uchar,
+    iovec_count: libc::c_ushort,
+    dxfer_len: libc::c_uint,
+    dxferp: *mut libc::c_void,
+    cmdp: *mut libc::c_uchar,
+    sbp: *mut libc::c_uchar,
+    timeout: libc::c_uint,
+    flags: libc::c_uint,
+    pack_id: libc::c_int,
+    usr_ptr: *mut libc::c_void,
+    status: libc::c_uchar,
+    masked_status: libc::c_uchar,
+    msg_status: libc::c_uchar,
+    sb_len_wr: libc::c_uchar,
+    host_status: libc::c_ushort,
+    driver_status: libc::c_ushort,
+    resid: libc::c_int,
+    duration: libc::c_uint,
+    info: libc::c_uint,
+}
+
+/// ATA-3 values, newer than what hdparm uses. Shared by the HDIO and SAT paths so the two
+/// cannot disagree about a given byte.
+fn power_state_from_ata_count(count: u8) -> PowerState {
+    match count {
+        0x00..=0x01 => PowerState::Standby,
+        0x80..=0x83 => PowerState::Idle,
+        0xFF => PowerState::ActiveIdle,
+        _ => PowerState::Unknown,
+    }
+}
+
+/// Split from the ioctl so the parsing is testable without a SAS HBA. `None` for sense that is
+/// not descriptor format, lacks an ATA Status Return descriptor, is truncated, or reports an error.
+fn ata_count_from_sense(sense: &[u8]) -> Option<u8> {
+    let response_code = *sense.first()?;
+    let is_current = response_code == SENSE_FORMAT_DESCRIPTOR_CURRENT;
+    let is_deferred = response_code == SENSE_FORMAT_DESCRIPTOR_DEFERRED;
+    if is_current.not() && is_deferred.not() {
+        return None;
+    }
+    let additional_length = usize::from(*sense.get(7)?);
+    let end = additional_length.saturating_add(8).min(sense.len());
+    let mut offset = 8;
+    // Each descriptor is a 2 byte header plus its declared length. The loop is bounded
+    // by `end`, and a zero-length descriptor still advances by 2, so it terminates.
+    while offset + 1 < end {
+        let descriptor_code = sense[offset];
+        let descriptor_length = usize::from(sense[offset + 1]);
+        if descriptor_code == SENSE_DESC_ATA_RETURN {
+            // [code, length, flags, error, count_ext, count, lba x6, device, status]
+            if descriptor_length < SENSE_DESC_ATA_RETURN_LEN {
+                return None;
+            }
+            let status = *sense.get(offset + 13)?;
+            if status & ATA_STATUS_ERR != 0 {
+                return None;
+            }
+            return sense.get(offset + 5).copied();
+        }
+        offset += descriptor_length + 2;
+    }
+    None
+}
+
+/// Returns `None` when the driver rejects it, the normal outcome for any drive not directly
+/// attached via libata.
+fn drive_power_state_via_hdio(fd: RawFd) -> Option<PowerState> {
+    let mut query: [libc::c_uchar; 4] = [0; 4];
+    // SAFETY: `fd` is an open block device owned by the caller and outlives this call.
+    // `query` is a 4 byte buffer matching what HDIO_DRIVE_CMD reads and writes.
+    // The try_into conversion is for musl, where the ioctl signature uses c_uint.
+    #[allow(clippy::useless_conversion)]
+    unsafe {
+        let request = IOCTL_DRIVE_CMD.try_into().ok()?;
+        query[0] = ATA_CHECKPOWERMODE;
+        if libc::ioctl(fd, request, query.as_mut_ptr()) != 0 {
+            query[0] = ATA_CHECKPOWERMODE_RETIRED;
+            if libc::ioctl(fd, request, query.as_mut_ptr()) != 0 {
+                return None;
+            }
+        }
+    }
+    Some(power_state_from_ata_count(query[2]))
+}
+
+/// Needed because `HDIO_DRIVE_CMD` is serviced only by libata, so drives behind a SAS HBA
+/// reject it and the suspend check silently degrades to "always awake". Same mechanism as
+/// `smartctl -d sat`.
+fn drive_power_state_via_sat(fd: RawFd, timeout: Duration) -> Option<PowerState> {
+    let mut cdb: [u8; 16] = [0; 16];
+    cdb[0] = SCSI_ATA_PASS_THROUGH_16;
+    cdb[1] = SAT_PROTOCOL_NON_DATA;
+    cdb[2] = SAT_FLAG_CK_COND;
+    cdb[14] = ATA_CHECKPOWERMODE;
+    let mut sense: [u8; SENSE_BUFFER_LEN] = [0; SENSE_BUFFER_LEN];
+    let timeout_ms = u32::try_from(timeout.as_millis()).unwrap_or(u32::MAX);
+    let mut header = SgIoHdr {
+        interface_id: i32::from(b'S'),
+        dxfer_direction: -1, // SG_DXFER_NONE
+        cmd_len: u8::try_from(cdb.len()).ok()?,
+        mx_sb_len: u8::try_from(sense.len()).ok()?,
+        iovec_count: 0,
+        dxfer_len: 0,
+        dxferp: std::ptr::null_mut(),
+        cmdp: cdb.as_mut_ptr(),
+        sbp: sense.as_mut_ptr(),
+        timeout: timeout_ms,
+        flags: 0,
+        pack_id: 0,
+        usr_ptr: std::ptr::null_mut(),
+        status: 0,
+        masked_status: 0,
+        msg_status: 0,
+        sb_len_wr: 0,
+        host_status: 0,
+        driver_status: 0,
+        resid: 0,
+        duration: 0,
+        info: 0,
+    };
+    assert_eq!(usize::from(header.cmd_len), cdb.len());
+    assert_eq!(usize::from(header.mx_sb_len), sense.len());
+    // SAFETY: `fd` is an open block device owned by the caller. `header` points at
+    // `cdb` and `sense`, both live for the whole call, and their lengths are recorded
+    // in `cmd_len` / `mx_sb_len` so the kernel cannot overrun either.
+    // The try_into conversion is for musl, where the ioctl signature uses c_uint.
+    #[allow(clippy::useless_conversion)]
+    let result = unsafe {
+        let request = IOCTL_SG_IO.try_into().ok()?;
+        libc::ioctl(fd, request, std::ptr::addr_of_mut!(header))
+    };
+    if result != 0 {
+        return None;
+    }
+    // Never trust the device's own count as a bound.
+    let written = usize::from(header.sb_len_wr).min(sense.len());
+    ata_count_from_sense(&sense[..written]).map(power_state_from_ata_count)
+}
+
+/// Synchronous body of `drive_power_state`, run on the blocking pool. Prefers the legacy
+/// `HDIO_DRIVE_CMD` ioctl and falls back to SAT for transports without it.
+fn drive_power_state_blocking(dev_path: &Path, timeout: Duration) -> Result<PowerState> {
     use std::os::unix::fs::OpenOptionsExt;
     let block_dev_file = std::fs::OpenOptions::new()
         .read(true)
@@ -290,28 +470,15 @@ fn drive_power_state_blocking(dev_path: &Path) -> Result<PowerState> {
     if fd == -1 {
         return Err(anyhow!("Failed to open device"));
     }
-    let mut query: [libc::c_uchar; 4] = [0; 4];
-
-    // low level kernel ioctl
-    #[allow(clippy::useless_conversion)]
-    unsafe {
-        query[0] = ATA_CHECKPOWERMODE;
-        // try_into conversion is for musl libc compatability, where the ioctl signature uses c_uint
-        if libc::ioctl(fd, IOCTL_DRIVE_CMD.try_into()?, query.as_mut_ptr()) != 0 {
-            // Try the retired command if the current one failed
-            query[0] = ATA_CHECKPOWERMODE_RETIRED;
-            if libc::ioctl(fd, IOCTL_DRIVE_CMD.try_into()?, query.as_mut_ptr()) != 0 {
-                return Err(anyhow!("Not a Block Device File"));
-            }
-        }
+    if let Some(power_state) = drive_power_state_via_hdio(fd) {
+        return Ok(power_state);
     }
-    // These are based on ATA-3 standards (newer than what hdparm uses)
-    Ok(match query[2] {
-        0x00..=0x01 => PowerState::Standby,
-        0x80..=0x83 => PowerState::Idle,
-        0xFF => PowerState::ActiveIdle,
-        _ => PowerState::Unknown,
-    })
+    if let Some(power_state) = drive_power_state_via_sat(fd, timeout) {
+        return Ok(power_state);
+    }
+    Err(anyhow!(
+        "the driver rejected both HDIO_DRIVE_CMD and SCSI ATA PASS-THROUGH"
+    ))
 }
 
 /// Tests
@@ -491,6 +658,109 @@ mod tests {
             let power_state = dev_result.unwrap();
             assert_eq!(power_state, PowerState::Unknown,);
         });
+    }
+
+    // Goal: both power-state paths decode the ATA count register identically, so a drive
+    // behind an HBA cannot be classified differently from the same drive on a SATA port.
+    // Covers every documented band plus the negative space between them.
+    #[test]
+    fn ata_count_maps_to_documented_power_states() {
+        assert_eq!(power_state_from_ata_count(0x00), PowerState::Standby);
+        assert_eq!(power_state_from_ata_count(0x01), PowerState::Standby);
+        assert_eq!(power_state_from_ata_count(0x80), PowerState::Idle);
+        assert_eq!(power_state_from_ata_count(0x83), PowerState::Idle);
+        assert_eq!(power_state_from_ata_count(0xFF), PowerState::ActiveIdle);
+        // Between the bands: not a value the standard assigns.
+        assert_eq!(power_state_from_ata_count(0x02), PowerState::Unknown);
+        assert_eq!(power_state_from_ata_count(0x7F), PowerState::Unknown);
+        assert_eq!(power_state_from_ata_count(0x84), PowerState::Unknown);
+    }
+
+    /// Descriptor-format sense carrying an ATA Status Return descriptor whose count
+    /// register holds `count`. Shaped as the kernel returns it for a CK_COND request.
+    fn ata_sense_with_count(count: u8) -> Vec<u8> {
+        let mut sense = vec![0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0E];
+        sense.extend_from_slice(&[SENSE_DESC_ATA_RETURN, 0x0C, 0x00, 0x00, 0x00, count]);
+        sense.extend_from_slice(&[0; 8]);
+        sense
+    }
+
+    // Goal: the SAT path's only untestable-on-this-machine step is the ioctl itself, so
+    // the sense parsing is verified directly. A standby drive must decode as Standby.
+    #[test]
+    fn ata_count_is_read_from_descriptor_sense() {
+        assert_eq!(
+            ata_count_from_sense(&ata_sense_with_count(0x00)),
+            Some(0x00)
+        );
+        assert_eq!(
+            ata_count_from_sense(&ata_sense_with_count(0xFF)),
+            Some(0xFF)
+        );
+        let standby = ata_count_from_sense(&ata_sense_with_count(0x00)).unwrap();
+        assert_eq!(power_state_from_ata_count(standby), PowerState::Standby);
+    }
+
+    // Goal: the ATA descriptor is not required to come first, so the walk must skip
+    // preceding descriptors using their declared lengths rather than assuming offset 8.
+    #[test]
+    fn ata_count_is_found_after_another_descriptor() {
+        let mut sense = vec![0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16];
+        // A 6 byte Information descriptor (code 0x00) ahead of the ATA one.
+        sense.extend_from_slice(&[0x00, 0x04, 0x00, 0x00, 0x00, 0x00]);
+        sense.extend_from_slice(&[SENSE_DESC_ATA_RETURN, 0x0C, 0x00, 0x00, 0x00, 0x83]);
+        sense.extend_from_slice(&[0; 8]);
+
+        assert_eq!(ata_count_from_sense(&sense), Some(0x83));
+    }
+
+    // Goal: negative space. Anything that is not descriptor-format sense carrying an ATA
+    // descriptor must yield None so the caller falls through rather than inventing a
+    // power state from unrelated bytes.
+    #[test]
+    fn ata_count_rejects_sense_without_an_ata_descriptor() {
+        // Fixed-format sense (0x70) is not descriptor format.
+        let mut fixed = vec![0x70];
+        fixed.extend_from_slice(&[0; 20]);
+        assert_eq!(ata_count_from_sense(&fixed), None);
+        // Descriptor format, but only an Information descriptor.
+        let mut other = vec![0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06];
+        other.extend_from_slice(&[0x00, 0x04, 0x00, 0x00, 0x00, 0x00]);
+        assert_eq!(ata_count_from_sense(&other), None);
+        // Empty and truncated buffers must not panic.
+        assert_eq!(ata_count_from_sense(&[]), None);
+        assert_eq!(ata_count_from_sense(&[0x72, 0x00]), None);
+        // Declares an ATA descriptor but is cut off before the count byte.
+        let truncated = vec![0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0E, 0x09, 0x0C];
+        assert_eq!(ata_count_from_sense(&truncated), None);
+    }
+
+    // Goal: a short ATA descriptor means truncated registers, so +5 belongs to the next
+    // descriptor. Decoding it would read 0x00 as Standby and suppress the temp read.
+    #[test]
+    fn ata_count_rejects_a_short_ata_descriptor() {
+        // Declares length 0x06 rather than 0x0C, then a second descriptor behind it.
+        let mut sense = vec![0x72, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10];
+        sense.extend_from_slice(&[SENSE_DESC_ATA_RETURN, 0x06, 0x00, 0x00, 0x00, 0x00]);
+        sense.extend_from_slice(&[0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00]);
+
+        assert_eq!(ata_count_from_sense(&sense), None);
+    }
+
+    // Goal: ERR set means no power mode in the registers. A zero count must not decode as
+    // Standby, which would report 0 C for a drive that is awake and heating.
+    #[test]
+    fn ata_count_rejects_a_descriptor_reporting_an_ata_error() {
+        let mut errored = ata_sense_with_count(0x00);
+        errored[8 + 3] = 0x04; // error register: ABRT
+        errored[8 + 13] = ATA_STATUS_ERR; // status register: ERR
+
+        assert_eq!(ata_count_from_sense(&errored), None);
+
+        // Negative space: the same descriptor without ERR still decodes.
+        let mut ok = ata_sense_with_count(0x00);
+        ok[8 + 13] = 0x50; // DRDY | DSC, no ERR
+        assert_eq!(ata_count_from_sense(&ok), Some(0x00));
     }
 
     // --- run_blocking_with_timeout: timeout & success semantics ---
