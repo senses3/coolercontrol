@@ -22,7 +22,7 @@ use crate::device::{
 };
 use crate::device_health::{FailsafeKind, FailsafeRef};
 use crate::overrides::OverridesController;
-use crate::repositories::failsafe::MISSING_TEMP_FAILSAFE;
+use crate::repositories::failsafe::{MISSING_STATUS_THRESHOLD, MISSING_TEMP_FAILSAFE};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
 use crate::setting::{
     CustomSensor, CustomSensorKind, CustomSensorMixFunctionType, CustomTempSourceData, LcdSettings,
@@ -88,6 +88,17 @@ pub struct CustomSensorsRepo {
     /// sensor id. Lets each tick fetch only the current source sample instead of
     /// rescanning up to `SAMPLE_WINDOW_MAX_SLOTS` history entries per sensor.
     sample_windows: RefCell<HashMap<TempName, SampleWindow>>,
+    /// Transient read state for `File` sensors. See [`FileReadState`].
+    file_read_state: RefCell<HashMap<TempName, FileReadState>>,
+}
+
+/// The held value is emitted for up to `MISSING_STATUS_THRESHOLD` consecutive failures, so one
+/// unlucky read does not slam a fan curve to `MISSING_TEMP_FAILSAFE`. A sensor that never read
+/// successfully has nothing to hold and failsafes at once.
+#[derive(Default)]
+struct FileReadState {
+    consecutive_failures: u16,
+    last_good_temp: Option<Temp>,
 }
 
 impl CustomSensorsRepo {
@@ -112,6 +123,7 @@ impl CustomSensorsRepo {
             poll_rate,
             overrides,
             failsafing_sensors: RefCell::new(HashMap::new()),
+            file_read_state: RefCell::new(HashMap::new()),
             sample_windows: RefCell::new(HashMap::new()),
         })
     }
@@ -180,6 +192,8 @@ impl CustomSensorsRepo {
             .remove(&custom_sensor.id);
         // The window or source may have changed; the next tick reseeds from history.
         self.sample_windows.borrow_mut().remove(&custom_sensor.id);
+        // A repointed File sensor must not ride out failures on the old file's value.
+        self.file_read_state.borrow_mut().remove(&custom_sensor.id);
         self.config.update_custom_sensor(custom_sensor.clone())?;
         {
             let mut sensors = self.sensors.borrow_mut();
@@ -217,6 +231,7 @@ impl CustomSensorsRepo {
             .borrow_mut()
             .remove(custom_sensor_id);
         self.sample_windows.borrow_mut().remove(custom_sensor_id);
+        self.file_read_state.borrow_mut().remove(custom_sensor_id);
         self.update_device_info_temps();
         self.reconstruct_relationships();
         Ok(())
@@ -953,9 +968,10 @@ impl CustomSensorsRepo {
         (temp_data[0].temp + Temp::from(offset)).clamp(0.0, 150.0)
     }
 
-    /// Reads the current temp for a File-type Custom Sensor. On unreadable / malformed file,
-    /// emits `MISSING_TEMP_FAILSAFE` (and a once-per-occurrence warn log), so a fan curve
-    /// driven by the file sensor reacts to the lost source rather than a fake-cool value.
+    /// Reads the current temp for a File-type Custom Sensor. An unreadable / malformed file
+    /// holds the last good value for `MISSING_STATUS_THRESHOLD` consecutive failures, then
+    /// emits `MISSING_TEMP_FAILSAFE` (and a once-per-occurrence warn log): a fan curve rides
+    /// out a writer caught mid-truncate but still reacts to a genuinely lost source.
     /// Live-tick path only; backfill reads `get_custom_sensor_file_temp` directly so it
     /// does not interact with the failsafing-state set.
     async fn process_custom_sensor_data_file_current(
@@ -964,9 +980,38 @@ impl CustomSensorsRepo {
         file_path: &Path,
     ) -> TempStatus {
         match Self::get_custom_sensor_file_temp(file_path).await {
-            Ok(temp) => self.emit_real_temp(id, temp),
-            Err(_) => self.emit_failsafe(id, "file unreadable"),
+            Ok(temp) => {
+                self.record_file_read_success(id, temp);
+                self.emit_real_temp(id, temp)
+            }
+            Err(_) => match self.tolerate_file_read_failure(id) {
+                Some(temp) => TempStatus {
+                    name: id.clone(),
+                    temp,
+                },
+                None => self.emit_failsafe(id, "file unreadable"),
+            },
         }
+    }
+
+    /// Clears the failure run and holds `temp` as the value to emit if the next reads fail.
+    fn record_file_read_success(&self, id: &TempName, temp: Temp) {
+        let mut states = self.file_read_state.borrow_mut();
+        let state = states.entry(id.clone()).or_default();
+        state.consecutive_failures = 0;
+        state.last_good_temp = Some(temp);
+    }
+
+    /// Returns the held value while inside the tolerance window, or `None` once the run
+    /// of failures passes `MISSING_STATUS_THRESHOLD` and the caller must failsafe.
+    fn tolerate_file_read_failure(&self, id: &TempName) -> Option<Temp> {
+        let mut states = self.file_read_state.borrow_mut();
+        let state = states.entry(id.clone()).or_default();
+        state.consecutive_failures = state.consecutive_failures.saturating_add(1);
+        if usize::from(state.consecutive_failures) > MISSING_STATUS_THRESHOLD {
+            return None;
+        }
+        state.last_good_temp
     }
 
     async fn get_custom_sensor_file_temp(file_path: &Path) -> Result<f64> {
@@ -1456,7 +1501,7 @@ mod tests {
     use crate::repositories::custom_sensors_repo::{
         CustomSensorsRepo, SampleWindow, TempData, SAMPLE_WINDOW_MAX_SLOTS,
     };
-    use crate::repositories::failsafe::MISSING_TEMP_FAILSAFE;
+    use crate::repositories::failsafe::{MISSING_STATUS_THRESHOLD, MISSING_TEMP_FAILSAFE};
     use crate::repositories::repository::{DeviceLock, Repository};
     use crate::setting::{
         CustomSensor, CustomSensorKind, CustomSensorMixFunctionType, CustomTempSourceData,
@@ -3272,8 +3317,9 @@ mod tests {
     }
 
     // File sensor entering failsafe and recovering: write valid file, run a live tick,
-    // delete the file, run another live tick (failsafe + set entry), restore the file with
-    // a new value, run another live tick (real value + set cleared).
+    // delete the file, exhaust the tolerance window (the held value is emitted until the
+    // failure run passes MISSING_STATUS_THRESHOLD), then confirm failsafe + set entry, and
+    // finally restore the file with a new value and confirm recovery.
     #[test]
     #[serial]
     fn file_sensor_recovers_from_failsafe() {
@@ -3292,9 +3338,17 @@ mod tests {
             assert!((current_temp_for(&repo, "file1") - 45.0).abs() < f64::EPSILON);
             assert!(repo.failsafing_sensors.borrow().contains_key("file1").not());
 
-            // Remove the file: next tick should failsafe, and the repository must report
-            // the ref with the reason from the entry transition.
+            // Remove the file. Reads inside the tolerance window hold the last good value
+            // rather than commanding a fan curve to 100 C on one unlucky read.
             cc_fs::remove_file(&test_file).await.ok();
+            for _ in 0..MISSING_STATUS_THRESHOLD {
+                repo.update_statuses().await.unwrap();
+                assert!((current_temp_for(&repo, "file1") - 45.0).abs() < f64::EPSILON);
+                assert!(repo.failsafing_sensors.borrow().contains_key("file1").not());
+            }
+
+            // One more failure passes the threshold: now it failsafes, and the repository
+            // must report the ref with the reason from the entry transition.
             repo.update_statuses().await.unwrap();
             assert!(
                 (current_temp_for(&repo, "file1") - MISSING_TEMP_FAILSAFE).abs() < f64::EPSILON
@@ -3307,6 +3361,94 @@ mod tests {
 
             // Restore the file with a new value: next tick recovers.
             cc_fs::write(&test_file, b"55000".to_vec()).await.unwrap();
+            repo.update_statuses().await.unwrap();
+            assert!((current_temp_for(&repo, "file1") - 55.0).abs() < f64::EPSILON);
+            assert!(repo.failsafing_sensors.borrow().contains_key("file1").not());
+        });
+    }
+
+    // Goal: the reporter's actual symptom. Their script rewrites the file, so reads land
+    // mid-truncate and each one used to command 100 C for a tick. Method: one good tick,
+    // one failed read, assert the held value is emitted and no failsafe is entered.
+    #[test]
+    #[serial]
+    fn file_sensor_holds_last_good_value_on_transient_failure() {
+        cc_fs::test_runtime(async {
+            let test_file = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
+            cc_fs::write(&test_file, b"45000".to_vec()).await.unwrap();
+            let test_config = Rc::new(Config::init_default_config().unwrap());
+            let mut repo = CustomSensorsRepo::new(test_config, vec![], test_overrides()).unwrap();
+            repo.initialize_devices().await.unwrap();
+            repo.set_custom_sensor(file_sensor("file1", test_file.clone()))
+                .await
+                .unwrap();
+            repo.update_statuses().await.unwrap();
+
+            // A truncated file reads as unparseable, exactly like the mid-write race.
+            cc_fs::write(&test_file, Vec::new()).await.unwrap();
+            repo.update_statuses().await.unwrap();
+
+            assert!((current_temp_for(&repo, "file1") - 45.0).abs() < f64::EPSILON);
+            assert!(repo.failsafing_sensors.borrow().contains_key("file1").not());
+        });
+    }
+
+    // Goal: negative space for the tolerance window. A sensor that has never read
+    // successfully has nothing to hold, so it must failsafe on its first failed tick
+    // instead of reporting a stale-but-plausible value it never had.
+    #[test]
+    #[serial]
+    fn file_sensor_failsafes_immediately_when_never_read_successfully() {
+        cc_fs::test_runtime(async {
+            let test_file = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
+            cc_fs::write(&test_file, b"45000".to_vec()).await.unwrap();
+            let test_config = Rc::new(Config::init_default_config().unwrap());
+            let mut repo = CustomSensorsRepo::new(test_config, vec![], test_overrides()).unwrap();
+            repo.initialize_devices().await.unwrap();
+            // set_custom_sensor validates the file, so it must exist here. Removing it
+            // before the first live tick means no tick ever recorded a good value.
+            repo.set_custom_sensor(file_sensor("file1", test_file.clone()))
+                .await
+                .unwrap();
+            cc_fs::remove_file(&test_file).await.ok();
+
+            repo.update_statuses().await.unwrap();
+
+            assert!(
+                (current_temp_for(&repo, "file1") - MISSING_TEMP_FAILSAFE).abs() < f64::EPSILON
+            );
+            assert!(repo.failsafing_sensors.borrow().contains_key("file1"));
+        });
+    }
+
+    // Goal: the window is a run of CONSECUTIVE failures, not a lifetime budget. A flapping
+    // writer must not eventually exhaust it. Method: fail almost to the threshold, succeed
+    // once, then fail again and assert the held value is still emitted.
+    #[test]
+    #[serial]
+    fn file_sensor_failure_run_resets_after_a_good_read() {
+        cc_fs::test_runtime(async {
+            let test_file = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
+            cc_fs::write(&test_file, b"45000".to_vec()).await.unwrap();
+            let test_config = Rc::new(Config::init_default_config().unwrap());
+            let mut repo = CustomSensorsRepo::new(test_config, vec![], test_overrides()).unwrap();
+            repo.initialize_devices().await.unwrap();
+            repo.set_custom_sensor(file_sensor("file1", test_file.clone()))
+                .await
+                .unwrap();
+            repo.update_statuses().await.unwrap();
+
+            for _ in 0..MISSING_STATUS_THRESHOLD {
+                cc_fs::write(&test_file, Vec::new()).await.unwrap();
+                repo.update_statuses().await.unwrap();
+            }
+            // A good read clears the run.
+            cc_fs::write(&test_file, b"55000".to_vec()).await.unwrap();
+            repo.update_statuses().await.unwrap();
+            assert!((current_temp_for(&repo, "file1") - 55.0).abs() < f64::EPSILON);
+
+            // The very next failure is therefore the first of a fresh run, not the ninth.
+            cc_fs::write(&test_file, Vec::new()).await.unwrap();
             repo.update_statuses().await.unwrap();
             assert!((current_temp_for(&repo, "file1") - 55.0).abs() < f64::EPSILON);
             assert!(repo.failsafing_sensors.borrow().contains_key("file1").not());
