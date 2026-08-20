@@ -556,7 +556,19 @@ enum SubCommands {
     StressGpu {
         #[arg(long)]
         timeout: u16,
+        /// Stress only the GPU at this position in `stress-gpu-list`.
+        /// All GPUs if omitted. Requires --gpu-id.
+        #[arg(long, requires = "gpu_id")]
+        gpu_index: Option<usize>,
+        /// PCI ID (`vendor:device` in hex) expected at --gpu-index, which
+        /// guards against the list shifting in between.
+        #[arg(long, requires = "gpu_index")]
+        gpu_id: Option<String>,
     },
+    /// Print the stress-testable GPUs as JSON. Runs out of process so the
+    /// daemon never loads a Vulkan driver into its own address space.
+    #[command(hide = true)]
+    StressGpuList,
     #[command(hide = true)]
     StressRam {
         #[arg(long)]
@@ -592,8 +604,29 @@ fn handle_non_root_commands(args: &Args) -> Result<()> {
         cc_stress::run_cpu_stress(*threads, *timeout)?;
         exit_successfully();
     }
-    if let Some(SubCommands::StressGpu { timeout }) = &args.command {
-        cc_stress::run_gpu_stress(*timeout)?;
+    if let Some(SubCommands::StressGpu {
+        timeout,
+        gpu_index,
+        gpu_id,
+    }) = &args.command
+    {
+        // clap's `requires` pairs the two flags, so either both are present
+        // or neither is.
+        let selection = match (gpu_index, gpu_id) {
+            (Some(index), Some(id)) => Some(cc_stress::GpuSelection {
+                index: *index,
+                pci_id: id.parse()?,
+            }),
+            _ => None,
+        };
+        cc_stress::run_gpu_stress(*timeout, selection)?;
+        exit_successfully();
+    }
+    if let Some(SubCommands::StressGpuList) = &args.command {
+        println!(
+            "{}",
+            serde_json::to_string(&api::actor::enumerate_gpu_adapters()?)?
+        );
         exit_successfully();
     }
     if let Some(SubCommands::StressRam { bytes, timeout }) = &args.command {

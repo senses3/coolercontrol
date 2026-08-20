@@ -12,5 +12,5 @@ fn main() {
         .unwrap_or_else(|| "15".into())
         .parse()
         .expect("seconds");
-    cc_stress::run_gpu_stress(secs).expect("gpu stress");
+    cc_stress::run_gpu_stress(secs, None).expect("gpu stress");
 }

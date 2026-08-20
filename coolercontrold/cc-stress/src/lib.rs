@@ -36,6 +36,8 @@
 //!   wrapper in the `nix` crate at the version we use.
 
 use std::alloc;
+use std::collections::HashMap;
+use std::ops::Not;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::io::AsRawFd;
 use std::time::{Duration, Instant};
@@ -723,51 +725,235 @@ fn drive_stress_thread(path: &str, thread_idx: u16, max_offset: u64, deadline: I
     std::hint::black_box(buf.as_slice()[0]);
 }
 
-/// Enumerate hardware GPU adapters, one per physical device.
+/// PCI vendor and device IDs identifying one GPU model, as printed in
+/// `/sys/.../uevent` `PCI_ID` and reported by `wgpu::AdapterInfo`. This is
+/// the only identity the two share: wgpu does not expose the PCI slot.
 ///
-/// Vulkan wins outright when it is available at all, and GL is used only as
-/// a whole-system fallback. Deduplicating across backends is not possible:
-/// the same card enumerates under both, and the two report different device
-/// IDs and even different device types, so a single RX 6750 XT appeared as a
-/// discrete Vulkan GPU plus an "integrated" GL one and got stressed twice.
-/// Any GPU new enough to matter here has a Vulkan driver.
+/// Held as `u32` because that is what wgpu reports. Real PCI IDs are 16-bit,
+/// but GL drivers report whatever they like and truncating would silently
+/// alias two different adapters onto one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GpuPciId {
+    pub vendor: u32,
+    pub device: u32,
+}
+
+impl GpuPciId {
+    fn matches(self, info: &wgpu::AdapterInfo) -> bool {
+        self.vendor == info.vendor && self.device == info.device
+    }
+}
+
+impl From<&wgpu::AdapterInfo> for GpuPciId {
+    fn from(info: &wgpu::AdapterInfo) -> Self {
+        Self {
+            vendor: info.vendor,
+            device: info.device,
+        }
+    }
+}
+
+/// Which enumerated GPU to stress. Identical cards share a PCI ID, so the
+/// position in `list_gpu_adapters` is what tells them apart; the ID rides
+/// along to catch a list that shifted between listing and starting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GpuSelection {
+    pub index: usize,
+    pub pci_id: GpuPciId,
+}
+
+impl std::str::FromStr for GpuPciId {
+    type Err = anyhow::Error;
+
+    /// Parses `vendor:device` in hex, e.g. `1002:73df`.
+    fn from_str(s: &str) -> Result<Self> {
+        let (vendor, device) = s
+            .split_once(':')
+            .ok_or_else(|| anyhow!("GPU PCI ID must be vendor:device in hex, got '{s}'"))?;
+        Ok(Self {
+            vendor: u32::from_str_radix(vendor.trim(), 16)
+                .map_err(|e| anyhow!("Invalid GPU vendor ID '{vendor}': {e}"))?,
+            device: u32::from_str_radix(device.trim(), 16)
+                .map_err(|e| anyhow!("Invalid GPU device ID '{device}': {e}"))?,
+        })
+    }
+}
+
+impl std::fmt::Display for GpuPciId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04x}:{:04x}", self.vendor, self.device)
+    }
+}
+
+/// One enumerated GPU, as the daemon needs to describe it to the user.
+#[derive(Debug, Clone)]
+pub struct GpuAdapterInfo {
+    pub pci_id: GpuPciId,
+    /// Driver-reported name, e.g. "AMD Radeon RX 6750 XT (RADV NAVI22)".
+    pub name: String,
+    /// Discrete cards are what users normally mean to stress; the iGPU
+    /// alongside them is incidental.
+    pub discrete: bool,
+}
+
+/// Backends considered for GPU stress. See `unique_gpu_adapters` for why
+/// Vulkan takes precedence over GL rather than joining it.
+fn gpu_backends() -> wgpu::Backends {
+    wgpu::Backends::VULKAN | wgpu::Backends::GL
+}
+
+/// List the GPUs available for stress testing, one per physical device.
+///
+/// This is the authoritative source for the daemon's GPU picker: it reports
+/// exactly the adapters `run_gpu_stress` can drive, and it is the only place
+/// discrete and integrated can be told apart reliably. sysfs cannot:
+/// `boot_vga` names the display GPU rather than the discrete one, and AMD
+/// APU iGPUs do not sit on PCI bus 0.
+///
+/// # Errors
+///
+/// Returns an error if no hardware GPU adapter is found.
+pub fn list_gpu_adapters() -> Result<Vec<GpuAdapterInfo>> {
+    let adapters = unique_gpu_adapters(gpu_backends())?;
+    Ok(adapters
+        .iter()
+        .map(|adapter| {
+            let info = adapter.get_info();
+            GpuAdapterInfo {
+                pci_id: GpuPciId {
+                    vendor: info.vendor,
+                    device: info.device,
+                },
+                name: info.name.clone(),
+                discrete: info.device_type == wgpu::DeviceType::DiscreteGpu,
+            }
+        })
+        .collect())
+}
+
+/// Pick out the adapters that are distinct physical GPUs, as indices into
+/// `infos`, preserving enumeration order.
+///
+/// Three rules, in order:
+///
+/// 1. Software rasterizers are not hardware and cannot be stressed.
+/// 2. Vulkan wins outright when it is available at all, and GL is used only
+///    as a whole-system fallback. Deduplicating across the two is not
+///    possible: the same card enumerates under both with different device
+///    IDs and even different device types, so a single RX 6750 XT appeared
+///    as a discrete Vulkan GPU plus an "integrated" GL one and got stressed
+///    twice. Any GPU new enough to matter here has a Vulkan driver.
+/// 3. Within one PCI ID, keep the adapters of a single driver. Two installed
+///    ICDs (RADV alongside AMDVLK) report the same card twice, and the ICD
+///    name is what separates that from a rig with two of the same card,
+///    which reports one adapter per card all under the same ICD. The driver
+///    reporting the most adapters wins, so an ICD that only supports one of
+///    two identical cards cannot hide the other.
+fn distinct_adapter_indices(infos: &[wgpu::AdapterInfo]) -> Vec<usize> {
+    let has_vulkan = infos
+        .iter()
+        .any(|info| info.backend == wgpu::Backend::Vulkan);
+    let candidates: Vec<usize> = infos
+        .iter()
+        .enumerate()
+        .filter(|(_, info)| info.device_type != wgpu::DeviceType::Cpu)
+        .filter(|(_, info)| has_vulkan.not() || info.backend == wgpu::Backend::Vulkan)
+        .map(|(index, _)| index)
+        .collect();
+
+    let mut per_driver: HashMap<(u32, u32, &str), usize> = HashMap::new();
+    for &index in &candidates {
+        let info = &infos[index];
+        *per_driver
+            .entry((info.vendor, info.device, info.driver.as_str()))
+            .or_default() += 1;
+    }
+    let mut chosen: HashMap<(u32, u32), &str> = HashMap::new();
+    for &index in &candidates {
+        let info = &infos[index];
+        let count = per_driver[&(info.vendor, info.device, info.driver.as_str())];
+        let entry = chosen
+            .entry((info.vendor, info.device))
+            .or_insert(info.driver.as_str());
+        // Ties keep the driver seen first, so the result is deterministic.
+        if per_driver[&(info.vendor, info.device, *entry)] < count {
+            *entry = info.driver.as_str();
+        }
+    }
+    candidates
+        .into_iter()
+        .filter(|&index| {
+            let info = &infos[index];
+            chosen[&(info.vendor, info.device)] == info.driver
+        })
+        .collect()
+}
+
+/// Enumerate hardware GPU adapters, one per physical device.
 fn unique_gpu_adapters(backends: wgpu::Backends) -> Result<Vec<wgpu::Adapter>> {
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends,
         ..Default::default()
     });
-    let adapters: Vec<wgpu::Adapter> = instance
+    let mut adapters: Vec<Option<wgpu::Adapter>> = instance
         .enumerate_adapters(backends)
         .into_iter()
-        .filter(|a| a.get_info().device_type != wgpu::DeviceType::Cpu)
+        .map(Some)
         .collect();
-    let has_vulkan = adapters
+    let infos: Vec<wgpu::AdapterInfo> = adapters
         .iter()
-        .any(|a| a.get_info().backend == wgpu::Backend::Vulkan);
+        .map(|a| a.as_ref().expect("adapters are all present").get_info())
+        .collect();
 
-    let mut seen_devices = std::collections::HashSet::with_capacity(adapters.len());
-    let mut unique = Vec::with_capacity(adapters.len());
-    for adapter in adapters {
-        let info = adapter.get_info();
-        if has_vulkan && info.backend != wgpu::Backend::Vulkan {
-            continue;
-        }
-        if seen_devices.insert((info.vendor, info.device)) {
-            unique.push(adapter);
-        }
-    }
+    let unique: Vec<wgpu::Adapter> = distinct_adapter_indices(&infos)
+        .into_iter()
+        .map(|index| adapters[index].take().expect("each index is yielded once"))
+        .collect();
     if unique.is_empty() {
         return Err(anyhow!(
             "No hardware GPU adapter found. \
              Ensure Vulkan or OpenGL ES drivers are installed."
         ));
     }
-    assert_eq!(unique.len(), seen_devices.len());
     Ok(unique)
 }
 
-/// Run GPU stress test using wgpu compute shaders. Enumerates all available
-/// GPU adapters and stresses them in parallel, one OS thread each.
+/// Narrow the enumerated adapters to the requested one, or keep them all
+/// when no selection is given.
+fn select_gpu_adapters(
+    mut adapters: Vec<wgpu::Adapter>,
+    selection: Option<GpuSelection>,
+) -> Result<Vec<wgpu::Adapter>> {
+    let Some(selection) = selection else {
+        return Ok(adapters);
+    };
+    let count = adapters.len();
+    if selection.index >= count {
+        return Err(anyhow!(
+            "Selected GPU {} is out of range; only {count} adapter(s) are present",
+            selection.index
+        ));
+    }
+    let adapter = adapters.swap_remove(selection.index);
+    // Two identical cards are indistinguishable by PCI ID, so the index is
+    // what picks between them. The ID is the guard: if the enumeration
+    // shifted since the list was read, this catches it instead of quietly
+    // loading a different card.
+    if selection.pci_id.matches(&adapter.get_info()).not() {
+        return Err(anyhow!(
+            "The GPU list changed since it was read: expected {} at position {}, \
+             found {}. Reload and try again",
+            selection.pci_id,
+            selection.index,
+            GpuPciId::from(&adapter.get_info())
+        ));
+    }
+    Ok(vec![adapter])
+}
+
+/// Run GPU stress test using wgpu compute shaders. Stresses every available
+/// GPU adapter in parallel, one OS thread each, or only the selected adapter
+/// when a selection is given.
 ///
 /// Synchronous by design, like the CPU, RAM, and drive entry points. An
 /// earlier version drove each adapter from a `tokio` task, which both
@@ -778,20 +964,20 @@ fn unique_gpu_adapters(backends: wgpu::Backends) -> Result<Vec<wgpu::Adapter>> {
 ///
 /// # Errors
 ///
-/// Returns an error if no hardware GPU adapter is found, if all adapters
-/// fail to initialize, or if CPU affinity/nice level cannot be set.
+/// Returns an error if no hardware GPU adapter is found, if `selection` does
+/// not resolve to one of them, if all adapters fail to initialize, or if CPU
+/// affinity/nice level cannot be set.
 ///
 /// # Panics
 ///
 /// Panics if adapter bookkeeping is inconsistent, which would mean a bug
 /// here rather than a hardware or driver condition.
-pub fn run_gpu_stress(timeout_secs: u16) -> Result<()> {
+pub fn run_gpu_stress(timeout_secs: u16, selection: Option<GpuSelection>) -> Result<()> {
     reset_cpu_affinity()?;
     set_nice_level()?;
 
     let duration = Duration::from_secs(u64::from(timeout_secs));
-    let backends = wgpu::Backends::VULKAN | wgpu::Backends::GL;
-    let adapters = unique_gpu_adapters(backends)?;
+    let adapters = select_gpu_adapters(unique_gpu_adapters(gpu_backends())?, selection)?;
     let adapter_count = adapters.len();
     assert!(adapter_count > 0);
 
@@ -1235,6 +1421,147 @@ mod tests {
     }
 
     #[test]
+    fn gpu_pci_id_parses_the_sysfs_spelling() {
+        // The daemon reads PCI_ID out of uevent ("1002:73DF") and hands it
+        // back on the command line, so both cases must parse and round-trip.
+        let id: GpuPciId = "1002:73df".parse().unwrap();
+        assert_eq!(id.vendor, 0x1002);
+        assert_eq!(id.device, 0x73df);
+        assert_eq!(id.to_string(), "1002:73df");
+        assert_eq!("1002:73DF".parse::<GpuPciId>().unwrap(), id);
+    }
+
+    #[test]
+    fn gpu_pci_id_rejects_malformed_input() {
+        // A bad ID must fail loudly at parse time. Falling back to "stress
+        // everything" would silently load the wrong card.
+        for bad in ["1002", "1002:", ":73df", "10g2:73df", "", "1002:73df:0"] {
+            assert!(bad.parse::<GpuPciId>().is_err(), "'{bad}' should not parse");
+        }
+    }
+
+    fn adapter_info(
+        vendor: u32,
+        device: u32,
+        driver: &str,
+        device_type: wgpu::DeviceType,
+        backend: wgpu::Backend,
+    ) -> wgpu::AdapterInfo {
+        wgpu::AdapterInfo {
+            name: format!("{vendor:04x}:{device:04x} via {driver}"),
+            vendor,
+            device,
+            device_type,
+            driver: driver.to_string(),
+            driver_info: String::new(),
+            backend,
+        }
+    }
+
+    fn vulkan_gpu(vendor: u32, device: u32, driver: &str) -> wgpu::AdapterInfo {
+        adapter_info(
+            vendor,
+            device,
+            driver,
+            wgpu::DeviceType::DiscreteGpu,
+            wgpu::Backend::Vulkan,
+        )
+    }
+
+    #[test]
+    fn gpu_pci_id_matches_only_its_own_adapter() {
+        // Selection compares against wgpu's report; both halves must agree.
+        let target = GpuPciId {
+            vendor: 0x1002,
+            device: 0x73df,
+        };
+        assert!(target.matches(&vulkan_gpu(0x1002, 0x73df, "radv")));
+        assert!(target.matches(&vulkan_gpu(0x1002, 0x744c, "radv")).not());
+        assert!(target.matches(&vulkan_gpu(0x10de, 0x73df, "radv")).not());
+    }
+
+    #[test]
+    fn distinct_adapters_keep_every_card_in_a_matched_pair() {
+        // Multi-GPU rigs usually run matching cards, which report identical
+        // PCI IDs under one ICD. Deduping by PCI ID hid the second card, so
+        // only one of them could ever be stressed.
+        let infos = [
+            vulkan_gpu(0x10de, 0x2684, "NVIDIA"),
+            vulkan_gpu(0x10de, 0x2684, "NVIDIA"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [0, 1]);
+    }
+
+    #[test]
+    fn distinct_adapters_collapse_one_card_seen_through_two_icds() {
+        // RADV alongside AMDVLK reports the same card twice. The ICD name is
+        // what separates this from the matched-pair case above; without it
+        // the card would be stressed by two contexts at once.
+        let infos = [
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            vulkan_gpu(0x1002, 0x73df, "AMD proprietary driver"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [0]);
+    }
+
+    #[test]
+    fn distinct_adapters_prefer_the_icd_that_sees_the_most_cards() {
+        // An ICD supporting only one of two identical cards must not hide
+        // the other, whichever order the ICDs enumerate in.
+        let infos = [
+            vulkan_gpu(0x1002, 0x73df, "AMD proprietary driver"),
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [1, 2]);
+    }
+
+    #[test]
+    fn distinct_adapters_keep_cards_from_different_vendors() {
+        // Different vendors mean different ICDs by necessity. Choosing one
+        // ICD globally would drop a whole card.
+        let infos = [
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            vulkan_gpu(0x10de, 0x2684, "NVIDIA"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [0, 1]);
+    }
+
+    #[test]
+    fn distinct_adapters_drop_software_and_gl_duplicates() {
+        // llvmpipe is not hardware, and the same card enumerates under both
+        // Vulkan and GL with different IDs, so GL is only a fallback.
+        let infos = [
+            adapter_info(
+                0x1002,
+                0x73df,
+                "radv",
+                wgpu::DeviceType::Cpu,
+                wgpu::Backend::Vulkan,
+            ),
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            adapter_info(
+                0x1002,
+                0x0000,
+                "AMD open-source",
+                wgpu::DeviceType::IntegratedGpu,
+                wgpu::Backend::Gl,
+            ),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [1]);
+
+        // With no Vulkan adapter at all, GL carries the whole system.
+        let gl_only = [adapter_info(
+            0x1002,
+            0x0000,
+            "AMD open-source",
+            wgpu::DeviceType::IntegratedGpu,
+            wgpu::Backend::Gl,
+        )];
+        assert_eq!(distinct_adapter_indices(&gl_only), [0]);
+    }
+
+    #[test]
     fn gpu_stress_runs_without_an_async_runtime() {
         // The daemon's default compio backend provides no ambient Tokio
         // runtime, and an earlier version panicked there because it called
@@ -1242,7 +1569,7 @@ mod tests {
         // environment. A zero timeout exercises setup and teardown without
         // heating anything. Either outcome is fine on a machine with no GPU;
         // what must not happen is a panic.
-        let result = run_gpu_stress(0);
+        let result = run_gpu_stress(0, None);
         if let Err(e) = result {
             let msg = e.to_string();
             assert!(
@@ -1253,24 +1580,34 @@ mod tests {
     }
 
     #[test]
-    fn unique_gpu_adapters_returns_each_device_once() {
+    fn unique_gpu_adapters_returns_one_adapter_per_card() {
         // Callers rely on a non-empty result, so absence of adapters must
-        // surface as an error instead. And no physical device may appear
-        // twice: the same card enumerates under both Vulkan and GL, which
-        // previously had one GPU stressed by two contexts at once.
+        // surface as an error instead. Duplicates of a single card must be
+        // gone, which on this machine means one ICD and one backend. Cards
+        // may legitimately repeat a PCI ID (a matched pair), so that is
+        // asserted in `distinct_adapter_indices` tests rather than here.
         match unique_gpu_adapters(wgpu::Backends::VULKAN | wgpu::Backends::GL) {
             Ok(adapters) => {
                 assert!(adapters.is_empty().not());
-                let mut seen = std::collections::HashSet::with_capacity(adapters.len());
                 for adapter in &adapters {
-                    let info = adapter.get_info();
-                    assert_ne!(info.device_type, wgpu::DeviceType::Cpu);
-                    assert!(seen.insert((info.vendor, info.device)));
+                    assert_ne!(adapter.get_info().device_type, wgpu::DeviceType::Cpu);
                 }
-                // Mixing backends means the same card counted twice.
+                // Mixing backends, or two ICDs for one PCI ID, means the same
+                // card counted twice.
                 let backends: std::collections::HashSet<_> =
                     adapters.iter().map(|a| a.get_info().backend).collect();
                 assert_eq!(backends.len(), 1, "adapters span multiple backends");
+                let mut drivers_per_device = std::collections::HashMap::new();
+                for adapter in &adapters {
+                    let info = adapter.get_info();
+                    drivers_per_device
+                        .entry((info.vendor, info.device))
+                        .or_insert_with(std::collections::HashSet::new)
+                        .insert(info.driver);
+                }
+                for (device, drivers) in drivers_per_device {
+                    assert_eq!(drivers.len(), 1, "{device:?} kept two ICDs");
+                }
             }
             Err(e) => assert!(e.to_string().contains("No hardware GPU adapter found")),
         }

@@ -639,6 +639,8 @@ export default {
             backendTooltip:
                 'ストレステストのバックエンドを選択します。<br>内蔵は外部依存なしで動作します。<br>stress-ng (インストール時) は追加のストレッサーバリアントを提供します。',
             selectDrive: 'ドライブを選択',
+            selectGpu: 'GPUを選択',
+            allGpus: 'すべてのGPU',
             start: '開始',
             stop: '停止',
             stopAll: 'すべて停止',

@@ -630,6 +630,8 @@ export default {
             backendTooltip:
                 '스트레스 테스트 백엔드를 선택하세요.<br>내장 백엔드는 외부 종속성 없이 작동합니다.<br>stress-ng (설치된 경우) 추가 스트레스 변형을 제공합니다.',
             selectDrive: '드라이브 선택',
+            selectGpu: 'GPU 선택',
+            allGpus: '모든 GPU',
             start: '시작',
             stop: '중지',
             stopAll: '모두 중지',
