@@ -166,9 +166,10 @@ pub async fn get_device_model_name(base_path: &Path) -> Option<String> {
         .ok()
 }
 
-/// Gets the real device path under /sys. This path doesn't change between boots
-/// and contains additional sysfs files outside of hardware monitoring.
-/// All `HWMon` devices should have this path.
+/// Gets the real device path under /sys. It contains additional sysfs files
+/// outside of hardware monitoring. All `HWMon` devices should have this path.
+///
+/// NOT stable across boots: SCSI/SAS/SATA disks embed probe-order `hostN` / `ataN`.
 /// Note: Some 'Virtual' `HWMon` drivers do not have `device` paths, but the `base_path`
 /// is the same as the `device` path of normal drivers (/hwmon/hwmon* not in it).
 pub fn get_static_device_path_str(base_path: &Path) -> Option<String> {
@@ -210,16 +211,38 @@ fn get_canonical_path_str(path: &Path) -> Option<String> {
 /// The preferred order of identifiers is:
 ///
 /// 1. device serial number
-/// 2. realpath under /sys
-/// 3. PCI ID
-/// 4. device name
+/// 2. SCSI wwid (`sd` disks only)
+/// 3. realpath under /sys
+/// 4. PCI ID
+/// 5. device name
 ///
 /// The purpose of this is to ensure that we have unique IDs for device settings that persist
 /// across boots and hardware changes if possible.
+///
+/// The wwid sits below the serial so a device that already resolves by serial is not re-keyed
+/// for no gain. Uniqueness is handled separately by `Device::assign_unique`.
 pub async fn get_device_unique_id(base_path: &Path, device_name: &str) -> UID {
     if let Some(serial) = get_device_serial_number(base_path).await {
-        serial
-    } else if let Some(device_path) = get_static_device_path_str(base_path) {
+        return serial;
+    }
+    if let Some(wwid) = get_scsi_device_wwid(base_path).await {
+        return wwid;
+    }
+    get_location_based_id(base_path, device_name).await
+}
+
+/// What `get_device_unique_id` returned before the `wwid` rung, so the migration can find what
+/// an older release wrote. Identical to the current chain for any device with a serial.
+pub async fn get_legacy_device_unique_id(base_path: &Path, device_name: &str) -> UID {
+    if let Some(serial) = get_device_serial_number(base_path).await {
+        return serial;
+    }
+    get_location_based_id(base_path, device_name).await
+}
+
+/// Location-derived tail shared by both chains so they cannot drift.
+async fn get_location_based_id(base_path: &Path, device_name: &str) -> UID {
+    if let Some(device_path) = get_static_device_path_str(base_path) {
         device_path
     } else if let Some(vendor_and_model_id) =
         get_device_uevent_details(base_path).await.get("PCI_ID")
@@ -228,6 +251,64 @@ pub async fn get_device_unique_id(base_path: &Path, device_name: &str) -> UID {
     } else {
         device_name.to_owned()
     }
+}
+
+/// Returns the SCSI `wwid`, which only a `scsi_device` exposes, so this doubles as the test
+/// for whether the device is an `sd` disk. Behind a USB bridge it identifies the BRIDGE, which
+/// is why `assign_unique` stays load bearing.
+pub async fn get_scsi_device_wwid(base_path: &Path) -> Option<String> {
+    let raw = cc_fs::read_sysfs(device_path(base_path).join("wwid"))
+        .await
+        .ok()?;
+    normalize_sysfs_identifier(&raw)
+}
+
+const VPD_PAGE_UNIT_SERIAL: u8 = 0x80;
+/// Peripheral type, page code, then a 2 byte length.
+const VPD_HEADER_LEN: usize = 4;
+
+/// The drive serial from VPD page 0x80, used only as a collision tiebreaker. Must NOT be folded
+/// into `get_device_serial_number`: that feeds the legacy chain, so the migration would see no
+/// change and skip these drives.
+pub async fn get_scsi_vpd_serial(base_path: &Path) -> Option<String> {
+    let page = cc_fs::read_bytes(device_path(base_path).join("vpd_pg80"))
+        .await
+        .ok()?;
+    parse_vpd_unit_serial(&page)
+}
+
+/// Split out from the read so the byte handling is testable. The field is padded with spaces
+/// on some drives and NULs on others, so both are trimmed.
+fn parse_vpd_unit_serial(page: &[u8]) -> Option<String> {
+    if page.len() < VPD_HEADER_LEN {
+        return None;
+    }
+    if page[1] != VPD_PAGE_UNIT_SERIAL {
+        return None;
+    }
+    let declared_len = usize::from(u16::from_be_bytes([page[2], page[3]]));
+    let end = declared_len
+        .checked_add(VPD_HEADER_LEN)
+        .map_or(page.len(), |end| end.min(page.len()));
+    let serial = std::str::from_utf8(page.get(VPD_HEADER_LEN..end)?).ok()?;
+    let serial = serial.trim_matches(|c: char| c.is_whitespace() || c == '\0');
+    if serial.is_empty() {
+        return None;
+    }
+    Some(serial.to_owned())
+}
+
+/// The kernel escapes non-printables in `wwid`, so a trailing NUL run arrives as the literal
+/// text `\0`. Interior padding is kept: it belongs to the T10 designator layout.
+fn normalize_sysfs_identifier(raw: &str) -> Option<String> {
+    let mut identifier = raw.trim();
+    while let Some(stripped) = identifier.strip_suffix("\\0") {
+        identifier = stripped.trim_end();
+    }
+    if identifier.is_empty() {
+        return None;
+    }
+    Some(identifier.to_owned())
 }
 
 /// Returns the device serial number if found.
@@ -780,6 +861,280 @@ mod tests {
             teardown(&ctx).await;
             assert!(!hwmon_paths.is_empty());
             assert_eq!(hwmon_paths.len(), 2);
+        });
+    }
+
+    // Goal: a SCSI disk's identity comes from `wwid`, so the UID no longer
+    // depends on the probe-order sysfs path. Method: write a realistic
+    // `naa.` wwid and assert it is returned verbatim after normalization.
+    #[test]
+    #[serial]
+    fn scsi_wwid_is_preferred_identifier() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(device_dir.join("wwid"), b"naa.5000c500a1b2c3d4\n".to_vec())
+                .await
+                .unwrap();
+
+            let wwid = get_scsi_device_wwid(&ctx.hwmon_path).await;
+
+            teardown(&ctx).await;
+            assert_eq!(wwid, Some("naa.5000c500a1b2c3d4".to_string()));
+        });
+    }
+
+    // Goal: the kernel escapes a trailing NUL run in the VPD page as the
+    // literal text `\0`, and pads with spaces. Both must be stripped so the
+    // UID does not move if that escaping changes. Real sample taken from a
+    // JMicron USB SATA bridge.
+    #[test]
+    #[serial]
+    fn scsi_wwid_strips_escaped_nul_padding() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(
+                device_dir.join("wwid"),
+                b"t10.JMicron Tech            DD5641988389C\\0\\0\\0\n".to_vec(),
+            )
+            .await
+            .unwrap();
+
+            let wwid = get_scsi_device_wwid(&ctx.hwmon_path).await;
+
+            teardown(&ctx).await;
+            assert_eq!(
+                wwid,
+                Some("t10.JMicron Tech            DD5641988389C".to_string())
+            );
+        });
+    }
+
+    // Goal: a wwid that normalizes to nothing must not be treated as an
+    // identity, otherwise every such device hashes to the same UID. Negative
+    // space for `scsi_wwid_is_preferred_identifier`.
+    #[test]
+    #[serial]
+    fn scsi_wwid_blank_is_not_an_identifier() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(device_dir.join("wwid"), b"  \\0\\0 \n".to_vec())
+                .await
+                .unwrap();
+
+            let wwid = get_scsi_device_wwid(&ctx.hwmon_path).await;
+
+            teardown(&ctx).await;
+            assert_eq!(wwid, None);
+        });
+    }
+
+    // Goal: devices with no `wwid` (everything that is not an sd disk) keep
+    // their existing identity chain untouched, so no other device class
+    // re-keys. Method: no wwid file at all.
+    #[test]
+    #[serial]
+    fn non_scsi_device_has_no_wwid() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+
+            let wwid = get_scsi_device_wwid(&ctx.hwmon_path).await;
+
+            teardown(&ctx).await;
+            assert_eq!(wwid, None);
+        });
+    }
+
+    // Goal: the whole point of the change. Two boots that renumber the SCSI
+    // host must yield the same UID. Method: derive the id from two different
+    // base paths carrying the same wwid, and assert equality; then assert a
+    // different wwid still separates them (negative space).
+    #[test]
+    #[serial]
+    fn scsi_uid_is_stable_across_host_renumbering() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let boot_one = ctx.hwmon_path.join("host6");
+            let boot_two = ctx.hwmon_path.join("host7");
+            let other = ctx.hwmon_path.join("host8");
+            for (dir, wwid) in [
+                (&boot_one, "naa.5000c500a1b2c3d4"),
+                (&boot_two, "naa.5000c500a1b2c3d4"),
+                (&other, "naa.5000c500dddddddd"),
+            ] {
+                let device_dir = dir.join("device");
+                cc_fs::create_dir_all(&device_dir).await.unwrap();
+                cc_fs::write(device_dir.join("wwid"), format!("{wwid}\n").into_bytes())
+                    .await
+                    .unwrap();
+            }
+
+            let id_one = get_device_unique_id(&boot_one, "ST6000VN0033-2EE").await;
+            let id_two = get_device_unique_id(&boot_two, "ST6000VN0033-2EE").await;
+            let id_other = get_device_unique_id(&other, "ST6000VN0033-2EE").await;
+
+            teardown(&ctx).await;
+            assert_eq!(id_one, id_two);
+            assert_ne!(id_one, id_other);
+        });
+    }
+
+    // Goal: the real page 0x80 layout from a Seagate ST2000LX001, whose `serial` attribute is
+    // absent while the page holds the serial. Left-padded with spaces. This is the sample that
+    // motivated the whole fallback, so it is pinned byte for byte.
+    #[test]
+    fn vpd_unit_serial_parses_a_real_space_padded_page() {
+        let mut page = vec![0x00, 0x80, 0x00, 0x14];
+        page.extend_from_slice(b"            WCC34KL1");
+
+        assert_eq!(parse_vpd_unit_serial(&page), Some("WCC34KL1".to_string()));
+    }
+
+    // Goal: the other padding style seen in the wild. A JMicron USB bridge NUL-pads instead,
+    // and those are real NUL bytes here, unlike the escaped `\0` text the wwid attribute shows.
+    #[test]
+    fn vpd_unit_serial_trims_nul_padding() {
+        let mut page = vec![0x00, 0x80, 0x00, 0x10];
+        page.extend_from_slice(b"DD5641988389C\0\0\0");
+
+        assert_eq!(
+            parse_vpd_unit_serial(&page),
+            Some("DD5641988389C".to_string())
+        );
+    }
+
+    // Goal: negative space. Anything that is not a well-formed page 0x80 must yield None so the
+    // rung stays blank and `assign_unique` moves on, rather than inventing a serial from
+    // unrelated bytes. Also proves no panic on short or truncated input.
+    #[test]
+    fn vpd_unit_serial_rejects_malformed_pages() {
+        // Wrong page code (0x83 is Device Identification, not Unit Serial).
+        assert_eq!(parse_vpd_unit_serial(&[0x00, 0x83, 0x00, 0x08, b'x']), None);
+        // Shorter than the header.
+        assert_eq!(parse_vpd_unit_serial(&[0x00, 0x80]), None);
+        assert_eq!(parse_vpd_unit_serial(&[]), None);
+        // Declares more payload than is present: clamp, do not panic.
+        let mut truncated = vec![0x00, 0x80, 0xFF, 0xFF];
+        truncated.extend_from_slice(b"AB");
+        assert_eq!(parse_vpd_unit_serial(&truncated), Some("AB".to_string()));
+        // All padding, so nothing identifying is left.
+        let mut blank = vec![0x00, 0x80, 0x00, 0x04];
+        blank.extend_from_slice(b"    ");
+        assert_eq!(parse_vpd_unit_serial(&blank), None);
+    }
+
+    // Goal: the fallback must not disturb identity. A drive with no `serial` attribute but a
+    // readable page 0x80 still resolves to its wwid, and its legacy id is still the sysfs path,
+    // so the migration continues to fire. Guards the exact regression this design avoids:
+    // folding page 0x80 into the serial tier would silently skip the migration.
+    #[test]
+    #[serial]
+    fn vpd_serial_does_not_affect_either_identity_chain() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(device_dir.join("wwid"), b"naa.5000c500a9068285\n".to_vec())
+                .await
+                .unwrap();
+            let mut page = vec![0x00, 0x80, 0x00, 0x14];
+            page.extend_from_slice(b"            WCC34KL1");
+            cc_fs::write(device_dir.join("vpd_pg80"), page)
+                .await
+                .unwrap();
+
+            let vpd_serial = get_scsi_vpd_serial(&ctx.hwmon_path).await;
+            let current = get_device_unique_id(&ctx.hwmon_path, "drive").await;
+            let legacy = get_legacy_device_unique_id(&ctx.hwmon_path, "drive").await;
+
+            teardown(&ctx).await;
+            assert_eq!(vpd_serial, Some("WCC34KL1".to_string()));
+            assert_eq!(current, "naa.5000c500a9068285".to_string());
+            assert!(
+                legacy.contains("hwmon"),
+                "legacy must still be the sysfs path"
+            );
+            assert_ne!(current, legacy, "the migration must still fire");
+        });
+    }
+
+    // Goal: a device that already resolves by serial has a stable UID and no bug, so the
+    // wwid must NOT displace it. This is what keeps the migration from re-keying users who
+    // were never affected. Method: supply both, assert the serial wins.
+    #[test]
+    #[serial]
+    fn serial_outranks_scsi_wwid() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(device_dir.join("wwid"), b"naa.5000c500a1b2c3d4\n".to_vec())
+                .await
+                .unwrap();
+            cc_fs::write(device_dir.join("serial"), b"WD-WCC4N0803777\n".to_vec())
+                .await
+                .unwrap();
+
+            let unique_id = get_device_unique_id(&ctx.hwmon_path, "ST6000VN0033-2EE").await;
+
+            teardown(&ctx).await;
+            assert_eq!(unique_id, "WD-WCC4N0803777".to_string());
+        });
+    }
+
+    // Goal: the migration must be a no-op for the unaffected cohort. A device with a serial
+    // resolves identically under the old and new chains, so no settings are ever moved for
+    // it. Guards the ordering above against a future edit that silently re-keys everyone.
+    #[test]
+    #[serial]
+    fn device_with_a_serial_is_never_migrated() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(device_dir.join("wwid"), b"naa.5000c500a1b2c3d4\n".to_vec())
+                .await
+                .unwrap();
+            cc_fs::write(device_dir.join("serial"), b"WD-WCC4N0803777\n".to_vec())
+                .await
+                .unwrap();
+
+            let current = get_device_unique_id(&ctx.hwmon_path, "drive").await;
+            let legacy = get_legacy_device_unique_id(&ctx.hwmon_path, "drive").await;
+
+            teardown(&ctx).await;
+            assert_eq!(current, legacy, "no serial-bearing device may be re-keyed");
+        });
+    }
+
+    // Goal: negative space for the above. The affected cohort, a drive with no serial, DOES
+    // change identifier, since that is the whole fix. Without this the previous test could
+    // be satisfied by a chain that never consults the wwid at all.
+    #[test]
+    #[serial]
+    fn device_without_a_serial_moves_onto_its_wwid() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            let device_dir = ctx.hwmon_path.join("device");
+            cc_fs::create_dir_all(&device_dir).await.unwrap();
+            cc_fs::write(device_dir.join("wwid"), b"naa.5000c500a1b2c3d4\n".to_vec())
+                .await
+                .unwrap();
+
+            let current = get_device_unique_id(&ctx.hwmon_path, "drive").await;
+            let legacy = get_legacy_device_unique_id(&ctx.hwmon_path, "drive").await;
+
+            teardown(&ctx).await;
+            assert_eq!(current, "naa.5000c500a1b2c3d4".to_string());
+            assert_ne!(current, legacy, "the affected cohort must move");
+            assert!(legacy.contains("hwmon"), "legacy resolved by sysfs path");
         });
     }
 }

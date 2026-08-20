@@ -47,6 +47,7 @@
 //! silently drops a device from a uid-keyed map.
 
 use std::collections::HashSet;
+use std::ops::Not;
 
 use log::info;
 use sha2::{Digest, Sha256};
@@ -83,39 +84,49 @@ impl Device {
     /// Assigns a device a UID that is unique within a detection batch, so a device is never silently
     /// dropped by colliding with another in a uid-keyed map.
     ///
-    /// `identifier` is the device's preferred identity (a serial or path; may be empty or shared).
-    /// `distinguisher` is a stable per-device fallback (its sysfs path) used only on collision.
-    /// `assigned` accumulates the UIDs handed out so far; pass the same set for a whole batch.
-    ///
-    /// Returns the identifier to actually store (so a later `create_uid_from` reproduces the same
-    /// UID) and that UID. The first device to claim a UID keeps it, so a stable processing order
-    /// (for example path-sorted) yields a stable, reboot-independent result.
+    /// `distinguishers` are fallbacks in descending strength, tried only on a collision; the last
+    /// is salted with an ordinal, so it must be one the caller can always supply (a sysfs path).
+    /// Order matters for stability, not just uniqueness: a hardware identifier follows the device
+    /// while a sysfs path is reassigned every boot. Returns the identifier to store, and its UID.
     pub fn assign_unique(
         assigned: &mut HashSet<UID>,
         d_type: DeviceType,
         name: &str,
         identifier: &str,
-        distinguisher: &str,
+        distinguishers: &[&str],
     ) -> (String, UID) {
+        debug_assert!(
+            distinguishers.is_empty().not(),
+            "at least one distinguisher is required, since the last one is salted"
+        );
         let natural = Self::create_uid_from(name, d_type, 0, Some(&identifier.to_owned()));
         if assigned.insert(natural.clone()) {
             return (identifier.to_owned(), natural);
         }
-        // The preferred identifier is empty or shared with an earlier device. Fall back to the
-        // stable per-device distinguisher, salting with an ordinal only if that also collides. The
-        // loop is bounded by the number of already-assigned UIDs, since each salt is distinct.
-        let mut ordinal: u16 = 0;
-        loop {
-            let candidate = if ordinal == 0 {
-                distinguisher.to_owned()
-            } else {
-                format!("{distinguisher}#{ordinal}")
-            };
-            let uid = Self::create_uid_from(name, d_type, 0, Some(&candidate));
+        // Shared or empty. Walk the rest strongest first; a blank carries no identity.
+        for candidate in distinguishers {
+            if candidate.is_empty() {
+                continue;
+            }
+            let uid = Self::create_uid_from(name, d_type, 0, Some(&(*candidate).to_owned()));
             if assigned.insert(uid.clone()) {
                 info!(
                     "Device '{name}' computed a UID already used by another device; \
-                     assigned it a distinct UID from its location instead"
+                     assigned it a distinct UID from a weaker identifier instead"
+                );
+                return ((*candidate).to_owned(), uid);
+            }
+        }
+        // All shared. Salt the weakest one. Bounded by the assigned count, each salt distinct.
+        let base = distinguishers.last().copied().unwrap_or(identifier);
+        let mut ordinal: u16 = 1;
+        loop {
+            let candidate = format!("{base}#{ordinal}");
+            let uid = Self::create_uid_from(name, d_type, 0, Some(&candidate));
+            if assigned.insert(uid.clone()) {
+                info!(
+                    "Device '{name}' shares every available identifier with another device; \
+                     assigned it a synthesised UID that will not survive a hardware change"
                 );
                 return (candidate, uid);
             }
@@ -221,7 +232,7 @@ mod tests {
             DeviceType::Hwmon,
             "dev",
             "serial-x",
-            "/path/x",
+            &["/path/x"],
         );
         assert_eq!(id, "serial-x");
         assert_eq!(
@@ -242,7 +253,7 @@ mod tests {
             DeviceType::Hwmon,
             "psu",
             "",
-            "/sys/devices/hwmon10",
+            &["/sys/devices/hwmon10"],
         );
         assert_eq!(id, "");
         assert_eq!(
@@ -257,9 +268,9 @@ mod tests {
         // Method: assign two distinct serials and assert the identifiers and UIDs pass through.
         let mut assigned = HashSet::new();
         let (id_a, uid_a) =
-            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "serial-a", "/a");
+            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "serial-a", &["/a"]);
         let (id_b, uid_b) =
-            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "serial-b", "/b");
+            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "serial-b", &["/b"]);
 
         assert_eq!(id_a, "serial-a");
         assert_eq!(id_b, "serial-b");
@@ -281,14 +292,14 @@ mod tests {
             DeviceType::Hwmon,
             "poweradjust3",
             "",
-            "/sys/hwmon2",
+            &["/sys/hwmon2"],
         );
         let (id_b, uid_b) = Device::assign_unique(
             &mut assigned,
             DeviceType::Hwmon,
             "poweradjust3",
             "",
-            "/sys/hwmon3",
+            &["/sys/hwmon3"],
         );
 
         // the incumbent keeps the natural blank-identifier UID:
@@ -309,9 +320,9 @@ mod tests {
         // branch). Method: assign a colliding pair and re-derive both UIDs with arbitrary indexes.
         let mut assigned = HashSet::new();
         let (id_a, uid_a) =
-            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "shared", "/a");
+            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "shared", &["/a"]);
         let (id_b, uid_b) =
-            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "shared", "/b");
+            Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "shared", &["/b"]);
 
         assert_eq!(id_a, "shared");
         assert_eq!(id_b, "/b");
@@ -326,15 +337,107 @@ mod tests {
         assert_ne!(uid_a, uid_b);
     }
 
+    // Goal: two drives whose firmware reports the same wwid must still both get a STABLE
+    // identity when their serials differ. Before the serial rung existed the second fell
+    // straight to its sysfs path, which is reassigned in probe order on exactly the
+    // hardware this matters for, so its UID would churn every boot.
+    #[test]
+    fn colliding_wwid_falls_back_to_serial_not_location() {
+        let mut assigned = HashSet::new();
+        let shared_wwid = "naa.5000c500a9068285";
+
+        let (id_a, uid_a) = Device::assign_unique(
+            &mut assigned,
+            DeviceType::Hwmon,
+            "ST2000LX001",
+            shared_wwid,
+            &[
+                "WCC34KL1",
+                "/sys/devices/pci0000:00/host6/target6:0:0/6:0:0:0",
+            ],
+        );
+        let (id_b, uid_b) = Device::assign_unique(
+            &mut assigned,
+            DeviceType::Hwmon,
+            "ST2000LX001",
+            shared_wwid,
+            &[
+                "WCC34KL2",
+                "/sys/devices/pci0000:00/host6/target6:0:1/6:0:1:0",
+            ],
+        );
+
+        assert_eq!(id_a, shared_wwid, "the incumbent keeps the wwid");
+        assert_eq!(
+            id_b, "WCC34KL2",
+            "the collider takes its serial, not its path"
+        );
+        assert_ne!(uid_a, uid_b);
+        // Neither UID may be derived from a sysfs path.
+        assert!(id_b.starts_with("/sys").not());
+    }
+
+    // Goal: negative space for the rung. A blank serial carries no identity, so it must be
+    // skipped rather than claimed, otherwise every serial-less duplicate would collapse
+    // onto one UID and a device would be silently dropped from a uid-keyed map.
+    #[test]
+    fn blank_serial_rung_is_skipped_for_the_path() {
+        let mut assigned = HashSet::new();
+        let shared_wwid = "shared-wwid";
+
+        let (id_a, _) = Device::assign_unique(
+            &mut assigned,
+            DeviceType::Hwmon,
+            "drive",
+            shared_wwid,
+            &["", "/sys/a"],
+        );
+        let (id_b, uid_b) = Device::assign_unique(
+            &mut assigned,
+            DeviceType::Hwmon,
+            "drive",
+            shared_wwid,
+            &["", "/sys/b"],
+        );
+
+        assert_eq!(id_a, shared_wwid);
+        assert_eq!(id_b, "/sys/b", "a blank rung is skipped, not claimed");
+        assert_eq!(
+            uid_b,
+            Device::create_uid_from("drive", DeviceType::Hwmon, 0, Some(&"/sys/b".to_owned()))
+        );
+    }
+
+    // Goal: when every rung is shared (a bridge reporting one canned identity for all its
+    // units) the salt still guarantees distinct UIDs, so no device is silently dropped.
+    #[test]
+    fn every_rung_shared_still_yields_distinct_uids() {
+        let mut assigned = HashSet::new();
+        let mut uids = Vec::new();
+        for _ in 0..3 {
+            let (_, uid) = Device::assign_unique(
+                &mut assigned,
+                DeviceType::Hwmon,
+                "clone",
+                "canned-wwid",
+                &["canned-serial", "/sys/same"],
+            );
+            uids.push(uid);
+        }
+
+        let distinct: HashSet<&UID> = uids.iter().collect();
+        assert_eq!(distinct.len(), uids.len());
+    }
+
     #[test]
     fn indistinguishable_devices_salt_with_ordinal() {
         // Goal: even devices sharing BOTH identifier and distinguisher (truly indistinguishable)
         // still get distinct UIDs via an ordinal salt, never a collision.
         // Method: assign three devices all with empty identifier and empty distinguisher.
         let mut assigned = HashSet::new();
-        let (_, uid_a) = Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "", "");
-        let (_, uid_b) = Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "", "");
-        let (_, uid_c) = Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "", "");
+        let (_, uid_a) = Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "", &[""]);
+        let (_, uid_b) = Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "", &[""]);
+        let (_, uid_c) = Device::assign_unique(&mut assigned, DeviceType::Hwmon, "dev", "", &[""]);
 
         assert_ne!(uid_a, uid_b);
         assert_ne!(uid_b, uid_c);
@@ -349,17 +452,17 @@ mod tests {
         // Method: assign the same two blank devices in both orders and inspect who kept the natural.
         let mut forward = HashSet::new();
         let kept_forward =
-            Device::assign_unique(&mut forward, DeviceType::Hwmon, "dev", "", "/a").0;
+            Device::assign_unique(&mut forward, DeviceType::Hwmon, "dev", "", &["/a"]).0;
         let bumped_forward =
-            Device::assign_unique(&mut forward, DeviceType::Hwmon, "dev", "", "/b").0;
+            Device::assign_unique(&mut forward, DeviceType::Hwmon, "dev", "", &["/b"]).0;
         assert_eq!(kept_forward, "");
         assert_eq!(bumped_forward, "/b");
 
         let mut reverse = HashSet::new();
         let kept_reverse =
-            Device::assign_unique(&mut reverse, DeviceType::Hwmon, "dev", "", "/b").0;
+            Device::assign_unique(&mut reverse, DeviceType::Hwmon, "dev", "", &["/b"]).0;
         let bumped_reverse =
-            Device::assign_unique(&mut reverse, DeviceType::Hwmon, "dev", "", "/a").0;
+            Device::assign_unique(&mut reverse, DeviceType::Hwmon, "dev", "", &["/a"]).0;
         assert_eq!(kept_reverse, "");
         assert_eq!(bumped_reverse, "/a");
     }
@@ -376,7 +479,7 @@ mod tests {
                 DeviceType::Hwmon,
                 "same-model",
                 "",
-                &format!("/p/{i}"),
+                &[format!("/p/{i}").as_str()],
             );
             uids.push(uid);
         }
@@ -386,7 +489,7 @@ mod tests {
                 DeviceType::Liquidctl,
                 "other-model",
                 "GENERIC-SERIAL",
-                &format!("/dev/hidraw{i}"),
+                &[format!("/dev/hidraw{i}").as_str()],
             );
             uids.push(uid);
         }

@@ -23,7 +23,7 @@
 //! deliberate entity deletion, never on hardware absence.
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
@@ -263,6 +263,37 @@ impl OverridesController {
             Ok(())
         })
         .await
+    }
+
+    /// An entry already under `current` is left alone: merging would pick a winner. Reports
+    /// what the on-disk pass did, not the in-memory probe: a hand-edit can land in between.
+    pub async fn migrate_device_uid(
+        &self,
+        legacy: &DeviceUID,
+        current: &DeviceUID,
+    ) -> Result<bool> {
+        {
+            let document = self.document.borrow();
+            if document.devices.contains_key(legacy).not() {
+                return Ok(false);
+            }
+            if document.devices.contains_key(current) {
+                return Ok(false);
+            }
+        }
+        let moved = Cell::new(false);
+        self.read_modify_write(|document| {
+            if document.devices.contains_key(current) {
+                return Ok(());
+            }
+            if let Some(device_overrides) = document.devices.remove(legacy) {
+                document.devices.insert(current.clone(), device_overrides);
+                moved.set(true);
+            }
+            Ok(())
+        })
+        .await?;
+        Ok(moved.get())
     }
 
     /// Read-modify-write against the file on disk. Re-reading narrows the
@@ -552,6 +583,94 @@ mod tests {
 
     fn overrides_path(tmp: &tempfile::TempDir) -> PathBuf {
         tmp.path().join("overrides.toml")
+    }
+
+    const LEGACY_UID: &str = "8ef08515338cc1f7727415a1d6bc45e84d5a818e94bd2072ac34b9d8d87f4210";
+    const CURRENT_UID: &str = "67ada747f6820bb2e4a9b5b639657e0971998a6f5ca5f50480ecf36b46c7ec29";
+
+    #[test]
+    fn migrate_device_uid_moves_overrides_and_persists() {
+        // Goal: a drive's label overrides follow it onto the wwid-derived UID, and the
+        // move survives a fresh load, so the rename is on disk and not just in memory.
+        crate::rt::test_runtime(async {
+            let tmp = tempfile::tempdir().unwrap();
+            let path = overrides_path(&tmp);
+            let legacy = LEGACY_UID.to_string();
+            let current = CURRENT_UID.to_string();
+            let controller = OverridesController::init_from(path.clone()).await;
+            controller
+                .set_device_name(&legacy, HINT, Some("SSD OS"))
+                .await
+                .unwrap();
+
+            let moved = controller
+                .migrate_device_uid(&legacy, &current)
+                .await
+                .unwrap();
+
+            assert!(moved);
+            assert_eq!(
+                controller.device_name_override(&current),
+                Some("SSD OS".to_string())
+            );
+            assert_eq!(controller.device_name_override(&legacy), None);
+            let reloaded = OverridesController::init_from(path).await;
+            assert_eq!(
+                reloaded.device_name_override(&current),
+                Some("SSD OS".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn migrate_device_uid_does_not_clobber_existing_overrides() {
+        // Goal: negative space. Real overrides already stored under the new UID must win,
+        // since merging two entries would silently discard one of the user's names.
+        crate::rt::test_runtime(async {
+            let tmp = tempfile::tempdir().unwrap();
+            let path = overrides_path(&tmp);
+            let legacy = LEGACY_UID.to_string();
+            let current = CURRENT_UID.to_string();
+            let controller = OverridesController::init_from(path).await;
+            controller
+                .set_device_name(&legacy, HINT, Some("old"))
+                .await
+                .unwrap();
+            controller
+                .set_device_name(&current, HINT, Some("keep me"))
+                .await
+                .unwrap();
+
+            let moved = controller
+                .migrate_device_uid(&legacy, &current)
+                .await
+                .unwrap();
+
+            assert!(moved.not());
+            assert_eq!(
+                controller.device_name_override(&current),
+                Some("keep me".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn migrate_device_uid_is_a_noop_without_overrides() {
+        // Goal: the common case. Almost no device has overrides, so the migration must
+        // cost nothing and must not create the file (which would close the migration gate).
+        crate::rt::test_runtime(async {
+            let tmp = tempfile::tempdir().unwrap();
+            let path = overrides_path(&tmp);
+            let controller = OverridesController::init_from(path.clone()).await;
+
+            let moved = controller
+                .migrate_device_uid(&LEGACY_UID.to_string(), &CURRENT_UID.to_string())
+                .await
+                .unwrap();
+
+            assert!(moved.not());
+            assert!(path.exists().not());
+        });
     }
 
     #[test]
