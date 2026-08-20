@@ -1680,14 +1680,26 @@ export default class DaemonClient {
         }
     }
 
+    async listGpusForStress(): Promise<Array<{ id: string; name: string; discrete: boolean }>> {
+        try {
+            const response = await this.getClient().get('/stress-test/gpus')
+            this.logDaemonResponse(response, 'List GPUs')
+            return response.data
+        } catch {
+            return []
+        }
+    }
+
     async startGpuStress(
         durationSecs?: number,
         backend?: 'stress_ng' | 'built_in',
+        gpuId?: string,
     ): Promise<undefined | ErrorResponse> {
         try {
             const response = await this.getClient().post('/stress-test/gpu', {
                 duration_secs: durationSecs,
                 backend: backend,
+                gpu_id: gpuId,
             })
             this.logDaemonResponse(response, 'Start GPU Stress')
             return undefined

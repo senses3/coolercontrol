@@ -556,7 +556,14 @@ enum SubCommands {
     StressGpu {
         #[arg(long)]
         timeout: u16,
+        /// Stress only this GPU, as `vendor:device` in hex. All GPUs if omitted.
+        #[arg(long)]
+        gpu_id: Option<String>,
     },
+    /// Print the stress-testable GPUs as JSON. Runs out of process so the
+    /// daemon never loads a Vulkan driver into its own address space.
+    #[command(hide = true)]
+    StressGpuList,
     #[command(hide = true)]
     StressRam {
         #[arg(long)]
@@ -592,8 +599,16 @@ fn handle_non_root_commands(args: &Args) -> Result<()> {
         cc_stress::run_cpu_stress(*threads, *timeout)?;
         exit_successfully();
     }
-    if let Some(SubCommands::StressGpu { timeout }) = &args.command {
-        cc_stress::run_gpu_stress(*timeout)?;
+    if let Some(SubCommands::StressGpu { timeout, gpu_id }) = &args.command {
+        let target = gpu_id.as_deref().map(str::parse).transpose()?;
+        cc_stress::run_gpu_stress(*timeout, target)?;
+        exit_successfully();
+    }
+    if let Some(SubCommands::StressGpuList) = &args.command {
+        println!(
+            "{}",
+            serde_json::to_string(&api::actor::enumerate_gpu_adapters()?)?
+        );
         exit_successfully();
     }
     if let Some(SubCommands::StressRam { bytes, timeout }) = &args.command {

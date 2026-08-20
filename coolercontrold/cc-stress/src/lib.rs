@@ -723,6 +723,94 @@ fn drive_stress_thread(path: &str, thread_idx: u16, max_offset: u64, deadline: I
     std::hint::black_box(buf.as_slice()[0]);
 }
 
+/// PCI vendor and device IDs identifying one GPU model, as printed in
+/// `/sys/.../uevent` `PCI_ID` and reported by `wgpu::AdapterInfo`. This is
+/// the only identity the two share: wgpu does not expose the PCI slot.
+///
+/// Held as `u32` because that is what wgpu reports. Real PCI IDs are 16-bit,
+/// but GL drivers report whatever they like and truncating would silently
+/// alias two different adapters onto one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GpuPciId {
+    pub vendor: u32,
+    pub device: u32,
+}
+
+impl GpuPciId {
+    fn matches(self, info: &wgpu::AdapterInfo) -> bool {
+        self.vendor == info.vendor && self.device == info.device
+    }
+}
+
+impl std::str::FromStr for GpuPciId {
+    type Err = anyhow::Error;
+
+    /// Parses `vendor:device` in hex, e.g. `1002:73df`.
+    fn from_str(s: &str) -> Result<Self> {
+        let (vendor, device) = s
+            .split_once(':')
+            .ok_or_else(|| anyhow!("GPU PCI ID must be vendor:device in hex, got '{s}'"))?;
+        Ok(Self {
+            vendor: u32::from_str_radix(vendor.trim(), 16)
+                .map_err(|e| anyhow!("Invalid GPU vendor ID '{vendor}': {e}"))?,
+            device: u32::from_str_radix(device.trim(), 16)
+                .map_err(|e| anyhow!("Invalid GPU device ID '{device}': {e}"))?,
+        })
+    }
+}
+
+impl std::fmt::Display for GpuPciId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04x}:{:04x}", self.vendor, self.device)
+    }
+}
+
+/// One enumerated GPU, as the daemon needs to describe it to the user.
+#[derive(Debug, Clone)]
+pub struct GpuAdapterInfo {
+    pub pci_id: GpuPciId,
+    /// Driver-reported name, e.g. "AMD Radeon RX 6750 XT (RADV NAVI22)".
+    pub name: String,
+    /// Discrete cards are what users normally mean to stress; the iGPU
+    /// alongside them is incidental.
+    pub discrete: bool,
+}
+
+/// Backends considered for GPU stress. See `unique_gpu_adapters` for why
+/// Vulkan takes precedence over GL rather than joining it.
+fn gpu_backends() -> wgpu::Backends {
+    wgpu::Backends::VULKAN | wgpu::Backends::GL
+}
+
+/// List the GPUs available for stress testing, one per physical device.
+///
+/// This is the authoritative source for the daemon's GPU picker: it reports
+/// exactly the adapters `run_gpu_stress` can drive, and it is the only place
+/// discrete and integrated can be told apart reliably. sysfs cannot:
+/// `boot_vga` names the display GPU rather than the discrete one, and AMD
+/// APU iGPUs do not sit on PCI bus 0.
+///
+/// # Errors
+///
+/// Returns an error if no hardware GPU adapter is found.
+pub fn list_gpu_adapters() -> Result<Vec<GpuAdapterInfo>> {
+    let adapters = unique_gpu_adapters(gpu_backends())?;
+    Ok(adapters
+        .iter()
+        .map(|adapter| {
+            let info = adapter.get_info();
+            GpuAdapterInfo {
+                pci_id: GpuPciId {
+                    vendor: info.vendor,
+                    device: info.device,
+                },
+                name: info.name.clone(),
+                discrete: info.device_type == wgpu::DeviceType::DiscreteGpu,
+            }
+        })
+        .collect())
+}
+
 /// Enumerate hardware GPU adapters, one per physical device.
 ///
 /// Vulkan wins outright when it is available at all, and GL is used only as
@@ -731,6 +819,11 @@ fn drive_stress_thread(path: &str, thread_idx: u16, max_offset: u64, deadline: I
 /// IDs and even different device types, so a single RX 6750 XT appeared as a
 /// discrete Vulkan GPU plus an "integrated" GL one and got stressed twice.
 /// Any GPU new enough to matter here has a Vulkan driver.
+///
+/// Dedup is by PCI ID, which also collapses two identical cards into one.
+/// That is the lesser evil: multiple installed Vulkan ICDs (RADV alongside
+/// AMDVLK) enumerate a single card twice, and wgpu exposes no PCI slot to
+/// tell the two cases apart.
 fn unique_gpu_adapters(backends: wgpu::Backends) -> Result<Vec<wgpu::Adapter>> {
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends,
@@ -766,8 +859,30 @@ fn unique_gpu_adapters(backends: wgpu::Backends) -> Result<Vec<wgpu::Adapter>> {
     Ok(unique)
 }
 
-/// Run GPU stress test using wgpu compute shaders. Enumerates all available
-/// GPU adapters and stresses them in parallel, one OS thread each.
+/// Narrow the enumerated adapters to the requested one, or keep them all
+/// when no target is given.
+fn select_gpu_adapters(
+    adapters: Vec<wgpu::Adapter>,
+    target: Option<GpuPciId>,
+) -> Result<Vec<wgpu::Adapter>> {
+    let Some(target) = target else {
+        return Ok(adapters);
+    };
+    let selected: Vec<wgpu::Adapter> = adapters
+        .into_iter()
+        .filter(|a| target.matches(&a.get_info()))
+        .collect();
+    if selected.is_empty() {
+        return Err(anyhow!(
+            "Selected GPU {target} was not found among the available adapters"
+        ));
+    }
+    Ok(selected)
+}
+
+/// Run GPU stress test using wgpu compute shaders. Stresses every available
+/// GPU adapter in parallel, one OS thread each, or only the adapter matching
+/// `target` when one is given.
 ///
 /// Synchronous by design, like the CPU, RAM, and drive entry points. An
 /// earlier version drove each adapter from a `tokio` task, which both
@@ -778,20 +893,20 @@ fn unique_gpu_adapters(backends: wgpu::Backends) -> Result<Vec<wgpu::Adapter>> {
 ///
 /// # Errors
 ///
-/// Returns an error if no hardware GPU adapter is found, if all adapters
-/// fail to initialize, or if CPU affinity/nice level cannot be set.
+/// Returns an error if no hardware GPU adapter is found, if `target` matches
+/// none of them, if all adapters fail to initialize, or if CPU affinity/nice
+/// level cannot be set.
 ///
 /// # Panics
 ///
 /// Panics if adapter bookkeeping is inconsistent, which would mean a bug
 /// here rather than a hardware or driver condition.
-pub fn run_gpu_stress(timeout_secs: u16) -> Result<()> {
+pub fn run_gpu_stress(timeout_secs: u16, target: Option<GpuPciId>) -> Result<()> {
     reset_cpu_affinity()?;
     set_nice_level()?;
 
     let duration = Duration::from_secs(u64::from(timeout_secs));
-    let backends = wgpu::Backends::VULKAN | wgpu::Backends::GL;
-    let adapters = unique_gpu_adapters(backends)?;
+    let adapters = select_gpu_adapters(unique_gpu_adapters(gpu_backends())?, target)?;
     let adapter_count = adapters.len();
     assert!(adapter_count > 0);
 
@@ -1235,6 +1350,47 @@ mod tests {
     }
 
     #[test]
+    fn gpu_pci_id_parses_the_sysfs_spelling() {
+        // The daemon reads PCI_ID out of uevent ("1002:73DF") and hands it
+        // back on the command line, so both cases must parse and round-trip.
+        let id: GpuPciId = "1002:73df".parse().unwrap();
+        assert_eq!(id.vendor, 0x1002);
+        assert_eq!(id.device, 0x73df);
+        assert_eq!(id.to_string(), "1002:73df");
+        assert_eq!("1002:73DF".parse::<GpuPciId>().unwrap(), id);
+    }
+
+    #[test]
+    fn gpu_pci_id_rejects_malformed_input() {
+        // A bad ID must fail loudly at parse time. Falling back to "stress
+        // everything" would silently load the wrong card.
+        for bad in ["1002", "1002:", ":73df", "10g2:73df", "", "1002:73df:0"] {
+            assert!(bad.parse::<GpuPciId>().is_err(), "'{bad}' should not parse");
+        }
+    }
+
+    #[test]
+    fn gpu_pci_id_matches_only_its_own_adapter() {
+        // Selection compares against wgpu's report; both halves must agree.
+        let target = GpuPciId {
+            vendor: 0x1002,
+            device: 0x73df,
+        };
+        let info = |vendor, device| wgpu::AdapterInfo {
+            name: String::new(),
+            vendor,
+            device,
+            device_type: wgpu::DeviceType::DiscreteGpu,
+            driver: String::new(),
+            driver_info: String::new(),
+            backend: wgpu::Backend::Vulkan,
+        };
+        assert!(target.matches(&info(0x1002, 0x73df)));
+        assert!(target.matches(&info(0x1002, 0x744c)).not());
+        assert!(target.matches(&info(0x10de, 0x73df)).not());
+    }
+
+    #[test]
     fn gpu_stress_runs_without_an_async_runtime() {
         // The daemon's default compio backend provides no ambient Tokio
         // runtime, and an earlier version panicked there because it called
@@ -1242,7 +1398,7 @@ mod tests {
         // environment. A zero timeout exercises setup and teardown without
         // heating anything. Either outcome is fine on a machine with no GPU;
         // what must not happen is a panic.
-        let result = run_gpu_stress(0);
+        let result = run_gpu_stress(0, None);
         if let Err(e) = result {
             let msg = e.to_string();
             assert!(

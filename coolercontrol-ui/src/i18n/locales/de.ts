@@ -650,6 +650,8 @@ export default {
             backendTooltip:
                 'Wählen Sie das Stresstest-Backend.<br>Das eingebaute Backend funktioniert ohne externe Abhängigkeiten.<br>stress-ng (sofern installiert) bietet zusätzliche Stressor-Varianten.',
             selectDrive: 'Laufwerk auswählen',
+            selectGpu: 'Grafikkarte auswählen',
+            allGpus: 'Alle Grafikkarten',
             start: 'Start',
             stop: 'Stop',
             stopAll: 'Alle stoppen',

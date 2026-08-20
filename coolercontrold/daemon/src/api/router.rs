@@ -1414,6 +1414,19 @@ fn stress_test_routes() -> ApiRouter<AppState> {
             .layer(axum::middleware::from_fn(auth::session_auth_middleware)),
         )
         .api_route(
+            "/stress-test/gpus",
+            get_with(stress_test::list_gpus, |o| {
+                o.summary("List Available GPUs")
+                    .description(
+                        "Returns the GPUs available for stress testing, discrete first. \
+                         Enumerated out of process on first use, then cached.",
+                    )
+                    .tag("stress-test")
+                    .security_requirement("CookieAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::session_auth_middleware)),
+        )
+        .api_route(
             "/stress-test/ram",
             post_with(stress_test::start_ram, |o| {
                 o.summary("Start RAM Stress Test")

@@ -50,6 +50,10 @@ const ramLoading = ref(false)
 const driveLoading = ref(false)
 const availableDrives = ref<Array<{ device_path: string; model?: string; size_bytes: number }>>([])
 const selectedDrive = ref<string | undefined>(undefined)
+const availableGpus = ref<Array<{ id: string; name: string; discrete: boolean }>>([])
+// Sentinel for "stress every GPU", which is what the daemon does when no id is sent.
+const ALL_GPUS = 'all'
+const selectedGpu = ref<string>(ALL_GPUS)
 let statusPollInterval: ReturnType<typeof setInterval> | null = null
 
 // Bumped whenever this component sets an active flag itself. A status request already in
@@ -181,11 +185,17 @@ const stopCpuStress = async () => {
     invalidatePendingStatus()
 }
 
+const gpuOptions = computed(() => [
+    { label: t('views.appInfo.allGpus'), value: ALL_GPUS },
+    ...availableGpus.value.map((gpu) => ({ label: gpu.name, value: gpu.id })),
+])
+
 const doGpuStress = async () => {
     gpuLoading.value = true
     const err = await deviceStore.daemonClient.startGpuStress(
         gpuDuration.value,
         stressNgAvailable.value ? settingsStore.gpuStressBackend : undefined,
+        selectedGpu.value === ALL_GPUS ? undefined : selectedGpu.value,
     )
     gpuLoading.value = false
     if (err) {
@@ -308,6 +318,11 @@ onMounted(async () => {
     if (drives.length > 0) {
         selectedDrive.value = drives[0].device_path
     }
+    const gpus = await deviceStore.daemonClient.listGpusForStress()
+    availableGpus.value = gpus
+    // The discrete card is the one with a cooler to validate. Falls back to
+    // every GPU when none is discrete, which is what the daemon did before.
+    selectedGpu.value = gpus.find((gpu) => gpu.discrete)?.id ?? ALL_GPUS
     await pollStatus()
     if (cpuActive.value || gpuActive.value || ramActive.value || driveActive.value) {
         startPolling()
@@ -405,14 +420,23 @@ onMounted(async () => {
                                 />
                             </td>
                             <td class="pr-4">
-                                <UiNumberInput
-                                    v-model="gpuDuration"
-                                    :min="15"
-                                    :max="600"
-                                    :step="15"
-                                    :disabled="gpuActive"
-                                    suffix="s"
-                                />
+                                <div class="flex items-center gap-2">
+                                    <UiNumberInput
+                                        v-model="gpuDuration"
+                                        :min="15"
+                                        :max="600"
+                                        :step="15"
+                                        :disabled="gpuActive"
+                                        suffix="s"
+                                    />
+                                    <UiSelect
+                                        v-model="selectedGpu"
+                                        :options="gpuOptions"
+                                        :placeholder="t('views.appInfo.selectGpu')"
+                                        class="w-64"
+                                        :disabled="gpuActive || availableGpus.length === 0"
+                                    />
+                                </div>
                             </td>
                             <td class="pr-4">
                                 <UiButton v-if="!gpuActive" @click="startGpuStress">{{

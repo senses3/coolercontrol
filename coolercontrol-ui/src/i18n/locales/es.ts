@@ -642,6 +642,8 @@ export default {
             backendTooltip:
                 'Elija el backend de la prueba de estrés.<br>El backend integrado funciona sin dependencias externas.<br>stress-ng (cuando está instalado) proporciona variantes adicionales de estresores.',
             selectDrive: 'Seleccionar disco',
+            selectGpu: 'Seleccionar GPU',
+            allGpus: 'Todas las GPU',
             start: 'Iniciar',
             stop: 'Detener',
             stopAll: 'Detener todo',

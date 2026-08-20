@@ -5854,6 +5854,35 @@
         ]
       }
     },
+    "/stress-test/gpus": {
+      "get": {
+        "tags": [
+          "stress-test"
+        ],
+        "summary": "List Available GPUs",
+        "description": "Returns the GPUs available for stress testing, discrete first. Enumerated out of process on first use, then cached.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GpuInfo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          }
+        ]
+      }
+    },
     "/stress-test/ram": {
       "post": {
         "tags": [
@@ -8969,6 +8998,28 @@
           "assignments"
         ]
       },
+      "GpuInfo": {
+        "type": "object",
+        "properties": {
+          "discrete": {
+            "description": "Discrete GPUs are listed first and are what a stress test normally\n means to target.",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "Opaque selection key to pass back as `gpu_id`. The PCI slot where one\n is known, e.g. \"0000:03:00.0\".",
+            "type": "string"
+          },
+          "name": {
+            "description": "Driver-reported name, e.g. \"AMD Radeon RX 6750 XT (RADV NAVI22)\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "discrete"
+        ]
+      },
       "HasUiDto": {
         "type": "object",
         "properties": {
@@ -10640,6 +10691,13 @@
             "format": "uint16",
             "maximum": 65535,
             "minimum": 0
+          },
+          "gpu_id": {
+            "description": "Which GPU to stress, as an `id` from GET /stress-test/gpus.\n Omit to stress every GPU.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

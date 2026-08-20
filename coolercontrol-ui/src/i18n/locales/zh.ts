@@ -609,6 +609,8 @@ export default {
             backendTooltip:
                 '选择压力测试后端。<br>内置无需外部依赖即可工作。<br>stress-ng (已安装时) 提供额外的压力测试变体。',
             selectDrive: '选择磁盘',
+            selectGpu: '选择显卡',
+            allGpus: '所有显卡',
             start: '开始',
             stop: '停止',
             stopAll: '全部停止',

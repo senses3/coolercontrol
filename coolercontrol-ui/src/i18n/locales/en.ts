@@ -633,6 +633,8 @@ export default {
             backendTooltip:
                 'Choose the stress-test backend.<br>Built-in works without external dependencies.<br>stress-ng (when installed) provides additional stressor variants.',
             selectDrive: 'Select drive',
+            selectGpu: 'Select GPU',
+            allGpus: 'All GPUs',
 
             start: 'Start',
             stop: 'Stop',
