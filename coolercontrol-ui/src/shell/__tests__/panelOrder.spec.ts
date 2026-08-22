@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
 import {
+    orderPinnedRows,
     orderedByGroup,
     reorderSubset,
     setDeviceChildrenSubset,
@@ -90,5 +91,34 @@ describe('sortEntitiesByGroup', () => {
         const entities = [{ uid: 'p1' }, { uid: 'p2' }, { uid: 'p3' }]
         sortEntitiesByGroup(menuOrder, 'profiles', entities, (e) => e.uid)
         expect(entities.map((e) => e.uid)).toEqual(['p2', 'p1', 'p3'])
+    })
+})
+
+describe('orderPinnedRows', () => {
+    // The bug this guards: the monitoring panel used to render pinned dashboards
+    // as their own list above pinned sensors, so a dashboard pinned last showed
+    // above sensors pinned first, and the home panel disagreed with it.
+    it('follows the pin order across kinds', () => {
+        const rows = new Map([
+            ['dev1_temp1', 'sensorA'],
+            ['dash-uid', 'dashboardB'],
+            ['dev1_fan1', 'sensorC'],
+        ])
+        expect(orderPinnedRows(['dev1_temp1', 'dash-uid', 'dev1_fan1'], rows)).toEqual([
+            'sensorA',
+            'dashboardB',
+            'sensorC',
+        ])
+    })
+
+    // A panel only builds rows for the kinds it shows, and pinnedIds is shared
+    // with the panels that show the others.
+    it('drops ids the panel has no row for', () => {
+        const rows = new Map([['kept', 'row']])
+        expect(orderPinnedRows(['gone', 'kept', 'also-gone'], rows)).toEqual(['row'])
+    })
+
+    it('returns nothing when nothing is pinned', () => {
+        expect(orderPinnedRows([], new Map([['a', 1]]))).toEqual([])
     })
 })

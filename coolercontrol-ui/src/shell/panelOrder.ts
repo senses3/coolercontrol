@@ -100,3 +100,17 @@ export function sortEntitiesByGroup<T>(
     }
     entities.sort((a, b) => getIndex(a) - getIndex(b))
 }
+
+// Pinned rows in the order their ids were pinned, whatever kind each row is.
+// A panel showing more than one kind must not group them: `pinnedIds` is one
+// order, so grouping would put a newly pinned item above older ones and make a
+// drag here mean something else in the panel next door. Ids with no row (a kind
+// this panel does not show, or a deleted entity) drop out.
+export function orderPinnedRows<T>(pinnedIds: string[], rowsById: Map<string, T>): T[] {
+    const rows: T[] = []
+    for (const id of pinnedIds) {
+        const row = rowsById.get(id)
+        if (row !== undefined) rows.push(row)
+    }
+    return rows
+}
