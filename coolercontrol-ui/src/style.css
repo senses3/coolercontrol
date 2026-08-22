@@ -58,20 +58,6 @@
 /*height: 0.5rem;*/
 /*}*/
 
-/* There is some odd WebKit issue where backdrop-filter can't handle vars */
-/* see: https://github.com/tailwindlabs/tailwindcss/issues/13844 */
-.backdrop-blur {
-    --tw-backdrop-blur: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: var(--tw-backdrop-blur);
-}
-
-.backdrop-blur-sm {
-    --tw-backdrop-blur: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: var(--tw-backdrop-blur);
-}
-
 /* IBM Plex, latin subsets, self-hosted: the Qt app has no network guarantee and
    a font CDN would be a new runtime dependency. No unicode-range is declared,
    so a character these files do not carry (CJK, Arabic, Devanagari) falls
