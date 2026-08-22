@@ -45,6 +45,9 @@ const COMMAND_SHUTDOWN: &str =
     "shutdown +1 \"Critical CoolerControl Alert! System will shutdown in 1 minute.\"";
 const COMMAND_SHUTDOWN_CANCEL: &str = "shutdown -c";
 
+/// Log text for a state change caused by editing an alert's watched sources.
+const MESSAGE_SOURCES_CHANGED: &str = "Watched sources changed";
+
 pub type AlertName = String;
 pub type AlertLogMessage = String;
 
@@ -611,11 +614,12 @@ impl AlertController {
         self.save_alert_data_to_config().await
     }
 
-    /// Updates an existing Alert. Runtime state carries over only when the watched
-    /// source set is unchanged; otherwise evaluation starts fresh.
+    /// Updates an existing Alert. Runtime state carries over per source, so an edit
+    /// never re-arms a source the user kept, and an edit that clears the alert is
+    /// announced here because no later tick would.
     pub async fn update(&self, mut alert: Alert) -> Result<()> {
         alert.normalize_sources();
-        {
+        let announcement = {
             let mut alerts_lock = self.alerts.borrow_mut();
             let Some(existing_alert) = alerts_lock.get(&alert.uid) else {
                 return Err(CCError::NotFound {
@@ -623,29 +627,113 @@ impl AlertController {
                 }
                 .into());
             };
+            let previous_state = existing_alert.state;
             if alert.channel_sources == existing_alert.channel_sources {
-                // don't overwrite server-authoritative runtime state:
-                alert.state = existing_alert.state;
-                alert.source_states = existing_alert.source_states.clone();
-                alert.notified = existing_alert.notified;
-                alert.last_notified = existing_alert.last_notified;
-                alert.shutdown_scheduled = existing_alert.shutdown_scheduled;
-            } else if existing_alert.shutdown_scheduled {
-                // The source set changed under a pending shutdown; evaluation
-                // restarts fresh, so the pending shutdown must not linger.
-                Self::fire_command(COMMAND_SHUTDOWN_CANCEL);
-                info!(
-                    "Alert sources changed: {} - pending shutdown cancelled",
-                    alert.name
-                );
+                Self::carry_runtime_state(&mut alert, existing_alert);
+            } else {
+                Self::carry_surviving_source_states(&mut alert, existing_alert);
+                Self::cancel_shutdown_on_source_change(&alert, existing_alert);
             }
             Self::cancel_shutdown_if_unwanted(&mut alert);
             if alert.enabled.not() {
                 Self::reset_saved_alert_state(&mut alert);
             }
+            let announcement =
+                Self::state_changed_by_edit(&alert, previous_state).then(|| alert.clone());
             alerts_lock.insert(alert.uid.clone(), alert);
+            announcement
+        };
+        if let Some(edited_alert) = announcement {
+            self.announce_edited_state(&edited_alert);
         }
         self.save_alert_data_to_config().await
+    }
+
+    /// Server-authoritative runtime state that a plain settings edit must not
+    /// overwrite. The next tick re-evaluates it against the new thresholds and
+    /// announces any transition itself.
+    fn carry_runtime_state(alert: &mut Alert, existing_alert: &Alert) {
+        alert.state = existing_alert.state;
+        alert
+            .source_states
+            .clone_from(&existing_alert.source_states);
+        alert.notified = existing_alert.notified;
+        alert.last_notified = existing_alert.last_notified;
+        alert.shutdown_scheduled = existing_alert.shutdown_scheduled;
+    }
+
+    /// Carries runtime state across a source-set edit. A source the user kept keeps
+    /// its state, so a live alarm is neither dropped nor made to warm up again; a
+    /// source they added starts Inactive. The aggregate then follows the survivors,
+    /// which is what clears an alert whose only firing source was removed.
+    fn carry_surviving_source_states(alert: &mut Alert, existing_alert: &Alert) {
+        debug_assert_eq!(
+            existing_alert.channel_sources.len(),
+            existing_alert.source_states.len()
+        );
+        debug_assert_eq!(alert.channel_sources.len(), alert.source_states.len());
+        for (index, source) in alert.channel_sources.iter().enumerate() {
+            let Some(previous) = existing_alert
+                .channel_sources
+                .iter()
+                .position(|kept_source| kept_source == source)
+            else {
+                continue;
+            };
+            alert.source_states[index] = existing_alert.source_states[previous];
+        }
+        alert.state = alert.worst_of_visible();
+        alert.last_notified = existing_alert.last_notified;
+        alert.notified = existing_alert.notified;
+        if alert.state == AlertState::Inactive {
+            alert.notified = false;
+        }
+    }
+
+    /// A pending shutdown does not survive a source-set edit: the user gets a fresh
+    /// countdown instead of the remainder of one armed for a set they have changed.
+    /// `shutdown_scheduled` stays false, so the tick loop re-arms it while a
+    /// surviving source still holds the alert active.
+    fn cancel_shutdown_on_source_change(alert: &Alert, existing_alert: &Alert) {
+        if existing_alert.shutdown_scheduled.not() {
+            return;
+        }
+        Self::fire_command(COMMAND_SHUTDOWN_CANCEL);
+        info!(
+            "Alert sources changed: {} - pending shutdown cancelled",
+            alert.name
+        );
+    }
+
+    /// True when the edit itself moved the wire-visible state. The tick loop only
+    /// announces per-source transitions, so a change made here has no later tick to
+    /// carry it: dropping the one firing source would otherwise leave every client
+    /// showing an alert the daemon already considers clear. A disabled alert stays
+    /// silent, as it always has.
+    fn state_changed_by_edit(alert: &Alert, previous_state: AlertState) -> bool {
+        if alert.enabled.not() {
+            return false;
+        }
+        alert.state != previous_state
+    }
+
+    /// Publishes a state change the tick loop cannot produce. User-initiated, so it
+    /// logs and updates clients but never raises a desktop notification.
+    fn announce_edited_state(&self, alert: &Alert) {
+        let log = self.log_alert_state_change(
+            alert.uid.clone(),
+            alert.name.clone(),
+            alert.state,
+            MESSAGE_SOURCES_CHANGED.to_string(),
+            alert.is_silenced(),
+            // Not a source recovery: the user edited the watched set. Marking it
+            // one would toast "Alert recovered" on top of the update toast the
+            // same click already raised.
+            false,
+        );
+        if let Some(handle) = self.alert_handle.borrow().as_ref() {
+            handle.broadcast_alert_state_change(log);
+        }
     }
 
     /// True when a pending shutdown is no longer wanted, because the alert was
@@ -2012,6 +2100,188 @@ mod tests {
         let mut idle = make_alert_with_pending_shutdown();
         idle.shutdown_scheduled = false;
         AlertController::cancel_shutdown_on_delete(&idle);
+        assert!(take_fired_commands().is_empty());
+    }
+
+    // -- Source-set edit tests --
+
+    /// Builds a two-source alert held Active by `temp1` while `fan1` sits clear.
+    fn make_two_source_alert() -> Alert {
+        let mut alert = make_alert("a", 20.0, 80.0, AlertState::Active);
+        alert
+            .channel_sources
+            .push(make_source("fan1", ChannelMetric::Temp));
+        alert.source_states = vec![AlertState::Active, AlertState::Inactive];
+        alert.notified = true;
+        alert
+    }
+
+    #[test]
+    fn dropping_the_only_firing_source_clears_the_alert() {
+        // Goal: the reported bug. Remove the source holding the alert Active and
+        // the aggregate must follow the survivors immediately, because no later
+        // tick produces a per-source transition to announce it.
+        let existing_alert = make_two_source_alert();
+        let mut alert = make_two_source_alert();
+        alert.channel_sources.remove(0);
+        alert.source_states = vec![AlertState::Inactive];
+        alert.notified = false;
+
+        AlertController::carry_surviving_source_states(&mut alert, &existing_alert);
+
+        assert_eq!(alert.state, AlertState::Inactive);
+        assert_eq!(alert.source_states, vec![AlertState::Inactive]);
+        assert!(
+            alert.notified.not(),
+            "a cleared alert must be able to announce a later episode"
+        );
+    }
+
+    #[test]
+    fn dropping_a_clear_source_keeps_the_alert_active() {
+        // Goal: the negative space of the case above. Removing a source that was
+        // not firing must leave the still-firing survivor untouched, so the alarm
+        // is neither dropped nor forced through warmup again.
+        let existing_alert = make_two_source_alert();
+        let mut alert = make_two_source_alert();
+        alert.channel_sources.remove(1);
+        alert.source_states = vec![AlertState::Inactive];
+
+        AlertController::carry_surviving_source_states(&mut alert, &existing_alert);
+
+        assert_eq!(alert.state, AlertState::Active);
+        assert_eq!(alert.source_states, vec![AlertState::Active]);
+        assert!(alert.notified, "the episode was already announced");
+    }
+
+    #[test]
+    fn an_added_source_starts_inactive_and_survivors_keep_their_state() {
+        // Goal: adding a source must not disturb the sources already being
+        // watched, and the new one must warm up on its own terms.
+        let existing_alert = make_two_source_alert();
+        let mut alert = make_two_source_alert();
+        alert
+            .channel_sources
+            .push(make_source("fan2", ChannelMetric::Temp));
+        alert.source_states = vec![AlertState::Inactive; 3];
+
+        AlertController::carry_surviving_source_states(&mut alert, &existing_alert);
+
+        assert_eq!(
+            alert.source_states,
+            vec![
+                AlertState::Active,
+                AlertState::Inactive,
+                AlertState::Inactive
+            ]
+        );
+        assert_eq!(alert.state, AlertState::Active);
+    }
+
+    #[test]
+    fn reordering_sources_carries_state_by_identity_not_position() {
+        // Goal: the carry-over matches on the source itself, so moving a source
+        // in the list cannot hand its state to a different channel.
+        let existing_alert = make_two_source_alert();
+        let mut alert = make_two_source_alert();
+        alert.channel_sources.swap(0, 1);
+        alert.source_states = vec![AlertState::Inactive; 2];
+
+        AlertController::carry_surviving_source_states(&mut alert, &existing_alert);
+
+        assert_eq!(
+            alert.source_states,
+            vec![AlertState::Inactive, AlertState::Active]
+        );
+        assert_eq!(alert.state, AlertState::Active);
+    }
+
+    #[test]
+    fn a_warming_survivor_keeps_its_pending_timer() {
+        // Goal: a source part-way through warmup must not restart the clock, or
+        // an edit would postpone every alarm by the full warmup duration.
+        let started = Local::now() - Duration::seconds(30);
+        let mut existing_alert = make_two_source_alert();
+        existing_alert.source_states = vec![AlertState::WarmUp(started), AlertState::Inactive];
+        existing_alert.state = AlertState::Inactive;
+        let mut alert = make_two_source_alert();
+        alert.channel_sources.remove(1);
+        alert.source_states = vec![AlertState::Inactive];
+
+        AlertController::carry_surviving_source_states(&mut alert, &existing_alert);
+
+        assert_eq!(alert.source_states, vec![AlertState::WarmUp(started)]);
+        assert_eq!(
+            alert.state,
+            AlertState::Inactive,
+            "warmup is not yet wire-visible"
+        );
+    }
+
+    #[test]
+    fn state_changed_by_edit_reports_only_real_movement() {
+        // Goal: the announcement fires exactly when the edit moved the visible
+        // state, and never for a disabled alert, whose reset stays silent.
+        let mut alert = make_alert("a", 20.0, 80.0, AlertState::Inactive);
+        assert!(AlertController::state_changed_by_edit(
+            &alert,
+            AlertState::Active
+        ));
+        assert!(
+            AlertController::state_changed_by_edit(&alert, AlertState::Inactive).not(),
+            "an unchanged state has nothing to announce"
+        );
+
+        alert.enabled = false;
+        assert!(
+            AlertController::state_changed_by_edit(&alert, AlertState::Active).not(),
+            "disabling is reset silently by design"
+        );
+    }
+
+    #[test]
+    fn carry_runtime_state_preserves_the_whole_episode() {
+        // Goal: guards the unchanged-sources path, where a min/max edit must keep
+        // every runtime field so the next tick announces the transition itself.
+        let mut existing_alert = make_two_source_alert();
+        existing_alert.shutdown_scheduled = true;
+        existing_alert.last_notified = Some(Local::now());
+        let mut alert = make_two_source_alert();
+        alert.state = AlertState::Inactive;
+        alert.source_states = vec![AlertState::Inactive; 2];
+        alert.notified = false;
+        alert.shutdown_scheduled = false;
+
+        AlertController::carry_runtime_state(&mut alert, &existing_alert);
+
+        assert_eq!(alert.state, existing_alert.state);
+        assert_eq!(alert.source_states, existing_alert.source_states);
+        assert!(alert.notified);
+        assert_eq!(alert.last_notified, existing_alert.last_notified);
+        assert!(alert.shutdown_scheduled);
+    }
+
+    #[test]
+    fn a_source_edit_cancels_a_pending_shutdown() {
+        // Goal: the countdown was armed for a source set the user has just
+        // changed, so it is cancelled here; the tick loop re-arms a fresh one
+        // while a surviving source still holds the alert active.
+        let _ = take_fired_commands();
+        let existing_alert = make_alert_with_pending_shutdown();
+        let alert = make_alert("a", 20.0, 80.0, AlertState::Active);
+        AlertController::cancel_shutdown_on_source_change(&alert, &existing_alert);
+        assert_eq!(
+            take_fired_commands(),
+            vec![COMMAND_SHUTDOWN_CANCEL.to_string()]
+        );
+        assert!(
+            alert.shutdown_scheduled.not(),
+            "the tick loop must see an unarmed alert to re-arm it"
+        );
+
+        let mut idle = make_alert_with_pending_shutdown();
+        idle.shutdown_scheduled = false;
+        AlertController::cancel_shutdown_on_source_change(&alert, &idle);
         assert!(take_fired_commands().is_empty());
     }
 
