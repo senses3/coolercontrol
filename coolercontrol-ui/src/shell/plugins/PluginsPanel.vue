@@ -118,7 +118,7 @@ const isRouteActive = useRouteActive()
             <svg-icon
                 type="mdi"
                 :path="mdiViewListOutline"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             {{ t('layout.plugins.overview') }}
@@ -150,7 +150,7 @@ const isRouteActive = useRouteActive()
                     <svg-icon
                         type="mdi"
                         :path="mdiPowerPlugOutline"
-                        :size="14"
+                        :size="18"
                         class="shrink-0 text-text-color-secondary"
                     />
                     <span class="truncate">{{ plugin.id }}</span>

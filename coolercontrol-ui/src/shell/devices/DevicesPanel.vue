@@ -354,7 +354,7 @@ const isRouteActive = useRouteActive()
                         :to="{ name: 'device-custom-sensor-new' }"
                         class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                     >
-                        <svg-icon type="mdi" :path="mdiPlus" :size="14" class="shrink-0" />
+                        <svg-icon type="mdi" :path="mdiPlus" :size="18" class="shrink-0" />
                         <span class="truncate">
                             {{ t('layout.menu.tooltips.addCustomSensor') }}
                         </span>

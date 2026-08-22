@@ -529,7 +529,7 @@ const isRouteActive = useRouteActive()
                 <svg-icon
                     type="mdi"
                     :path="mdiChartMultiple"
-                    :size="14"
+                    :size="18"
                     class="shrink-0 text-text-color-secondary"
                 />
                 <span class="truncate">{{ profile.name }}</span>
@@ -542,7 +542,7 @@ const isRouteActive = useRouteActive()
                 <span
                     class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
+                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                 </span>
             </RouterLink>
         </VueDraggable>
@@ -576,14 +576,14 @@ const isRouteActive = useRouteActive()
                 <svg-icon
                     type="mdi"
                     :path="mdiFunction"
-                    :size="14"
+                    :size="18"
                     class="shrink-0 text-text-color-secondary"
                 />
                 <span class="truncate">{{ fun.name }}</span>
                 <span
                     class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
+                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                 </span>
             </RouterLink>
         </VueDraggable>

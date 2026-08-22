@@ -367,7 +367,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="mdiViewDashboardOutline"
-                            :size="14"
+                            :size="18"
                             class="shrink-0 text-text-color-secondary"
                         />
                         <span class="truncate">{{ dashboard.name }}</span>
@@ -531,7 +531,7 @@ const isRouteActive = useRouteActive()
                     <svg-icon
                         type="mdi"
                         :path="mdiViewDashboardOutline"
-                        :size="14"
+                        :size="18"
                         class="shrink-0 text-text-color-secondary"
                     />
                     <span class="truncate">{{ dashboard.name }}</span>
@@ -597,7 +597,7 @@ const isRouteActive = useRouteActive()
             <svg-icon
                 type="mdi"
                 :path="mdiBellOutline"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             <span class="truncate">{{ t('views.alerts.alertsOverview') }}</span>
@@ -619,7 +619,7 @@ const isRouteActive = useRouteActive()
                 <svg-icon
                     type="mdi"
                     :path="alertMenuIcon(alert)"
-                    :size="14"
+                    :size="18"
                     class="shrink-0"
                     :class="alertMenuIconClass(alert)"
                 />
@@ -635,7 +635,7 @@ const isRouteActive = useRouteActive()
                                 class="rounded p-0.5 text-text-color-secondary hover:text-text-color"
                                 v-tooltip.top="t('views.alerts.silenceTooltip')"
                             >
-                                <svg-icon type="mdi" :path="mdiBellSleepOutline" :size="14" />
+                                <svg-icon type="mdi" :path="mdiBellSleepOutline" :size="16" />
                             </button>
                         </template>
                     </AlertSilenceMenu>
@@ -652,14 +652,14 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="alert.enabled ? mdiBellOffOutline : mdiBellOutline"
-                            :size="14"
+                            :size="16"
                         />
                     </button>
                 </span>
                 <span
                     class="drag-handle hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
+                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                 </span>
             </RouterLink>
         </VueDraggable>

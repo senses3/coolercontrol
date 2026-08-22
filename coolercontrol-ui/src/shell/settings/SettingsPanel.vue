@@ -50,7 +50,7 @@ const isActive = (tab: string): boolean => {
             <svg-icon
                 type="mdi"
                 :path="entry.icon"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             {{ t(entry.labelKey) }}

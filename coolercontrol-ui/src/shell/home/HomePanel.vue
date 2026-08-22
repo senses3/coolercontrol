@@ -215,7 +215,7 @@ const isRouteActive = useRouteActive()
             <svg-icon
                 type="mdi"
                 :path="mdiHomeOutline"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             {{ t('layout.shell.homePanel.overview') }}
@@ -228,7 +228,7 @@ const isRouteActive = useRouteActive()
             <svg-icon
                 type="mdi"
                 :path="mdiTextBoxOutline"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             {{ t('layout.shell.homePanel.logs') }}
@@ -260,7 +260,7 @@ const isRouteActive = useRouteActive()
                             v-if="row.icon"
                             type="mdi"
                             :path="row.icon"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{ 'animate-spin-slow': row.spins }"
                             :style="{ color: row.color || undefined }"
@@ -269,7 +269,7 @@ const isRouteActive = useRouteActive()
                             v-else
                             type="mdi"
                             :path="mdiViewDashboardOutline"
-                            :size="14"
+                            :size="18"
                             class="shrink-0 text-text-color-secondary"
                         />
                         <span class="truncate">{{ row.label }}</span>
