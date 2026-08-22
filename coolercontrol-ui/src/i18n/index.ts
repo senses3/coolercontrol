@@ -15,8 +15,11 @@ import pt from './locales/pt.ts'
 import hi from './locales/hi.ts'
 import ko from './locales/ko.ts'
 
-// Get saved language settings or use English as default
-const savedLocale = localStorage.getItem('locale') || 'en'
+// The cached setting stands in until the daemon's copy arrives with the rest
+// of the UI settings, which is well after this instance has to exist.
+import { readCachedLanguage, resolveLanguage } from './locale.ts'
+
+const savedLocale = resolveLanguage(readCachedLanguage())
 
 const i18n = createI18n({
     legacy: false, // Use Composition API

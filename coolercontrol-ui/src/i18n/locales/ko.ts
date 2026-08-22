@@ -301,6 +301,7 @@ export default {
             general: '일반',
             language: '언어',
             selectLanguage: '언어 선택',
+            systemLanguage: '시스템',
             fullScreen: '전체 화면',
             eyeCandy: '시각 효과',
             interfaceFont: '인터페이스 글꼴',

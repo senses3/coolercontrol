@@ -301,6 +301,7 @@ export default {
             general: 'عام',
             language: 'اللغة',
             selectLanguage: 'اختر اللغة',
+            systemLanguage: 'النظام',
             fullScreen: 'ملء الشاشة',
             eyeCandy: 'تأثيرات بصرية',
             interfaceFont: 'خط الواجهة',

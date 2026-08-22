@@ -301,6 +301,7 @@ export default {
             general: 'सामान्य',
             language: 'भाषा',
             selectLanguage: 'भाषा चुनें',
+            systemLanguage: 'सिस्टम',
             fullScreen: 'पूर्ण स्क्रीन',
             eyeCandy: 'विज़ुअल इफ़ेक्ट',
             interfaceFont: 'इंटरफ़ेस फ़ॉन्ट',

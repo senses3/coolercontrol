@@ -307,6 +307,7 @@ export default {
             general: 'Général',
             language: 'Langue',
             selectLanguage: 'Sélectionner la langue',
+            systemLanguage: 'Système',
             fullScreen: 'Plein écran',
             eyeCandy: 'Effets visuels',
             interfaceFont: "Police de l'interface",

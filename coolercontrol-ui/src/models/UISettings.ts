@@ -274,6 +274,11 @@ export class UISettingsDTO {
     eyeCandy: boolean = false
     pointsOverlayTablePositions: Array<[UID, TablePosition]> = []
     interfaceFont: InterfaceFont = InterfaceFont.BUNDLED
+    // Undefined means the user has never chosen, and `system` means follow the
+    // browser locale. Never a resolved code for a non-choice: that is what let
+    // a system locale masquerade as a deliberate pick when this lived only in
+    // localStorage.
+    language?: string
     // The tour version the user has completed; below ONBOARDING_TOUR_VERSION
     // means it runs again. Legacy configs hold a boolean here, which coerces
     // to 0 (dismissed) or 1 (never run) and so replays the reworked tour once.

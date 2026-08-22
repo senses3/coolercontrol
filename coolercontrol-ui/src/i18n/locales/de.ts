@@ -308,6 +308,7 @@ export default {
             general: 'Allgemein',
             language: 'Sprache',
             selectLanguage: 'Sprache auswählen',
+            systemLanguage: 'System',
             fullScreen: 'Vollbild',
             eyeCandy: 'Augenschmaus',
             interfaceFont: 'Schriftart der Oberfläche',

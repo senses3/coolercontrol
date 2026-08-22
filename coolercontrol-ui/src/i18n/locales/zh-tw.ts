@@ -291,6 +291,7 @@ export default {
             general: '一般',
             language: '語言',
             selectLanguage: '選擇語言',
+            systemLanguage: '跟隨系統',
             fullScreen: '全屏',
             eyeCandy: '視覺效果',
             interfaceFont: '介面字型',

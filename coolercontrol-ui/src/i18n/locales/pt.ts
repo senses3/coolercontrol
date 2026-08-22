@@ -305,6 +305,7 @@ export default {
             general: 'Geral',
             language: 'Idioma',
             selectLanguage: 'Selecionar idioma',
+            systemLanguage: 'Sistema',
             fullScreen: 'Tela cheia',
             eyeCandy: 'Efeitos visuais',
             interfaceFont: 'Fonte da interface',

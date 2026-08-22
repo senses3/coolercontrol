@@ -302,6 +302,7 @@ export default {
             general: '一般',
             language: '言語',
             selectLanguage: '言語を選択',
+            systemLanguage: 'システム',
             fullScreen: '全画面表示',
             eyeCandy: '視覚効果',
             interfaceFont: 'インターフェースのフォント',

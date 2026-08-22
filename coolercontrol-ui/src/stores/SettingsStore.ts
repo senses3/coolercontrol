@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { defineStore } from 'pinia'
+import i18n from '@/i18n'
+import { cacheLanguage, languageSetting, resolveLanguage, SYSTEM_LANGUAGE } from '@/i18n/locale.ts'
 import { Function, FunctionsDTO, Profile, ProfilesDTO } from '@/models/Profile'
 import type { Ref } from 'vue'
 import { computed, reactive, inject, ref, toRaw, watch, watchEffect } from 'vue'
@@ -257,6 +259,11 @@ export const useSettingsStore = defineStore('settings', () => {
         ]
     }
     const interfaceFont: Ref<InterfaceFont> = ref(InterfaceFont.BUNDLED)
+    // The chosen language, not the resolved one: `system` follows the browser.
+    const language: Ref<string> = ref(SYSTEM_LANGUAGE)
+    // What the daemon had, held between loading the settings and adopting it
+    // below, which cannot happen until the save watcher is running.
+    let persistedLanguage: string | undefined
     // Persisted as the tour version the user has finished. Callers only ask the
     // yes/no question, so they read the computed below and call
     // completeOnboarding() rather than writing a flag.
@@ -412,6 +419,7 @@ export const useSettingsStore = defineStore('settings', () => {
         pointsOverlayTablePositions.value = uiSettings.pointsOverlayTablePositions ?? []
         interfaceFont.value = uiSettings.interfaceFont ?? InterfaceFont.BUNDLED
         applyInterfaceFont()
+        persistedLanguage = uiSettings.language
         // Legacy configs stored a boolean here: false once the old tour was
         // dismissed, true when it had never run. Both coerce below the current
         // version, so either way the reworked tour plays once.
@@ -482,6 +490,7 @@ export const useSettingsStore = defineStore('settings', () => {
         await getActiveModes()
 
         await startWatchingToSaveChanges()
+        adoptLanguageSetting()
     }
 
     async function loadCCSettings(): Promise<void> {
@@ -1303,6 +1312,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 eyeCandy,
                 pointsOverlayTablePositions,
                 interfaceFont,
+                language,
                 onboardingSeenVersion,
                 cpuStressBackend,
                 gpuStressBackend,
@@ -1362,6 +1372,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.eyeCandy = eyeCandy.value
                     uiSettings.pointsOverlayTablePositions = pointsOverlayTablePositions.value
                     uiSettings.interfaceFont = interfaceFont.value
+                    uiSettings.language = language.value
                     uiSettings.showOnboarding = onboardingSeenVersion.value
                     uiSettings.cpuStressBackend = cpuStressBackend.value
                     uiSettings.gpuStressBackend = gpuStressBackend.value
@@ -1383,6 +1394,26 @@ export const useSettingsStore = defineStore('settings', () => {
             console.debug('Saving CC Settings')
             await deviceStore.daemonClient.saveCCSettings(ccSettings.value)
         })
+    }
+
+    // Deliberately after the save watcher starts: a value adopted from an older
+    // version's localStorage is a change the daemon has never seen, and it has
+    // to be written there or the next lost browser store forgets it again. The
+    // language on screen is already right, having come from the same cache at
+    // module load, so this only flips it when the daemon disagrees.
+    function adoptLanguageSetting(): void {
+        language.value = languageSetting(persistedLanguage)
+        applyLanguage()
+    }
+
+    // The daemon holds the setting; localStorage mirrors it so the next start
+    // paints in the right language before the settings request returns, and
+    // <html lang> follows so the browser hyphenates and speaks the right one.
+    function applyLanguage(): void {
+        const resolved = resolveLanguage(language.value)
+        i18n.global.locale.value = resolved
+        document.documentElement.setAttribute('lang', resolved)
+        cacheLanguage(language.value)
     }
 
     // Both font roles live in CSS variables, so the setting is one class.
@@ -1763,6 +1794,7 @@ export const useSettingsStore = defineStore('settings', () => {
         pointsTablePosition,
         setPointsTablePosition,
         interfaceFont,
+        language,
         showOnboarding,
         completeOnboarding,
         cpuStressBackend,
@@ -1834,6 +1866,7 @@ export const useSettingsStore = defineStore('settings', () => {
         applyStaleSourceDelta,
         applyThemeMode,
         applyInterfaceFont,
+        applyLanguage,
         tags,
         createTag,
         deleteTag,

@@ -190,52 +190,9 @@ onMounted(async () => {
         }
     })
 
-    // Set default language
-    const savedLocale = localStorage.getItem('locale')
-
-    if (savedLocale) {
-        locale.value = savedLocale
-    } else {
-        // Use browser language if supported
-        const browserLang = navigator.language.toLowerCase()
-
-        // List of supported languages
-        const supportedLanguages: Record<string, string> = {
-            zh: 'zh', // Chinese (Simplified)
-            'zh-cn': 'zh', // Chinese (Mainland China)
-            'zh-tw': 'zh-tw', // Chinese (Traditional)
-            'zh-hk': 'zh-tw', // Chinese (Hong Kong)
-            ja: 'ja', // Japanese
-            ru: 'ru', // Russian
-            de: 'de', // German
-            fr: 'fr', // French
-            es: 'es', // Spanish
-            ar: 'ar', // Arabic
-            pt: 'pt', // Portuguese
-            'pt-br': 'pt', // Brazilian Portuguese
-            ko: 'ko', // Korean
-            hi: 'hi', // Hindi
-        }
-
-        // Check for exact match
-        if (supportedLanguages[browserLang]) {
-            locale.value = supportedLanguages[browserLang]
-        }
-        // Check for language prefix match (e.g. en-US matches en)
-        else {
-            const langPrefix = browserLang.split('-')[0]
-            if (supportedLanguages[langPrefix]) {
-                locale.value = supportedLanguages[langPrefix]
-            } else {
-                // Default to English
-                locale.value = 'en'
-            }
-        }
-
-        // Save to localStorage
-        localStorage.setItem('locale', locale.value)
-    }
-    document.querySelector('html')?.setAttribute('lang', locale.value)
+    // The language was resolved when the i18n instance was built, from the
+    // cached setting; loadUISettings replaces it with the daemon's copy.
+    document.documentElement.setAttribute('lang', locale.value)
 
     // Handshake and login must happen before anything else
     const handshakeSuccessful = await deviceStore.handshake()

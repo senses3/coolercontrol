@@ -300,6 +300,7 @@ export default {
             general: 'General',
             language: 'Language',
             selectLanguage: 'Select Language',
+            systemLanguage: 'System',
             fullScreen: 'Full Screen',
             eyeCandy: 'Eye Candy',
             interfaceFont: 'Interface Font',
