@@ -223,14 +223,14 @@ const isRouteActive = useRouteActive()
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
                         <CCColorPicker
                             :model-value="pickerColor(device.uid)"
                             :size="1.25"
                             @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
                         />
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
                 <RouterLink
@@ -307,9 +307,14 @@ const isRouteActive = useRouteActive()
                                     '!flex': openTagRow === `${device.uid}-${sensorName}`,
                                 }"
                             >
-                                <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                                </span>
+                                <TagPopover
+                                    :device-u-i-d="device.uid"
+                                    :channel-name="sensorName"
+                                    @open="
+                                        (open: boolean) =>
+                                            onTagOpen(`${device.uid}-${sensorName}`, open)
+                                    "
+                                />
                                 <CCColorPicker
                                     :model-value="sensorPickerColor(device.uid, sensorName)"
                                     :default-color="sensorDefaultColor(device.uid, sensorName)"
@@ -318,14 +323,6 @@ const isRouteActive = useRouteActive()
                                         (c: Color) => setSensorColor(device.uid, sensorName, c)
                                     "
                                     @reset="resetSensorColor(device.uid, sensorName)"
-                                />
-                                <TagPopover
-                                    :device-u-i-d="device.uid"
-                                    :channel-name="sensorName"
-                                    @open="
-                                        (open: boolean) =>
-                                            onTagOpen(`${device.uid}-${sensorName}`, open)
-                                    "
                                 />
                                 <button
                                     type="button"
@@ -347,6 +344,9 @@ const isRouteActive = useRouteActive()
                                         :size="16"
                                     />
                                 </button>
+                                <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                                </span>
                             </div>
                         </div>
                     </VueDraggable>

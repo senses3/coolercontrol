@@ -312,32 +312,16 @@ const isRouteActive = useRouteActive()
                             </span>
                         </span>
                     </RouterLink>
+                    <!-- Every panel orders its actions by how many row types carry
+                         them, most universal last. The cluster is right-aligned, so
+                         only the last slot sits at a fixed x: drag is in every row,
+                         so it ends every cluster, and pin precedes it. -->
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                        <CCColorPicker
-                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                            :default-color="
-                                channelDefaultColor(channel.deviceUID, channel.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
-                            @reset="resetChannelColor(channel)"
-                        />
-                        <TagPopover
-                            :device-u-i-d="channel.deviceUID"
-                            :channel-name="channel.channelName"
-                            @open="
-                                (open: boolean) =>
-                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
-                            "
-                        />
                         <button
                             v-if="hasRpm(channel)"
                             type="button"
@@ -347,6 +331,23 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
                         </button>
+                        <TagPopover
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
+                            "
+                        />
+                        <CCColorPicker
+                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                            :default-color="
+                                channelDefaultColor(channel.deviceUID, channel.channelName)
+                            "
+                            :size="1.25"
+                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                            @reset="resetChannelColor(channel)"
+                        />
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -355,6 +356,9 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>
@@ -447,26 +451,6 @@ const isRouteActive = useRouteActive()
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                        <CCColorPicker
-                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                            :default-color="
-                                channelDefaultColor(channel.deviceUID, channel.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
-                            @reset="resetChannelColor(channel)"
-                        />
-                        <TagPopover
-                            :device-u-i-d="channel.deviceUID"
-                            :channel-name="channel.channelName"
-                            @open="
-                                (open: boolean) =>
-                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
-                            "
-                        />
                         <button
                             v-if="hasRpm(channel)"
                             type="button"
@@ -476,6 +460,23 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
                         </button>
+                        <TagPopover
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
+                            "
+                        />
+                        <CCColorPicker
+                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                            :default-color="
+                                channelDefaultColor(channel.deviceUID, channel.channelName)
+                            "
+                            :size="1.25"
+                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                            @reset="resetChannelColor(channel)"
+                        />
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -492,6 +493,9 @@ const isRouteActive = useRouteActive()
                                 :size="16"
                             />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>

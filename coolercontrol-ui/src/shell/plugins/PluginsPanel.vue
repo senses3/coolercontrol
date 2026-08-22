@@ -168,9 +168,6 @@ const isRouteActive = useRouteActive()
                 <div
                     class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                 >
-                    <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                        <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                    </span>
                     <template v-if="!plugin.disabled">
                         <button
                             v-if="statuses.get(plugin.id) === PluginStatus.Stopped"
@@ -203,6 +200,9 @@ const isRouteActive = useRouteActive()
                             <svg-icon type="mdi" :path="mdiRestart" :size="16" />
                         </button>
                     </template>
+                    <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                        <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                    </span>
                 </div>
             </div>
         </VueDraggable>

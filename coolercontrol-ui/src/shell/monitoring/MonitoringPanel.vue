@@ -375,9 +375,6 @@ const isRouteActive = useRouteActive()
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -386,6 +383,9 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>
@@ -447,26 +447,6 @@ const isRouteActive = useRouteActive()
                             '!flex': openTagRow === `pin-${sensor.deviceUID}-${sensor.channelName}`,
                         }"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                        <CCColorPicker
-                            :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
-                            :default-color="
-                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setSensorColor(sensor, c)"
-                            @reset="resetSensorColor(sensor)"
-                        />
-                        <TagPopover
-                            :device-u-i-d="sensor.deviceUID"
-                            :channel-name="sensor.channelName"
-                            @open="
-                                (open: boolean) =>
-                                    onTagOpen(`pin-${sensor.deviceUID}-${sensor.channelName}`, open)
-                            "
-                        />
                         <button
                             v-if="alertKind(sensor) != null"
                             type="button"
@@ -486,6 +466,23 @@ const isRouteActive = useRouteActive()
                                 :size="16"
                             />
                         </button>
+                        <TagPopover
+                            :device-u-i-d="sensor.deviceUID"
+                            :channel-name="sensor.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`pin-${sensor.deviceUID}-${sensor.channelName}`, open)
+                            "
+                        />
+                        <CCColorPicker
+                            :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                            :default-color="
+                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                            "
+                            :size="1.25"
+                            @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                            @reset="resetSensorColor(sensor)"
+                        />
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -494,6 +491,9 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>
@@ -547,9 +547,6 @@ const isRouteActive = useRouteActive()
                 <div
                     class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                 >
-                    <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                        <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                    </span>
                     <button
                         type="button"
                         class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -566,6 +563,9 @@ const isRouteActive = useRouteActive()
                             :size="16"
                         />
                     </button>
+                    <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                        <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                    </span>
                 </div>
             </div>
         </VueDraggable>
@@ -732,26 +732,6 @@ const isRouteActive = useRouteActive()
                             '!flex': openTagRow === `${sensor.deviceUID}-${sensor.channelName}`,
                         }"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                        <CCColorPicker
-                            :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
-                            :default-color="
-                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setSensorColor(sensor, c)"
-                            @reset="resetSensorColor(sensor)"
-                        />
-                        <TagPopover
-                            :device-u-i-d="sensor.deviceUID"
-                            :channel-name="sensor.channelName"
-                            @open="
-                                (open: boolean) =>
-                                    onTagOpen(`${sensor.deviceUID}-${sensor.channelName}`, open)
-                            "
-                        />
                         <button
                             v-if="alertKind(sensor) != null"
                             type="button"
@@ -771,6 +751,23 @@ const isRouteActive = useRouteActive()
                                 :size="16"
                             />
                         </button>
+                        <TagPopover
+                            :device-u-i-d="sensor.deviceUID"
+                            :channel-name="sensor.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`${sensor.deviceUID}-${sensor.channelName}`, open)
+                            "
+                        />
+                        <CCColorPicker
+                            :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                            :default-color="
+                                sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                            "
+                            :size="1.25"
+                            @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                            @reset="resetSensorColor(sensor)"
+                        />
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -787,6 +784,9 @@ const isRouteActive = useRouteActive()
                                 :size="16"
                             />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>
