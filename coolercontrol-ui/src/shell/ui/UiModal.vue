@@ -59,7 +59,7 @@ const guardEscape = (event: Event): void => {
             <!-- Opacity only, no backdrop-filter: a blur here flashed and left
                  artifacts under QtWebEngine on NVIDIA when the GPU dropped to a
                  low power state. The dim carries the separation on its own. -->
-            <DialogOverlay v-if="modal" class="fixed inset-0 z-[1200] bg-black/60" />
+            <DialogOverlay v-if="modal" class="fixed inset-0 z-[1200] bg-black/80" />
             <DialogContent
                 class="fixed left-1/2 top-1/2 z-[1210] max-h-[92vh] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border-one bg-bg-two p-6 text-text-color shadow-xl outline-none"
                 :class="contentClass"
