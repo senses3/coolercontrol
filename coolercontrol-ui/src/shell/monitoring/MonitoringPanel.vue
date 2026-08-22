@@ -711,9 +711,12 @@ const isRouteActive = useRouteActive()
                             {{ deviceLabel(group.deviceUID) }}
                         </RouterLink>
                     </template>
-                    <!-- invisible, not hidden: the header must not change height on hover. -->
+                    <!-- invisible, not hidden: the header must not change height on
+                         hover. -mr-0.5 lands the drag glyph on the same column as the
+                         rows below, whose cluster insets by pr-1 inside a p-1 handle
+                         where the header insets by its own px-2 and a p-0.5 one. -->
                     <span
-                        class="invisible flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
+                        class="invisible -mr-0.5 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
                         :class="{ '!visible': openColorDevice === group.deviceUID }"
                     >
                         <CCColorPicker
