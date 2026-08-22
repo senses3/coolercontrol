@@ -70,7 +70,7 @@ const counts = (device: Device): string => {
 
 <template>
     <div class="flex h-full flex-col overflow-y-auto">
-        <div class="flex items-center gap-3 px-4 pt-4">
+        <div class="flex flex-wrap items-center gap-3 px-4 pt-4">
             <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.devices') }}</h1>
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.devicesPage.landingHint') }}

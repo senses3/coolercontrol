@@ -127,12 +127,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: '管理感測器',
+                title: '管理裝置與感測器',
                 hint: '啟用或停用裝置與感測器。建議停用未使用的項目。',
                 pendingChanges: '無變更 | {count} 項變更 | {count} 項變更',
                 applyRestart: '套用並重啟',
                 disabledDevices: '已停用的裝置',
-                openButton: '管理感測器',
+                openButton: '管理裝置與感測器',
             },
             toast: {
                 copy: '複製',

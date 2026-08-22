@@ -127,12 +127,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: '센서 관리',
+                title: '장치 및 센서 관리',
                 hint: '장치와 센서를 활성화하거나 비활성화합니다. 사용하지 않는 항목은 비활성화하는 것을 추천합니다.',
                 pendingChanges: '변경 없음 | {count}개 변경 | {count}개 변경',
                 applyRestart: '적용 및 재시작',
                 disabledDevices: '비활성화된 장치',
-                openButton: '센서 관리',
+                openButton: '장치 및 센서 관리',
             },
             toast: {
                 copy: '복사',

@@ -127,12 +127,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: '管理传感器',
+                title: '管理设备与传感器',
                 hint: '启用或禁用设备和传感器。建议禁用未使用的项。',
                 pendingChanges: '无更改 | {count} 项更改 | {count} 项更改',
                 applyRestart: '应用并重启',
                 disabledDevices: '已禁用的设备',
-                openButton: '管理传感器',
+                openButton: '管理设备与传感器',
             },
             toast: {
                 copy: '复制',

@@ -130,12 +130,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'Sensoren verwalten',
+                title: 'Geräte und Sensoren verwalten',
                 hint: 'Geräte und Sensoren aktivieren oder deaktivieren. Das Deaktivieren ungenutzter wird empfohlen.',
                 pendingChanges: 'Keine Änderungen | {count} Änderung | {count} Änderungen',
                 applyRestart: 'Anwenden & Neustart',
                 disabledDevices: 'Deaktivierte Geräte',
-                openButton: 'Sensoren verwalten',
+                openButton: 'Geräte und Sensoren verwalten',
             },
             toast: {
                 copy: 'Kopieren',
