@@ -123,6 +123,8 @@ _LCD_BUCKET_SLOT_BYTES: int = 1024
 # `_switch_bucket`'s mode for displaying a bucket. Its other caller passes 0x2, which selects
 # liquid mode and carries a bucket index of 0 that means nothing.
 _LCD_SWITCH_DISPLAY_MODE: int = 0x4
+# The one model liquidctl refuses gifs on, and only at firmware 2.x.
+_LCD_GIF_UNSUPPORTED_PID: int = 0x300E
 
 
 def _connect_with_whole_frame_transfers(self, **kwargs):
@@ -237,6 +239,22 @@ def _send_frame_fw2(self, data, bulk_info):
         return
     _write_frame_fw2(self, data, bulk_info)
     self._cc_fw2_primed = True
+
+
+def lcd_gif_supported(lc_device) -> Optional[bool]:
+    """Whether this screen can show a gif, or None where the device does not answer for it.
+
+    liquidctl refuses gifs on the Kraken 2023 at firmware 2.x (its issue #631) and gates
+    that on the product id and the firmware major together. The daemon never sees a product
+    id, so the answer travels rather than the inputs. Read after `initialize`, which is what
+    populates `_fw`.
+    """
+    if isinstance(lc_device, KrakenZ3) is False:
+        return None
+    if getattr(lc_device.device, "product_id", None) != _LCD_GIF_UNSUPPORTED_PID:
+        return True
+    firmware = getattr(lc_device, "_fw", None)
+    return None if firmware is None else firmware[0] != 2
 
 
 def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
@@ -1483,7 +1501,11 @@ class DeviceService:
                 f"LC #{device_id} {lc_device.__class__.__name__}initialize() "
                 f"RESPONSE: {lc_init_status}"
             )
-            return self._stringify_status(lc_init_status)
+            statuses = self._stringify_status(lc_init_status)
+            gif_supported = lcd_gif_supported(lc_device)
+            if gif_supported is not None:
+                statuses.append(("LCD Gif Support", str(gif_supported).lower(), ""))
+            return statuses
         except BaseException as os_exc:
             # OSError can happen when a device was found and there's a permissions error
             # OSError: read error sometimes happens when the OS/Device isn't ready.

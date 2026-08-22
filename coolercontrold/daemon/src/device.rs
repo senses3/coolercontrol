@@ -752,6 +752,9 @@ pub struct LcdInfo {
     pub screen_width: u32,
     pub screen_height: u32,
     pub max_image_size_bytes: u32,
+    /// Whether this screen can show an animated gif. The Kraken 2023 on firmware 2.x
+    /// cannot, and liquidctl refuses outright, so the mode has to stop offering it.
+    pub gif_supported: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -1267,6 +1270,7 @@ mod tests {
                     screen_width: 320,
                     screen_height: 320,
                     max_image_size_bytes: 100_000,
+                    gif_supported: true,
                 }),
             },
         };

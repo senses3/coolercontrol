@@ -915,6 +915,7 @@ export default {
             unsavedChangesHeader: 'Unsaved Changes',
             imageTooLarge: 'Image is too large. Please choose a smaller one.',
             notImageType: 'Image does not register as an image type',
+            gifNotSupported: "This screen's firmware cannot display gifs. Choose a static image.",
         },
         shortcuts: {
             browserHint:

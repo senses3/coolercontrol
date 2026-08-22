@@ -880,6 +880,7 @@ export default {
             unsavedChangesHeader: '未保存的更改',
             imageTooLarge: '圖片太大。請選擇一張更小的圖片。',
             notImageType: '文件不是有效的圖片類型',
+            gifNotSupported: '此螢幕的韌體無法顯示 GIF。請選擇靜態圖片。',
         },
         shortcuts: {
             browserHint:

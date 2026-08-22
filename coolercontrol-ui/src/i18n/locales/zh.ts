@@ -879,6 +879,7 @@ export default {
             unsavedChangesHeader: '未保存的更改',
             imageTooLarge: '图片太大。请选择一张更小的图片。',
             notImageType: '文件不是有效的图片类型',
+            gifNotSupported: '此屏幕的固件无法显示 GIF。请选择静态图片。',
         },
         shortcuts: {
             browserHint:

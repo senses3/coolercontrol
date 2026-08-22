@@ -914,6 +914,7 @@ export default {
             unsavedChangesHeader: 'असहेजे परिवर्तन',
             imageTooLarge: 'छवि बहुत बड़ी है। कृपया एक छोटी छवि चुनें।',
             notImageType: 'छवि एक छवि प्रकार के रूप में पंजीकृत नहीं होती है',
+            gifNotSupported: 'इस स्क्रीन का फ़र्मवेयर gif नहीं दिखा सकता। कोई स्थिर छवि चुनें।',
         },
         shortcuts: {
             browserHint:

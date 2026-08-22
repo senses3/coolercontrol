@@ -13,7 +13,8 @@ use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::device::{
-    ChannelName, DeviceType, DeviceUID, Duty, LcInfo, Status, Temp, TempInfo, TypeIndex, UID,
+    ChannelKind, ChannelName, DeviceInfo, DeviceType, DeviceUID, Duty, LcInfo, Status, Temp,
+    TempInfo, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
 use crate::hardware_support::HardwareSupportController;
@@ -85,6 +86,40 @@ pub struct LiquidctlRepo {
     /// never opens more concurrent connections to one device than liqctld (which processes each
     /// device serially) can use.
     device_permits: HashMap<u8, Semaphore>,
+}
+
+/// What liqctld reports gif support under, in the statuses `initialize` returns.
+const LCD_GIF_SUPPORT_KEY: &str = "lcd gif support";
+/// What the image mode is called on a screen that cannot animate.
+const LCD_IMAGE_MODE_NAME_NO_GIF: &str = "Image";
+
+/// Whether liqctld reported that this device's firmware refuses gifs.
+///
+/// An absent key means the device was never asked, which is every device but the one screen
+/// that can refuse, so only an explicit denial withdraws anything.
+fn lcd_gif_refused(status_map: &StatusMap) -> bool {
+    status_map
+        .get(LCD_GIF_SUPPORT_KEY)
+        .is_some_and(|supported| supported == "false")
+}
+
+/// Takes the gif capability off every LCD channel of a device whose firmware refuses it.
+///
+/// liqctld answers for this rather than the daemon deciding: liquidctl gates its refusal on
+/// the USB product id as well as the firmware major, and the product id never leaves that
+/// process. Runs before anything reads the device list, so the mode is never offered at all.
+fn withdraw_lcd_gif_support(device_info: &mut DeviceInfo) {
+    for channel in device_info.channels.values_mut() {
+        let ChannelKind::Lcd { modes, info } = &mut channel.kind else {
+            continue;
+        };
+        if let Some(lcd_info) = info.as_mut() {
+            lcd_info.gif_supported = false;
+        }
+        for mode in modes.iter_mut().filter(|mode| mode.image) {
+            mode.frontend_name = LCD_IMAGE_MODE_NAME_NO_GIF.to_string();
+        }
+    }
 }
 
 /// Maps a device onto what the hardware report prints for it. A pure helper so
@@ -623,12 +658,16 @@ impl LiquidctlRepo {
             .initialize_device(&device_index, None)
             .await?;
         let mut device = device_lock.borrow_mut();
-        let lc_info = device
+        let status_map = Self::create_status_map(&status_response.status);
+        let firmware_version = device_support::get_firmware_ver(&status_map);
+        device
             .lc_info
             .as_mut()
-            .expect("This should always be set for LIQUIDCTL devices");
-        lc_info.firmware_version =
-            device_support::get_firmware_ver(&Self::create_status_map(&status_response.status));
+            .expect("This should always be set for LIQUIDCTL devices")
+            .firmware_version = firmware_version;
+        if lcd_gif_refused(&status_map) {
+            withdraw_lcd_gif_support(&mut device.info);
+        }
         Ok(())
     }
 
@@ -1559,7 +1598,8 @@ fn find_duplicate_names<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::liquidctl::liqctld_client::DeviceProperties;
+    use crate::device::{ChannelInfo, LcdInfo, LcdMode, LcdModeType};
+    use crate::repositories::liquidctl::liqctld_client::{DeviceProperties, LCStatus};
 
     const DEV_PROPS: DeviceProperties = DeviceProperties {
         speed_channels: Vec::new(),
@@ -1825,6 +1865,128 @@ mod tests {
                 "the waiter proceeds once the delay elapses and the permit drops"
             );
         });
+    }
+
+    fn status_map_of(entries: &[(&str, &str)]) -> StatusMap {
+        let statuses: LCStatus = entries
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), (*value).to_string(), String::new()))
+            .collect();
+        LiquidctlRepo::create_status_map(&statuses)
+    }
+
+    fn lcd_device_info() -> DeviceInfo {
+        let mut channels = HashMap::new();
+        channels.insert(
+            "lcd".to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Lcd {
+                    modes: vec![
+                        LcdMode {
+                            name: "image".to_string(),
+                            frontend_name: "Image/gif".to_string(),
+                            brightness: true,
+                            orientation: true,
+                            image: true,
+                            colors_min: 0,
+                            colors_max: 0,
+                            type_: LcdModeType::Liquidctl,
+                        },
+                        LcdMode {
+                            name: "liquid".to_string(),
+                            frontend_name: "Liquid(default)".to_string(),
+                            brightness: true,
+                            orientation: true,
+                            image: false,
+                            colors_min: 0,
+                            colors_max: 0,
+                            type_: LcdModeType::Liquidctl,
+                        },
+                    ],
+                    info: Some(LcdInfo {
+                        screen_width: 240,
+                        screen_height: 240,
+                        max_image_size_bytes: 24_320 * 1024,
+                        gif_supported: true,
+                    }),
+                },
+            },
+        );
+        channels.insert(
+            "pump".to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::InfoOnly,
+            },
+        );
+        DeviceInfo {
+            channels,
+            ..Default::default()
+        }
+    }
+
+    fn lcd_info_of(device_info: &DeviceInfo) -> &LcdInfo {
+        let ChannelKind::Lcd { info, .. } = &device_info.channels["lcd"].kind else {
+            panic!("the lcd channel should be an lcd channel");
+        };
+        info.as_ref().expect("lcd info should be present")
+    }
+
+    fn lcd_modes_of(device_info: &DeviceInfo) -> &Vec<LcdMode> {
+        let ChannelKind::Lcd { modes, .. } = &device_info.channels["lcd"].kind else {
+            panic!("the lcd channel should be an lcd channel");
+        };
+        modes
+    }
+
+    /// Goal: only liqctld can answer for gif support, and only for the one firmware that
+    /// refuses it, so silence and consent both have to leave the mode alone. Method: the
+    /// three answers a status map can carry, keyed as liqctld actually sends it.
+    #[test]
+    fn gif_support_is_withdrawn_only_on_an_explicit_refusal() {
+        assert!(
+            lcd_gif_refused(&status_map_of(&[("LCD Gif Support", "false")])),
+            "liqctld sends the key capitalized; the status map is what lowercases it"
+        );
+        assert!(lcd_gif_refused(&status_map_of(&[("LCD Gif Support", "true")])).not());
+        assert!(
+            lcd_gif_refused(&status_map_of(&[("Firmware version", "2.0.0")])).not(),
+            "a device that was never asked keeps the mode"
+        );
+        assert!(lcd_gif_refused(&status_map_of(&[])).not());
+    }
+
+    /// Goal: a firmware that cannot animate must stop advertising that it can, in the flag
+    /// the upload path checks and in the name the user reads. Method: withdraw and read both.
+    #[test]
+    fn withdrawing_gif_support_clears_the_flag_and_renames_the_image_mode() {
+        let mut device_info = lcd_device_info();
+
+        withdraw_lcd_gif_support(&mut device_info);
+
+        assert!(lcd_info_of(&device_info).gif_supported.not());
+        let modes = lcd_modes_of(&device_info);
+        assert_eq!(modes[0].frontend_name, "Image");
+        assert_eq!(
+            modes[1].frontend_name, "Liquid(default)",
+            "a mode that takes no image never offered a gif to withdraw"
+        );
+    }
+
+    /// Goal: the withdrawal walks every channel of the device, so it must not disturb the
+    /// ones that have nothing to do with a screen. Method: a device with a non-LCD channel.
+    #[test]
+    fn withdrawing_gif_support_leaves_other_channels_alone() {
+        let mut device_info = lcd_device_info();
+
+        withdraw_lcd_gif_support(&mut device_info);
+
+        assert_eq!(device_info.channels.len(), 2);
+        assert!(matches!(
+            device_info.channels["pump"].kind,
+            ChannelKind::InfoOnly
+        ));
     }
 }
 

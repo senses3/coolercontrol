@@ -942,6 +942,8 @@ export default {
             unsavedChangesHeader: 'Changements non enregistrés',
             imageTooLarge: "L'image est trop grande. Veuillez en choisir une plus petite.",
             notImageType: "L'image n'est pas reconnue comme un type d'image",
+            gifNotSupported:
+                'Le micrologiciel de cet écran ne peut pas afficher de gifs. Choisissez une image fixe.',
         },
         shortcuts: {
             browserHint:

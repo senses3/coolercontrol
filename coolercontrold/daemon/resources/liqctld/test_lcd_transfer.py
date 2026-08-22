@@ -1001,6 +1001,46 @@ class TestFirmware2Transfer(unittest.TestCase):
         self.assertFalse(getattr(device, "_cc_fw2_primed", False))
 
 
+class TestGifSupportIsReported(unittest.TestCase):
+    """The daemon never sees a product id, so the one model that cannot show a gif has to be
+    named here or the mode goes on being offered and failing."""
+
+    def _kraken(self, product_id, fw):
+        device = FakeKraken({})
+        device.device.product_id = product_id
+        if fw is not None:
+            device._fw = fw
+        return device
+
+    def test_the_2023_on_firmware_2_cannot(self):
+        with mock.patch.object(main, "KrakenZ3", FakeKraken):
+            self.assertIs(
+                main.lcd_gif_supported(self._kraken(0x300E, (2, 0, 0))), False
+            )
+
+    def test_the_same_model_on_firmware_1_can(self):
+        """Goal: liquidctl gates on the firmware major as well as the model. Method: the same
+        product id one major earlier."""
+        with mock.patch.object(main, "KrakenZ3", FakeKraken):
+            self.assertIs(main.lcd_gif_supported(self._kraken(0x300E, (1, 8, 0))), True)
+
+    def test_another_model_on_firmware_2_can(self):
+        """Goal: a 2024 model on a 2.x firmware takes liquidctl's ordinary path, where gifs
+        work, so keying off the firmware alone would take the mode away from it. Method: a
+        different product id at the refusing firmware."""
+        with mock.patch.object(main, "KrakenZ3", FakeKraken):
+            self.assertIs(main.lcd_gif_supported(self._kraken(0x3014, (2, 0, 0))), True)
+
+    def test_a_device_without_a_screen_answers_nothing(self):
+        self.assertIsNone(main.lcd_gif_supported(self._kraken(0x300E, (2, 0, 0))))
+
+    def test_an_unread_firmware_answers_nothing(self):
+        """Goal: reporting "no gifs" from a firmware that was never read would take the mode
+        away on a guess. Method: the refusing model with `_fw` never populated."""
+        with mock.patch.object(main, "KrakenZ3", FakeKraken):
+            self.assertIsNone(main.lcd_gif_supported(self._kraken(0x300E, None)))
+
+
 class TestGifUnsupportedIsExplained(unittest.TestCase):
     """A firmware that cannot show gifs fails the same way a broken device does, and the daemon
     re-applies on a schedule, so the explanation has to be said once and only once."""

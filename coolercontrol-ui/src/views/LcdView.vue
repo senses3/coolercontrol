@@ -91,15 +91,22 @@ const channelLabel = ref(
 const contextIsDirty: Ref<boolean> = ref(false)
 let imageWidth: number = 320
 let imageSizeMaxBytes: number = 10_000_000
+// The Kraken 2023 on firmware 2.x has no gif support at all, and the daemon withdraws it
+// once it knows the firmware. Assumed until then, as it is for every other screen.
+let gifSupported: boolean = true
 for (const device of deviceStore.allDevices()) {
     if (device.uid === props.deviceUID && device.info != null) {
         const channelInfo = device.info.channels.get(props.channelName)
         if (channelInfo != null && channelInfo.lcd_info != null) {
             imageWidth = channelInfo.lcd_info.screen_width
             imageSizeMaxBytes = channelInfo.lcd_info.max_image_size_bytes * 2 // we double it so that processing can reduce it further
+            gifSupported = channelInfo.lcd_info.gif_supported
         }
     }
 }
+const acceptedImageTypes: string = gifSupported
+    ? 'image/jpeg,image/png,image/gif,image/tiff,image/bmp'
+    : 'image/jpeg,image/png,image/tiff,image/bmp'
 const lcdModes: Array<LcdMode> = []
 const noneLcdMode = new LcdMode('none', 'None', false, false, false, 0, 0, LcdModeType.NONE)
 lcdModes.push(noneLcdMode)
@@ -284,6 +291,17 @@ const validateFileSize = (file: File): boolean => {
 }
 
 const validateFileType = (file: File): boolean => {
+    if (file.type === 'image/gif' && !gifSupported) {
+        // The picker already filters gifs out, but a drop does not go through it.
+        console.error('This screen cannot display gifs')
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: t('views.lcd.gifNotSupported'),
+            life: 4000,
+        })
+        return false
+    }
     if (file.type.startsWith('image/')) {
         return true
     }
@@ -637,7 +655,7 @@ onUnmounted(clearImages)
                                 <input
                                     ref="fileInputRef"
                                     type="file"
-                                    accept="image/jpeg,image/png,image/gif,image/tiff,image/bmp"
+                                    :accept="acceptedImageTypes"
                                     class="hidden"
                                     @change="filesSelected"
                                 />

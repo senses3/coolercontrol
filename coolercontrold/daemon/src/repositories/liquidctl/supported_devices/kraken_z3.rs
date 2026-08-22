@@ -127,6 +127,9 @@ impl DeviceSupport for KrakenZ3Support {
                         screen_width: lcd_resolution.0,
                         screen_height: lcd_resolution.1,
                         max_image_size_bytes: 24_320 * 1024, // 24,320 KB/KiB
+                        // Withdrawn after initialize, the first point the firmware version
+                        // is known. Only the Kraken 2023 on firmware 2.x refuses gifs.
+                        gif_supported: true,
                     }),
                 },
             },

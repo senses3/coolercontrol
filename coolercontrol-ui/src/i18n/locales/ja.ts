@@ -921,6 +921,8 @@ export default {
             unsavedChangesHeader: '未保存の変更',
             imageTooLarge: '画像が大きすぎます。より小さいものを選んでください。',
             notImageType: 'ファイルが画像タイプとして登録されていません',
+            gifNotSupported:
+                'この画面のファームウェアは GIF を表示できません。静止画像を選んでください。',
         },
         shortcuts: {
             browserHint:

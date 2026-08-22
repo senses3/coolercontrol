@@ -906,6 +906,8 @@ export default {
             unsavedChangesHeader: '저장되지 않은 변경 사항',
             imageTooLarge: '이미지가 너무 큽니다. 더 작은 이미지를 선택해 주세요.',
             notImageType: '이미지가 이미지 유형으로 등록되지 않았음',
+            gifNotSupported:
+                '이 화면의 펌웨어는 GIF를 표시할 수 없습니다. 정지 이미지를 선택하세요.',
         },
         shortcuts: {
             browserHint:
