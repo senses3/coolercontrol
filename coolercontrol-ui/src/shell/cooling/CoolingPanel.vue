@@ -417,11 +417,11 @@ const isRouteActive = useRouteActive()
                 >
                     <template #label>{{ deviceLabel(group.deviceUID) }}</template>
                     <!-- invisible, not hidden: the header must not change height on
-                         hover. -mr-0.5 lands the drag glyph on the same column as the
-                         rows below, whose cluster insets by pr-1 inside a p-1 handle
-                         where the header's sits in pr-2 with a p-0.5 one. -->
+                         hover. -mr-1 cancels the header's pr-2 down to the pr-1 the
+                         rows below inset by, so the same p-1 handle puts the drag
+                         glyph on the same column. -->
                     <span
-                        class="invisible -mr-0.5 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
+                        class="invisible -mr-1 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
                         :class="{ '!visible': openColorDevice === group.deviceUID }"
                     >
                         <CCColorPicker
@@ -433,8 +433,10 @@ const isRouteActive = useRouteActive()
                             "
                             @update:model-value="(c: Color) => setDeviceColor(group.deviceUID, c)"
                         />
+                        <!-- The rows' p-1 grab area, with -my-0.5 giving the extra
+                             height back so the header does not grow for it. -->
                         <span
-                            class="device-drag-handle cursor-grab p-0.5 text-text-color-secondary"
+                            class="device-drag-handle -my-0.5 cursor-grab p-1 text-text-color-secondary"
                         >
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
