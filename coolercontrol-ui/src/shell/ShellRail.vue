@@ -7,13 +7,14 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiCog, mdiLockOutline, mdiPower } from '@mdi/js'
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { PLUGINS_SECTION, type SectionId, sectionsFor, startupRouteName } from '@/shell/sections.ts'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
+import ShellRailLabel from '@/shell/ShellRailLabel.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
 import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
 import { registerLogoTap } from '@/shell/supportWizards.ts'
@@ -34,6 +35,21 @@ const railSections = computed(() => {
     return settingsStore.isSimpleMode ? sections : [...sections, PLUGINS_SECTION]
 })
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
+
+// A label clips when its translation outgrows the rail, and the tooltip is the
+// only way to read the whole word. It hangs off the rail item rather than the
+// label so that hovering the icon reveals it too, which means the item has to
+// be told what its own label did.
+const truncatedLabels = reactive(new Set<string>())
+const onTruncated = (key: string, truncated: boolean): void => {
+    if (truncated) truncatedLabels.add(key)
+    else truncatedLabels.delete(key)
+}
+const labelTooltip = (key: string, label: string) => ({
+    value: label,
+    disabled: !truncatedLabels.has(key),
+})
+
 // The logo resets to the configured startup page, which is what sets it apart
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
@@ -58,7 +74,7 @@ const onLogoTap = (): void => {
 </script>
 
 <template>
-    <nav class="flex h-full w-20 flex-col items-center gap-1 py-2">
+    <nav class="flex h-full w-[5.5rem] flex-col items-center gap-1 py-2 pl-1.5 pr-1">
         <RouterLink
             id="logo"
             :to="startupTarget"
@@ -81,7 +97,8 @@ const onLogoTap = (): void => {
             :id="`rail-${section.id}`"
             :key="section.id"
             :to="{ name: section.routeName }"
-            class="relative flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            v-tooltip.right="labelTooltip(section.id, t(section.labelKey))"
+            class="relative flex w-full flex-col items-center gap-0.5 rounded-lg py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             :class="
                 activeSection === section.id
                     ? 'text-accent'
@@ -92,16 +109,21 @@ const onLogoTap = (): void => {
                  equals its accent renders this as a plain accent bar. -->
             <span
                 v-if="activeSection === section.id"
-                class="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
+                class="absolute inset-y-1.5 -left-1 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
             />
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.5)" />
-            <span class="text-[0.8125rem] leading-tight">{{ t(section.labelKey) }}</span>
+            <ShellRailLabel
+                :label="t(section.labelKey)"
+                :font-key="settingsStore.interfaceFont"
+                @update:truncated="onTruncated(section.id, $event)"
+            />
         </RouterLink>
         <div class="flex-1" />
         <RouterLink
             id="rail-settings"
             :to="{ name: 'settings' }"
-            class="relative flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            v-tooltip.right="labelTooltip('settings', t('layout.shell.settings'))"
+            class="relative flex w-full flex-col items-center gap-0.5 rounded-lg py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             :class="
                 activeSection === 'settings'
                     ? 'text-accent'
@@ -110,10 +132,14 @@ const onLogoTap = (): void => {
         >
             <span
                 v-if="activeSection === 'settings'"
-                class="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
+                class="absolute inset-y-1.5 -left-1 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
             />
             <svg-icon type="mdi" :path="mdiCog" :size="deviceStore.getREMSize(1.5)" />
-            <span class="text-[0.8125rem] leading-tight">{{ t('layout.shell.settings') }}</span>
+            <ShellRailLabel
+                :label="t('layout.shell.settings')"
+                :font-key="settingsStore.interfaceFont"
+                @update:truncated="onTruncated('settings', $event)"
+            />
         </RouterLink>
         <!-- Both menus hang off the rail rather than over it. They are docked at the
              rail bottom, so `end` bottom-aligns them with their trigger. -->
@@ -122,16 +148,19 @@ const onLogoTap = (): void => {
                 <button
                     id="access"
                     type="button"
-                    class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    v-tooltip.right="labelTooltip('access', t('layout.shell.access'))"
+                    class="flex w-full flex-col items-center gap-0.5 rounded-lg py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                 >
                     <svg-icon
                         type="mdi"
                         :path="mdiLockOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                    <span class="text-[0.8125rem] leading-tight">
-                        {{ t('layout.shell.access') }}
-                    </span>
+                    <ShellRailLabel
+                        :label="t('layout.shell.access')"
+                        :font-key="settingsStore.interfaceFont"
+                        @update:truncated="onTruncated('access', $event)"
+                    />
                 </button>
             </template>
             <ShellAccessMenuItems />
@@ -141,12 +170,15 @@ const onLogoTap = (): void => {
                 <button
                     id="restart"
                     type="button"
-                    class="flex w-[4.5rem] flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    v-tooltip.right="labelTooltip('power', t('layout.shell.power'))"
+                    class="flex w-full flex-col items-center gap-0.5 rounded-lg py-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                 >
                     <svg-icon type="mdi" :path="mdiPower" :size="deviceStore.getREMSize(1.5)" />
-                    <span class="text-[0.8125rem] leading-tight">
-                        {{ t('layout.shell.power') }}
-                    </span>
+                    <ShellRailLabel
+                        :label="t('layout.shell.power')"
+                        :font-key="settingsStore.interfaceFont"
+                        @update:truncated="onTruncated('power', $event)"
+                    />
                 </button>
             </template>
             <ShellPowerMenuItems />
