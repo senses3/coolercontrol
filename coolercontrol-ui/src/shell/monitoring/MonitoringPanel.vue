@@ -69,7 +69,6 @@ const groups = ref<ReturnType<typeof monitoringSensors>>([])
 watchEffect(() => {
     groups.value = monitoringSensors(deviceStore.allDevices())
 })
-watchEffect(() => {})
 
 const allChannelIds = (deviceUID: UID): string[] => {
     const device = [...deviceStore.allDevices()].find((dev) => dev.uid === deviceUID)
