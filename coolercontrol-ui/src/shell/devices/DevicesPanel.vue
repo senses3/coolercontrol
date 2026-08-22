@@ -223,14 +223,13 @@ const isRouteActive = useRouteActive()
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                     >
-                        <CCColorPicker
-                            :model-value="pickerColor(device.uid)"
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
-                        />
-                        <!-- Holds the pin column open so the color picker lands where it
-                             does on the rows that pin, and not one slot to its right. -->
-                        <span class="w-6 shrink-0" />
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="pickerColor(device.uid)"
+                                :size="1.25"
+                                @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
+                            />
+                        </span>
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
@@ -318,15 +317,17 @@ const isRouteActive = useRouteActive()
                                             onTagOpen(`${device.uid}-${sensorName}`, open)
                                     "
                                 />
-                                <CCColorPicker
-                                    :model-value="sensorPickerColor(device.uid, sensorName)"
-                                    :default-color="sensorDefaultColor(device.uid, sensorName)"
-                                    :size="1.25"
-                                    @update:model-value="
-                                        (c: Color) => setSensorColor(device.uid, sensorName, c)
-                                    "
-                                    @reset="resetSensorColor(device.uid, sensorName)"
-                                />
+                                <span class="flex w-6 shrink-0 justify-center">
+                                    <CCColorPicker
+                                        :model-value="sensorPickerColor(device.uid, sensorName)"
+                                        :default-color="sensorDefaultColor(device.uid, sensorName)"
+                                        :size="1.25"
+                                        @update:model-value="
+                                            (c: Color) => setSensorColor(device.uid, sensorName, c)
+                                        "
+                                        @reset="resetSensorColor(device.uid, sensorName)"
+                                    />
+                                </span>
                                 <button
                                     type="button"
                                     class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"

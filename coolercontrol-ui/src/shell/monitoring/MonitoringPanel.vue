@@ -498,17 +498,24 @@ const isRouteActive = useRouteActive()
                                         )
                                 "
                             />
-                            <CCColorPicker
-                                :model-value="
-                                    sensorColor(row.sensor.deviceUID, row.sensor.channelName)
-                                "
-                                :default-color="
-                                    sensorDefaultColor(row.sensor.deviceUID, row.sensor.channelName)
-                                "
-                                :size="1.25"
-                                @update:model-value="(c: Color) => setSensorColor(row.sensor, c)"
-                                @reset="resetSensorColor(row.sensor)"
-                            />
+                            <span class="flex w-6 shrink-0 justify-center">
+                                <CCColorPicker
+                                    :model-value="
+                                        sensorColor(row.sensor.deviceUID, row.sensor.channelName)
+                                    "
+                                    :default-color="
+                                        sensorDefaultColor(
+                                            row.sensor.deviceUID,
+                                            row.sensor.channelName,
+                                        )
+                                    "
+                                    :size="1.25"
+                                    @update:model-value="
+                                        (c: Color) => setSensorColor(row.sensor, c)
+                                    "
+                                    @reset="resetSensorColor(row.sensor)"
+                                />
+                            </span>
                             <button
                                 type="button"
                                 class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -720,18 +727,19 @@ const isRouteActive = useRouteActive()
                         class="invisible -mr-1 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
                         :class="{ '!visible': openColorDevice === group.deviceUID }"
                     >
-                        <CCColorPicker
-                            :model-value="devicePickerColor(group.deviceUID)"
-                            :size="1.25"
-                            @open="
-                                (open: boolean) =>
-                                    (openColorDevice = open ? group.deviceUID : undefined)
-                            "
-                            @update:model-value="(c: Color) => setDeviceColor(group.deviceUID, c)"
-                        />
-                        <!-- Holds the pin column open so the color picker lands where it
-                             does on the rows that pin, and not one slot to its right. -->
-                        <span class="w-6 shrink-0" />
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="devicePickerColor(group.deviceUID)"
+                                :size="1.25"
+                                @open="
+                                    (open: boolean) =>
+                                        (openColorDevice = open ? group.deviceUID : undefined)
+                                "
+                                @update:model-value="
+                                    (c: Color) => setDeviceColor(group.deviceUID, c)
+                                "
+                            />
+                        </span>
                         <!-- The rows' p-1 grab area, with -my-0.5 giving the extra
                              height back so the header does not grow for it. -->
                         <span
@@ -834,15 +842,17 @@ const isRouteActive = useRouteActive()
                                         onTagOpen(`${sensor.deviceUID}-${sensor.channelName}`, open)
                                 "
                             />
-                            <CCColorPicker
-                                :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
-                                :default-color="
-                                    sensorDefaultColor(sensor.deviceUID, sensor.channelName)
-                                "
-                                :size="1.25"
-                                @update:model-value="(c: Color) => setSensorColor(sensor, c)"
-                                @reset="resetSensorColor(sensor)"
-                            />
+                            <span class="flex w-6 shrink-0 justify-center">
+                                <CCColorPicker
+                                    :model-value="sensorColor(sensor.deviceUID, sensor.channelName)"
+                                    :default-color="
+                                        sensorDefaultColor(sensor.deviceUID, sensor.channelName)
+                                    "
+                                    :size="1.25"
+                                    @update:model-value="(c: Color) => setSensorColor(sensor, c)"
+                                    @reset="resetSensorColor(sensor)"
+                                />
+                            </span>
                             <button
                                 type="button"
                                 class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"

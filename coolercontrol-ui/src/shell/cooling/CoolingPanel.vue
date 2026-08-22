@@ -345,7 +345,9 @@ const isRouteActive = useRouteActive()
                     <!-- Every panel orders its actions by how many row types carry
                          them, most universal last. The cluster is right-aligned, so
                          only the last slot sits at a fixed x: drag is in every row,
-                         so it ends every cluster, and pin precedes it. -->
+                         so it ends every cluster, and pin precedes it. Slots are
+                         24px on a 26px pitch, which is why the 20px color trigger
+                         is centred in a w-6 span rather than sized up. -->
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
@@ -369,15 +371,17 @@ const isRouteActive = useRouteActive()
                                     onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
                             "
                         />
-                        <CCColorPicker
-                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                            :default-color="
-                                channelDefaultColor(channel.deviceUID, channel.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
-                            @reset="resetChannelColor(channel)"
-                        />
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                                :default-color="
+                                    channelDefaultColor(channel.deviceUID, channel.channelName)
+                                "
+                                :size="1.25"
+                                @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                                @reset="resetChannelColor(channel)"
+                            />
+                        </span>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -424,18 +428,19 @@ const isRouteActive = useRouteActive()
                         class="invisible -mr-1 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
                         :class="{ '!visible': openColorDevice === group.deviceUID }"
                     >
-                        <CCColorPicker
-                            :model-value="devicePickerColor(group.deviceUID)"
-                            :size="1.25"
-                            @open="
-                                (open: boolean) =>
-                                    (openColorDevice = open ? group.deviceUID : undefined)
-                            "
-                            @update:model-value="(c: Color) => setDeviceColor(group.deviceUID, c)"
-                        />
-                        <!-- Holds the pin column open so the color picker lands where it
-                             does on the rows that pin, and not one slot to its right. -->
-                        <span class="w-6 shrink-0" />
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="devicePickerColor(group.deviceUID)"
+                                :size="1.25"
+                                @open="
+                                    (open: boolean) =>
+                                        (openColorDevice = open ? group.deviceUID : undefined)
+                                "
+                                @update:model-value="
+                                    (c: Color) => setDeviceColor(group.deviceUID, c)
+                                "
+                            />
+                        </span>
                         <!-- The rows' p-1 grab area, with -my-0.5 giving the extra
                              height back so the header does not grow for it. -->
                         <span
@@ -553,15 +558,19 @@ const isRouteActive = useRouteActive()
                                         )
                                 "
                             />
-                            <CCColorPicker
-                                :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                                :default-color="
-                                    channelDefaultColor(channel.deviceUID, channel.channelName)
-                                "
-                                :size="1.25"
-                                @update:model-value="(c: Color) => setChannelColor(channel, c)"
-                                @reset="resetChannelColor(channel)"
-                            />
+                            <span class="flex w-6 shrink-0 justify-center">
+                                <CCColorPicker
+                                    :model-value="
+                                        channelColor(channel.deviceUID, channel.channelName)
+                                    "
+                                    :default-color="
+                                        channelDefaultColor(channel.deviceUID, channel.channelName)
+                                    "
+                                    :size="1.25"
+                                    @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                                    @reset="resetChannelColor(channel)"
+                                />
+                            </span>
                             <button
                                 type="button"
                                 class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"

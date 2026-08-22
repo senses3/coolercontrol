@@ -318,11 +318,13 @@ const isRouteActive = useRouteActive()
                                 :channel-name="row.channelName"
                                 @open="(open: boolean) => onTagOpen(row.key, open)"
                             />
-                            <CCColorPicker
-                                :model-value="row.color ?? ''"
-                                :size="1.25"
-                                @update:model-value="(c: Color) => setRowColor(row, c)"
-                            />
+                            <span class="flex w-6 shrink-0 justify-center">
+                                <CCColorPicker
+                                    :model-value="row.color ?? ''"
+                                    :size="1.25"
+                                    @update:model-value="(c: Color) => setRowColor(row, c)"
+                                />
+                            </span>
                         </template>
                         <button
                             type="button"
