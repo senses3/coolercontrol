@@ -284,6 +284,27 @@ def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
         raise
 
 
+def _log_lcd_size_fallback_once(self, bucket, capacity, slots_needed):
+    """Says once per device that frames are outgrowing the bucket they rotate through.
+
+    The rotation reuses an allocation, so a frame larger than the one that made it has
+    nowhere to go and takes liquidctl's own upload, re-initialize and all. Only variable
+    content does this: a static image is a fixed size for a given screen, a gif is not, and
+    a 640x640 screen is where gifs get big enough to leave no room for a second bucket. At
+    debug this left an LCD that is slow for a knowable reason looking mysterious.
+    """
+    if getattr(self, "_cc_size_fallback_logged", False):
+        return
+    self._cc_size_fallback_logged = True
+    log.info(
+        "LCD frames are outgrowing bucket %s (needs %s KiB, holds %s), so these frames take "
+        "liquidctl's slower upload. Expected with gifs, which vary in size.",
+        bucket,
+        slots_needed,
+        capacity,
+    )
+
+
 def _fall_back_to_liquidctl(self, data, bulk_info, reason):
     """Hands the frame to liquidctl's own upload, recording which gate turned it away.
 
@@ -385,7 +406,10 @@ def _send_frame_to_spare_bucket(self, data, bulk_info):
     occupied = any(bucket[15:])
     capacity = int.from_bytes([bucket[19], bucket[20]], "little")
     if not occupied or capacity < slots_needed:
-        # First use of this bucket, or the frame outgrew it.
+        # First use of this bucket, or the frame outgrew it. Only the second is worth
+        # reporting: the first is how a rotation starts.
+        if occupied:
+            _log_lcd_size_fallback_once(self, target_bucket, capacity, slots_needed)
         return _fall_back_to_liquidctl(
             self,
             data,

@@ -888,6 +888,64 @@ class TestDeviceProfileLine(unittest.TestCase):
         self.assertEqual(len(device.bulk_writes), 2, "the frame must still go out")
 
 
+class TestOutgrownBucketIsReported(unittest.TestCase):
+    """A frame that no longer fits its bucket falls back every time it happens, which on a
+    640x640 screen full of gifs is most of them. The fallback itself is by design; being
+    unable to tell from a log that it is happening is not."""
+
+    def _rotating(self, capacity, occupied=True):
+        device = FakeKraken(
+            {
+                0: bucket_response(True),
+                1: bucket_response(occupied, slots=capacity),
+            }
+        )
+        device._cc_bucket_pair = (0, 1)
+        device._cc_active_bucket = 0
+        return device
+
+    def _size_lines(self, captured):
+        return [m for m in captured.output if "outgrowing bucket" in m]
+
+    def test_a_frame_that_outgrew_its_bucket_says_so(self):
+        """Goal: this is the one fallback with a cause the reporter can act on, so it has to
+        reach a default-level log. Method: answer with a bucket too small for the frame.
+        """
+        device = self._rotating(capacity=10)
+
+        with mock.patch.object(main, "_ORIGINAL_SEND_DATA", return_value=None):
+            with self.assertLogs(level="INFO") as captured:
+                main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        line = self._size_lines(captured)[0]
+        self.assertIn("bucket 1", line)
+        self.assertIn("holds 10", line)
+
+    def test_it_is_said_once_per_device_not_once_per_frame(self):
+        """Goal: a carousel of gifs hits this on most frames, so saying it every time would
+        be the log spam the once-per-device profile line exists to avoid. Method: three.
+        """
+        device = self._rotating(capacity=10)
+
+        with mock.patch.object(main, "_ORIGINAL_SEND_DATA", return_value=None):
+            with self.assertLogs(level="INFO") as captured:
+                for _ in range(3):
+                    main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(len(self._size_lines(captured)), 1)
+
+    def test_a_bucket_in_first_use_is_not_reported_as_outgrown(self):
+        """Goal: an unoccupied bucket takes the same branch, but it is how a rotation starts
+        rather than a condition worth a line. Method: answer with an empty bucket."""
+        device = self._rotating(capacity=10, occupied=False)
+
+        with mock.patch.object(main, "_ORIGINAL_SEND_DATA", return_value=None):
+            with self.assertLogs(level="DEBUG") as captured:
+                main._send_frame_to_spare_bucket(device, FRAME, BULK_INFO)
+
+        self.assertEqual(self._size_lines(captured), [], captured.output)
+
+
 class TestFirmware2Transfer(unittest.TestCase):
     """The Kraken 2023 on firmware 2.x takes a path of its own: no buckets, and liquidctl
     sends the whole frame twice on every apply. These pin what replaced it."""
