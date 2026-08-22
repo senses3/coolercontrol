@@ -729,6 +729,9 @@ const isRouteActive = useRouteActive()
                             "
                             @update:model-value="(c: Color) => setDeviceColor(group.deviceUID, c)"
                         />
+                        <!-- Holds the pin column open so the color picker lands where it
+                             does on the rows that pin, and not one slot to its right. -->
+                        <span class="w-6 shrink-0" />
                         <!-- The rows' p-1 grab area, with -my-0.5 giving the extra
                              height back so the header does not grow for it. -->
                         <span

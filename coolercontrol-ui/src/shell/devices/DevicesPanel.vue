@@ -228,6 +228,9 @@ const isRouteActive = useRouteActive()
                             :size="1.25"
                             @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
                         />
+                        <!-- Holds the pin column open so the color picker lands where it
+                             does on the rows that pin, and not one slot to its right. -->
+                        <span class="w-6 shrink-0" />
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
