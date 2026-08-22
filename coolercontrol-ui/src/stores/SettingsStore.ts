@@ -241,6 +241,9 @@ export const useSettingsStore = defineStore('settings', () => {
     }
     watch(pinnedIds, () => pushTrayPinnedSensors(), { deep: true })
     const collapsedMainMenu: Ref<boolean> = ref(false)
+    // Whether the rail's empty space also toggles the menu panel. See UISettingsDTO
+    // for why the name talks about an icon it no longer hides.
+    const hideMenuCollapseIcon: Ref<boolean> = ref(false)
     const mainMenuWidthRem: Ref<number> = ref(24)
     const frequencyPrecision: Ref<number> = ref(1)
     const customTheme: CustomThemeSettings = reactive({ ...defaultCustomTheme })
@@ -406,6 +409,7 @@ export const useSettingsStore = defineStore('settings', () => {
         expandedMenuIds.value = uiSettings.expandedMenuIds
         pinnedIds.value = uiSettings.pinnedIds
         collapsedMainMenu.value = uiSettings.collapsedMainMenu
+        hideMenuCollapseIcon.value = uiSettings.hideMenuCollapseIcon ?? false
         mainMenuWidthRem.value = uiSettings.mainMenuWidthRem
         frequencyPrecision.value = uiSettings.frequencyPrecision
         // Settings saved before the status colors existed have only the first
@@ -1305,6 +1309,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 expandedMenuIds,
                 pinnedIds,
                 collapsedMainMenu,
+                hideMenuCollapseIcon,
                 mainMenuWidthRem,
                 frequencyPrecision,
                 customTheme,
@@ -1363,6 +1368,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.expandedMenuIds = expandedMenuIds.value
                     uiSettings.pinnedIds = pinnedIds.value
                     uiSettings.collapsedMainMenu = collapsedMainMenu.value
+                    uiSettings.hideMenuCollapseIcon = hideMenuCollapseIcon.value
                     uiSettings.mainMenuWidthRem = mainMenuWidthRem.value
                     uiSettings.frequencyPrecision = frequencyPrecision.value
                     for (const key of THEME_TOKEN_KEYS) {
@@ -1786,6 +1792,7 @@ export const useSettingsStore = defineStore('settings', () => {
         expandedMenuIds,
         pinnedIds,
         collapsedMainMenu,
+        hideMenuCollapseIcon,
         mainMenuWidthRem,
         frequencyPrecision,
         customTheme,

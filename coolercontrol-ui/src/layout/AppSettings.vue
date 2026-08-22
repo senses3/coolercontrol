@@ -700,6 +700,14 @@ onUnmounted(() => {
                 >
                     <UiSwitch v-model="settingsStore.eyeCandy" />
                 </UiSettingRow>
+                <!-- Simple mode has no menu panel, so there is nothing to collapse. -->
+                <UiSettingRow
+                    v-if="!settingsStore.isSimpleMode"
+                    v-tooltip.top="t('layout.settings.tooltips.railToCollapse')"
+                    :label="t('layout.settings.railToCollapse')"
+                >
+                    <UiSwitch v-model="settingsStore.hideMenuCollapseIcon" />
+                </UiSettingRow>
                 <UiSettingRow
                     v-tooltip.top="t('layout.settings.tooltips.interfaceFont')"
                     :label="t('layout.settings.interfaceFont')"

@@ -308,6 +308,7 @@ export default {
             selectLanguage: 'Select Language',
             systemLanguage: 'System',
             fullScreen: 'Full Screen',
+            railToCollapse: 'Rail to Collapse',
             eyeCandy: 'Eye Candy',
             interfaceFont: 'Interface Font',
             introduction: 'Introduction',
@@ -373,6 +374,8 @@ export default {
                 frequencyPrecision: 'Adjust the precision of displayed frequency values.',
                 uiMode: 'Simple shows only fan control and sensors. Full interface shows everything.',
                 startupPage: 'The page shown after the application loads.',
+                railToCollapse:
+                    'Also use the empty space in the navigation rail to expand or collapse the menu.',
                 eyeCandy:
                     'Enable visual animations like spinning fan icons.\nThis will use some additional GPU resources.',
                 interfaceFont:

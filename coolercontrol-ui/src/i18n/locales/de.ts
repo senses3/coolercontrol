@@ -317,6 +317,7 @@ export default {
             selectLanguage: 'Sprache auswählen',
             systemLanguage: 'System',
             fullScreen: 'Vollbild',
+            railToCollapse: 'Leiste zum Einklappen',
             eyeCandy: 'Augenschmaus',
             interfaceFont: 'Schriftart der Oberfläche',
             introduction: 'Einführung',
@@ -383,6 +384,8 @@ export default {
                     'Stellen Sie die Genauigkeit der angezeigten Frequenzwerte ein.',
                 uiMode: 'Einfach zeigt nur die Lüftersteuerung und Sensoren. Die vollständige Oberfläche zeigt alles.',
                 startupPage: 'Die Seite, die nach dem Laden der Anwendung angezeigt wird.',
+                railToCollapse:
+                    'Auch den leeren Bereich der Navigationsleiste nutzen, um das Menü auszuklappen oder einzuklappen.',
                 eyeCandy:
                     'Visuelle Animationen wie drehende Lüftersymbole aktivieren.\nDies beansprucht zusätzliche GPU-Ressourcen.',
                 interfaceFont:
