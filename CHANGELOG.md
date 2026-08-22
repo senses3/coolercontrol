@@ -16,10 +16,6 @@ Release notes are automatically generated from this file and git tags.
 
 - Rebuilt application UI shell: Home, Cooling, Monitoring, Devices, Plugins and Settings sections,
   with a persistent icon rail, per-section side panels, and landing pages for each area
-- A Simple interface alongside the full one: a slim Home, a Fans section with a per-fan curve editor
-  and no visible profile or function management, and a Sensors section. It is switched from the
-  header, has its own product tour, and is the default for fresh configurations; existing
-  configurations stay on the full interface and switching either way is lossless
 - Mobile layout with bottom navigation, a header overflow menu for the Access, Power and Plugins
   menus, a dashboard switcher, and responsive editors throughout
 - Consolidated channel page in the Cooling section: embedded profile editor, mini curve previews,
