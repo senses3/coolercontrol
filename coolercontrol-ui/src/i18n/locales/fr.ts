@@ -316,6 +316,7 @@ export default {
             selectLanguage: 'Sélectionner la langue',
             systemLanguage: 'Système',
             fullScreen: 'Plein écran',
+            railToCollapse: 'Barre de navigation pour réduire',
             eyeCandy: 'Effets visuels',
             interfaceFont: "Police de l'interface",
             introduction: 'Introduction',
@@ -386,6 +387,8 @@ export default {
                 frequencyPrecision: 'Ajuster la précision des valeurs de fréquence affichées.',
                 uiMode: "Simple n'affiche que le contrôle des ventilateurs et les capteurs. L'interface complète affiche tout.",
                 startupPage: "La page affichée après le chargement de l'application.",
+                railToCollapse:
+                    'Utiliser aussi la zone vide de la barre de navigation pour étendre ou réduire le menu.',
                 eyeCandy:
                     'Activer les animations visuelles comme les icônes de ventilateurs en rotation.\nCela utilisera des ressources GPU supplémentaires.',
                 interfaceFont:

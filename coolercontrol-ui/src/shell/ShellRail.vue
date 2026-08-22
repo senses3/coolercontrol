@@ -6,8 +6,8 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiCog, mdiLockOutline, mdiPower } from '@mdi/js'
-import { computed, reactive } from 'vue'
+import { mdiCog, mdiDockLeft, mdiLockOutline, mdiPower } from '@mdi/js'
+import { computed, inject, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
@@ -57,6 +57,9 @@ const labelTooltip = (key: string, label: string) => ({
 const startupTarget = computed(() => ({
     name: settingsStore.isSimpleMode ? 'section-home' : startupRouteName(settingsStore.startupPage),
 }))
+
+// Provided by ShellLayout; toggles the menu panel, same as the header button.
+const toggleMainMenu = inject<() => void>('toggleMainMenu')
 
 // Hidden tribute: a run of taps here turns every fan glyph into a wizard hat.
 // The navigation the link already does is left alone, so a user who never finds
@@ -118,7 +121,24 @@ const onLogoTap = (): void => {
                 @update:truncated="onTruncated(section.id, $event)"
             />
         </RouterLink>
-        <div class="flex-1" />
+        <!-- The rail's empty space doubles as a collapse target when asked for.
+             The icon rests in the rail's own background color, so it reads as blank
+             space until hovered. Simple mode renders no panel to toggle. -->
+        <button
+            v-if="settingsStore.hideMenuCollapseIcon && !settingsStore.isSimpleMode"
+            id="rail-collapse"
+            type="button"
+            v-tooltip.right="
+                settingsStore.collapsedMainMenu
+                    ? t('layout.topbar.expandMenu')
+                    : t('layout.topbar.collapseMenu')
+            "
+            class="flex w-full flex-1 items-center justify-center rounded-lg text-bg-two outline-none hover:text-text-color-secondary/50 focus-visible:ring-2 focus-visible:ring-accent"
+            @click="toggleMainMenu?.()"
+        >
+            <svg-icon type="mdi" :path="mdiDockLeft" :size="deviceStore.getREMSize(1.5)" />
+        </button>
+        <div v-else class="flex-1" />
         <RouterLink
             id="rail-settings"
             :to="{ name: 'settings' }"

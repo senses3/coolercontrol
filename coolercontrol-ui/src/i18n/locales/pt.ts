@@ -314,6 +314,7 @@ export default {
             selectLanguage: 'Selecionar idioma',
             systemLanguage: 'Sistema',
             fullScreen: 'Tela cheia',
+            railToCollapse: 'Barra de navegação para recolher',
             eyeCandy: 'Efeitos visuais',
             interfaceFont: 'Fonte da interface',
             introduction: 'Introdução',
@@ -379,6 +380,8 @@ export default {
                 frequencyPrecision: 'Ajustar a precisão dos valores de frequência exibidos.',
                 uiMode: 'Simples mostra apenas o controle de ventoinhas e os sensores. A interface completa mostra tudo.',
                 startupPage: 'A página exibida após o carregamento do aplicativo.',
+                railToCollapse:
+                    'Usar também a área vazia da barra de navegação para expandir ou recolher o menu.',
                 eyeCandy:
                     'Ativar animações visuais como ícones de ventoinhas girando.\nIsto utilizará alguns recursos adicionais da GPU.',
                 interfaceFont:

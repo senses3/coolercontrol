@@ -311,6 +311,7 @@ export default {
             selectLanguage: '言語を選択',
             systemLanguage: 'システム',
             fullScreen: '全画面表示',
+            railToCollapse: '折りたたむナビゲーションバー',
             eyeCandy: '視覚効果',
             interfaceFont: 'インターフェースのフォント',
             introduction: '紹介',
@@ -376,6 +377,8 @@ export default {
                 frequencyPrecision: '表示される周波数値の精度を調整します。',
                 uiMode: 'シンプルはファン制御とセンサーのみを表示します。完全なインターフェースはすべてを表示します。',
                 startupPage: 'アプリケーション読み込み後に表示されるページ。',
+                railToCollapse:
+                    'ナビゲーションバーの空いている領域でもメニューを展開または折りたたみます。',
                 eyeCandy:
                     '回転するファンアイコンなどのビジュアルアニメーションを有効にします。\nこれにより追加のGPUリソースが使用されます。',
                 interfaceFont:

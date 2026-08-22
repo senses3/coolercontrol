@@ -309,6 +309,7 @@ export default {
             selectLanguage: '언어 선택',
             systemLanguage: '시스템',
             fullScreen: '전체 화면',
+            railToCollapse: '탐색 바로 접기',
             eyeCandy: '시각 효과',
             interfaceFont: '인터페이스 글꼴',
             introduction: '소개',
@@ -374,6 +375,7 @@ export default {
                 frequencyPrecision: '표시되는 주파수 값의 정밀도를 조정하세요.',
                 uiMode: '간단은 팬 제어와 센서만 표시합니다. 전체 인터페이스는 모든 것을 표시합니다.',
                 startupPage: '애플리케이션 로드 후 표시되는 페이지입니다.',
+                railToCollapse: '탐색 바의 빈 영역으로도 메뉴를 펼치거나 접을 수 있습니다.',
                 eyeCandy:
                     '회전하는 팬 아이콘과 같은 시각적 애니메이션을 활성화합니다.\n이 기능은 추가적인 GPU 리소스를 사용합니다.',
                 interfaceFont:

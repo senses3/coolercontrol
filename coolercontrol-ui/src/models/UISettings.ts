@@ -267,6 +267,11 @@ export class UISettingsDTO {
     expandedMenuIds: Array<string> | undefined
     pinnedIds: Array<string> = []
     collapsedMainMenu: boolean = false
+    // Legacy name: in the old shell this hid the rail's collapse icon and put the
+    // toggle on the rail's empty space instead. The header button now stays either
+    // way, so this only adds the empty space as a second target. Kept under the old
+    // name so anyone who had it on keeps it on.
+    hideMenuCollapseIcon: boolean = false
     mainMenuWidthRem: number = 24
     frequencyPrecision: number = 1
     customTheme: CustomThemeSettings = { ...defaultCustomTheme }
