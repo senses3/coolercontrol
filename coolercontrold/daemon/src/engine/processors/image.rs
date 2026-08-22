@@ -62,7 +62,9 @@ pub async fn process_carousel_images(
             .inspect_err(|err| warn!("Error getting image digest: {err}"))?;
         // The content type is just used to know if it's processing an animated gif or a
         // static file, all processed static file output is encoded to png regardless of input.
-        let content_type = if path.extension() == Some("gif".as_ref()) {
+        // A screen that cannot animate still shows the gif's first frame, which is what
+        // the static path encodes. Skipping the file would empty a carousel of gifs instead.
+        let content_type = if path.extension() == Some("gif".as_ref()) && lcd_info.gif_supported {
             mime::IMAGE_GIF
         } else {
             mime::IMAGE_PNG

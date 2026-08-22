@@ -665,6 +665,13 @@ impl Engine {
         )
         .await
         .and_then(|(content_type, image_data)| {
+            if content_type == mime::IMAGE_GIF && lcd_info.gif_supported.not() {
+                return Err(CCError::UserError {
+                    msg: "This screen's firmware cannot display gifs. Choose a static image."
+                        .to_string(),
+                }
+                .into());
+            }
             if image_data.len() > lcd_info.max_image_size_bytes as usize {
                 Err(CCError::UserError {
                     msg: format!(

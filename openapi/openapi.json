@@ -9257,6 +9257,10 @@
         "description": "Specific LCD Screen info",
         "type": "object",
         "properties": {
+          "gif_supported": {
+            "description": "Whether this screen can show an animated gif. The Kraken 2023 on firmware 2.x\n cannot, and liquidctl refuses outright, so the mode has to stop offering it.",
+            "type": "boolean"
+          },
           "max_image_size_bytes": {
             "type": "integer",
             "format": "uint32",
@@ -9276,7 +9280,8 @@
         "required": [
           "screen_width",
           "screen_height",
-          "max_image_size_bytes"
+          "max_image_size_bytes",
+          "gif_supported"
         ]
       },
       "LcdMode": {

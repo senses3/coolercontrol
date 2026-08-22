@@ -6,5 +6,6 @@ export class LcdInfo {
         readonly screen_width: number,
         readonly screen_height: number,
         readonly max_image_size_bytes: number,
+        readonly gif_supported: boolean,
     ) {}
 }

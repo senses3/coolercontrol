@@ -930,6 +930,8 @@ export default {
             unsavedChangesHeader: 'Cambios no guardados',
             imageTooLarge: 'La imagen es demasiado grande. Por favor, elija una más pequeña.',
             notImageType: 'La imagen no se registra como un tipo de imagen',
+            gifNotSupported:
+                'El firmware de esta pantalla no puede mostrar gifs. Elige una imagen estática.',
         },
         shortcuts: {
             browserHint:

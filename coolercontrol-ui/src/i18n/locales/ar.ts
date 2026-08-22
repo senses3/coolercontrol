@@ -907,6 +907,7 @@ export default {
             unsavedChangesHeader: 'تغييرات غير محفوظة',
             imageTooLarge: 'الصورة كبيرة جدًا. يرجى اختيار صورة أصغر.',
             notImageType: 'الصورة لا تسجل كنوع صورة',
+            gifNotSupported: 'لا تستطيع برامج هذه الشاشة عرض صور gif. اختر صورة ثابتة.',
         },
         shortcuts: {
             browserHint:

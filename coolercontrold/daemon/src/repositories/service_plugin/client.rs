@@ -341,6 +341,8 @@ impl DeviceServiceClient {
                     screen_width: lcd_info.screen_width,
                     screen_height: lcd_info.screen_height,
                     max_image_size_bytes: lcd_info.max_image_size_bytes,
+                    // The plugin protocol carries no gif field, and every screen but one can.
+                    gif_supported: true,
                 });
                 ChannelKind::Lcd { modes, info }
             }

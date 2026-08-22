@@ -940,6 +940,8 @@ export default {
             unsavedChangesHeader: 'Ungespeicherte Änderungen',
             imageTooLarge: 'Bild ist zu groß. Bitte wählen Sie ein kleineres.',
             notImageType: 'Bild wird nicht als Bildtyp erkannt',
+            gifNotSupported:
+                'Die Firmware dieses Bildschirms kann keine GIFs anzeigen. Bitte ein statisches Bild wählen.',
         },
         shortcuts: {
             browserHint:

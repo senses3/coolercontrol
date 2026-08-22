@@ -930,6 +930,8 @@ export default {
             unsavedChangesHeader: 'Несохраненные изменения',
             imageTooLarge: 'Изображение слишком большое. Пожалуйста, выберите меньшее.',
             notImageType: 'Файл не распознается как изображение',
+            gifNotSupported:
+                'Прошивка этого экрана не поддерживает gif. Выберите статичное изображение.',
         },
         shortcuts: {
             browserHint:
