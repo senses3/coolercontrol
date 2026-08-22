@@ -170,10 +170,17 @@ export default {
                 disableUnusedSensors: 'Désactiver les capteurs inutilisés… (recommandé)',
                 sensors: 'Capteurs',
             },
+            hardwareHelp: {
+                missingDevice: "Vous attendiez du matériel qui n'apparaît pas ici ?",
+            },
             coolingPage: {
                 landingHint:
                     'Sélectionnez un ventilateur ou une pompe pour afficher et ajuster son refroidissement.',
-                noChannels: "Aucun canal de ventilateur ou de pompe contrôlable n'a été détecté.",
+                noChannels: "Aucun canal de ventilateur ou de pompe n'a été détecté.",
+                noneControllable:
+                    'Aucun des canaux de ventilateur ou de pompe détectés ne peut être contrôlé.',
+                noticeBlockedByEnvironment:
+                    "La détection matérielle n'a pas pu s'exécuter, des canaux de ventilateur et de pompe peuvent donc manquer.",
                 fullChart: 'Graphique complet',
                 guidedSetup: 'Configuration guidée',
                 setupMenu: {
@@ -633,6 +640,12 @@ export default {
             findingBlacklisted: "Ce pilote est sur liste noire et n'a pas été chargé.",
             findingBlockedByEnvironment:
                 "La détection matérielle n'a pas pu s'exécuter dans cet environnement.",
+            findingBlockedBySecureBoot:
+                "La détection matérielle n'a pas pu s'exécuter car le démarrage sécurisé est activé.",
+            findingBlockedByContainer:
+                "La détection matérielle n'a pas pu s'exécuter dans un conteneur.",
+            findingBlockedByNoDevPort:
+                "La détection matérielle n'a pas pu s'exécuter car /dev/port n'est pas disponible.",
             findingDetectionUnsupported:
                 "La détection matérielle n'est pas prise en charge sur cette architecture.",
             failsafeActive: 'Valeurs de secours utilisées',

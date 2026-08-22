@@ -49,6 +49,7 @@ import { channelSpins } from '@/shell/channelIcon.ts'
 import { useFailAlert } from '@/composables/useFailAlert.ts'
 import TagChips from '@/shell/TagChips.vue'
 import TagPopover from '@/shell/monitoring/TagPopover.vue'
+import HardwareHelpLine from '@/shell/hardware/HardwareHelpLine.vue'
 import { useRouteActive } from '@/shell/routeActive.ts'
 import type { RouteLocationRaw } from 'vue-router'
 
@@ -595,6 +596,12 @@ const isRouteActive = useRouteActive()
                 </VueDraggable>
             </div>
         </VueDraggable>
+
+        <!-- Without this the panel would show a lone Functions header and no
+             hint that the missing fans are the point. -->
+        <div v-if="groups.length === 0" class="px-3 py-2">
+            <HardwareHelpLine />
+        </div>
 
         <UiSeparator class="my-1" />
         <PanelHeader :label="t('layout.shell.coolingPanel.library')" />

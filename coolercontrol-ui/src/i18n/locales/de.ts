@@ -169,10 +169,17 @@ export default {
                 disableUnusedSensors: 'Ungenutzte Sensoren deaktivieren… (empfohlen)',
                 sensors: 'Sensoren',
             },
+            hardwareHelp: {
+                missingDevice: 'Hardware erwartet, die hier nicht aufgeführt ist?',
+            },
             coolingPage: {
                 landingHint:
                     'Wählen Sie einen Lüfter oder eine Pumpe, um dessen Kühlung anzuzeigen und anzupassen.',
-                noChannels: 'Keine steuerbaren Lüfter- oder Pumpenkanäle erkannt.',
+                noChannels: 'Keine Lüfter- oder Pumpenkanäle erkannt.',
+                noneControllable:
+                    'Keiner der erkannten Lüfter- oder Pumpenkanäle kann gesteuert werden.',
+                noticeBlockedByEnvironment:
+                    'Die Hardware-Erkennung konnte nicht ausgeführt werden, daher fehlen möglicherweise Lüfter- und Pumpenkanäle.',
                 fullChart: 'Vollständiges Diagramm',
                 guidedSetup: 'Geführte Einrichtung',
                 setupMenu: {
@@ -630,6 +637,12 @@ export default {
             findingBlacklisted: 'Dieser Treiber steht auf der Blockliste und wurde nicht geladen.',
             findingBlockedByEnvironment:
                 'Die Hardware-Erkennung konnte in dieser Umgebung nicht ausgeführt werden.',
+            findingBlockedBySecureBoot:
+                'Die Hardware-Erkennung konnte nicht ausgeführt werden, da Secure Boot aktiviert ist.',
+            findingBlockedByContainer:
+                'Die Hardware-Erkennung konnte in einem Container nicht ausgeführt werden.',
+            findingBlockedByNoDevPort:
+                'Die Hardware-Erkennung konnte nicht ausgeführt werden, da /dev/port nicht verfügbar ist.',
             findingDetectionUnsupported:
                 'Die Hardware-Erkennung wird auf dieser Architektur nicht unterstützt.',
             failsafeActive: 'Failsafe-Werte in Verwendung',

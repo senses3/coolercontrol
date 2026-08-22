@@ -168,10 +168,17 @@ export default {
                 disableUnusedSensors: 'Deshabilitar sensores no utilizados… (recomendado)',
                 sensors: 'Sensores',
             },
+            hardwareHelp: {
+                missingDevice: '¿Esperabas hardware que no aparece aquí?',
+            },
             coolingPage: {
                 landingHint:
                     'Seleccione un ventilador o bomba para ver y ajustar su refrigeración.',
-                noChannels: 'No se detectaron canales de ventilador o bomba controlables.',
+                noChannels: 'No se detectaron canales de ventilador o bomba.',
+                noneControllable:
+                    'Ninguno de los canales de ventilador o bomba detectados se puede controlar.',
+                noticeBlockedByEnvironment:
+                    'La detección de hardware no pudo ejecutarse, por lo que pueden faltar canales de ventilador y bomba.',
                 fullChart: 'Gráfico completo',
                 guidedSetup: 'Configuración Guiada',
                 setupMenu: {
@@ -622,6 +629,12 @@ export default {
             findingBlacklisted: 'Este controlador está en la lista negra y no se cargó.',
             findingBlockedByEnvironment:
                 'La detección de hardware no pudo ejecutarse en este entorno.',
+            findingBlockedBySecureBoot:
+                'La detección de hardware no pudo ejecutarse porque el Arranque seguro está activado.',
+            findingBlockedByContainer:
+                'La detección de hardware no pudo ejecutarse dentro de un contenedor.',
+            findingBlockedByNoDevPort:
+                'La detección de hardware no pudo ejecutarse porque /dev/port no está disponible.',
             findingDetectionUnsupported:
                 'La detección de hardware no es compatible con esta arquitectura.',
             failsafeActive: 'Valores de seguridad en uso',

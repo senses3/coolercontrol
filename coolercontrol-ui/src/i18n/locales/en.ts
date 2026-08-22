@@ -166,9 +166,15 @@ export default {
                 disableUnusedSensors: 'Disable unused sensors… (recommended)',
                 sensors: 'Sensors',
             },
+            hardwareHelp: {
+                missingDevice: "Expected hardware that isn't listed here?",
+            },
             coolingPage: {
                 landingHint: 'Select a fan or pump to view and adjust its cooling.',
-                noChannels: 'No controllable fan or pump channels were detected.',
+                noChannels: 'No fan or pump channels were detected.',
+                noneControllable: 'None of the detected fan or pump channels can be controlled.',
+                noticeBlockedByEnvironment:
+                    'Hardware detection could not run, so fan and pump channels may be missing.',
                 fullChart: 'Full chart',
                 guidedSetup: 'Guided Setup',
                 setupMenu: {
@@ -613,6 +619,11 @@ export default {
             findingNoDriverBound: 'A chip was detected, but no loaded driver is serving it.',
             findingBlacklisted: 'This driver is blacklisted and was not loaded.',
             findingBlockedByEnvironment: 'Hardware detection could not run in this environment.',
+            findingBlockedBySecureBoot:
+                'Hardware detection could not run because Secure Boot is enabled.',
+            findingBlockedByContainer: 'Hardware detection could not run inside a container.',
+            findingBlockedByNoDevPort:
+                'Hardware detection could not run because /dev/port is not available.',
             findingDetectionUnsupported:
                 'Hardware detection is not supported on this architecture.',
             failsafeActive: 'Failsafe values in use',
