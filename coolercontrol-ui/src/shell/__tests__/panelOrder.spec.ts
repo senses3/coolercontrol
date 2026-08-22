@@ -7,6 +7,7 @@ import {
     orderPinnedRows,
     orderedByGroup,
     reorderSubset,
+    reorderTopLevel,
     setDeviceChildrenSubset,
     setGroupOrder,
     setTopLevelOrder,
@@ -120,5 +121,54 @@ describe('orderPinnedRows', () => {
 
     it('returns nothing when nothing is pinned', () => {
         expect(orderPinnedRows([], new Map([['a', 1]]))).toEqual([])
+    })
+})
+
+describe('reorderTopLevel', () => {
+    const ids = (order: MenuOrderIds[]) => order.map((entry) => entry.id)
+
+    // Cooling lists devices with controllable channels, Monitoring devices with
+    // sensors, so a drag in either only ever sees part of the device order.
+    it('permutes the shown devices within the slots they already hold', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'devA', children: ['a1'] },
+            { id: 'devHidden', children: [] },
+            { id: 'devB', children: ['b1'] },
+        ]
+        expect(ids(reorderTopLevel(menuOrder, ['devB', 'devA']))).toEqual([
+            'devB',
+            'devHidden',
+            'devA',
+        ])
+    })
+
+    it('keeps each moved device its children', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'devA', children: ['a1'] },
+            { id: 'devB', children: ['b1'] },
+        ]
+        expect(reorderTopLevel(menuOrder, ['devB', 'devA'])).toEqual([
+            { id: 'devB', children: ['b1'] },
+            { id: 'devA', children: ['a1'] },
+        ])
+    })
+
+    // Group ids share the top level with devices and must not be dragged over.
+    it('leaves the entity group entries where they were', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'devA', children: [] },
+            { id: 'profiles', children: ['p1'] },
+            { id: 'devB', children: [] },
+        ]
+        expect(ids(reorderTopLevel(menuOrder, ['devB', 'devA']))).toEqual([
+            'devB',
+            'profiles',
+            'devA',
+        ])
+    })
+
+    it('appends a device the order has never seen', () => {
+        const menuOrder: MenuOrderIds[] = [{ id: 'devA', children: [] }]
+        expect(ids(reorderTopLevel(menuOrder, ['devA', 'devNew']))).toEqual(['devA', 'devNew'])
     })
 })
