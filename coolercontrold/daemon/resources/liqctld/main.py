@@ -60,6 +60,7 @@ _ORIGINAL_KRAKENZ3_CONNECT = KrakenZ3.connect
 _ORIGINAL_SWITCH_BUCKET = KrakenZ3._switch_bucket
 _ORIGINAL_SEND_DATA = KrakenZ3._send_data
 _ORIGINAL_SET_SCREEN = KrakenZ3.set_screen
+_ORIGINAL_INITIALIZE = KrakenZ3.initialize
 _ORIGINAL_SEND_2023_FW2 = getattr(KrakenZ3, "_send_2023_data_fw2", None)
 # Which packing layouts the C path replaced, reported per device by the profile line.
 _LCD_PACKING_PATCHED: set = set()
@@ -175,7 +176,7 @@ def _log_lcd_profile_once(self, path, frame_bytes, slots):
     self._cc_profile_logged = True
     firmware = getattr(self, "_fw", None)
     resolution = getattr(self, "lcd_resolution", None)
-    packing = "rgb565" if path == "fw2-double" else "rgbx"
+    packing = "rgb565" if path == "fw2" else "rgbx"
     replaced = (
         "_prepare_static_file_rgb16" if packing == "rgb565" else "_prepare_static_file"
     )
@@ -194,14 +195,48 @@ def _log_lcd_profile_once(self, path, frame_bytes, slots):
     )
 
 
-def _send_2023_fw2_logged(self, data, bulkInfo):
-    """Reports the Kraken 2023 firmware 2.x transfer, which nothing here patches.
+def _initialize_repriming_the_lcd(self, *args, **kwargs):
+    """Re-arms the firmware 2.x doubled first frame.
 
-    That firmware takes this instead of `_send_data`, so the rotation never applies to it and
-    liquidctl sends each frame twice. Reporting only; unverified on hardware.
+    Called at boot, on resume and on reconnect, which is the state liquidctl's own comment
+    says that second transfer is there for.
     """
-    _log_lcd_profile_once(self, "fw2-double", len(data), "n/a")
-    return _ORIGINAL_SEND_2023_FW2(self, data, bulkInfo)
+    self._cc_fw2_primed = False
+    return _ORIGINAL_INITIALIZE(self, *args, **kwargs)
+
+
+def _write_frame_fw2(self, data, bulk_info):
+    """One firmware 2.x transfer: open, the frame, close.
+
+    No buckets. This firmware streams the frame straight at the screen, which is why none of
+    the rotation applies here and why there is nothing to keep off the display.
+    """
+    self._write_then_read([0x36, 0x01, 0x00, 0x01, 0x06])
+    _bulk_write_frame(self, list(_LCD_BULK_HEADER) + bulk_info, data)
+    self._write_then_read([0x36, 0x02])
+
+
+def _send_frame_fw2(self, data, bulk_info):
+    """Kraken 2023 firmware 2.x transfer, doubled only on the first frame after an initialize.
+
+    liquidctl sends every frame twice here, commenting that the second is "only required
+    once after initialization" and that NZXT's own software does the same at init. A daemon
+    that stays connected can take that at its word: prime once, then one frame per apply
+    instead of two. Why the device wants the second is unestablished, so it is kept for the
+    frame liquidctl says needs it rather than reasoned away.
+
+    The drain matters more than it looks. `_write_then_read` returns whichever report
+    arrives next and checks nothing, so a status report the device sent unasked while the
+    frame was decoded becomes the answer to the transfer-start command, and every read after
+    it is one behind until something clears the queue.
+    """
+    _log_lcd_profile_once(self, "fw2", len(data), "n/a")
+    self.device.clear_enqueued_reports()
+    _write_frame_fw2(self, data, bulk_info)
+    if getattr(self, "_cc_fw2_primed", False):
+        return
+    _write_frame_fw2(self, data, bulk_info)
+    self._cc_fw2_primed = True
 
 
 def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
@@ -403,8 +438,9 @@ def patch_kraken_lcd_transfer() -> bool:
     KrakenZ3._switch_bucket = _switch_bucket_tracking_active
     KrakenZ3._send_data = _send_frame_to_spare_bucket
     KrakenZ3.set_screen = _set_screen_with_drained_queue
+    KrakenZ3.initialize = _initialize_repriming_the_lcd
     if _ORIGINAL_SEND_2023_FW2 is not None:
-        KrakenZ3._send_2023_data_fw2 = _send_2023_fw2_logged
+        KrakenZ3._send_2023_data_fw2 = _send_frame_fw2
     log.debug("LCD transfer patched to whole-frame writes with a two-bucket rotation")
     return True
 

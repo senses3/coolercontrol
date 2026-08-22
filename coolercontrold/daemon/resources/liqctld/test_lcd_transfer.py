@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Tests for the Kraken LCD whole-frame transfer and two-bucket rotation.
+"""Tests for the Kraken LCD whole-frame transfer, two-bucket rotation and fw2 path.
 
 These drive the replacements against a stub that records every call, so
 no device, no USB and no liquidctl driver instance is involved. What is
@@ -859,21 +859,18 @@ class TestDeviceProfileLine(unittest.TestCase):
         self.assertIn("slots=401", line)
 
     def test_the_firmware_2_path_names_itself_and_its_packing(self):
-        """Goal: the Kraken 2023 fw2 double-send is unpatched and invisible in a log today.
-        Method: drive that transfer and read the path and packing fields."""
+        """Goal: this model takes a different transfer and a different framebuffer layout to
+        every other screen, so triage has to be able to tell which one ran. Method: drive that
+        transfer and read the path and packing fields."""
         device = self._kraken(product_id=0x300E, fw=(2, 0, 1), resolution=(240, 240))
 
-        with mock.patch.object(
-            main, "_ORIGINAL_SEND_2023_FW2", return_value=None
-        ) as original:
-            with self.assertLogs(level="INFO") as captured:
-                main._send_2023_fw2_logged(device, FRAME, BULK_INFO)
+        with self.assertLogs(level="INFO") as captured:
+            main._send_frame_fw2(device, FRAME, BULK_INFO)
 
         line = self._profile_lines(captured)[0]
-        self.assertIn("path=fw2-double", line)
+        self.assertIn("path=fw2", line)
         self.assertIn("packing=rgb565", line)
         self.assertIn("pid=0x300e", line)
-        original.assert_called_once()
 
     def test_a_device_missing_every_attribute_still_sends_its_frame(self):
         """Goal: this is a diagnostic, so an unfamiliar driver shape must not be the reason an
@@ -889,6 +886,119 @@ class TestDeviceProfileLine(unittest.TestCase):
         self.assertIn("fw=unknown", line)
         self.assertIn("res=unknown", line)
         self.assertEqual(len(device.bulk_writes), 2, "the frame must still go out")
+
+
+class TestFirmware2Transfer(unittest.TestCase):
+    """The Kraken 2023 on firmware 2.x takes a path of its own: no buckets, and liquidctl
+    sends the whole frame twice on every apply. These pin what replaced it."""
+
+    FRAME_FW2 = bytes(range(256)) * 450  # 115,200 bytes, one 240x240 RGB565 frame
+    BULK_INFO_FW2 = [0x06, 0x0, 0x0, 0x0] + list((115200).to_bytes(4, "little"))
+
+    def _kraken(self, primed=None):
+        device = FakeKraken({})
+        device.device.product_id = 0x300E
+        device._fw = (2, 0, 0)
+        device.lcd_resolution = (240, 240)
+        device.bulk_buffer_size = main._LCD_BULK_TRANSFER_BYTES
+        if primed is not None:
+            device._cc_fw2_primed = primed
+        return device
+
+    def _send(self, device):
+        main._send_frame_fw2(device, self.FRAME_FW2, self.BULK_INFO_FW2)
+
+    def _transfers(self, device):
+        """How many times the frame went out; each transfer opens with its own command."""
+        return len(
+            [
+                c
+                for c in device.calls
+                if c[0] == "write_then_read" and c[1][0:2] == [0x36, 0x01]
+            ]
+        )
+
+    def test_the_first_frame_after_an_initialize_is_sent_twice(self):
+        """Goal: liquidctl says the second transfer is needed once after initialization, and
+        that is the one claim here taken on trust. Method: send one frame cold."""
+        device = self._kraken()
+
+        self._send(device)
+
+        self.assertEqual(self._transfers(device), 2)
+        self.assertEqual(device.bulk_writes.count(self.FRAME_FW2), 2)
+
+    def test_every_frame_after_the_first_is_sent_once(self):
+        """Goal: halving the device work per apply is the point of the change, and Temp mode
+        re-applies constantly. Method: four applies, counting transfers."""
+        device = self._kraken()
+
+        for _ in range(4):
+            self._send(device)
+
+        self.assertEqual(
+            self._transfers(device), 5, "two for the first apply, one for each after"
+        )
+
+    def test_an_initialize_re_arms_the_doubled_frame(self):
+        """Goal: boot, resume and reconnect all land back in the state liquidctl says needs
+        the second transfer. Method: prime, initialize, then count the next apply."""
+        device = self._kraken()
+        self._send(device)
+
+        with mock.patch.object(main, "_ORIGINAL_INITIALIZE", return_value=None):
+            main._initialize_repriming_the_lcd(device)
+        device.calls.clear()
+        self._send(device)
+
+        self.assertEqual(self._transfers(device), 2)
+
+    def test_queued_reports_are_drained_before_the_transfer_opens(self):
+        """Goal: `_write_then_read` returns the next report and checks nothing, so a status
+        report that arrived while the frame was decoded is taken as the transfer's answer and
+        every read after it is one behind. Method: check the drain lands first."""
+        device = self._kraken(primed=True)
+
+        self._send(device)
+
+        self.assertEqual(device.calls[0][0], "clear_enqueued_reports")
+        self.assertEqual(device.calls[1][1][0:2], [0x36, 0x01])
+
+    def test_the_frame_is_handed_over_whole_without_a_copy(self):
+        """Goal: liquidctl rebuilt the frame as a python list of ints for every chunk of
+        every send, and it sent twice. Method: capture what the write was given."""
+        device = self._kraken(primed=True)
+        written = []
+        device._bulk_write = written.append
+
+        self._send(device)
+
+        self.assertIs(
+            written[1], self.FRAME_FW2, "the frame must not be sliced or rebuilt"
+        )
+
+    def test_the_frame_is_chunked_at_the_connections_transfer_size(self):
+        """Goal: this path shares the transfer sizing the rotation uses, including the fall
+        back a timeout triggers. Method: send at liquidctl's own 512 bytes."""
+        device = self._kraken(primed=True)
+        device.bulk_buffer_size = 512
+
+        self._send(device)
+
+        header, *chunks = device.bulk_writes
+        self.assertEqual(header[:12], bytes(main._LCD_BULK_HEADER))
+        self.assertEqual(b"".join(chunks), self.FRAME_FW2)
+
+    def test_a_transfer_that_failed_leaves_the_next_frame_doubled(self):
+        """Goal: priming records that the device has had its second transfer, so a send that
+        never landed must not count as one. Method: time the frame write out."""
+        device = self._kraken()
+        device._bulk_write = mock.Mock(side_effect=main.Timeout())
+
+        with self.assertRaises(main.Timeout):
+            self._send(device)
+
+        self.assertFalse(getattr(device, "_cc_fw2_primed", False))
 
 
 class TestGifUnsupportedIsExplained(unittest.TestCase):
