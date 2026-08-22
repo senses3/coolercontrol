@@ -411,7 +411,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="sensorIcon(sensor)"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{ 'animate-spin-slow': sensorSpins(sensor) }"
                             :style="{
@@ -690,7 +690,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="sensorIcon(sensor)"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{ 'animate-spin-slow': sensorSpins(sensor) }"
                             :style="{

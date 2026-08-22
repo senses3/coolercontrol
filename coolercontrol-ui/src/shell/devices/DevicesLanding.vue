@@ -75,14 +75,16 @@ const counts = (device: Device): string => {
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.devicesPage.landingHint') }}
             </span>
+            <!-- A link cannot be a UiButton, so it carries the same outline
+                 variant at the same md size by hand. Keep the two in step. -->
             <RouterLink
                 :to="{ name: 'devices-manage-sensors' }"
-                class="ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-3 text-sm font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                class="ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-4 text-base font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <svg-icon
                     type="mdi"
                     :path="mdiToggleSwitchOffOutline"
-                    :size="16"
+                    :size="18"
                     class="text-text-color-secondary"
                 />
                 {{ t('layout.shell.manageSensors.openButton') }}

@@ -253,7 +253,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="mdiFan"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{
                                 'animate-spin-slow': channelSpins(
@@ -387,7 +387,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="mdiFan"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{
                                 'animate-spin-slow': channelSpins(

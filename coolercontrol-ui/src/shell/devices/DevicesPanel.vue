@@ -197,7 +197,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="deviceTypeIcon(device.type)"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :style="{ color: dotColor(device.uid) }"
                         />
@@ -246,7 +246,7 @@ const isRouteActive = useRouteActive()
                     <svg-icon
                         type="mdi"
                         :path="link.kind === 'lighting' ? mdiLightbulbOutline : mdiTelevision"
-                        :size="14"
+                        :size="18"
                         class="shrink-0 text-text-color-secondary"
                     />
                     <span class="truncate">{{
@@ -280,7 +280,7 @@ const isRouteActive = useRouteActive()
                                 <svg-icon
                                     type="mdi"
                                     :path="mdiThermometer"
-                                    :size="14"
+                                    :size="18"
                                     class="shrink-0"
                                     :style="{
                                         color: sensorDotColor(device.uid, sensorName) || undefined,
