@@ -8,7 +8,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
-import { SIMPLE_TOUR_STEPS, TOUR_KEY_PREFIX, TOUR_STEPS } from '@/shell/tour.ts'
+import { TOUR_KEY_PREFIX, TOUR_STEPS } from '@/shell/tour.ts'
 import { SENSOR_LINK_KINDS } from '@/shell/devices/devices.ts'
 import { CHAIN_PILL_KINDS } from '@/shell/cooling/channels.ts'
 
@@ -59,18 +59,17 @@ describe('shell i18n keys', () => {
         expect(missing).toEqual([])
     })
 
-    // The tour builds its keys from its step lists at runtime, so the static
+    // The tour builds its keys from its step list at runtime, so the static
     // sweep above cannot see them and an unused-key cleanup cannot either.
     // Checking every locale is the point: a prune once took these out of all
-    // twelve. Both interfaces' walks are covered, since only one of them is ever
-    // on screen to catch a missing key by hand.
+    // twelve.
     it('resolves every tour step key in every locale', () => {
         const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
         expect(locales).toHaveLength(LOCALE_COUNT)
 
         const missing: string[] = []
         for (const [path, module] of locales) {
-            for (const step of [...TOUR_STEPS, ...SIMPLE_TOUR_STEPS]) {
+            for (const step of TOUR_STEPS) {
                 for (const suffix of ['', 'Desc']) {
                     const key = `${TOUR_KEY_PREFIX}${step.key}${suffix}`
                     if (!resolves(module.default, key)) missing.push(`${path}: ${key}`)

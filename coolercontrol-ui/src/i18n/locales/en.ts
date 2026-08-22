@@ -950,22 +950,6 @@ export default {
         },
         onboarding: {
             welcome: 'Welcome to CoolerControl!',
-            simpleHome: 'Home',
-            simpleHomeDesc:
-                'Daemon status and device health at a glance, plus logs and the hardware report to send when something is not detected.',
-            simpleFans: 'Fans',
-            simpleFansDesc:
-                'Every fan and pump CoolerControl can control. Open one to give it a curve, hold a fixed speed, or leave it to the firmware.',
-            simpleSensors: 'Sensors',
-            simpleSensorsDesc:
-                'Every temperature, fan and power reading on the system. Open one to see its recent history.',
-            interfaceMode: 'Interface',
-            interfaceModeDesc:
-                'Switch between the simple and full interfaces here at any time. Nothing is lost either way: both drive the same settings.',
-            chooseInterface: 'Which interface would you like?',
-            simpleChoiceDesc: 'Fan curves and sensors, and nothing else.',
-            fullChoiceDesc:
-                'Everything: profiles, functions, dashboards, alerts, modes, lighting and more.',
             gettingStartedIntro:
                 'Take a quick tour to get oriented. It walks through the navigation rail and the main areas of the app.',
             startTourAgain: 'You can start this tour again at any time from Settings.',
