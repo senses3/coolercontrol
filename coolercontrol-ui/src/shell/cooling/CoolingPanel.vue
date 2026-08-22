@@ -403,22 +403,23 @@ const isRouteActive = useRouteActive()
             @end="persistDeviceOrder"
         >
             <div v-for="group in groups" :key="group.deviceUID" class="flex flex-col gap-0.5">
+                <!-- The whole band is the link, as a channel row is, so the active
+                     device reads the same way here as a selected channel does. The
+                     label keeps the device color rather than turning accent: the
+                     color is what identifies the device across every panel. -->
                 <PanelHeader
-                    class="group/device"
+                    class="group/device rounded-t-lg hover:bg-surface-hover"
+                    :class="{
+                        'bg-surface-hover': isRouteActive(deviceTarget(group.deviceUID)),
+                    }"
+                    :to="deviceTarget(group.deviceUID)"
                     :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
                 >
-                    <template #label>
-                        <RouterLink
-                            :to="deviceTarget(group.deviceUID)"
-                            class="truncate outline-none hover:underline focus-visible:underline"
-                        >
-                            {{ deviceLabel(group.deviceUID) }}
-                        </RouterLink>
-                    </template>
+                    <template #label>{{ deviceLabel(group.deviceUID) }}</template>
                     <!-- invisible, not hidden: the header must not change height on
                          hover. -mr-0.5 lands the drag glyph on the same column as the
                          rows below, whose cluster insets by pr-1 inside a p-1 handle
-                         where the header insets by its own px-2 and a p-0.5 one. -->
+                         where the header's sits in pr-2 with a p-0.5 one. -->
                     <span
                         class="invisible -mr-0.5 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
                         :class="{ '!visible': openColorDevice === group.deviceUID }"
