@@ -237,8 +237,9 @@ export class DeviceUISettings {
 }
 
 // Bump when the tour changes enough that everyone should see it again. 1 was
-// the original tour; 2 reworked it for the new shell; 3 split it per interface
-// and put the interface choice in the welcome, which everyone should be asked.
+// the original tour; 2 reworked it for the new shell; 3 reran it for the shell's
+// rail. Later removals of steps do not bump it: nobody needs to sit through the
+// tour again to be shown less.
 export const ONBOARDING_TOUR_VERSION = 3
 
 /**

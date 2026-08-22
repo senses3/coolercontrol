@@ -955,22 +955,6 @@ export default {
         },
         onboarding: {
             welcome: 'CoolerControlへようこそ！',
-            simpleHome: 'ホーム',
-            simpleHomeDesc:
-                'デーモンの状態とデバイスの健全性がひと目でわかります。ログと、何かが検出されないときに送るハードウェアレポートもここにあります。',
-            simpleFans: 'ファン',
-            simpleFansDesc:
-                'CoolerControl が制御できるすべてのファンとポンプ。開いてカーブを設定したり、固定速度にしたり、ファームウェアに任せたりできます。',
-            simpleSensors: 'センサー',
-            simpleSensorsDesc:
-                'システムのすべての温度、ファン、電力の値。開くと最近の履歴を確認できます。',
-            interfaceMode: 'インターフェース',
-            interfaceModeDesc:
-                'シンプルと完全なインターフェースはここでいつでも切り替えられます。どちらも同じ設定を操作するので、失われるものはありません。',
-            chooseInterface: 'どちらのインターフェースを使いますか?',
-            simpleChoiceDesc: 'ファンカーブとセンサーだけ。',
-            fullChoiceDesc:
-                'プロファイル、関数、ダッシュボード、アラート、モード、ライティングなどすべて。',
             gettingStartedIntro:
                 '簡単なツアーで概要を把握しましょう。ナビゲーションバーとアプリの主要な領域を案内します。',
             startTourAgain: 'このツアーは設定からいつでも再開できます。',

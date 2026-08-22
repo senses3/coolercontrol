@@ -973,22 +973,6 @@ export default {
         },
         onboarding: {
             welcome: 'Willkommen bei CoolerControl!',
-            simpleHome: 'Start',
-            simpleHomeDesc:
-                'Dienststatus und Gerätezustand auf einen Blick, dazu Protokolle und der Hardware-Bericht, falls etwas nicht erkannt wird.',
-            simpleFans: 'Lüfter',
-            simpleFansDesc:
-                'Alle Lüfter und Pumpen, die CoolerControl steuern kann. Öffnen Sie einen, um ihm eine Kurve zu geben, eine feste Drehzahl zu halten oder ihn der Firmware zu überlassen.',
-            simpleSensors: 'Sensoren',
-            simpleSensorsDesc:
-                'Alle Temperatur-, Lüfter- und Leistungswerte des Systems. Öffnen Sie einen, um seinen bisherigen Verlauf zu sehen.',
-            interfaceMode: 'Oberfläche',
-            interfaceModeDesc:
-                'Wechseln Sie hier jederzeit zwischen der einfachen und der vollständigen Oberfläche. Dabei geht nichts verloren: beide steuern dieselben Einstellungen.',
-            chooseInterface: 'Welche Oberfläche möchten Sie?',
-            simpleChoiceDesc: 'Lüfterkurven und Sensoren, sonst nichts.',
-            fullChoiceDesc:
-                'Alles: Profile, Funktionen, Dashboards, Alarme, Modi, Beleuchtung und mehr.',
             gettingStartedIntro:
                 'Machen Sie eine kurze Tour, um sich zu orientieren. Sie führt durch die Navigationsleiste und die wichtigsten Bereiche der Anwendung.',
             startTourAgain:
