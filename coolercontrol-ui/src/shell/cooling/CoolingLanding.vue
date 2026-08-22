@@ -10,9 +10,12 @@ import type { UID } from '@/models/Device.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { coolingChannels } from '@/shell/cooling/channels.ts'
+import { hardwareNoticeKind } from '@/shell/hardware/findings.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { features } from '@/features'
 import ChannelCard from '@/shell/cooling/ChannelCard.vue'
+import HardwareNotice from '@/shell/hardware/HardwareNotice.vue'
+import HardwareHelpLine from '@/shell/hardware/HardwareHelpLine.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
 
 const { t } = useI18n()
@@ -20,6 +23,18 @@ const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
 const groups = computed(() => coolingChannels(deviceStore.allDevices()))
+
+const channels = computed(() => groups.value.flatMap((group) => group.channels))
+
+// Undefined whenever at least one channel can be driven: a working machine has
+// nothing to be told here.
+const noticeKind = computed(() =>
+    hardwareNoticeKind(
+        settingsStore.healthSystemFindings,
+        channels.value.length,
+        channels.value.filter((channel) => channel.controllable).length,
+    ),
+)
 
 // Simple mode calls the section Fans, and keeps the wizards out of it.
 const title = computed(() =>
@@ -56,6 +71,9 @@ const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
             </span>
         </div>
         <template v-if="groups.length > 0">
+            <div v-if="noticeKind" class="px-4 pt-4">
+                <HardwareNotice :kind="noticeKind" />
+            </div>
             <section v-for="group in groups" :key="group.deviceUID" class="px-4 pt-4">
                 <h2
                     class="truncate pb-2 text-sm font-medium uppercase tracking-wide"
@@ -74,10 +92,15 @@ const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
                     />
                 </div>
             </section>
+            <!-- Only when the page lists something. The empty state below is a
+                 HardwareNotice, which already carries both of these links. -->
+            <div class="px-4 pt-6">
+                <HardwareHelpLine />
+            </div>
             <div class="pb-6" />
         </template>
-        <div v-else class="flex flex-1 items-center justify-center text-text-color-secondary">
-            {{ t('layout.shell.coolingPage.noChannels') }}
+        <div v-else-if="noticeKind" class="flex flex-1 items-center justify-center p-4">
+            <HardwareNotice :kind="noticeKind" class="w-full max-w-2xl" />
         </div>
     </div>
 </template>

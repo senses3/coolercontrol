@@ -16,6 +16,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { deviceChannelLinks, deviceTypeGroups, hardwareDevices } from '@/shell/devices/devices.ts'
 import { deviceTypeIcon } from '@/shell/deviceIcon.ts'
+import HardwareHelpLine from '@/shell/hardware/HardwareHelpLine.vue'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
@@ -163,6 +164,9 @@ const counts = (device: Device): string => {
                 </RouterLink>
             </div>
         </section>
+        <div class="px-4 pt-6">
+            <HardwareHelpLine />
+        </div>
         <div class="pb-6" />
     </div>
 </template>

@@ -166,9 +166,16 @@ export default {
                 disableUnusedSensors: '使用していないセンサーを無効化…（推奨）',
                 sensors: 'センサー',
             },
+            hardwareHelp: {
+                missingDevice: 'ここに表示されていないハードウェアを期待していましたか？',
+            },
             coolingPage: {
                 landingHint: 'ファンまたはポンプを選択して冷却を表示・調整します。',
-                noChannels: '制御可能なファンまたはポンプのチャンネルが検出されませんでした。',
+                noChannels: 'ファンまたはポンプのチャンネルが検出されませんでした。',
+                noneControllable:
+                    '検出されたファンまたはポンプのチャンネルはいずれも制御できません。',
+                noticeBlockedByEnvironment:
+                    'ハードウェア検出を実行できなかったため、ファンやポンプのチャンネルが不足している可能性があります。',
                 fullChart: 'フルチャート',
                 guidedSetup: 'ガイド付きセットアップ',
                 setupMenu: {
@@ -619,6 +626,11 @@ export default {
             findingBlacklisted:
                 'このドライバーはブラックリストに登録されており、読み込まれませんでした。',
             findingBlockedByEnvironment: 'この環境ではハードウェア検出を実行できませんでした。',
+            findingBlockedBySecureBoot:
+                'セキュアブートが有効なため、ハードウェア検出を実行できませんでした。',
+            findingBlockedByContainer: 'コンテナ内ではハードウェア検出を実行できませんでした。',
+            findingBlockedByNoDevPort:
+                '/dev/port が利用できないため、ハードウェア検出を実行できませんでした。',
             findingDetectionUnsupported:
                 'このアーキテクチャではハードウェア検出はサポートされていません。',
             failsafeActive: 'フェイルセーフ値を使用中',

@@ -166,9 +166,15 @@ export default {
                 disableUnusedSensors: 'تعطيل المستشعرات غير المستخدمة… (موصى به)',
                 sensors: 'المستشعرات',
             },
+            hardwareHelp: {
+                missingDevice: 'هل توقّعت عتاداً غير مدرَج هنا؟',
+            },
             coolingPage: {
                 landingHint: 'حدد مروحة أو مضخة لعرض تبريدها وضبطه.',
-                noChannels: 'لم يتم اكتشاف قنوات مراوح أو مضخات قابلة للتحكم.',
+                noChannels: 'لم يتم اكتشاف قنوات مراوح أو مضخات.',
+                noneControllable: 'لا يمكن التحكم في أي من قنوات المراوح أو المضخات المكتشفة.',
+                noticeBlockedByEnvironment:
+                    'تعذّر تشغيل اكتشاف الأجهزة، لذا قد تكون بعض قنوات المراوح والمضخات مفقودة.',
                 fullChart: 'الرسم البياني الكامل',
                 guidedSetup: 'إعداد موجّه',
                 setupMenu: {
@@ -611,6 +617,9 @@ export default {
             findingNoDriverBound: 'تم اكتشاف شريحة، لكن لا يوجد برنامج تشغيل محمَّل يخدمها.',
             findingBlacklisted: 'برنامج التشغيل هذا محظور ولم يتم تحميله.',
             findingBlockedByEnvironment: 'تعذّر تشغيل اكتشاف الأجهزة في هذه البيئة.',
+            findingBlockedBySecureBoot: 'تعذّر تشغيل اكتشاف الأجهزة لأن الإقلاع الآمن مُفعّل.',
+            findingBlockedByContainer: 'تعذّر تشغيل اكتشاف الأجهزة داخل حاوية.',
+            findingBlockedByNoDevPort: 'تعذّر تشغيل اكتشاف الأجهزة لأن ‎/dev/port غير متاح.',
             findingDetectionUnsupported: 'اكتشاف الأجهزة غير مدعوم على هذه البنية.',
             failsafeActive: 'قيم الأمان قيد الاستخدام',
             missingTempSource: 'مصدر درجة الحرارة مفقود',

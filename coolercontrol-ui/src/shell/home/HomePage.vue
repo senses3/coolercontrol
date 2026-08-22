@@ -31,8 +31,6 @@ import {
     HARDWARE_SUPPORT_DOCS,
     HealthEntityType,
     type SourceRef,
-    type SystemFinding,
-    SystemFindingKind,
     failsafeKey,
     sourceKey,
     sourceTempDisplayName,
@@ -47,8 +45,10 @@ import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
-import HardwareReportModal from '@/shell/home/HardwareReportModal.vue'
-import DetectionModal from '@/shell/home/DetectionModal.vue'
+import HardwareReportModal from '@/shell/hardware/HardwareReportModal.vue'
+import DetectionModal from '@/shell/hardware/DetectionModal.vue'
+import { actionableFindings } from '@/shell/hardware/findings.ts'
+import { useHardwareText } from '@/shell/hardware/useHardwareText.ts'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
 const deviceStore = useDeviceStore()
@@ -58,6 +58,7 @@ const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 const { t } = useI18n({ useScope: 'global' })
 const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
 const { openShortcutsDialog } = useShortcutsDialog()
+const { findingDetail } = useHardwareText()
 
 // Read from the store rather than awaiting here: a top-level await makes this an
 // async-setup component behind Suspense, so a slow /health blocks navigation to Home
@@ -258,19 +259,6 @@ const capabilityDetail = (verdict: ChannelVerdict): string => {
     }
 }
 
-const findingDetail = (finding: SystemFinding): string => {
-    switch (finding.kind) {
-        case SystemFindingKind.NoDriverBound:
-            return t('views.appInfo.findingNoDriverBound')
-        case SystemFindingKind.Blacklisted:
-            return t('views.appInfo.findingBlacklisted')
-        case SystemFindingKind.BlockedByEnvironment:
-            return t('views.appInfo.findingBlockedByEnvironment')
-        default:
-            return t('views.appInfo.findingDetectionUnsupported')
-    }
-}
-
 // The report is useful even when nothing is wrong, so its button is not gated
 // on there being findings.
 const reportOpen = ref(false)
@@ -278,12 +266,7 @@ const detectionOpen = ref(false)
 
 const supportRows = computed((): Array<SupportRow> => {
     const rows: Array<SupportRow> = []
-    for (const finding of settingsStore.healthSystemFindings) {
-        // A statement about the build, not a problem with this machine. The
-        // daemon leaves it out of its actionable set for the same reason, and a
-        // row here would put a docs link in front of every non-x86_64 user
-        // whose fans work.
-        if (finding.kind === SystemFindingKind.DetectionUnsupported) continue
+    for (const finding of actionableFindings(settingsStore.healthSystemFindings)) {
         // Machine-scope, so there is no channel to route to. The docs page is
         // the only useful destination.
         rows.push({

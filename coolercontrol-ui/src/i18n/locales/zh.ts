@@ -166,9 +166,14 @@ export default {
                 disableUnusedSensors: '禁用未使用的传感器…（推荐）',
                 sensors: '传感器',
             },
+            hardwareHelp: {
+                missingDevice: '预期的硬件没有出现在这里？',
+            },
             coolingPage: {
                 landingHint: '选择一个风扇或水泵以查看和调整其冷却。',
-                noChannels: '未检测到可控制的风扇或水泵通道。',
+                noChannels: '未检测到风扇或水泵通道。',
+                noneControllable: '检测到的风扇或水泵通道均无法控制。',
+                noticeBlockedByEnvironment: '硬件检测无法运行，因此可能缺少风扇和水泵通道。',
                 fullChart: '完整图表',
                 guidedSetup: '引导设置',
                 setupMenu: {
@@ -591,6 +596,9 @@ export default {
             findingNoDriverBound: '检测到一个芯片，但没有已加载的驱动为其服务。',
             findingBlacklisted: '该驱动已列入黑名单，未被加载。',
             findingBlockedByEnvironment: '硬件检测无法在此环境中运行。',
+            findingBlockedBySecureBoot: '安全启动已启用，硬件检测无法运行。',
+            findingBlockedByContainer: '硬件检测无法在容器中运行。',
+            findingBlockedByNoDevPort: '/dev/port 不可用，硬件检测无法运行。',
             findingDetectionUnsupported: '此架构不支持硬件检测。',
             failsafeActive: '正在使用故障保护值',
             missingTempSource: '缺少温度源',

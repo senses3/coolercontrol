@@ -167,9 +167,16 @@ export default {
                 disableUnusedSensors: 'अप्रयुक्त सेंसर अक्षम करें… (अनुशंसित)',
                 sensors: 'सेंसर',
             },
+            hardwareHelp: {
+                missingDevice: 'ऐसा हार्डवेयर अपेक्षित था जो यहाँ सूचीबद्ध नहीं है?',
+            },
             coolingPage: {
                 landingHint: 'कूलिंग देखने और समायोजित करने के लिए एक पंखा या पंप चुनें।',
-                noChannels: 'कोई नियंत्रण योग्य पंखा या पंप चैनल नहीं मिला।',
+                noChannels: 'कोई पंखा या पंप चैनल नहीं मिला।',
+                noneControllable:
+                    'मिले हुए पंखा या पंप चैनलों में से कोई भी नियंत्रित नहीं किया जा सकता।',
+                noticeBlockedByEnvironment:
+                    'हार्डवेयर पहचान नहीं चल सकी, इसलिए कुछ पंखा और पंप चैनल छूट सकते हैं।',
                 fullChart: 'पूरा चार्ट',
                 guidedSetup: 'निर्देशित सेटअप',
                 setupMenu: {
@@ -613,6 +620,11 @@ export default {
             findingNoDriverBound: 'एक चिप मिली, पर कोई लोड किया गया ड्राइवर उसे नहीं चला रहा।',
             findingBlacklisted: 'यह ड्राइवर ब्लैकलिस्ट में है और लोड नहीं किया गया।',
             findingBlockedByEnvironment: 'इस परिवेश में हार्डवेयर पहचान नहीं चल सकी।',
+            findingBlockedBySecureBoot:
+                'सिक्योर बूट सक्षम होने के कारण हार्डवेयर पहचान नहीं चल सकी।',
+            findingBlockedByContainer: 'कंटेनर के भीतर हार्डवेयर पहचान नहीं चल सकी।',
+            findingBlockedByNoDevPort:
+                '/dev/port उपलब्ध न होने के कारण हार्डवेयर पहचान नहीं चल सकी।',
             findingDetectionUnsupported: 'इस आर्किटेक्चर पर हार्डवेयर पहचान समर्थित नहीं है।',
             failsafeActive: 'फेलसेफ मान उपयोग में हैं',
             missingTempSource: 'तापमान स्रोत गायब है',
