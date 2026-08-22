@@ -402,12 +402,9 @@ const isRouteActive = useRouteActive()
             class="flex flex-col gap-0.5"
             @end="persistDeviceOrder"
         >
-            <div
-                v-for="group in groups"
-                :key="group.deviceUID"
-                class="group/device flex flex-col gap-0.5"
-            >
+            <div v-for="group in groups" :key="group.deviceUID" class="flex flex-col gap-0.5">
                 <PanelHeader
+                    class="group/device"
                     :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
                 >
                     <template #label>
@@ -420,7 +417,7 @@ const isRouteActive = useRouteActive()
                     </template>
                     <!-- invisible, not hidden: the header must not change height on hover. -->
                     <span
-                        class="invisible flex items-center gap-0.5 group-focus-within/device:visible group-hover/device:visible"
+                        class="invisible flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
                         :class="{ '!visible': openColorDevice === group.deviceUID }"
                     >
                         <CCColorPicker
