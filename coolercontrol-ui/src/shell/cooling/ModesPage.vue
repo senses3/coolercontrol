@@ -25,7 +25,7 @@ const activate = async (modeUID: string): Promise<void> => {
     <div class="flex h-full flex-col overflow-y-auto p-4">
         <div class="flex items-center justify-between">
             <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.modes') }}</h1>
-            <UiButton size="sm" variant="outline" @click="openModeWizard()">
+            <UiButton variant="outline" @click="openModeWizard()">
                 {{ t('views.modes.createMode') }}
             </UiButton>
         </div>

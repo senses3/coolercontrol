@@ -130,13 +130,13 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'Gérer les capteurs',
+                title: 'Gérer les appareils et les capteurs',
                 hint: 'Activez ou désactivez les appareils et capteurs. Il est recommandé de désactiver ceux qui sont inutilisés.',
                 pendingChanges:
                     'Aucune modification | {count} modification | {count} modifications',
                 applyRestart: 'Appliquer et redémarrer',
                 disabledDevices: 'Appareils désactivés',
-                openButton: 'Gérer les capteurs',
+                openButton: 'Gérer les appareils et les capteurs',
             },
             toast: {
                 copy: 'Copier',

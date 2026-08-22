@@ -4,8 +4,10 @@
 import { describe, expect, it } from 'vitest'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
 import {
+    orderPinnedRows,
     orderedByGroup,
     reorderSubset,
+    reorderTopLevel,
     setDeviceChildrenSubset,
     setGroupOrder,
     setTopLevelOrder,
@@ -90,5 +92,83 @@ describe('sortEntitiesByGroup', () => {
         const entities = [{ uid: 'p1' }, { uid: 'p2' }, { uid: 'p3' }]
         sortEntitiesByGroup(menuOrder, 'profiles', entities, (e) => e.uid)
         expect(entities.map((e) => e.uid)).toEqual(['p2', 'p1', 'p3'])
+    })
+})
+
+describe('orderPinnedRows', () => {
+    // The bug this guards: the monitoring panel used to render pinned dashboards
+    // as their own list above pinned sensors, so a dashboard pinned last showed
+    // above sensors pinned first, and the home panel disagreed with it.
+    it('follows the pin order across kinds', () => {
+        const rows = new Map([
+            ['dev1_temp1', 'sensorA'],
+            ['dash-uid', 'dashboardB'],
+            ['dev1_fan1', 'sensorC'],
+        ])
+        expect(orderPinnedRows(['dev1_temp1', 'dash-uid', 'dev1_fan1'], rows)).toEqual([
+            'sensorA',
+            'dashboardB',
+            'sensorC',
+        ])
+    })
+
+    // A panel only builds rows for the kinds it shows, and pinnedIds is shared
+    // with the panels that show the others.
+    it('drops ids the panel has no row for', () => {
+        const rows = new Map([['kept', 'row']])
+        expect(orderPinnedRows(['gone', 'kept', 'also-gone'], rows)).toEqual(['row'])
+    })
+
+    it('returns nothing when nothing is pinned', () => {
+        expect(orderPinnedRows([], new Map([['a', 1]]))).toEqual([])
+    })
+})
+
+describe('reorderTopLevel', () => {
+    const ids = (order: MenuOrderIds[]) => order.map((entry) => entry.id)
+
+    // Cooling lists devices with controllable channels, Monitoring devices with
+    // sensors, so a drag in either only ever sees part of the device order.
+    it('permutes the shown devices within the slots they already hold', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'devA', children: ['a1'] },
+            { id: 'devHidden', children: [] },
+            { id: 'devB', children: ['b1'] },
+        ]
+        expect(ids(reorderTopLevel(menuOrder, ['devB', 'devA']))).toEqual([
+            'devB',
+            'devHidden',
+            'devA',
+        ])
+    })
+
+    it('keeps each moved device its children', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'devA', children: ['a1'] },
+            { id: 'devB', children: ['b1'] },
+        ]
+        expect(reorderTopLevel(menuOrder, ['devB', 'devA'])).toEqual([
+            { id: 'devB', children: ['b1'] },
+            { id: 'devA', children: ['a1'] },
+        ])
+    })
+
+    // Group ids share the top level with devices and must not be dragged over.
+    it('leaves the entity group entries where they were', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'devA', children: [] },
+            { id: 'profiles', children: ['p1'] },
+            { id: 'devB', children: [] },
+        ]
+        expect(ids(reorderTopLevel(menuOrder, ['devB', 'devA']))).toEqual([
+            'devB',
+            'profiles',
+            'devA',
+        ])
+    })
+
+    it('appends a device the order has never seen', () => {
+        const menuOrder: MenuOrderIds[] = [{ id: 'devA', children: [] }]
+        expect(ids(reorderTopLevel(menuOrder, ['devA', 'devNew']))).toEqual(['devA', 'devNew'])
     })
 })

@@ -127,12 +127,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'センサーを管理',
+                title: 'デバイスとセンサーを管理',
                 hint: 'デバイスとセンサーを有効化または無効化します。使用していないものは無効化することをお勧めします。',
                 pendingChanges: '変更なし | {count}件の変更 | {count}件の変更',
                 applyRestart: '適用して再起動',
                 disabledDevices: '無効化されたデバイス',
-                openButton: 'センサーを管理',
+                openButton: 'デバイスとセンサーを管理',
             },
             toast: {
                 copy: 'コピー',

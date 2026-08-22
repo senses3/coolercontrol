@@ -197,7 +197,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="deviceTypeIcon(device.type)"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :style="{ color: dotColor(device.uid) }"
                         />
@@ -223,14 +223,16 @@ const isRouteActive = useRouteActive()
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                     >
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="pickerColor(device.uid)"
+                                :size="1.25"
+                                @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
+                            />
+                        </span>
                         <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
                             <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                         </span>
-                        <CCColorPicker
-                            :model-value="pickerColor(device.uid)"
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setDeviceColor(device.uid, c)"
-                        />
                     </div>
                 </div>
                 <RouterLink
@@ -246,7 +248,7 @@ const isRouteActive = useRouteActive()
                     <svg-icon
                         type="mdi"
                         :path="link.kind === 'lighting' ? mdiLightbulbOutline : mdiTelevision"
-                        :size="14"
+                        :size="18"
                         class="shrink-0 text-text-color-secondary"
                     />
                     <span class="truncate">{{
@@ -280,7 +282,7 @@ const isRouteActive = useRouteActive()
                                 <svg-icon
                                     type="mdi"
                                     :path="mdiThermometer"
-                                    :size="14"
+                                    :size="18"
                                     class="shrink-0"
                                     :style="{
                                         color: sensorDotColor(device.uid, sensorName) || undefined,
@@ -307,18 +309,6 @@ const isRouteActive = useRouteActive()
                                     '!flex': openTagRow === `${device.uid}-${sensorName}`,
                                 }"
                             >
-                                <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                                </span>
-                                <CCColorPicker
-                                    :model-value="sensorPickerColor(device.uid, sensorName)"
-                                    :default-color="sensorDefaultColor(device.uid, sensorName)"
-                                    :size="1.25"
-                                    @update:model-value="
-                                        (c: Color) => setSensorColor(device.uid, sensorName, c)
-                                    "
-                                    @reset="resetSensorColor(device.uid, sensorName)"
-                                />
                                 <TagPopover
                                     :device-u-i-d="device.uid"
                                     :channel-name="sensorName"
@@ -327,6 +317,17 @@ const isRouteActive = useRouteActive()
                                             onTagOpen(`${device.uid}-${sensorName}`, open)
                                     "
                                 />
+                                <span class="flex w-6 shrink-0 justify-center">
+                                    <CCColorPicker
+                                        :model-value="sensorPickerColor(device.uid, sensorName)"
+                                        :default-color="sensorDefaultColor(device.uid, sensorName)"
+                                        :size="1.25"
+                                        @update:model-value="
+                                            (c: Color) => setSensorColor(device.uid, sensorName, c)
+                                        "
+                                        @reset="resetSensorColor(device.uid, sensorName)"
+                                    />
+                                </span>
                                 <button
                                     type="button"
                                     class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -347,6 +348,9 @@ const isRouteActive = useRouteActive()
                                         :size="16"
                                     />
                                 </button>
+                                <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                                </span>
                             </div>
                         </div>
                     </VueDraggable>
@@ -354,7 +358,7 @@ const isRouteActive = useRouteActive()
                         :to="{ name: 'device-custom-sensor-new' }"
                         class="flex items-center gap-2 rounded-lg py-1 pl-6 pr-2 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                     >
-                        <svg-icon type="mdi" :path="mdiPlus" :size="14" class="shrink-0" />
+                        <svg-icon type="mdi" :path="mdiPlus" :size="18" class="shrink-0" />
                         <span class="truncate">
                             {{ t('layout.menu.tooltips.addCustomSensor') }}
                         </span>

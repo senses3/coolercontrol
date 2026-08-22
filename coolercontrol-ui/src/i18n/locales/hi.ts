@@ -128,12 +128,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'सेंसर प्रबंधित करें',
+                title: 'उपकरण और सेंसर प्रबंधित करें',
                 hint: 'उपकरण और सेंसर सक्षम या अक्षम करें। अप्रयुक्त को अक्षम करना अनुशंसित है।',
                 pendingChanges: 'कोई परिवर्तन नहीं | {count} परिवर्तन | {count} परिवर्तन',
                 applyRestart: 'लागू करें और पुनरारंभ करें',
                 disabledDevices: 'अक्षम उपकरण',
-                openButton: 'सेंसर प्रबंधित करें',
+                openButton: 'उपकरण और सेंसर प्रबंधित करें',
             },
             toast: {
                 copy: 'कॉपी करें',

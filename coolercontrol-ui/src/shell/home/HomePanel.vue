@@ -215,7 +215,7 @@ const isRouteActive = useRouteActive()
             <svg-icon
                 type="mdi"
                 :path="mdiHomeOutline"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             {{ t('layout.shell.homePanel.overview') }}
@@ -228,7 +228,7 @@ const isRouteActive = useRouteActive()
             <svg-icon
                 type="mdi"
                 :path="mdiTextBoxOutline"
-                :size="14"
+                :size="18"
                 class="shrink-0 text-text-color-secondary"
             />
             {{ t('layout.shell.homePanel.logs') }}
@@ -260,7 +260,7 @@ const isRouteActive = useRouteActive()
                             v-if="row.icon"
                             type="mdi"
                             :path="row.icon"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{ 'animate-spin-slow': row.spins }"
                             :style="{ color: row.color || undefined }"
@@ -269,7 +269,7 @@ const isRouteActive = useRouteActive()
                             v-else
                             type="mdi"
                             :path="mdiViewDashboardOutline"
-                            :size="14"
+                            :size="18"
                             class="shrink-0 text-text-color-secondary"
                         />
                         <span class="truncate">{{ row.label }}</span>
@@ -293,20 +293,7 @@ const isRouteActive = useRouteActive()
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex"
                         :class="{ '!flex': openTagRow === row.key }"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
                         <template v-if="row.deviceUID != null && row.channelName != null">
-                            <CCColorPicker
-                                :model-value="row.color ?? ''"
-                                :size="1.25"
-                                @update:model-value="(c: Color) => setRowColor(row, c)"
-                            />
-                            <TagPopover
-                                :device-u-i-d="row.deviceUID"
-                                :channel-name="row.channelName"
-                                @open="(open: boolean) => onTagOpen(row.key, open)"
-                            />
                             <button
                                 v-if="row.alertKind != null"
                                 type="button"
@@ -326,6 +313,18 @@ const isRouteActive = useRouteActive()
                                     :size="16"
                                 />
                             </button>
+                            <TagPopover
+                                :device-u-i-d="row.deviceUID"
+                                :channel-name="row.channelName"
+                                @open="(open: boolean) => onTagOpen(row.key, open)"
+                            />
+                            <span class="flex w-6 shrink-0 justify-center">
+                                <CCColorPicker
+                                    :model-value="row.color ?? ''"
+                                    :size="1.25"
+                                    @update:model-value="(c: Color) => setRowColor(row, c)"
+                                />
+                            </span>
                         </template>
                         <button
                             type="button"
@@ -335,6 +334,9 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>

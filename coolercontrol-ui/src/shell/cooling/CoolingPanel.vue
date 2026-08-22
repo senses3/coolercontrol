@@ -28,6 +28,7 @@ import type { Color, UID } from '@/models/Device.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { HealthEntityType } from '@/models/DeviceHealth.ts'
 import { useLibraryWizards } from '@/composables/useLibraryWizards.ts'
 import {
@@ -38,6 +39,7 @@ import {
 } from '@/shell/cooling/channels.ts'
 import {
     reorderSubset,
+    reorderTopLevel,
     setDeviceChildrenSubset,
     setGroupOrder,
     sortEntitiesByGroup,
@@ -86,6 +88,34 @@ const deviceLabel = (deviceUID: UID): string =>
 
 const deviceColor = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.userColor ?? ''
+
+const colorStore = useThemeColorsStore()
+const devicePickerColor = (deviceUID: UID): string =>
+    deviceColor(deviceUID) || `rgb(${colorStore.themeColors.text_color})`
+const setDeviceColor = (deviceUID: UID, newColor: Color): void => {
+    const setting = settingsStore.allUIDeviceSettings.get(deviceUID)
+    if (setting != null) setting.userColor = newColor
+}
+
+// Held open while the color popover is: the pointer leaves the header for the
+// portalled content, which would otherwise hide the trigger under it.
+const openColorDevice = ref<UID | undefined>(undefined)
+
+// The header names a device, so it goes where the device does, and carries the
+// same two actions its row in the Devices panel has.
+const deviceTarget = (deviceUID: UID): RouteLocationRaw => ({
+    name: 'devices-device',
+    params: { deviceUID },
+})
+// One device order, shared by every panel. Only the devices this panel lists
+// move within it; the rest keep their slots.
+const persistDeviceOrder = (): void => {
+    settingsStore.menuOrder = reorderTopLevel(
+        settingsStore.menuOrder,
+        groups.value.map((group) => group.deviceUID),
+    )
+    deviceStore.reSortDevicesByMenuOrder()
+}
 
 const channelLabel = (deviceUID: UID, channelName: string): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.sensorsAndChannels.get(channelName)?.name ??
@@ -253,7 +283,7 @@ const isRouteActive = useRouteActive()
                         <svg-icon
                             type="mdi"
                             :path="mdiFan"
-                            :size="14"
+                            :size="18"
                             class="shrink-0"
                             :class="{
                                 'animate-spin-slow': channelSpins(
@@ -312,32 +342,18 @@ const isRouteActive = useRouteActive()
                             </span>
                         </span>
                     </RouterLink>
+                    <!-- Every panel orders its actions by how many row types carry
+                         them, most universal last. The cluster is right-aligned, so
+                         only the last slot sits at a fixed x: drag is in every row,
+                         so it ends every cluster, and pin precedes it. Slots are
+                         24px on a 26px pitch, which is why the 20px color trigger
+                         is centred in a w-6 span rather than sized up. -->
                     <div
                         class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                         :class="{
                             '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                         }"
                     >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                        <CCColorPicker
-                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                            :default-color="
-                                channelDefaultColor(channel.deviceUID, channel.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
-                            @reset="resetChannelColor(channel)"
-                        />
-                        <TagPopover
-                            :device-u-i-d="channel.deviceUID"
-                            :channel-name="channel.channelName"
-                            @open="
-                                (open: boolean) =>
-                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
-                            "
-                        />
                         <button
                             v-if="hasRpm(channel)"
                             type="button"
@@ -347,6 +363,25 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
                         </button>
+                        <TagPopover
+                            :device-u-i-d="channel.deviceUID"
+                            :channel-name="channel.channelName"
+                            @open="
+                                (open: boolean) =>
+                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
+                            "
+                        />
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="channelColor(channel.deviceUID, channel.channelName)"
+                                :default-color="
+                                    channelDefaultColor(channel.deviceUID, channel.channelName)
+                                "
+                                :size="1.25"
+                                @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                                @reset="resetChannelColor(channel)"
+                            />
+                        </span>
                         <button
                             type="button"
                             class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
@@ -355,147 +390,211 @@ const isRouteActive = useRouteActive()
                         >
                             <svg-icon type="mdi" :path="mdiPinOff" :size="16" />
                         </button>
+                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
                     </div>
                 </div>
             </VueDraggable>
             <UiSeparator class="my-1" />
         </template>
 
-        <template v-for="group in groups" :key="group.deviceUID">
-            <PanelHeader
-                :label="deviceLabel(group.deviceUID)"
-                :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
-            />
-            <VueDraggable
-                v-model="group.channels"
-                handle=".drag-handle"
-                :animation="150"
-                class="flex flex-col gap-0.5"
-                @end="persistChannelOrder(group)"
-            >
-                <div
-                    v-for="channel in group.channels"
-                    :key="channel.channelName"
-                    class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
-                    :class="{ 'bg-surface-hover': isRouteActive(channelTarget(channel)) }"
+        <VueDraggable
+            v-model="groups"
+            handle=".device-drag-handle"
+            :animation="150"
+            class="flex flex-col gap-0.5"
+            @end="persistDeviceOrder"
+        >
+            <div v-for="group in groups" :key="group.deviceUID" class="flex flex-col gap-0.5">
+                <!-- The whole band is the link, as a channel row is, so the active
+                     device reads the same way here as a selected channel does. The
+                     label keeps the device color rather than turning accent: the
+                     color is what identifies the device across every panel. -->
+                <PanelHeader
+                    class="group/device rounded-t-lg hover:bg-surface-hover"
+                    :class="{
+                        'bg-surface-hover': isRouteActive(deviceTarget(group.deviceUID)),
+                    }"
+                    :to="deviceTarget(group.deviceUID)"
+                    :color="deviceColor(group.deviceUID) || 'rgb(var(--colors-text-color))'"
                 >
-                    <RouterLink
-                        :to="channelTarget(channel)"
-                        class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
-                        exact-active-class="!text-accent"
+                    <template #label>{{ deviceLabel(group.deviceUID) }}</template>
+                    <!-- invisible, not hidden: the header must not change height on
+                         hover. -mr-1 cancels the header's pr-2 down to the pr-1 the
+                         rows below inset by, so the same p-1 handle puts the drag
+                         glyph on the same column. -->
+                    <span
+                        class="invisible -mr-1 flex items-center gap-0.5 group-hover/device:visible group-has-[:focus-visible]/device:visible"
+                        :class="{ '!visible': openColorDevice === group.deviceUID }"
                     >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiFan"
-                            :size="14"
-                            class="shrink-0"
-                            :class="{
-                                'animate-spin-slow': channelSpins(
-                                    'fan',
-                                    liveFor(channel.deviceUID, channel.channelName),
-                                    settingsStore.eyeCandy,
-                                ),
-                            }"
-                            :style="{
-                                color:
-                                    channelColor(channel.deviceUID, channel.channelName) ||
-                                    undefined,
-                            }"
-                        />
-                        <span class="truncate">
-                            {{ channelLabel(channel.deviceUID, channel.channelName) }}
+                        <span class="flex w-6 shrink-0 justify-center">
+                            <CCColorPicker
+                                :model-value="devicePickerColor(group.deviceUID)"
+                                :size="1.25"
+                                @open="
+                                    (open: boolean) =>
+                                        (openColorDevice = open ? group.deviceUID : undefined)
+                                "
+                                @update:model-value="
+                                    (c: Color) => setDeviceColor(group.deviceUID, c)
+                                "
+                            />
                         </span>
-                        <TagChips
-                            :device-u-i-d="channel.deviceUID"
-                            :channel-name="channel.channelName"
-                        />
-                        <UiTooltip
-                            v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
-                            :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
+                        <!-- The rows' p-1 grab area, with -my-0.5 giving the extra
+                             height back so the header does not grow for it. -->
+                        <span
+                            class="device-drag-handle -my-0.5 cursor-grab p-1 text-text-color-secondary"
+                        >
+                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                        </span>
+                    </span>
+                </PanelHeader>
+                <VueDraggable
+                    v-model="group.channels"
+                    handle=".drag-handle"
+                    :animation="150"
+                    class="flex flex-col gap-0.5"
+                    @end="persistChannelOrder(group)"
+                >
+                    <div
+                        v-for="channel in group.channels"
+                        :key="channel.channelName"
+                        class="group flex items-center rounded-lg hover:bg-surface-hover has-[:focus-visible]:bg-surface-hover has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent"
+                        :class="{ 'bg-surface-hover': isRouteActive(channelTarget(channel)) }"
+                    >
+                        <RouterLink
+                            :to="channelTarget(channel)"
+                            class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-text-color outline-none"
+                            exact-active-class="!text-accent"
                         >
                             <svg-icon
                                 type="mdi"
-                                :path="mdiAlert"
-                                :size="14"
-                                class="shrink-0 text-error"
+                                :path="mdiFan"
+                                :size="18"
+                                class="shrink-0"
+                                :class="{
+                                    'animate-spin-slow': channelSpins(
+                                        'fan',
+                                        liveFor(channel.deviceUID, channel.channelName),
+                                        settingsStore.eyeCandy,
+                                    ),
+                                }"
+                                :style="{
+                                    color:
+                                        channelColor(channel.deviceUID, channel.channelName) ||
+                                        undefined,
+                                }"
                             />
-                        </UiTooltip>
-                        <span
-                            class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-has-[:focus-visible]:hidden"
+                            <span class="truncate">
+                                {{ channelLabel(channel.deviceUID, channel.channelName) }}
+                            </span>
+                            <TagChips
+                                :device-u-i-d="channel.deviceUID"
+                                :channel-name="channel.channelName"
+                            />
+                            <UiTooltip
+                                v-if="isUnhealthy(channel.deviceUID, channel.channelName)"
+                                :text="failsafeTooltip(channel.deviceUID, channel.channelName)"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiAlert"
+                                    :size="14"
+                                    class="shrink-0 text-error"
+                                />
+                            </UiTooltip>
+                            <span
+                                class="ml-auto flex items-baseline gap-1.5 whitespace-nowrap group-hover:hidden group-has-[:focus-visible]:hidden"
+                                :class="{
+                                    '!hidden':
+                                        openTagRow ===
+                                        `${channel.deviceUID}-${channel.channelName}`,
+                                }"
+                            >
+                                <span
+                                    v-if="
+                                        liveFor(channel.deviceUID, channel.channelName)?.duty !=
+                                        null
+                                    "
+                                    class="font-numeric tabular-nums text-text-color"
+                                >
+                                    {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
+                                </span>
+                                <span
+                                    v-if="
+                                        liveFor(channel.deviceUID, channel.channelName)?.rpm != null
+                                    "
+                                    class="text-sm font-numeric tabular-nums text-text-color-secondary"
+                                >
+                                    {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
+                                </span>
+                            </span>
+                        </RouterLink>
+                        <div
+                            class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
                             :class="{
-                                '!hidden':
+                                '!flex':
                                     openTagRow === `${channel.deviceUID}-${channel.channelName}`,
                             }"
                         >
-                            <span
-                                v-if="liveFor(channel.deviceUID, channel.channelName)?.duty != null"
-                                class="font-numeric tabular-nums text-text-color"
+                            <button
+                                v-if="hasRpm(channel)"
+                                type="button"
+                                class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                                v-tooltip.top="t('layout.shell.monitoringPanel.failAlert')"
+                                @click.prevent="createFailAlert(channel)"
                             >
-                                {{ liveFor(channel.deviceUID, channel.channelName)?.duty }}%
-                            </span>
-                            <span
-                                v-if="liveFor(channel.deviceUID, channel.channelName)?.rpm != null"
-                                class="text-sm font-numeric tabular-nums text-text-color-secondary"
-                            >
-                                {{ liveFor(channel.deviceUID, channel.channelName)?.rpm }} rpm
-                            </span>
-                        </span>
-                    </RouterLink>
-                    <div
-                        class="ml-auto hidden items-center gap-0.5 pr-1 group-hover:flex group-has-[:focus-visible]:flex group-has-[[data-state=open]]:flex"
-                        :class="{
-                            '!flex': openTagRow === `${channel.deviceUID}-${channel.channelName}`,
-                        }"
-                    >
-                        <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                        <CCColorPicker
-                            :model-value="channelColor(channel.deviceUID, channel.channelName)"
-                            :default-color="
-                                channelDefaultColor(channel.deviceUID, channel.channelName)
-                            "
-                            :size="1.25"
-                            @update:model-value="(c: Color) => setChannelColor(channel, c)"
-                            @reset="resetChannelColor(channel)"
-                        />
-                        <TagPopover
-                            :device-u-i-d="channel.deviceUID"
-                            :channel-name="channel.channelName"
-                            @open="
-                                (open: boolean) =>
-                                    onTagOpen(`${channel.deviceUID}-${channel.channelName}`, open)
-                            "
-                        />
-                        <button
-                            v-if="hasRpm(channel)"
-                            type="button"
-                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            v-tooltip.top="t('layout.shell.monitoringPanel.failAlert')"
-                            @click.prevent="createFailAlert(channel)"
-                        >
-                            <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                            v-tooltip.top="
-                                isPinned(channel)
-                                    ? t('layout.shell.coolingPanel.unpin')
-                                    : t('layout.shell.coolingPanel.pin')
-                            "
-                            @click.prevent="togglePin(channel)"
-                        >
-                            <svg-icon
-                                type="mdi"
-                                :path="isPinned(channel) ? mdiPinOff : mdiPinOutline"
-                                :size="16"
+                                <svg-icon type="mdi" :path="mdiFanAlert" :size="16" />
+                            </button>
+                            <TagPopover
+                                :device-u-i-d="channel.deviceUID"
+                                :channel-name="channel.channelName"
+                                @open="
+                                    (open: boolean) =>
+                                        onTagOpen(
+                                            `${channel.deviceUID}-${channel.channelName}`,
+                                            open,
+                                        )
+                                "
                             />
-                        </button>
+                            <span class="flex w-6 shrink-0 justify-center">
+                                <CCColorPicker
+                                    :model-value="
+                                        channelColor(channel.deviceUID, channel.channelName)
+                                    "
+                                    :default-color="
+                                        channelDefaultColor(channel.deviceUID, channel.channelName)
+                                    "
+                                    :size="1.25"
+                                    @update:model-value="(c: Color) => setChannelColor(channel, c)"
+                                    @reset="resetChannelColor(channel)"
+                                />
+                            </span>
+                            <button
+                                type="button"
+                                class="rounded p-1 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                                v-tooltip.top="
+                                    isPinned(channel)
+                                        ? t('layout.shell.coolingPanel.unpin')
+                                        : t('layout.shell.coolingPanel.pin')
+                                "
+                                @click.prevent="togglePin(channel)"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="isPinned(channel) ? mdiPinOff : mdiPinOutline"
+                                    :size="16"
+                                />
+                            </button>
+                            <span class="drag-handle cursor-grab p-1 text-text-color-secondary">
+                                <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                            </span>
+                        </div>
                     </div>
-                </div>
-            </VueDraggable>
-        </template>
+                </VueDraggable>
+            </div>
+        </VueDraggable>
 
         <UiSeparator class="my-1" />
         <PanelHeader :label="t('layout.shell.coolingPanel.library')" />
@@ -529,7 +628,7 @@ const isRouteActive = useRouteActive()
                 <svg-icon
                     type="mdi"
                     :path="mdiChartMultiple"
-                    :size="14"
+                    :size="18"
                     class="shrink-0 text-text-color-secondary"
                 />
                 <span class="truncate">{{ profile.name }}</span>
@@ -542,7 +641,7 @@ const isRouteActive = useRouteActive()
                 <span
                     class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
+                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                 </span>
             </RouterLink>
         </VueDraggable>
@@ -576,14 +675,14 @@ const isRouteActive = useRouteActive()
                 <svg-icon
                     type="mdi"
                     :path="mdiFunction"
-                    :size="14"
+                    :size="18"
                     class="shrink-0 text-text-color-secondary"
                 />
                 <span class="truncate">{{ fun.name }}</span>
                 <span
                     class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                 >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="14" />
+                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                 </span>
             </RouterLink>
         </VueDraggable>

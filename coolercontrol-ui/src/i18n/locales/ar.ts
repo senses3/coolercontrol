@@ -127,12 +127,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'إدارة المستشعرات',
+                title: 'إدارة الأجهزة والمستشعرات',
                 hint: 'تمكين أو تعطيل الأجهزة والمستشعرات. يُنصح بتعطيل غير المستخدمة.',
                 pendingChanges: 'بدون تغييرات | {count} تغيير | {count} تغييرات',
                 applyRestart: 'تطبيق وإعادة التشغيل',
                 disabledDevices: 'الأجهزة المعطّلة',
-                openButton: 'إدارة المستشعرات',
+                openButton: 'إدارة الأجهزة والمستشعرات',
             },
             toast: {
                 copy: 'نسخ',

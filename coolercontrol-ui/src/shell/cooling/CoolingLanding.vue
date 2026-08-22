@@ -45,13 +45,12 @@ const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
             <span v-if="!settingsStore.isSimpleMode" class="ml-auto flex items-center gap-2">
                 <UiButton
                     v-if="features.coolingWizard"
-                    size="sm"
                     variant="outline"
                     @click="openGenerateWizard()"
                 >
                     {{ t('views.appInfo.gettingStartedAutoCreateLink') }}
                 </UiButton>
-                <UiButton size="sm" variant="outline" @click="openCalibrationWizard()">
+                <UiButton variant="outline" @click="openCalibrationWizard()">
                     {{ t('components.wizards.calibration.title') }}
                 </UiButton>
             </span>

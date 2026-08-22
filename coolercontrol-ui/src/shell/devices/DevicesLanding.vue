@@ -70,19 +70,21 @@ const counts = (device: Device): string => {
 
 <template>
     <div class="flex h-full flex-col overflow-y-auto">
-        <div class="flex items-center gap-3 px-4 pt-4">
+        <div class="flex flex-wrap items-center gap-3 px-4 pt-4">
             <h1 class="text-xl font-semibold text-text-color">{{ t('layout.shell.devices') }}</h1>
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.devicesPage.landingHint') }}
             </span>
+            <!-- A link cannot be a UiButton, so it carries the same outline
+                 variant at the same md size by hand. Keep the two in step. -->
             <RouterLink
                 :to="{ name: 'devices-manage-sensors' }"
-                class="ml-auto inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-3 text-sm font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                class="ml-auto inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-4 text-base font-medium text-text-color outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             >
                 <svg-icon
                     type="mdi"
                     :path="mdiToggleSwitchOffOutline"
-                    :size="16"
+                    :size="18"
                     class="text-text-color-secondary"
                 />
                 {{ t('layout.shell.manageSensors.openButton') }}

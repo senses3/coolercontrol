@@ -129,12 +129,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'Gestionar Sensores',
+                title: 'Gestionar Dispositivos y Sensores',
                 hint: 'Habilite o deshabilite dispositivos y sensores. Se recomienda deshabilitar los que no se utilizan.',
                 pendingChanges: 'Sin cambios | {count} cambio | {count} cambios',
                 applyRestart: 'Aplicar y Reiniciar',
                 disabledDevices: 'Dispositivos Deshabilitados',
-                openButton: 'Gestionar Sensores',
+                openButton: 'Gestionar Dispositivos y Sensores',
             },
             toast: {
                 copy: 'Copiar',

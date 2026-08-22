@@ -100,3 +100,39 @@ export function sortEntitiesByGroup<T>(
     }
     entities.sort((a, b) => getIndex(a) - getIndex(b))
 }
+
+// Pinned rows in the order their ids were pinned, whatever kind each row is.
+// A panel showing more than one kind must not group them: `pinnedIds` is one
+// order, so grouping would put a newly pinned item above older ones and make a
+// drag here mean something else in the panel next door. Ids with no row (a kind
+// this panel does not show, or a deleted entity) drop out.
+export function orderPinnedRows<T>(pinnedIds: string[], rowsById: Map<string, T>): T[] {
+    const rows: T[] = []
+    for (const id of pinnedIds) {
+        const row = rowsById.get(id)
+        if (row !== undefined) rows.push(row)
+    }
+    return rows
+}
+
+// Reorders only the devices a panel lists, leaving every other top-level entry
+// (devices it does not list, the 'profiles'/'dashboards' group ids) exactly
+// where it was. Cooling lists devices with controllable channels and Monitoring
+// devices with sensors, so both drag a slice of the one device order.
+export function reorderTopLevel(menuOrder: MenuOrderIds[], shownUids: string[]): MenuOrderIds[] {
+    const byId = new Map(menuOrder.map((entry) => [entry.id, entry]))
+    const base = [...menuOrder]
+    for (const uid of shownUids) {
+        if (byId.has(uid)) continue
+        // A device the order has never seen goes on the end, as setTopLevelOrder
+        // does, so its first drag has a slot to move within.
+        const entry: MenuOrderIds = { id: uid, children: [] }
+        byId.set(uid, entry)
+        base.push(entry)
+    }
+    const ids = reorderSubset(
+        base.map((entry) => entry.id),
+        shownUids,
+    )
+    return ids.map((id) => byId.get(id) ?? { id, children: [] })
+}

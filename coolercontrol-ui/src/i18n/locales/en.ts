@@ -127,12 +127,12 @@ export default {
                 lcd: 'LCD',
             },
             manageSensors: {
-                title: 'Manage Sensors',
+                title: 'Manage Devices and Sensors',
                 hint: 'Enable or disable devices and sensors. Disabling unused ones is recommended.',
                 pendingChanges: 'No changes | {count} change | {count} changes',
                 applyRestart: 'Apply & Restart',
                 disabledDevices: 'Disabled Devices',
-                openButton: 'Manage Sensors',
+                openButton: 'Manage Devices and Sensors',
             },
             toast: {
                 copy: 'Copy',
