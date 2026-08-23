@@ -147,18 +147,22 @@ export const useSettingsStore = defineStore('settings', () => {
     // instead of polling. `enabled` + not-silenced gate out muted alerts.
     const clearAlertAttention = (alertUID: UID): void => {
         for (const set of [alertsActive, alertsError]) {
-            const index = set.value.indexOf(alertUID)
-            if (index > -1) set.value.splice(index, 1)
+            for (let index = set.value.length - 1; index >= 0; index--) {
+                if (set.value[index] === alertUID) set.value.splice(index, 1)
+            }
         }
     }
     const alertNeedsAttention = (alert: Alert, now: number): boolean =>
         alert.enabled &&
         (alertsActive.value.includes(alert.uid) || alertsError.value.includes(alert.uid)) &&
         !alertIsSilencedAt(alert, now)
-    const anyActiveUnsilencedAlert = computed((): boolean => {
+    const alertsNeedingAttention = computed((): Array<Alert> => {
         const now = silenceClock.value
-        return alerts.value.some((alert) => alertNeedsAttention(alert, now))
+        return alerts.value.filter((alert) => alertNeedsAttention(alert, now))
     })
+    const anyActiveUnsilencedAlert = computed(
+        (): boolean => alertsNeedingAttention.value.length > 0,
+    )
     const pushTrayAlertState = (): void => {
         if (!deviceStore.isQtApp()) return
         // @ts-ignore - window.ipc is the QWebChannel bridge, present only in the Qt app.
@@ -1854,7 +1858,7 @@ export const useSettingsStore = defineStore('settings', () => {
         alertLogs,
         alertsActive,
         alertsError,
-        alertNeedsAttention,
+        alertsNeedingAttention,
         clearAlertAttention,
         anyActiveUnsilencedAlert,
         pushTrayAlertState,
