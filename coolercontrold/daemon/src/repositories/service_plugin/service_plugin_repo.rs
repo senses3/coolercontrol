@@ -41,7 +41,7 @@ use toml_edit::DocumentMut;
 pub type ServiceDeviceID = String;
 
 use crate::paths;
-const SERVICE_MANIFEST_FILE_NAME: &str = "manifest.toml";
+pub const SERVICE_MANIFEST_FILE_NAME: &str = "manifest.toml";
 pub const CC_PLUGIN_USER: &str = "cc-plugin-user";
 const TIMEOUT_SERVICE_START_SECONDS: usize = 5;
 const TIMEOUT_SERVICE_CONNECTION_SECONDS: usize = 10;
