@@ -136,7 +136,7 @@ onUnmounted(() => {
             <!-- Simple mode has no contextual panel: the page owns the width. -->
             <div
                 v-if="settingsStore.isSimpleMode"
-                class="min-h-0 flex-1 truncate rounded-lg border border-border-one bg-bg-one"
+                class="min-h-0 flex-1 overflow-hidden rounded-lg border border-border-one bg-bg-one"
             >
                 <router-view v-slot="{ Component, route }">
                     <Suspense>
@@ -170,7 +170,7 @@ onUnmounted(() => {
                 />
                 <SplitterPanel
                     :min-size="30"
-                    class="truncate rounded-lg border border-border-one bg-bg-one"
+                    class="overflow-hidden rounded-lg border border-border-one bg-bg-one"
                 >
                     <router-view v-slot="{ Component, route }">
                         <Suspense>
