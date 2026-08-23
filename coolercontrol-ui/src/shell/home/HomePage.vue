@@ -312,7 +312,9 @@ const cardTitleClasses = 'pb-3 text-lg font-medium text-text-color'
 const shortcutClasses =
     'flex items-center gap-2 rounded-lg px-2 py-1.5 text-base text-accent outline-none ' +
     'hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent cursor-pointer ' +
-    '[&>svg]:shrink-0 min-w-0'
+    // text-left: a button centers its label, an anchor does not. Without this the
+    // two kinds of shortcut disagree the moment a label takes a second line.
+    '[&>svg]:shrink-0 min-w-0 text-left'
 </script>
 
 <template>
@@ -481,7 +483,10 @@ const shortcutClasses =
             <!-- Shortcuts, grouped: tasks / learning / external resources -->
             <div v-if="!settingsStore.isSimpleMode" :class="cardClasses">
                 <span :class="cardTitleClasses">{{ t('views.appInfo.helpfulLinks') }}</span>
-                <div class="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-3">
+                <!-- auto-fit, not a viewport breakpoint: this card lives in a splitter
+                     pane, so the column count has to follow the pane. Dropping a
+                     column reads better than wrapping every label. -->
+                <div class="grid gap-4 pt-3 grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
                     <div class="flex flex-col gap-1">
                         <span class="px-2 pb-1 text-xs uppercase text-text-color-secondary">
                             {{ t('layout.shell.homePage.getStartedGroup') }}
