@@ -6610,7 +6610,6 @@
             "default": false
           },
           "resolved": {
-            "description": "DEPRECATED: derivable from `kind`. Still written for downgrade compatibility.",
             "type": "boolean",
             "default": false
           },

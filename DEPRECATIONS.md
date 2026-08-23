@@ -14,3 +14,4 @@ the removal checklist.
 | `lcd.colors` no-op field: 4.3.x requires it in config.toml and modes.json                                     | `daemon/src/setting.rs`, `daemon/src/config.rs` | 5.0.0 | 5.2.0  |
 | Alert `channel_source` single-source field: 4.3.x requires it in alerts.json; written as `channel_sources[0]` | `daemon/src/alerts.rs`                          | 5.0.0 | 5.2.0  |
 | Per-stream SSE routes `/sse/{logs,status,modes,alerts,notifications}`: superseded by `GET /sse?events=`       | `daemon/src/api/sse.rs`                         | 5.0.0 | 5.2.0  |
+| `AlertLog.resolved`: superseded by `AlertLog.kind`; still written for alert-logs.json readers                 | `daemon/src/alerts.rs`                          | 5.0.0 | 5.2.0  |

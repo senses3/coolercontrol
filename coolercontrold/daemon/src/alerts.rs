@@ -368,7 +368,8 @@ pub struct AlertLog {
     #[serde(default)]
     pub silenced: bool,
 
-    /// DEPRECATED: derivable from `kind`. Still written for downgrade compatibility.
+    // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): derivable from `kind`, but a
+    // 5.0.x daemon reading alert-logs.json still expects it. See DEPRECATIONS.md.
     #[serde(default)]
     pub resolved: bool,
 
