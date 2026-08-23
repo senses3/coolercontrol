@@ -82,12 +82,26 @@ const rebuild = (): void => {
     })
 }
 
+// Set when the palette closes because a result was taken, so the close handler
+// can tell that apart from a dismissal.
+const activated = ref(false)
+
 watch(paletteOpen, (open) => {
     if (!open) return
     query.value = ''
     expanded.value = new Set()
+    activated.value = false
     rebuild()
 })
+
+// Reka restores focus to the trigger on close, and a close driven by Enter
+// counts as keyboard-originated, so :focus-visible latches a ring onto the
+// header field. After taking a result the user is on a new page or in another
+// dialog, so there is nothing to return to; a dismissal still restores focus,
+// which is where a keyboard user does need to end up.
+const onCloseAutoFocus = (event: Event): void => {
+    if (activated.value) event.preventDefault()
+}
 
 const byId = computed(() => new Map(entries.value.map((entry) => [entry.id, entry])))
 
@@ -124,6 +138,7 @@ const visible = (group: SearchGroup): SearchEntry[] =>
 
 const activate = (entry: SearchEntry): void => {
     rememberRecent(entry.id)
+    activated.value = true
     paletteOpen.value = false
     if ('action' in entry.target) runAction(entry.target.action)
     else void router.push(entry.target.route)
@@ -156,6 +171,7 @@ const labelClass =
             <DialogOverlay class="fixed inset-0 z-[1200] bg-black/80" />
             <DialogContent
                 class="fixed left-1/2 top-1/2 z-[1210] flex h-[85vh] w-[95vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-border-one bg-bg-two text-text-color shadow-xl outline-none md:h-auto md:max-h-[70vh] md:top-[15%] md:-translate-y-0"
+                @close-auto-focus="onCloseAutoFocus"
             >
                 <DialogTitle class="sr-only">{{ t('common.search') }}</DialogTitle>
                 <DialogDescription class="sr-only">
