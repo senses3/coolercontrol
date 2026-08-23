@@ -637,6 +637,7 @@ impl AlertController {
         alert.normalize_sources();
         alert.source_states.fill(AlertState::Inactive);
         alert.notified = false;
+        alert.error_notified = false;
         alert.last_notified = None;
         alert.shutdown_scheduled = false;
     }
@@ -777,9 +778,7 @@ impl AlertController {
         alert.state = alert.worst_of_visible();
         alert.last_notified = existing_alert.last_notified;
         alert.notified = existing_alert.notified;
-        if alert.state == AlertState::Inactive {
-            alert.notified = false;
-        }
+        alert.error_notified = existing_alert.error_notified;
     }
 
     /// A pending shutdown does not survive a source-set edit: the user gets a fresh
@@ -2531,10 +2530,11 @@ mod tests {
 
     #[test]
     fn dropping_the_only_firing_source_clears_the_alert() {
-        // Goal: the reported bug. Remove the source holding the alert Active and
-        // the aggregate must follow the survivors immediately, because no later
-        // tick produces a per-source transition to announce it.
+        // Goal: the reported bug, over update()'s real sequence. Removing the source
+        // holding the alert Active clears it, and the alert's own state changed, so
+        // it still notifies even though that source's recovery path is gone.
         let existing_alert = make_two_source_alert();
+        let before = existing_alert.machine_state();
         let mut alert = make_two_source_alert();
         alert.channel_sources.remove(0);
         alert.source_states = vec![AlertState::Inactive];
@@ -2544,6 +2544,14 @@ mod tests {
 
         assert_eq!(alert.state, AlertState::Inactive);
         assert_eq!(alert.source_states, vec![AlertState::Inactive]);
+        assert!(
+            alert.notified,
+            "the carry must not clear the episode before the gate reads it"
+        );
+
+        let event = AlertController::build_edit_event(&mut alert, before).unwrap();
+        assert!(matches!(event.kind, AlertEventKind::Resolved));
+        assert!(event.notify_desktop, "the alert's own state changed");
         assert!(
             alert.notified.not(),
             "a cleared alert must be able to announce a later episode"
