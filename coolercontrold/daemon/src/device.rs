@@ -512,6 +512,18 @@ pub struct DeviceInfo {
     pub driver_info: DriverInfo,
 }
 
+impl DeviceInfo {
+    /// The detected label for a channel, when the device reports one.
+    pub fn detected_channel_label(&self, channel_name: &str) -> Option<String> {
+        if let Some(temp_info) = self.temps.get(channel_name) {
+            return Some(temp_info.label.clone());
+        }
+        self.channels
+            .get(channel_name)
+            .and_then(|channel| channel.label.clone())
+    }
+}
+
 impl Default for DeviceInfo {
     fn default() -> Self {
         DeviceInfo {

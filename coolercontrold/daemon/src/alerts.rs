@@ -908,9 +908,7 @@ impl AlertController {
                 Err(reason) => {
                     if *state != AlertState::Error {
                         *state = AlertState::Error;
-                        let channel_label = self
-                            .overrides
-                            .log_channel_name(&source.device_uid, &source.channel_name);
+                        let channel_label = self.source_label(source);
                         outcomes.errors.push(format!("{channel_label}: {reason}"));
                     }
                     continue;
@@ -954,9 +952,7 @@ impl AlertController {
         if (strictly_active && collect_active).not() && transition.is_none() {
             return;
         }
-        let channel_label = self
-            .overrides
-            .log_channel_name(&source.device_uid, &source.channel_name);
+        let channel_label = self.source_label(source);
         if strictly_active {
             let message = Self::format_out_of_range_message(&channel_label, value, min, max);
             if matches!(transition, Some(TransitionKind::Fired)) {
@@ -983,6 +979,18 @@ impl AlertController {
         }
         self.diagnosis_registry
             .is_in_flight_parts(&source.device_uid, &source.channel_name)
+    }
+
+    /// The user-facing label for an alert source: override > detected > raw.
+    fn source_label(&self, source: &ChannelSource) -> String {
+        let detected = self.all_devices.get(&source.device_uid).and_then(|device| {
+            device
+                .borrow()
+                .info
+                .detected_channel_label(&source.channel_name)
+        });
+        self.overrides
+            .resolve_channel_label(&source.device_uid, &source.channel_name, detected)
     }
 
     /// Reads the source's current metric value from the device status.

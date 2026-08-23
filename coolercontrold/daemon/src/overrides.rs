@@ -210,6 +210,23 @@ impl OverridesController {
             .unwrap_or_else(|| raw_name.to_owned())
     }
 
+    /// Resolves a channel display label. Layer order: override > detected > raw.
+    /// Used for user-facing text such as alert messages, so it carries the plain
+    /// label rather than the `Override (raw)` log form. Sanitized because these
+    /// strings also reach log lines and overrides arrive hand-edited.
+    pub fn resolve_channel_label(
+        &self,
+        device_uid: &DeviceUID,
+        channel_name: &str,
+        detected: Option<String>,
+    ) -> String {
+        let label = self
+            .channel_label_override(device_uid, channel_name)
+            .or(detected)
+            .unwrap_or_else(|| channel_name.to_owned());
+        sanitize_for_log(&label).into_owned()
+    }
+
     /// Log display form of a device name: `Override (raw)` when a user
     /// override exists and differs, plain raw otherwise.
     pub fn log_device_name(&self, device_uid: &DeviceUID, raw_name: &str) -> String {
@@ -659,6 +676,42 @@ mod tests {
             assert_eq!(
                 controller.resolve_device_name(&uid, Some("detected"), "raw"),
                 "Motherboard"
+            );
+        });
+    }
+
+    #[test]
+    fn channel_labels_resolve_override_then_detected_then_raw() {
+        // Goal: user-facing text (alert messages) shows the same label the rest
+        // of the app shows, and never leaks control characters into log lines.
+        crate::rt::test_runtime(async {
+            let tmp = tempfile::tempdir().unwrap();
+            let uid = DEVICE_UID.to_string();
+            let controller = OverridesController::init_from(overrides_path(&tmp)).await;
+
+            assert_eq!(
+                controller.resolve_channel_label(&uid, "temp1", None),
+                "temp1"
+            );
+            assert_eq!(
+                controller.resolve_channel_label(&uid, "temp1", Some("CPU Temp Tctl".to_string())),
+                "CPU Temp Tctl"
+            );
+
+            controller
+                .set_channel_label(&uid, HINT, &"temp1".to_string(), None, Some("Coolant"))
+                .await
+                .unwrap();
+            assert_eq!(
+                controller.resolve_channel_label(&uid, "temp1", Some("CPU Temp Tctl".to_string())),
+                "Coolant"
+            );
+
+            // A detected label comes from sysfs unvalidated, and these strings
+            // reach log lines.
+            assert_eq!(
+                controller.resolve_channel_label(&uid, "temp2", Some("Pump\u{1b}[31m".to_string())),
+                "Pump[31m"
             );
         });
     }

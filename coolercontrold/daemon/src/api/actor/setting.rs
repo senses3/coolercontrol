@@ -155,7 +155,7 @@ impl SettingActor {
     ) -> Option<String> {
         if let Some(device_lock) = self.all_devices.get(device_uid) {
             let lock = device_lock.borrow();
-            if let Some(label) = detected_channel_label(&lock.info, channel_name) {
+            if let Some(label) = lock.info.detected_channel_label(channel_name) {
                 return Some(label);
             }
         }
@@ -556,16 +556,6 @@ impl SettingHandle {
     }
 }
 
-/// The detected label for a channel from live device info, when present.
-fn detected_channel_label(info: &DeviceInfo, channel_name: &str) -> Option<String> {
-    if let Some(temp_info) = info.temps.get(channel_name) {
-        return Some(temp_info.label.clone());
-    }
-    info.channels
-        .get(channel_name)
-        .and_then(|channel| channel.label.clone())
-}
-
 /// Resolves a CC device settings name: override > saved memo > live detected.
 fn resolve_cc_device_name(
     overrides: &OverridesController,
@@ -592,7 +582,7 @@ fn resolve_channel_setting_labels(
     assert!(device_uid.is_empty().not());
     for (channel_name, settings) in channel_settings.iter_mut() {
         let memo = settings.label.take().filter(|label| label.is_empty().not());
-        let live = live_info.and_then(|info| detected_channel_label(info, channel_name));
+        let live = live_info.and_then(|info| info.detected_channel_label(channel_name));
         settings.label = overrides
             .channel_label_override(device_uid, channel_name)
             .or(memo)
@@ -620,7 +610,7 @@ fn stamp_detection_memos(
         update.name.clone_from(&current.name);
     }
     for (channel_name, settings) in &mut update.channel_settings {
-        let live_label = live.and_then(|(_, info)| detected_channel_label(info, channel_name));
+        let live_label = live.and_then(|(_, info)| info.detected_channel_label(channel_name));
         let memo = current
             .channel_settings
             .get(channel_name)
