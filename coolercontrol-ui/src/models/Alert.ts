@@ -86,9 +86,9 @@ export enum AlertState {
  * @param state AlertState枚举值
  * @returns 本地化的显示名称
  */
-export function getAlertStateDisplayName(state: AlertState): string {
+export function getAlertStateDisplayName(state?: AlertState): string {
     const { t } = i18n.global
-    switch (state) {
+    switch (state ?? AlertState.Inactive) {
         case AlertState.Active:
             return t('models.alertState.active')
         case AlertState.Inactive:
@@ -100,8 +100,22 @@ export function getAlertStateDisplayName(state: AlertState): string {
     }
 }
 
-export function getAlertStateIcon(state: AlertState): string {
-    switch (state) {
+/** The one colour per state every alert surface shares. */
+export function getAlertStateClass(state?: AlertState): string {
+    switch (state ?? AlertState.Inactive) {
+        case AlertState.Active:
+            return 'text-error'
+        case AlertState.Inactive:
+            return 'text-success'
+        case AlertState.Error:
+            return 'text-warning'
+        default:
+            return ''
+    }
+}
+
+export function getAlertStateIcon(state?: AlertState): string {
+    switch (state ?? AlertState.Inactive) {
         case AlertState.Active:
             return mdiBellRingOutline
         case AlertState.Inactive:

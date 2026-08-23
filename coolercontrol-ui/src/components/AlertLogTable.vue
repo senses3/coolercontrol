@@ -14,7 +14,7 @@ import {
     mdiPageFirst,
     mdiPageLast,
 } from '@mdi/js'
-import { AlertLog, AlertState, getAlertStateDisplayName } from '@/models/Alert.ts'
+import { AlertLog, getAlertStateClass, getAlertStateDisplayName } from '@/models/Alert.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -40,19 +40,8 @@ const openAlert = (alertUID: string) => {
 }
 
 // Announced rows carry the live state colour; quiet per-source rows stay muted.
-const logStateClass = (log: AlertLog): string => {
-    if (log.quiet) return 'text-text-color-secondary'
-    switch (log.state) {
-        case AlertState.Active:
-            return 'text-error'
-        case AlertState.Error:
-            return 'text-warning'
-        case AlertState.Inactive:
-            return 'text-success'
-        default:
-            return ''
-    }
-}
+const logStateClass = (log: AlertLog): string =>
+    log.quiet ? 'text-text-color-secondary' : getAlertStateClass(log.state)
 
 const logSearch = ref('')
 const logSortAsc = ref(false)

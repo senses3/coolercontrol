@@ -9,11 +9,9 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { v4 as uuidV4 } from 'uuid'
 import {
     mdiAlert,
-    mdiAlertCircle,
     mdiBellOffOutline,
     mdiBellOutline,
     mdiBellPlusOutline,
-    mdiBellRingOutline,
     mdiBellSleepOutline,
     mdiDragVertical,
     mdiFanAlert,
@@ -31,7 +29,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Color, Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
-import { Alert, alertIsSilenced, AlertState } from '@/models/Alert.ts'
+import { Alert, alertIsSilenced, getAlertStateClass, getAlertStateIcon } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
 import { useFailAlert } from '@/composables/useFailAlert.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
@@ -338,14 +336,10 @@ const activeAlertCount = computed(() => settingsStore.alertsNeedingAttention.len
 const alertMenuIcon = (alert: Alert): string => {
     if (!alert.enabled) return mdiBellOffOutline
     if (alertIsSilenced(alert)) return mdiBellSleepOutline
-    if (alert.state === AlertState.Error) return mdiAlertCircle
-    return alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline
+    return getAlertStateIcon(alert.state)
 }
-const alertMenuIconClass = (alert: Alert): string => {
-    if (!alert.enabled) return 'text-text-color-secondary'
-    if (alert.state === AlertState.Error) return 'text-warning'
-    return alert.state === AlertState.Active ? 'text-error' : 'text-success'
-}
+const alertMenuIconClass = (alert: Alert): string =>
+    alert.enabled ? getAlertStateClass(alert.state) : 'text-text-color-secondary'
 // Keeps a row's hover actions visible while its tag popover is open.
 const openTagRow = ref<string | null>(null)
 const onTagOpen = (rowKey: string, open: boolean): void => {
