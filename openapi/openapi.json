@@ -6589,14 +6589,27 @@
       "AlertLog": {
         "type": "object",
         "properties": {
+          "kind": {
+            "description": "What happened, independent of whether it interrupts the user.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertLogKind"
+              }
+            ],
+            "default": "unknown"
+          },
           "message": {
             "type": "string"
           },
           "name": {
             "type": "string"
           },
+          "quiet": {
+            "description": "A per-source detail, not an alert-level change: record it, raise no toast.",
+            "type": "boolean",
+            "default": false
+          },
           "resolved": {
-            "description": "The change was a source recovery; clients toast it as informational\n even when other sources keep the alert Active.",
             "type": "boolean",
             "default": false
           },
@@ -6622,6 +6635,26 @@
           "state",
           "message",
           "timestamp"
+        ]
+      },
+      "AlertLogKind": {
+        "description": "What a log entry represents. `state` is the worst of all sources, so it cannot\n say which machine moved: a trigger beside an Error is `state: Error` too.",
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "triggered",
+              "stillActive",
+              "resolved",
+              "error",
+              "errorResolved"
+            ]
+          },
+          {
+            "description": "Written before this field existed; clients fall back to `state`.",
+            "type": "string",
+            "const": "unknown"
+          }
         ]
       },
       "AlertPath": {

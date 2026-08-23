@@ -86,9 +86,9 @@ export enum AlertState {
  * @param state AlertState枚举值
  * @returns 本地化的显示名称
  */
-export function getAlertStateDisplayName(state: AlertState): string {
+export function getAlertStateDisplayName(state?: AlertState): string {
     const { t } = i18n.global
-    switch (state) {
+    switch (state ?? AlertState.Inactive) {
         case AlertState.Active:
             return t('models.alertState.active')
         case AlertState.Inactive:
@@ -100,8 +100,22 @@ export function getAlertStateDisplayName(state: AlertState): string {
     }
 }
 
-export function getAlertStateIcon(state: AlertState): string {
-    switch (state) {
+/** The one colour per state every alert surface shares. */
+export function getAlertStateClass(state?: AlertState): string {
+    switch (state ?? AlertState.Inactive) {
+        case AlertState.Active:
+            return 'text-error'
+        case AlertState.Inactive:
+            return 'text-success'
+        case AlertState.Error:
+            return 'text-warning'
+        default:
+            return ''
+    }
+}
+
+export function getAlertStateIcon(state?: AlertState): string {
+    switch (state ?? AlertState.Inactive) {
         case AlertState.Active:
             return mdiBellRingOutline
         case AlertState.Inactive:
@@ -113,6 +127,18 @@ export function getAlertStateIcon(state: AlertState): string {
     }
 }
 
+/** What a log entry represents. `state` is the worst of all sources, so it cannot
+ *  say which machine moved: a trigger beside an Error is `state: Error` too. */
+export enum AlertLogKind {
+    Triggered = 'triggered',
+    StillActive = 'stillActive',
+    Resolved = 'resolved',
+    Error = 'error',
+    ErrorResolved = 'errorResolved',
+    /** Written before this field existed; fall back to `state`. */
+    Unknown = 'unknown',
+}
+
 export class AlertLog {
     uid: UID
     name: string
@@ -121,9 +147,12 @@ export class AlertLog {
     timestamp: string
     /** The change happened while silenced; update state but raise no toast. */
     silenced: boolean = false
-    /** The change was a source recovery; toast it as informational even
-     *  when other sources keep the alert Active. */
+    /** @deprecated derivable from `kind`; kept for daemon downgrade compatibility. */
     resolved: boolean = false
+    /** What happened, independent of whether it interrupts the user. */
+    kind: AlertLogKind = AlertLogKind.Unknown
+    /** A per-source detail, not an alert-level change: record, do not toast. */
+    quiet: boolean = false
 
     constructor(uid: UID, name: string, state: AlertState, message: string, timestamp: string) {
         this.uid = uid
@@ -131,6 +160,52 @@ export class AlertLog {
         this.state = state
         this.message = message
         this.timestamp = timestamp
+    }
+}
+
+/** How a log entry should be surfaced, or null when it must not interrupt. */
+export interface AlertToast {
+    severity: 'error' | 'warn' | 'info'
+    summaryKey: string
+    life: number
+}
+
+export function alertToast(log: AlertLog): AlertToast | null {
+    if (log.silenced || log.quiet) return null
+    const triggered: AlertToast = {
+        severity: 'error',
+        summaryKey: 'views.alerts.alertTriggered',
+        life: 5000,
+    }
+    const errored: AlertToast = {
+        severity: 'warn',
+        summaryKey: 'views.alerts.alertError',
+        life: 5000,
+    }
+    const recovered: AlertToast = {
+        severity: 'info',
+        summaryKey: 'views.alerts.alertRecovered',
+        life: 3000,
+    }
+    switch (log.kind) {
+        case AlertLogKind.Triggered:
+        case AlertLogKind.StillActive:
+            return triggered
+        case AlertLogKind.Error:
+            return errored
+        case AlertLogKind.ErrorResolved:
+            return {
+                severity: 'info',
+                summaryKey: 'views.alerts.alertSensorsReadable',
+                life: 3000,
+            }
+        case AlertLogKind.Resolved:
+            return recovered
+        default:
+            // Written before `kind` existed; the aggregate is all we have.
+            if (log.state === AlertState.Error) return errored
+            if (log.state === AlertState.Active) return triggered
+            return recovered
     }
 }
 

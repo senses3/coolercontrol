@@ -7,9 +7,12 @@ import { plainToInstance } from 'class-transformer'
 import {
     alertIsSilenced,
     alertIsSilencedAt,
+    AlertLog,
+    AlertLogKind,
     alertSources,
     AlertsDTO,
     AlertState,
+    alertToast,
 } from '../Alert.ts'
 
 // class-transformer instantiates classes with NO constructor arguments and
@@ -143,5 +146,58 @@ describe('Alert deserialization', () => {
         expect(alertIsSilencedAt(alert, silencedUntil - 1)).toBe(true)
         expect(alertIsSilencedAt(alert, silencedUntil)).toBe(false)
         expect(alertIsSilencedAt(alert, silencedUntil + 1)).toBe(false)
+    })
+})
+
+// Only a log entry that crossed an alert-level edge interrupts the user, and
+// `state` alone cannot say which machine moved.
+describe('alertToast', () => {
+    const log = (fields: Partial<AlertLog>): AlertLog =>
+        plainToInstance(AlertLog, {
+            uid: 'uid-1',
+            name: 'Hot Tamale',
+            state: AlertState.Active,
+            message: 'temp1: too hot',
+            timestamp: new Date().toISOString(),
+            silenced: false,
+            resolved: false,
+            quiet: false,
+            kind: AlertLogKind.Triggered,
+            ...fields,
+        } as object)
+
+    it('withholds the toast for quiet and silenced entries', () => {
+        expect(alertToast(log({ quiet: true }))).toBeNull()
+        expect(alertToast(log({ silenced: true }))).toBeNull()
+    })
+
+    it('reads the kind, not the aggregate state', () => {
+        // A second sensor going unreadable while the first still fires.
+        const errored = log({ kind: AlertLogKind.Error, state: AlertState.Error })
+        expect(alertToast(errored)?.summaryKey).toBe('views.alerts.alertError')
+        // Same state, but the old state-only branch called this an error.
+        const triggered = log({ kind: AlertLogKind.Triggered, state: AlertState.Error })
+        expect(alertToast(triggered)?.summaryKey).toBe('views.alerts.alertTriggered')
+    })
+
+    it('announces sensors becoming readable while the alert still fires', () => {
+        const readable = log({ kind: AlertLogKind.ErrorResolved, state: AlertState.Active })
+        expect(alertToast(readable)).toEqual({
+            severity: 'info',
+            summaryKey: 'views.alerts.alertSensorsReadable',
+            life: 3000,
+        })
+    })
+
+    it('recovers only on the alert-level clearing edge', () => {
+        const recovered = log({ kind: AlertLogKind.Resolved, state: AlertState.Inactive })
+        expect(alertToast(recovered)?.summaryKey).toBe('views.alerts.alertRecovered')
+    })
+
+    it('falls back to the aggregate for entries written before kind existed', () => {
+        const legacy = log({ kind: AlertLogKind.Unknown, state: AlertState.Inactive })
+        expect(alertToast(legacy)?.summaryKey).toBe('views.alerts.alertRecovered')
+        const legacyActive = log({ kind: AlertLogKind.Unknown, state: AlertState.Active })
+        expect(alertToast(legacyActive)?.summaryKey).toBe('views.alerts.alertTriggered')
     })
 })

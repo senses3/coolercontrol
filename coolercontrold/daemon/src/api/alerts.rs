@@ -306,6 +306,7 @@ impl From<AlertDto> for Alert {
             source_states: vec![AlertState::Inactive; source_count],
             last_notified: None,
             notified: false,
+            error_notified: false,
             shutdown_scheduled: false,
         }
     }

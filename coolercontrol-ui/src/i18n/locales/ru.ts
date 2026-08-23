@@ -682,6 +682,7 @@ export default {
             alertTriggered: 'Оповещение сработало',
             alertRecovered: 'Оповещение восстановлено',
             alertError: 'Ошибка оповещения',
+            alertSensorsReadable: 'Датчики оповещения снова читаются',
             deleteAlertConfirm: 'Вы уверены, что хотите удалить: "{name}"?',
             saveAlert: 'Сохранить оповещение',
             channelSources: 'Источники каналов для оповещения',

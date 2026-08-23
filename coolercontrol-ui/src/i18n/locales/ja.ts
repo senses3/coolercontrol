@@ -678,6 +678,7 @@ export default {
             alertTriggered: 'アラートがトリガーされました',
             alertRecovered: 'アラートが回復しました',
             alertError: 'アラートエラー',
+            alertSensorsReadable: 'アラートセンサーの読み取り回復',
             deleteAlertConfirm: '削除してもよろしいですか："{name}"？',
             saveAlert: 'アラートを保存',
             channelSources: 'アラートのチャネルソース',

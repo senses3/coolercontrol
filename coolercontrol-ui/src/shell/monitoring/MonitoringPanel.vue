@@ -12,7 +12,6 @@ import {
     mdiBellOffOutline,
     mdiBellOutline,
     mdiBellPlusOutline,
-    mdiBellRingOutline,
     mdiBellSleepOutline,
     mdiDragVertical,
     mdiFanAlert,
@@ -30,7 +29,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import type { Color, Device, UID } from '@/models/Device.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
-import { Alert, alertIsSilenced, AlertState } from '@/models/Alert.ts'
+import { Alert, alertIsSilenced, getAlertStateClass, getAlertStateIcon } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
 import { useFailAlert } from '@/composables/useFailAlert.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
@@ -330,20 +329,17 @@ const persistAlertOrder = (): void => {
         orderedAlerts.value.map((alert) => alert.uid),
     )
 }
-const activeAlertCount = computed(
-    () => settingsStore.alerts.filter((alert) => alert.state === AlertState.Active).length,
-)
+// The same set the header bell uses, so an expiring silence updates both.
+const activeAlertCount = computed(() => settingsStore.alertsNeedingAttention.length)
 // Menu glyph: shape encodes silenced/disabled, color keeps the live state
 // (silenced alerts still evaluate; a red sleep bell means firing-but-muted).
 const alertMenuIcon = (alert: Alert): string => {
     if (!alert.enabled) return mdiBellOffOutline
     if (alertIsSilenced(alert)) return mdiBellSleepOutline
-    return alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline
+    return getAlertStateIcon(alert.state)
 }
-const alertMenuIconClass = (alert: Alert): string => {
-    if (!alert.enabled) return 'text-text-color-secondary'
-    return alert.state === AlertState.Active ? 'text-error' : 'text-success'
-}
+const alertMenuIconClass = (alert: Alert): string =>
+    alert.enabled ? getAlertStateClass(alert.state) : 'text-text-color-secondary'
 // Keeps a row's hover actions visible while its tag popover is open.
 const openTagRow = ref<string | null>(null)
 const onTagOpen = (rowKey: string, open: boolean): void => {

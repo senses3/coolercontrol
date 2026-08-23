@@ -681,6 +681,7 @@ export default {
             alertTriggered: 'Alerta Acionado',
             alertRecovered: 'Alerta Recuperado',
             alertError: 'Erro de alerta',
+            alertSensorsReadable: 'Sensores de alerta legíveis',
             deleteAlertConfirm: 'Tem certeza que deseja excluir: "{name}"?',
             saveAlert: 'Salvar Alerta',
             channelSources: 'Fontes de Canal para o Alerta',

@@ -665,6 +665,7 @@ export default {
             alertTriggered: 'تم تنشيط التنبيه',
             alertRecovered: 'تم استعادة التنبيه',
             alertError: 'خطأ في التنبيه',
+            alertSensorsReadable: 'مستشعرات التنبيه قابلة للقراءة',
             deleteAlertConfirm: 'هل أنت متأكد من رغبتك في حذف: "{name}"؟',
             saveAlert: 'حفظ التنبيه',
             channelSources: 'مصادر القنوات للتنبيه',

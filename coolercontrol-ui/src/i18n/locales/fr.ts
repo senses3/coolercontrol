@@ -693,6 +693,7 @@ export default {
             alertTriggered: 'Alerte Déclenchée',
             alertRecovered: 'Alerte Récupérée',
             alertError: "Erreur d'alerte",
+            alertSensorsReadable: "Capteurs d'alerte de nouveau lisibles",
             deleteAlertConfirm: 'Êtes-vous sûr de vouloir supprimer : "{name}" ?',
             saveAlert: "Enregistrer l'Alerte",
             channelSources: "Sources de Canal pour l'Alerte",

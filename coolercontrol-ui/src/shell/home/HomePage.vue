@@ -38,7 +38,7 @@ import {
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { alertIsSilenced } from '@/models/Alert.ts'
+import { alertIsSilenced, getAlertStateClass, getAlertStateDisplayName } from '@/models/Alert.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { channelRoute } from '@/shell/channelRoute.ts'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
@@ -293,8 +293,15 @@ const supportRows = computed((): Array<SupportRow> => {
 const activeMode = computed(() =>
     settingsStore.modes.find((mode) => mode.uid === settingsStore.modeActiveCurrent),
 )
+// Error belongs here too: an alert whose sensors went unreadable cannot be
+// trusted, and it lights every other surface. Silenced ones stay listed, muted.
 const activeAlerts = computed(() =>
-    settingsStore.alerts.filter((alert) => settingsStore.alertsActive.includes(alert.uid)),
+    settingsStore.alerts.filter(
+        (alert) =>
+            alert.enabled &&
+            (settingsStore.alertsActive.includes(alert.uid) ||
+                settingsStore.alertsError.includes(alert.uid)),
+    ),
 )
 
 const startTour = (): void => {
@@ -458,10 +465,12 @@ const shortcutClasses =
                                 alertIsSilenced(alert) ? mdiBellSleepOutline : mdiBellRingOutline
                             "
                             :size="18"
-                            class="text-error"
+                            :class="getAlertStateClass(alert.state)"
                         />
                         <span class="text-text-color">{{ alert.name }}</span>
-                        <span class="text-sm text-error">{{ t('models.alertState.active') }}</span>
+                        <span class="text-sm" :class="getAlertStateClass(alert.state)">{{
+                            getAlertStateDisplayName(alert.state)
+                        }}</span>
                     </RouterLink>
                     <RouterLink :to="{ name: 'monitoring-alerts' }" :class="shortcutClasses">
                         <svg-icon type="mdi" :path="mdiBellOutline" :size="18" />
