@@ -672,6 +672,7 @@ export default {
             alertTriggered: 'Alert Triggered',
             alertRecovered: 'Alert Recovered',
             alertError: 'Alert Error',
+            alertSensorsReadable: 'Alert Sensors Readable',
             deleteAlertConfirm: 'Are you sure you want to delete: "{name}"?',
             saveAlert: 'Save Alert',
             channelSources: 'Channel Sources for Alert',

@@ -116,6 +116,9 @@ export const useSettingsStore = defineStore('settings', () => {
     const alerts: Ref<Array<Alert>> = ref([])
     const alertLogs: Ref<Array<AlertLog>> = ref([])
     const alertsActive: Ref<Array<UID>> = ref([])
+    // Error is its own state, not a flavour of Active: it means the alert cannot be
+    // trusted, which needs a persistent indicator of its own rather than going dark.
+    const alertsError: Ref<Array<UID>> = ref([])
 
     // A silence expires by the clock passing its timestamp, which is not something a
     // computed can depend on, so the badge below would stay cleared for a still-firing
@@ -142,14 +145,19 @@ export const useSettingsStore = defineStore('settings', () => {
     // the UI, and the daemon emits nothing on the wire for a steadily-Active alert
     // that becomes silenced or disabled, so push the derived state to Qt over IPC
     // instead of polling. `enabled` + not-silenced gate out muted alerts.
+    const clearAlertAttention = (alertUID: UID): void => {
+        for (const set of [alertsActive, alertsError]) {
+            const index = set.value.indexOf(alertUID)
+            if (index > -1) set.value.splice(index, 1)
+        }
+    }
+    const alertNeedsAttention = (alert: Alert, now: number): boolean =>
+        alert.enabled &&
+        (alertsActive.value.includes(alert.uid) || alertsError.value.includes(alert.uid)) &&
+        !alertIsSilencedAt(alert, now)
     const anyActiveUnsilencedAlert = computed((): boolean => {
         const now = silenceClock.value
-        return alerts.value.some(
-            (alert) =>
-                alert.enabled &&
-                alertsActive.value.includes(alert.uid) &&
-                !alertIsSilencedAt(alert, now),
-        )
+        return alerts.value.some((alert) => alertNeedsAttention(alert, now))
     })
     const pushTrayAlertState = (): void => {
         if (!deviceStore.isQtApp()) return
@@ -1107,11 +1115,11 @@ export const useSettingsStore = defineStore('settings', () => {
         console.debug('Loading Alerts')
         const alertsDTO = await deviceStore.daemonClient.loadAlertsAndLogs()
         alertsActive.value.length = 0
-        alertsDTO.alerts
-            .filter((alert) => alert.state === AlertState.Active)
-            .forEach((alert) => {
-                alertsActive.value.push(alert.uid)
-            })
+        alertsError.value.length = 0
+        for (const alert of alertsDTO.alerts) {
+            if (alert.state === AlertState.Active) alertsActive.value.push(alert.uid)
+            else if (alert.state === AlertState.Error) alertsError.value.push(alert.uid)
+        }
         alerts.value.length = 0
         alerts.value = alertsDTO.alerts
         alertLogs.value.length = 0
@@ -1205,8 +1213,7 @@ export const useSettingsStore = defineStore('settings', () => {
             // and panel counter consistent. Re-enabling is announced via SSE.
             if (!alert_to_update.enabled) {
                 alert_to_update.state = AlertState.Inactive
-                const activeIndex = alertsActive.value.indexOf(alertUID)
-                if (activeIndex > -1) alertsActive.value.splice(activeIndex, 1)
+                clearAlertAttention(alertUID)
             }
             toast.add({
                 severity: 'success',
@@ -1267,10 +1274,7 @@ export const useSettingsStore = defineStore('settings', () => {
             if (index > -1) {
                 alerts.value.splice(index, 1)
             }
-            const activeIndex = alertsActive.value.findIndex((uid) => uid === alertUID)
-            if (activeIndex > -1) {
-                alertsActive.value.splice(activeIndex, 1)
-            }
+            clearAlertAttention(alertUID)
             toast.add({
                 severity: 'success',
                 summary: t('common.success'),
@@ -1849,6 +1853,9 @@ export const useSettingsStore = defineStore('settings', () => {
         alerts,
         alertLogs,
         alertsActive,
+        alertsError,
+        alertNeedsAttention,
+        clearAlertAttention,
         anyActiveUnsilencedAlert,
         pushTrayAlertState,
         pushTrayPinnedSensors,

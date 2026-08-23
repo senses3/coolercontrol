@@ -9,6 +9,7 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { v4 as uuidV4 } from 'uuid'
 import {
     mdiAlert,
+    mdiAlertCircle,
     mdiBellOffOutline,
     mdiBellOutline,
     mdiBellPlusOutline,
@@ -330,18 +331,24 @@ const persistAlertOrder = (): void => {
         orderedAlerts.value.map((alert) => alert.uid),
     )
 }
-const activeAlertCount = computed(
-    () => settingsStore.alerts.filter((alert) => alert.state === AlertState.Active).length,
-)
+// Matches the header bell: Error needs attention too, and disabled or silenced
+// alerts are muted everywhere rather than only on the bell.
+const activeAlertCount = computed(() => {
+    const now = Date.now()
+    return settingsStore.alerts.filter((alert) => settingsStore.alertNeedsAttention(alert, now))
+        .length
+})
 // Menu glyph: shape encodes silenced/disabled, color keeps the live state
 // (silenced alerts still evaluate; a red sleep bell means firing-but-muted).
 const alertMenuIcon = (alert: Alert): string => {
     if (!alert.enabled) return mdiBellOffOutline
     if (alertIsSilenced(alert)) return mdiBellSleepOutline
+    if (alert.state === AlertState.Error) return mdiAlertCircle
     return alert.state === AlertState.Active ? mdiBellRingOutline : mdiBellOutline
 }
 const alertMenuIconClass = (alert: Alert): string => {
     if (!alert.enabled) return 'text-text-color-secondary'
+    if (alert.state === AlertState.Error) return 'text-warning'
     return alert.state === AlertState.Active ? 'text-error' : 'text-success'
 }
 // Keeps a row's hover actions visible while its tag popover is open.

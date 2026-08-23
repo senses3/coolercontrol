@@ -644,6 +644,7 @@ export default {
             alertTriggered: '警報觸發',
             alertRecovered: '警報已恢復',
             alertError: '警報錯誤',
+            alertSensorsReadable: '警報感測器已恢復讀取',
             deleteAlertConfirm: '您確定要刪除："{name}"嗎？',
             saveAlert: '保存警報',
             channelSources: '警報通道源',

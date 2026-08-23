@@ -666,6 +666,7 @@ export default {
             alertTriggered: '경고 발생함',
             alertRecovered: '경고 복구됨',
             alertError: '경고 오류',
+            alertSensorsReadable: '경고 센서 읽기 복구됨',
             deleteAlertConfirm: '다음을 삭제할까요: "{name}" 맞나요?',
             saveAlert: '경고 저장',
             channelSources: '경고 채널 소스',

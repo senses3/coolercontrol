@@ -19,7 +19,7 @@ import { HealthCheck } from '@/models/HealthCheck.ts'
 import { DaemonStatus, useDaemonState } from '@/stores/DaemonState.ts'
 import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { AlertLog, AlertState } from '@/models/Alert.ts'
+import { AlertLog, alertToast, AlertState } from '@/models/Alert.ts'
 import { DeviceHealthDTO, FailsafeDelta, SourceDelta } from '@/models/DeviceHealth.ts'
 import { TempInfo } from '@/models/TempInfo.ts'
 import { Emitter, EventType } from 'mitt'
@@ -915,52 +915,23 @@ export const useDeviceStore = defineStore('device', () => {
             if (foundAlert) {
                 foundAlert.state = alertMessage.state
             }
+            settingsStore.clearAlertAttention(alertMessage.uid)
             if (alertMessage.state === AlertState.Active) {
-                if (!settingsStore.alertsActive.includes(alertMessage.uid)) {
-                    settingsStore.alertsActive.push(alertMessage.uid)
-                }
-            } else {
-                const activeIndex = settingsStore.alertsActive.findIndex(
-                    (uid) => uid === alertMessage.uid,
-                )
-                if (activeIndex > -1) {
-                    settingsStore.alertsActive.splice(activeIndex, 1)
-                }
-            }
-            // A silenced state change still updates state; only the toast
-            // is muted. The toast tone follows the event, not just the
-            // aggregate state: a partial recovery of a multi-source
-            // alert arrives as resolved while the state stays Active.
-            if (alertMessage.silenced) return
-            if (alertMessage.resolved) {
-                toast.add({
-                    severity: 'info',
-                    summary: t('views.alerts.alertRecovered'),
-                    detail: `${alertMessage.name} - ${alertMessage.message}`,
-                    life: 3000,
-                })
+                settingsStore.alertsActive.push(alertMessage.uid)
             } else if (alertMessage.state === AlertState.Error) {
-                toast.add({
-                    severity: 'warn',
-                    summary: t('views.alerts.alertError'),
-                    detail: `${alertMessage.name} - ${alertMessage.message}`,
-                    life: 5000,
-                })
-            } else if (alertMessage.state === AlertState.Active) {
-                toast.add({
-                    severity: 'error',
-                    summary: t('views.alerts.alertTriggered'),
-                    detail: `${alertMessage.name} - ${alertMessage.message}`,
-                    life: 5000,
-                })
-            } else {
-                toast.add({
-                    severity: 'info',
-                    summary: t('views.alerts.alertRecovered'),
-                    detail: `${alertMessage.name} - ${alertMessage.message}`,
-                    life: 3000,
-                })
+                settingsStore.alertsError.push(alertMessage.uid)
             }
+            // A silenced change still updates state; only the toast is muted. So is a
+            // quiet one: that is a per-source detail on an alert whose own state did
+            // not move, such as a second sensor firing or one of several recovering.
+            const decision = alertToast(alertMessage)
+            if (decision == null) return
+            toast.add({
+                severity: decision.severity,
+                summary: t(decision.summaryKey),
+                detail: `${alertMessage.name} - ${alertMessage.message}`,
+                life: decision.life,
+            })
         }
 
         async function handleEvent(eventName: string, data: string): Promise<void> {

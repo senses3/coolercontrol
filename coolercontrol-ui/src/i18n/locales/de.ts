@@ -690,6 +690,7 @@ export default {
             alertTriggered: 'Warnung ausgelöst',
             alertRecovered: 'Warnung wiederhergestellt',
             alertError: 'Warnungsfehler',
+            alertSensorsReadable: 'Warnungssensoren wieder lesbar',
             deleteAlertConfirm: 'Sind Sie sicher, dass Sie löschen möchten: "{name}"?',
             saveAlert: 'Warnung speichern',
             channelSources: 'Kanalquellen für Warnung',
