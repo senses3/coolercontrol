@@ -69,6 +69,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: '搜尋裝置、感測器、設定和操作',
+                recent: '最近',
+                jumpTo: '跳至',
+                noResults: '找不到相符項目。',
+                more: '還有 {count} 項',
+                kindAction: '操作',
+                kindPage: '頁面',
+            },
             home: '首頁',
             cooling: '冷卻',
             monitoring: '監控',
@@ -929,6 +938,9 @@ export default {
             locations: '位置',
         },
         onboarding: {
+            search: '搜尋',
+            searchDesc:
+                '在這裡可以找到任何裝置、感測器、設定或操作。在應用程式的任何位置按 Ctrl+K 開啟。',
             welcome: '歡迎使用CoolerControl！',
             gettingStartedIntro: '透過快速導覽來熟悉應用。它會介紹導覽列和應用的主要區域。',
             startTourAgain: '您可以隨時從設定中重新開始此導覽。',

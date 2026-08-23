@@ -19,7 +19,7 @@ import {
     mdiOpenInNew,
     mdiSpeedometer,
 } from '@mdi/js'
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Emitter, EventType } from 'mitt'
 import type { RouteLocationRaw } from 'vue-router'
@@ -45,8 +45,7 @@ import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
 import { features } from '@/features'
 import StressTestsCard from '@/components/StressTestsCard.vue'
 import UiButton from '@/shell/ui/UiButton.vue'
-import HardwareReportModal from '@/shell/hardware/HardwareReportModal.vue'
-import DetectionModal from '@/shell/hardware/DetectionModal.vue'
+import { detectionOpen, hardwareReportOpen } from '@/shell/hardware/hardwareModals.ts'
 import { actionableFindings } from '@/shell/hardware/findings.ts'
 import { useHardwareText } from '@/shell/hardware/useHardwareText.ts'
 
@@ -261,8 +260,8 @@ const capabilityDetail = (verdict: ChannelVerdict): string => {
 
 // The report is useful even when nothing is wrong, so its button is not gated
 // on there being findings.
-const reportOpen = ref(false)
-const detectionOpen = ref(false)
+// Hoisted to shell level so the search palette can raise them from any page;
+// the buttons below set the same refs.
 
 const supportRows = computed((): Array<SupportRow> => {
     const rows: Array<SupportRow> = []
@@ -579,7 +578,7 @@ const shortcutClasses =
                         <UiButton size="sm" variant="outline" @click="detectionOpen = true">
                             {{ t('views.appInfo.detectionButton') }}
                         </UiButton>
-                        <UiButton size="sm" variant="outline" @click="reportOpen = true">
+                        <UiButton size="sm" variant="outline" @click="hardwareReportOpen = true">
                             {{ t('views.appInfo.hardwareReportButton') }}
                         </UiButton>
                     </div>
@@ -620,7 +619,4 @@ const shortcutClasses =
         </div>
         <div class="pb-8" />
     </div>
-
-    <HardwareReportModal v-model:open="reportOpen" />
-    <DetectionModal v-model:open="detectionOpen" />
 </template>

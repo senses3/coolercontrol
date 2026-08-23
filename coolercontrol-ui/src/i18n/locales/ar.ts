@@ -69,6 +69,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: 'ابحث عن الأجهزة والمستشعرات والإعدادات والإجراءات',
+                recent: 'الأخيرة',
+                jumpTo: 'الانتقال إلى',
+                noResults: 'لا توجد نتائج مطابقة.',
+                more: '{count} أخرى',
+                kindAction: 'الإجراءات',
+                kindPage: 'الصفحات',
+            },
             home: 'الرئيسية',
             cooling: 'التبريد',
             monitoring: 'المراقبة',
@@ -958,6 +967,9 @@ export default {
             locations: 'المواقع',
         },
         onboarding: {
+            search: 'البحث',
+            searchDesc:
+                'ابحث هنا عن أي جهاز أو مستشعر أو إعداد أو إجراء. اضغط Ctrl+K من أي مكان في التطبيق.',
             welcome: 'مرحبًا بك في CoolerControl!',
             gettingStartedIntro:
                 'قم بجولة سريعة للتعرف على التطبيق. تمر بشريط التنقل والأقسام الرئيسية في التطبيق.',

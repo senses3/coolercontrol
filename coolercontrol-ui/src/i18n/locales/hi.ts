@@ -70,6 +70,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: 'डिवाइस, सेंसर, सेटिंग्स और क्रियाएँ खोजें',
+                recent: 'हाल ही में',
+                jumpTo: 'यहाँ जाएँ',
+                noResults: 'कोई मिलान नहीं मिला।',
+                more: '{count} और',
+                kindAction: 'क्रियाएँ',
+                kindPage: 'पृष्ठ',
+            },
             home: 'होम',
             cooling: 'कूलिंग',
             monitoring: 'निगरानी',
@@ -965,6 +974,9 @@ export default {
             locations: 'स्थान',
         },
         onboarding: {
+            search: 'खोज',
+            searchDesc:
+                'यहाँ से कोई भी डिवाइस, सेंसर, सेटिंग या क्रिया खोजें। ऐप में कहीं से भी Ctrl+K दबाएँ।',
             welcome: 'CoolerControl में आपका स्वागत है!',
             gettingStartedIntro:
                 'परिचय के लिए एक त्वरित टूर लें। यह नेविगेशन बार और ऐप के मुख्य क्षेत्रों से परिचित कराता है।',
