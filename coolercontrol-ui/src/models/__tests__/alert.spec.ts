@@ -149,10 +149,8 @@ describe('Alert deserialization', () => {
     })
 })
 
-// Notifications follow the alert, not its individual sensors: only a log entry
-// that crossed an alert-level edge interrupts the user. The daemon marks the
-// rest `quiet`, and `state` alone cannot say which machine moved, since a
-// trigger arriving beside an unreadable sensor also carries state Error.
+// Only a log entry that crossed an alert-level edge interrupts the user, and
+// `state` alone cannot say which machine moved.
 describe('alertToast', () => {
     const log = (fields: Partial<AlertLog>): AlertLog =>
         plainToInstance(AlertLog, {
@@ -177,8 +175,7 @@ describe('alertToast', () => {
         // A second sensor going unreadable while the first still fires.
         const errored = log({ kind: AlertLogKind.Error, state: AlertState.Error })
         expect(alertToast(errored)?.summaryKey).toBe('views.alerts.alertError')
-        // A trigger arriving while another sensor sits in Error: same state, and
-        // the old state-only branch would have called this an error.
+        // Same state, but the old state-only branch called this an error.
         const triggered = log({ kind: AlertLogKind.Triggered, state: AlertState.Error })
         expect(alertToast(triggered)?.summaryKey).toBe('views.alerts.alertTriggered')
     })

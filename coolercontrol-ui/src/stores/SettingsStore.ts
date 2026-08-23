@@ -116,8 +116,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const alerts: Ref<Array<Alert>> = ref([])
     const alertLogs: Ref<Array<AlertLog>> = ref([])
     const alertsActive: Ref<Array<UID>> = ref([])
-    // Error is its own state, not a flavour of Active: it means the alert cannot be
-    // trusted, which needs a persistent indicator of its own rather than going dark.
+    // Error needs a persistent indicator of its own rather than going dark.
     const alertsError: Ref<Array<UID>> = ref([])
 
     // A silence expires by the clock passing its timestamp, which is not something a

@@ -331,9 +331,7 @@ const persistAlertOrder = (): void => {
         orderedAlerts.value.map((alert) => alert.uid),
     )
 }
-// The same set the header bell uses: Error needs attention too, disabled and
-// silenced alerts are muted, and an expiring silence updates the count because
-// the store's computed depends on its silence clock.
+// The same set the header bell uses, so an expiring silence updates both.
 const activeAlertCount = computed(() => settingsStore.alertsNeedingAttention.length)
 // Menu glyph: shape encodes silenced/disabled, color keeps the live state
 // (silenced alerts still evaluate; a red sleep bell means firing-but-muted).

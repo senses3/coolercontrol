@@ -207,8 +207,7 @@ impl Alert {
             .any(|state| state.visible() == AlertState::Error)
     }
 
-    /// Snapshot of both announcement machines. Taken before and after a tick's
-    /// source transitions; the difference is what may be announced.
+    /// Taken before and after a tick; the difference is what may be announced.
     fn machine_state(&self) -> MachineState {
         MachineState {
             active: self.any_source_visible_active(),
@@ -338,10 +337,8 @@ impl<'de> Deserialize<'de> for AlertState {
     }
 }
 
-/// What a log entry represents. Clients pick their wording from this: `state` is
-/// the worst of all sources, so it cannot say which of the two announcement
-/// machines moved. A trigger arriving while another source sits in Error carries
-/// `state: Error` and would otherwise be indistinguishable from an Error itself.
+/// What a log entry represents. `state` is the worst of all sources, so it cannot
+/// say which machine moved: a trigger beside an Error is `state: Error` too.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum AlertLogKind {
@@ -377,8 +374,7 @@ pub struct AlertLog {
     #[serde(default)]
     pub kind: AlertLogKind,
 
-    /// A per-source detail rather than an alert-level change; clients record it
-    /// but raise no toast.
+    /// A per-source detail, not an alert-level change: record it, raise no toast.
     #[serde(default)]
     pub quiet: bool,
 }
@@ -408,8 +404,7 @@ struct SourceOutcomes {
     /// Messages for sources currently Active; only collected when a silence-expiry
     /// catch-up, shutdown re-arm, or repeat notification could consume them.
     out_of_range: Vec<AlertLogMessage>,
-    /// Messages for sources currently unreadable; only collected when the Error
-    /// silence-expiry catch-up could consume them.
+    /// Only collected when the Error catch-up could consume them.
     unreadable: Vec<AlertLogMessage>,
     /// A calibration-suppression reset changed a source state this tick.
     suppressed: bool,
@@ -473,9 +468,8 @@ struct AlertEvent {
     quiet: bool,
 }
 
-/// The two independent announcement machines, evaluated over all source states.
-/// Active and Error are separate because Error means the alert cannot be trusted,
-/// which is worth announcing on its own even while the alert is firing.
+/// The two independent announcement machines over all source states. Error is
+/// separate because "cannot be trusted" is worth announcing while firing.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct MachineState {
     active: bool,
@@ -689,10 +683,8 @@ impl AlertController {
         self.save_alert_data_to_config().await
     }
 
-    /// Updates an existing Alert. Runtime state carries over per source, so an edit
-    /// never re-arms a source the user kept, and an edit that crosses an alert-level
-    /// edge is announced here because no later tick would: the tick loop only sees
-    /// per-source transitions, and the source that would transition is gone.
+    /// Runtime state carries over per source, so an edit never re-arms a kept source.
+    /// An edge crossed by the edit is announced here because no later tick would.
     pub async fn update(&self, mut alert: Alert) -> Result<()> {
         alert.normalize_sources();
         let announcement = {
@@ -724,9 +716,8 @@ impl AlertController {
         self.save_alert_data_to_config().await
     }
 
-    /// The event for an edit that crossed an alert-level edge, using the same machines
-    /// and the same notification gates as a tick. A disabled alert stays silent, as it
-    /// always has.
+    /// An edit that crossed an edge, using a tick's machines and gates.
+    /// A disabled alert stays silent, as it always has.
     fn build_edit_event(alert: &mut Alert, before: MachineState) -> Option<AlertEvent> {
         if alert.enabled.not() {
             return None;
@@ -786,10 +777,8 @@ impl AlertController {
         alert.shutdown_scheduled = existing_alert.shutdown_scheduled;
     }
 
-    /// Carries runtime state across a source-set edit. A source the user kept keeps
-    /// its state, so a live alarm is neither dropped nor made to warm up again; a
-    /// source they added starts Inactive. The aggregate then follows the survivors,
-    /// which is what clears an alert whose only firing source was removed.
+    /// A kept source keeps its state, an added one starts Inactive, and the aggregate
+    /// follows the survivors, which is what clears an alert whose firing source went.
     fn carry_surviving_source_states(alert: &mut Alert, existing_alert: &Alert) {
         debug_assert_eq!(
             existing_alert.channel_sources.len(),
@@ -1131,15 +1120,8 @@ impl AlertController {
         }
     }
 
-    /// The alert-level edge this tick crossed, if any. Two independent machines:
-    /// Active fires when any source goes Active and clears when none is, Error the
-    /// same for unreadable sources. Per-source transitions that cross no edge are
-    /// logged but never announced, which is what stops a second sensor firing (or a
-    /// single sensor recovering) from interrupting an episode already underway.
-    ///
-    /// Only one event exists per alert per tick, so simultaneous edges are ranked:
-    /// the worse news first, then the older news. A consumed Active edge is covered
-    /// by the resulting-state sentence the Error bodies carry.
+    /// The alert-level edge this tick crossed. Transitions crossing none are logged
+    /// but never announced; simultaneous edges rank worse news first.
     fn edge_kind(before: MachineState, after: MachineState) -> Option<AlertEventKind> {
         if after.error && before.error.not() {
             Some(AlertEventKind::SourceError)
@@ -1188,11 +1170,8 @@ impl AlertController {
                 fire_shutdown = true;
                 alert.shutdown_scheduled = true;
             }
-            // Deliberate: a countdown is cancelled only once no source is Active AND
-            // none is unreadable. Sensors going dark under thermal stress is not
-            // evidence the machine cooled down, and the last trustworthy reading said
-            // it was too hot. An unnecessary shutdown is an inconvenience; a skipped
-            // one is hardware damage.
+            // Deliberate: unreadable sensors do not cancel a countdown. Losing a
+            // sensor under thermal stress is not evidence the machine cooled down.
             if alert.shutdown_scheduled && after.active.not() && after.error.not() {
                 cancel_shutdown = true;
                 alert.shutdown_scheduled = false;
@@ -1274,14 +1253,8 @@ impl AlertController {
         })
     }
 
-    /// Re-announces an Error episode a lapsed silence would otherwise have buried.
-    /// Mirrors the `StillActive` catch-up: "I still cannot read your sensors" is as
-    /// true as "still too hot", and more consequential on a shutdown alert.
-    ///
-    /// Deliberately has no repeat counterpart. Unlike an Active state, an Error can
-    /// be permanent (a pulled GPU, a dGPU parked in d3cold), and repeating it would
-    /// notify forever with no user action short of editing the alert that could ever
-    /// clear it. Active states are self-limiting; the temperature comes back down.
+    /// Re-announces an Error a lapsed silence would have buried. Deliberately has no
+    /// repeat: an Error can be permanent and would notify forever, unlike an Active.
     fn build_error_catch_up(alert: &mut Alert, outcomes: &SourceOutcomes) -> Option<AlertEvent> {
         if alert.any_source_error().not() || alert.error_notified {
             return None;
@@ -1408,9 +1381,8 @@ impl AlertController {
         format!("{channel_label}: {value_rounded} is again within allowed range: {min} - {max}")
     }
 
-    /// Executes an event's side effects and, when it logs, records and broadcasts it.
-    /// The single path out of the alert engine: the tick loop and the edit path both
-    /// go through here so they cannot drift in wording or wire shape.
+    /// The single path out of the alert engine, so the tick and edit paths cannot
+    /// drift in wording or wire shape.
     fn dispatch_event(&self, event: &AlertEvent) {
         self.send_notifications(event);
         if event.log.not() {
@@ -1538,10 +1510,8 @@ impl AlertController {
         }
     }
 
-    /// Appends the alert's resulting state to an Error-machine notification body.
-    /// The Error machine outranks the Active one when both edge on the same tick, so
-    /// this sentence is how a consumed Active edge still reaches the user, and it is
-    /// the moment a pending shutdown is most worth mentioning.
+    /// Appends the resulting state to an Error body: the only way a consumed Active
+    /// edge reaches the user, and when a pending shutdown is worth mentioning.
     fn with_resulting_state(alert: &Alert, message: &str) -> String {
         let mut body = if message.is_empty() {
             String::new()
@@ -2033,9 +2003,8 @@ mod tests {
 
     #[test]
     fn build_transition_event_second_source_firing_stays_quiet() {
-        // Goal: a second sensor failing while the alert is already Active crosses
-        // no alert-level edge, so it is logged but never announced. Notifications
-        // follow the alert, not the individual sensors.
+        // Goal: a second sensor firing crosses no alert-level edge, so it is
+        // logged but never announced.
         let mut alert = make_alert("a", 0.0, 1000.0, AlertState::Active);
         alert.channel_sources = vec![
             make_source("fan1", ChannelMetric::RPM),
@@ -2250,8 +2219,7 @@ mod tests {
         // aggregate tracks each one.
         let mut alert = make_alert("a", 20.0, 80.0, AlertState::Error);
         alert.source_states = vec![AlertState::Error];
-        // The Error was already announced, as it would have been on the tick the
-        // source first became unreadable; otherwise the catch-up claims this tick.
+        // Already announced, as it would be on the tick it became unreadable.
         alert.error_notified = true;
         let quiet = SourceOutcomes::default();
 
@@ -2297,9 +2265,7 @@ mod tests {
 
     #[test]
     fn edge_kind_ranks_simultaneous_edges_worst_news_first() {
-        // Goal: only one event exists per alert per tick, so when both machines
-        // edge together the Error wins. The consumed Active edge is carried by the
-        // resulting-state sentence on the Error body.
+        // Goal: one event per tick, so simultaneous edges rank Error first.
         let quiet_before = machines(false, false);
         assert!(matches!(
             AlertController::edge_kind(quiet_before, machines(true, true)),
@@ -2325,9 +2291,8 @@ mod tests {
 
     #[test]
     fn an_error_beside_a_firing_source_does_not_disturb_the_active_machine() {
-        // Goal: the machines are independent. A source going unreadable while
-        // another fires announces the Error and leaves the Active episode alone,
-        // so no spurious trigger or recovery is produced.
+        // Goal: the machines are independent, so an Error beside a firing source
+        // produces no spurious trigger or recovery.
         let mut alert = make_edge_alert(AlertState::Active, AlertState::Error);
         alert.notified = true;
         let outcomes = SourceOutcomes {
@@ -2347,9 +2312,8 @@ mod tests {
 
     #[test]
     fn sensors_becoming_readable_announces_while_still_active() {
-        // Goal: the Error machine has its own clearing edge. Trust returning is
-        // worth announcing even though the alert is still firing, which is exactly
-        // when the user most wants to know.
+        // Goal: the Error machine has its own clearing edge, announced even
+        // while the alert is still firing.
         let mut alert = make_edge_alert(AlertState::Active, AlertState::Inactive);
         alert.notified = true;
         alert.error_notified = true;
@@ -2369,9 +2333,7 @@ mod tests {
 
     #[test]
     fn an_error_body_states_the_resulting_alert_state_and_countdown() {
-        // Goal: the Error machine outranks the Active one, so its body is how a
-        // consumed Active edge still reaches the user, and it is the moment a
-        // pending shutdown is most worth mentioning.
+        // Goal: the Error body carries the resulting state and the countdown.
         let mut alert = make_edge_alert(AlertState::Active, AlertState::Error);
         alert.shutdown_scheduled = true;
         let body = AlertController::with_resulting_state(&alert, "fan2: Device not found");
@@ -2388,8 +2350,7 @@ mod tests {
 
     #[test]
     fn a_pending_shutdown_survives_every_source_going_unreadable() {
-        // Goal: deliberate safety behaviour. Sensors going dark under thermal
-        // stress is not evidence the machine cooled down, so the countdown stands.
+        // Goal: deliberate safety behaviour, the countdown stands.
         let mut alert = make_edge_alert(AlertState::Error, AlertState::Error);
         alert.shutdown_on_activation = true;
         alert.shutdown_scheduled = true;
@@ -2410,9 +2371,8 @@ mod tests {
 
     #[test]
     fn the_error_catch_up_fires_after_silence_but_never_repeats() {
-        // Goal: a lapsed silence must not bury sensors we still cannot read. The
-        // catch-up announces once; it deliberately has no repeat counterpart
-        // because an Error can be permanent and would notify forever.
+        // Goal: the catch-up announces once and never repeats, because an
+        // Error can be permanent.
         let mut alert = make_edge_alert(AlertState::Error, AlertState::Inactive);
         alert.repeat_interval = 60.0;
         alert.last_notified = Some(Local::now() - Duration::seconds(600));
@@ -2636,9 +2596,8 @@ mod tests {
 
     #[test]
     fn an_edit_announces_only_when_it_crosses_an_edge() {
-        // Goal: the edit path uses the same two machines as a tick. Dropping a
-        // clear source moves nothing and stays silent; dropping the firing one
-        // crosses the Active machine's clearing edge and announces.
+        // Goal: the edit path uses a tick's machines, so only dropping the
+        // firing source announces.
         let mut alert = make_alert("a", 20.0, 80.0, AlertState::Inactive);
         alert.source_states = vec![AlertState::Inactive];
         assert!(
@@ -3105,10 +3064,8 @@ mod tests {
 
     #[test]
     fn dropping_the_firing_source_logs_a_recovery() {
-        // Goal: the originally reported bug, end to end through update(). The tick
-        // loop only announces per-source transitions, and the source that would
-        // transition is gone, so update() has to announce the edge itself or every
-        // client keeps showing an alert the daemon considers clear.
+        // Goal: the reported bug, end to end. No later tick can announce this,
+        // so update() must, or clients keep showing a cleared alert.
         crate::rt::test_runtime(async {
             let registry = Rc::new(DiagnosisRegistry::new());
             let device = make_test_device(&[("fan1", 0), ("fan2", 1200)], 30.0);

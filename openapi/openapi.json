@@ -6605,7 +6605,7 @@
             "type": "string"
           },
           "quiet": {
-            "description": "A per-source detail rather than an alert-level change; clients record it\n but raise no toast.",
+            "description": "A per-source detail, not an alert-level change: record it, raise no toast.",
             "type": "boolean",
             "default": false
           },
@@ -6638,7 +6638,7 @@
         ]
       },
       "AlertLogKind": {
-        "description": "What a log entry represents. Clients pick their wording from this: `state` is\n the worst of all sources, so it cannot say which of the two announcement\n machines moved. A trigger arriving while another source sits in Error carries\n `state: Error` and would otherwise be indistinguishable from an Error itself.",
+        "description": "What a log entry represents. `state` is the worst of all sources, so it cannot\n say which machine moved: a trigger beside an Error is `state: Error` too.",
         "oneOf": [
           {
             "type": "string",

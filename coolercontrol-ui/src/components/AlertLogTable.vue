@@ -39,8 +39,7 @@ const openAlert = (alertUID: string) => {
     router.push({ name: 'monitoring-alert', params: { alertUID } })
 }
 
-// Announced rows carry the live state colour; quiet rows are per-source detail on
-// an alert whose own state did not move, so they stay muted to keep the two apart.
+// Announced rows carry the live state colour; quiet per-source rows stay muted.
 const logStateClass = (log: AlertLog): string => {
     if (log.quiet) return 'text-text-color-secondary'
     switch (log.state) {

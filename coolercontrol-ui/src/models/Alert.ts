@@ -114,8 +114,7 @@ export function getAlertStateIcon(state: AlertState): string {
 }
 
 /** What a log entry represents. `state` is the worst of all sources, so it cannot
- *  say which of the two announcement machines moved: a trigger arriving while
- *  another source sits in Error carries `state: Error` too. */
+ *  say which machine moved: a trigger beside an Error is `state: Error` too. */
 export enum AlertLogKind {
     Triggered = 'triggered',
     StillActive = 'stillActive',
@@ -138,7 +137,7 @@ export class AlertLog {
     resolved: boolean = false
     /** What happened, independent of whether it interrupts the user. */
     kind: AlertLogKind = AlertLogKind.Unknown
-    /** A per-source detail rather than an alert-level change: record, do not toast. */
+    /** A per-source detail, not an alert-level change: record, do not toast. */
     quiet: boolean = false
 
     constructor(uid: UID, name: string, state: AlertState, message: string, timestamp: string) {
@@ -150,8 +149,7 @@ export class AlertLog {
     }
 }
 
-/** How a log entry should be surfaced, or null when it must not interrupt.
- *  Silenced and quiet entries still update state; only the toast is withheld. */
+/** How a log entry should be surfaced, or null when it must not interrupt. */
 export interface AlertToast {
     severity: 'error' | 'warn' | 'info'
     summaryKey: string

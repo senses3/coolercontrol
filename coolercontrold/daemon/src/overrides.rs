@@ -210,10 +210,8 @@ impl OverridesController {
             .unwrap_or_else(|| raw_name.to_owned())
     }
 
-    /// Resolves a channel display label. Layer order: override > detected > raw.
-    /// Used for user-facing text such as alert messages, so it carries the plain
-    /// label rather than the `Override (raw)` log form. Sanitized because these
-    /// strings also reach log lines and overrides arrive hand-edited.
+    /// Channel display label: override > detected > raw. Plain, not the
+    /// `Override (raw)` log form, and sanitized because it reaches log lines.
     pub fn resolve_channel_label(
         &self,
         device_uid: &DeviceUID,
@@ -682,8 +680,7 @@ mod tests {
 
     #[test]
     fn channel_labels_resolve_override_then_detected_then_raw() {
-        // Goal: user-facing text (alert messages) shows the same label the rest
-        // of the app shows, and never leaks control characters into log lines.
+        // Goal: alert text shows the app's label and leaks no control characters.
         crate::rt::test_runtime(async {
             let tmp = tempfile::tempdir().unwrap();
             let uid = DEVICE_UID.to_string();
@@ -707,8 +704,7 @@ mod tests {
                 "Coolant"
             );
 
-            // A detected label comes from sysfs unvalidated, and these strings
-            // reach log lines.
+            // A detected label comes from sysfs unvalidated.
             assert_eq!(
                 controller.resolve_channel_label(&uid, "temp2", Some("Pump\u{1b}[31m".to_string())),
                 "Pump[31m"

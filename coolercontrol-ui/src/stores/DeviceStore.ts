@@ -921,9 +921,7 @@ export const useDeviceStore = defineStore('device', () => {
             } else if (alertMessage.state === AlertState.Error) {
                 settingsStore.alertsError.push(alertMessage.uid)
             }
-            // A silenced change still updates state; only the toast is muted. So is a
-            // quiet one: that is a per-source detail on an alert whose own state did
-            // not move, such as a second sensor firing or one of several recovering.
+            // Silenced and quiet changes still update state; only the toast is muted.
             const decision = alertToast(alertMessage)
             if (decision == null) return
             toast.add({
