@@ -6,7 +6,12 @@
 <!-- Header trigger for the search palette. A button dressed as an input, never
      a real one: a real field would take the first keystroke, then lose it when
      the modal opened and moved focus. Collapses to an icon on mobile, where the
-     header has no room. -->
+     header has no room.
+
+     Styled as UiButton's outline variant at size md, so it sits level with the
+     Modes button beside it. bg-control rather than a tinted overlay:
+     surface-hover is itself an alpha wash (and 0.25 in the high-contrast
+     themes), so layering opacity on it washed the field out into a light slab. -->
 
 <script setup lang="ts">
 // @ts-ignore
@@ -44,7 +49,7 @@ const isMobile = computed(() => width.value < 768)
         id="shell-search"
         type="button"
         :aria-label="t('common.search')"
-        class="flex h-8 w-64 shrink-0 items-center gap-2 rounded-lg border border-transparent bg-surface-hover/60 px-2 text-left text-text-color-secondary outline-none transition-colors hover:border-border-one hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+        class="flex h-10 w-64 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-3 text-left text-text-color-secondary outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
         @click="openPalette"
     >
         <svg-icon type="mdi" :path="mdiMagnify" :size="deviceStore.getREMSize(1.1)" />
