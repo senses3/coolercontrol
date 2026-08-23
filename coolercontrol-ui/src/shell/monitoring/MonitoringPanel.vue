@@ -32,6 +32,7 @@ import { Dashboard } from '@/models/Dashboard.ts'
 import { Alert, alertIsSilenced, getAlertStateClass, getAlertStateIcon } from '@/models/Alert.ts'
 import { ChannelMetric } from '@/models/ChannelSource.ts'
 import { useFailAlert } from '@/composables/useFailAlert.ts'
+import { useDashboardActions } from '@/composables/useDashboardActions.ts'
 import CCColorPicker from '@/components/CCColorPicker.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
@@ -307,11 +308,8 @@ const persistDashboardOrder = (): void => {
     )
 }
 
-const addDashboard = (): void => {
-    const dashboard = new Dashboard(t('layout.shell.monitoringPanel.newDashboard'))
-    settingsStore.dashboards.push(dashboard)
-    router.push({ name: 'monitoring-dashboard', params: { dashboardUID: dashboard.uid } })
-}
+// Shared with the search palette so the two cannot drift.
+const { addDashboard } = useDashboardActions()
 
 const orderedAlerts = ref<typeof settingsStore.alerts>([])
 watchEffect(() => {

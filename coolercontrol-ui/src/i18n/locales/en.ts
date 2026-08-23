@@ -69,6 +69,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: 'Search devices, sensors, settings and actions',
+                recent: 'Recent',
+                jumpTo: 'Jump to',
+                noResults: 'No matches found.',
+                more: '{count} more',
+                kindAction: 'Actions',
+                kindPage: 'Pages',
+            },
             home: 'Home',
             cooling: 'Cooling',
             monitoring: 'Monitoring',
@@ -966,6 +975,9 @@ export default {
             locations: 'Locations',
         },
         onboarding: {
+            search: 'Search',
+            searchDesc:
+                'Find any device, sensor, setting or action from here. Press Ctrl+K from anywhere in the app.',
             welcome: 'Welcome to CoolerControl!',
             gettingStartedIntro:
                 'Take a quick tour to get oriented. It walks through the navigation rail and the main areas of the app.',

@@ -69,6 +69,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: '搜索设备、传感器、设置和操作',
+                recent: '最近',
+                jumpTo: '跳转到',
+                noResults: '未找到匹配项。',
+                more: '还有 {count} 项',
+                kindAction: '操作',
+                kindPage: '页面',
+            },
             home: '主页',
             cooling: '冷却',
             monitoring: '监控',
@@ -928,6 +937,9 @@ export default {
             locations: '位置',
         },
         onboarding: {
+            search: '搜索',
+            searchDesc:
+                '在这里可以找到任何设备、传感器、设置或操作。在应用的任何位置按 Ctrl+K 打开。',
             welcome: '欢迎使用CoolerControl！',
             gettingStartedIntro: '通过快速导览来熟悉应用。它会介绍导航栏和应用的主要区域。',
             startTourAgain: '您可以随时从设置中重新开始此导览。',

@@ -19,6 +19,10 @@ const ctrl = computed(() => t('views.shortcuts.ctrl'))
 // that work in the current mode.
 const rows = computed((): Array<{ label: string; keys: string[] }> => {
     const entries = [{ label: t('views.shortcuts.viewShortcuts'), keys: [ctrl.value, '/'] }]
+    // Simple mode has no palette, so it has no shortcut to document either.
+    if (!settingsStore.isSimpleMode) {
+        entries.unshift({ label: t('common.search'), keys: [ctrl.value, 'K'] })
+    }
     for (const [index, section] of hotkeySections(settingsStore.uiMode).entries()) {
         if (section.id === 'plugins' && deviceStore.plugins.length === 0) continue
         entries.push({ label: t(section.labelKey), keys: [ctrl.value, String(index + 1)] })

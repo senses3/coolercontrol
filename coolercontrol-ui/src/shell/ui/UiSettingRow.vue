@@ -4,9 +4,12 @@
 -->
 
 <script setup lang="ts">
-withDefaults(defineProps<{ label?: string; description?: string }>(), {
+// `id` anchors a row for deep links: the search palette routes to
+// /settings/<id> and AppSettings scrolls to and briefly rings it.
+withDefaults(defineProps<{ label?: string; description?: string; highlighted?: boolean }>(), {
     label: '',
     description: '',
+    highlighted: false,
 })
 </script>
 
@@ -14,7 +17,10 @@ withDefaults(defineProps<{ label?: string; description?: string }>(), {
     <!-- flex-wrap: when the label cannot fit beside the control (basis-40 is
          its minimum), the control drops to its own right-aligned line rather
          than ever overlapping the text. -->
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+    <div
+        class="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 transition-colors"
+        :class="highlighted ? 'rounded-md ring-2 ring-inset ring-accent' : ''"
+    >
         <div class="flex min-w-0 flex-1 basis-40 flex-col">
             <!-- Prop labels get a plain wrapping span (long text must wrap,
                  never overflow); slot labels get a flex row so icon+text

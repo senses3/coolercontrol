@@ -69,6 +69,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: 'デバイス、センサー、設定、操作を検索',
+                recent: '最近',
+                jumpTo: '移動',
+                noResults: '一致する項目がありません。',
+                more: '他 {count} 件',
+                kindAction: '操作',
+                kindPage: 'ページ',
+            },
             home: 'ホーム',
             cooling: '冷却',
             monitoring: 'モニタリング',
@@ -973,6 +982,9 @@ export default {
             locations: '場所',
         },
         onboarding: {
+            search: '検索',
+            searchDesc:
+                'デバイス、センサー、設定、操作をここから探せます。アプリのどこからでも Ctrl+K で開けます。',
             welcome: 'CoolerControlへようこそ！',
             gettingStartedIntro:
                 '簡単なツアーで概要を把握しましょう。ナビゲーションバーとアプリの主要な領域を案内します。',

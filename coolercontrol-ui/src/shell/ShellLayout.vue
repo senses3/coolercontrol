@@ -17,6 +17,11 @@ import { hotkeySections } from '@/shell/sections.ts'
 import hotkeys from 'hotkeys-js'
 import { useRouter } from 'vue-router'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
+import ShellSearchPalette from '@/shell/search/ShellSearchPalette.vue'
+import { openPalette } from '@/shell/search/palette.ts'
+import DetectionModal from '@/shell/hardware/DetectionModal.vue'
+import HardwareReportModal from '@/shell/hardware/HardwareReportModal.vue'
+import { detectionOpen, hardwareReportOpen } from '@/shell/hardware/hardwareModals.ts'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
@@ -85,16 +90,29 @@ hotkeys('ctrl+/,ctrl+shift+/', (event) => {
     event.preventDefault()
     openShortcutsDialog()
 })
+// Firefox and Chrome bind ctrl+k to the address bar, so preventDefault has to
+// win here; the header field is the mouse path when the page is not focused.
+// Simple mode has no palette, checked in the handler because the binding is
+// registered once, at setup.
+hotkeys('ctrl+k', (event) => {
+    if (settingsStore.isSimpleMode) return
+    event.preventDefault()
+    openPalette(true)
+})
 onUnmounted(() => {
     for (const combo of HOTKEY_SCOPES) hotkeys.unbind(combo)
     hotkeys.unbind('ctrl+,')
     hotkeys.unbind('ctrl+/,ctrl+shift+/')
+    hotkeys.unbind('ctrl+k')
 })
 </script>
 
 <template>
     <!--Mobile View-->
     <div v-if="isMobile" class="flex h-screen w-full flex-col bg-bg-two text-text-color">
+        <ShellSearchPalette />
+        <DetectionModal v-model:open="detectionOpen" />
+        <HardwareReportModal v-model:open="hardwareReportOpen" />
         <ShellHeader />
         <div class="min-h-0 flex-1 px-2 pb-2">
             <div class="h-full overflow-hidden rounded-lg border border-border-one bg-bg-one">
@@ -109,6 +127,9 @@ onUnmounted(() => {
     </div>
     <!--Desktop View-->
     <div v-else class="flex h-screen w-full flex-row bg-bg-two text-text-color">
+        <ShellSearchPalette />
+        <DetectionModal v-model:open="detectionOpen" />
+        <HardwareReportModal v-model:open="hardwareReportOpen" />
         <ShellRail />
         <div class="flex min-w-0 flex-1 flex-col pb-2 pr-2">
             <ShellHeader />

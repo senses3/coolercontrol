@@ -32,6 +32,7 @@ import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
 import ShellPowerMenuItems from '@/shell/ShellPowerMenuItems.vue'
+import ShellSearchField from '@/shell/search/ShellSearchField.vue'
 import { dropdownItemClass } from '@/shell/ui/dropdownItemClass.ts'
 
 const { t } = useI18n()
@@ -137,6 +138,10 @@ const isMobile = computed(() => width.value < 768)
                 />
             </RouterLink>
         </UiTooltip>
+        <!-- Fixed slot right after the bell rather than centred in the spacer,
+             so the field never shifts as the hostname or the mode name change
+             length. Simple mode has no palette. -->
+        <ShellSearchField v-if="!settingsStore.isSimpleMode" />
         <div class="flex-1" />
         <UiDropdownMenu v-if="!settingsStore.isSimpleMode">
             <template #trigger>

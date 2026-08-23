@@ -97,12 +97,27 @@ const ANCHOR_IDS: Record<string, string> = {
     '2': 'settings-desktop',
     desktop: 'settings-desktop',
 }
+// Rings the row a search result asked for, then clears itself. Same shape as
+// the device highlight in ManageSensorsView: instant scroll to centre, a 2.5s
+// ring, and an identity re-check so a second search cannot clear the first.
+const HIGHLIGHT_MS = 2500
+const highlightId = ref<string | null>(null)
+
+// An unknown param is a row anchor, not a card: it goes straight to
+// getElementById. Cards and rows scroll the same way, centred and instant, so
+// the page does not behave differently depending on what was searched.
 const scrollToSection = (tab: string | undefined): void => {
-    const id = ANCHOR_IDS[tab ?? '']
-    if (id == null) return
-    nextTick(() =>
-        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-    )
+    const id = ANCHOR_IDS[tab ?? ''] ?? tab
+    if (id == null || id === '') return
+    const isRow = id.startsWith('setting-')
+    nextTick(() => {
+        document.getElementById(id)?.scrollIntoView({ block: 'center' })
+        if (!isRow) return
+        highlightId.value = id
+        setTimeout(() => {
+            if (highlightId.value === id) highlightId.value = null
+        }, HIGHLIGHT_MS)
+    })
 }
 watch(
     () => route.params.tabNumber,
@@ -576,18 +591,27 @@ onUnmounted(() => {
                 class="break-inside-avoid"
                 :title="t('layout.settings.general')"
             >
-                <UiSettingRow>
+                <UiSettingRow
+                    id="setting-introduction"
+                    :highlighted="highlightId === 'setting-introduction'"
+                >
                     <template #label>{{ t('layout.settings.introduction') }}</template>
                     <UiButton class="w-full" @click="emitter.emit('start-tour')">{{
                         t('layout.settings.startTour')
                     }}</UiButton>
                 </UiSettingRow>
-                <UiSettingRow :label="t('views.shortcuts.shortcuts')">
+                <UiSettingRow
+                    id="setting-shortcuts"
+                    :highlighted="highlightId === 'setting-shortcuts'"
+                    :label="t('views.shortcuts.shortcuts')"
+                >
                     <UiButton variant="outline" class="w-full" @click="openShortcutsDialog()">{{
                         t('views.shortcuts.shortcuts')
                     }}</UiButton>
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-ui-mode"
+                    :highlighted="highlightId === 'setting-ui-mode'"
                     v-tooltip.top="t('layout.settings.tooltips.uiMode')"
                     :label="t('layout.settings.uiMode')"
                 >
@@ -600,6 +624,8 @@ onUnmounted(() => {
                 </UiSettingRow>
                 <!-- Simple mode always opens on Home, so the choice would do nothing. -->
                 <UiSettingRow
+                    id="setting-startup-page"
+                    :highlighted="highlightId === 'setting-startup-page'"
                     v-if="!settingsStore.isSimpleMode"
                     v-tooltip.top="t('layout.settings.tooltips.startupPage')"
                     :label="t('layout.settings.startupPage')"
@@ -610,11 +636,17 @@ onUnmounted(() => {
                         class="w-full"
                     />
                 </UiSettingRow>
-                <UiSettingRow v-tooltip.top="t('layout.settings.language')">
+                <UiSettingRow
+                    id="setting-language"
+                    :highlighted="highlightId === 'setting-language'"
+                    v-tooltip.top="t('layout.settings.language')"
+                >
                     <template #label>{{ t('layout.settings.language') }}</template>
                     <LanguageSwitcher />
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-full-screen"
+                    :highlighted="highlightId === 'setting-full-screen'"
                     v-tooltip.top="t('layout.settings.tooltips.fullScreen')"
                     :label="t('layout.settings.fullScreen')"
                 >
@@ -630,7 +662,11 @@ onUnmounted(() => {
                 class="break-inside-avoid"
                 :title="t('layout.settings.appearance')"
             >
-                <UiSettingRow v-tooltip.top="t('layout.settings.appearance')">
+                <UiSettingRow
+                    id="setting-theme-style"
+                    :highlighted="highlightId === 'setting-theme-style'"
+                    v-tooltip.top="t('layout.settings.appearance')"
+                >
                     <template #label>{{ t('layout.settings.themeStyle') }}</template>
                     <UiSelect
                         :model-value="settingsStore.themeMode"
@@ -653,6 +689,8 @@ onUnmounted(() => {
                     </UiSelect>
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-dashboard-line-size"
+                    :highlighted="highlightId === 'setting-dashboard-line-size'"
                     v-tooltip.top="t('layout.settings.tooltips.lineThickness')"
                     :label="t('layout.settings.dashboardLineSize')"
                 >
@@ -675,6 +713,8 @@ onUnmounted(() => {
                     </UiSelect>
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-time-format"
+                    :highlighted="highlightId === 'setting-time-format'"
                     v-tooltip.top="t('layout.settings.tooltips.timeFormat')"
                     :label="t('layout.settings.timeFormat')"
                 >
@@ -685,6 +725,8 @@ onUnmounted(() => {
                     </span>
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-frequency-precision"
+                    :highlighted="highlightId === 'setting-frequency-precision'"
                     v-tooltip.top="t('layout.settings.tooltips.frequencyPrecision')"
                     :label="t('layout.settings.frequencyPrecision')"
                 >
@@ -695,6 +737,8 @@ onUnmounted(() => {
                     </span>
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-eye-candy"
+                    :highlighted="highlightId === 'setting-eye-candy'"
                     v-tooltip.top="t('layout.settings.tooltips.eyeCandy')"
                     :label="t('layout.settings.eyeCandy')"
                 >
@@ -702,6 +746,8 @@ onUnmounted(() => {
                 </UiSettingRow>
                 <!-- Simple mode has no menu panel, so there is nothing to collapse. -->
                 <UiSettingRow
+                    id="setting-rail-to-collapse"
+                    :highlighted="highlightId === 'setting-rail-to-collapse'"
                     v-if="!settingsStore.isSimpleMode"
                     v-tooltip.top="t('layout.settings.tooltips.railToCollapse')"
                     :label="t('layout.settings.railToCollapse')"
@@ -709,6 +755,8 @@ onUnmounted(() => {
                     <UiSwitch v-model="settingsStore.hideMenuCollapseIcon" />
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-interface-font"
+                    :highlighted="highlightId === 'setting-interface-font'"
                     v-tooltip.top="t('layout.settings.tooltips.interfaceFont')"
                     :label="t('layout.settings.interfaceFont')"
                 >
@@ -727,6 +775,7 @@ onUnmounted(() => {
             >
                 <UiSettingRow
                     v-for="row in CUSTOM_THEME_ROWS"
+                    :id="`setting-theme-${row.key}`"
                     :key="row.key"
                     :label="t(`layout.settings.customTheme.${row.labelKey}`)"
                 >
@@ -795,6 +844,8 @@ onUnmounted(() => {
             >
                 <UiSettingGroup :title="t('layout.settings.groups.startup')">
                     <UiSettingRow
+                        id="setting-apply-on-startup"
+                        :highlighted="highlightId === 'setting-apply-on-startup'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.applySettingsOnStartup'),
@@ -804,6 +855,8 @@ onUnmounted(() => {
                         <UiSwitch v-model="settingsStore.ccSettings.apply_on_boot" />
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-device-startup-delay"
+                        :highlighted="highlightId === 'setting-device-startup-delay'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.deviceDelayAtStartup'),
@@ -832,6 +885,8 @@ onUnmounted(() => {
                 </UiSettingGroup>
                 <UiSettingGroup :title="t('layout.settings.groups.performance')">
                     <UiSettingRow
+                        id="setting-polling-rate"
+                        :highlighted="highlightId === 'setting-polling-rate'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.pollingRate'),
@@ -872,6 +927,8 @@ onUnmounted(() => {
                         </div>
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-compress-api-payload"
+                        :highlighted="highlightId === 'setting-compress-api-payload'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.compressApiPayload'),
@@ -899,6 +956,8 @@ onUnmounted(() => {
                 </UiSettingGroup>
                 <UiSettingGroup :title="t('layout.settings.groups.devices')">
                     <UiSettingRow
+                        id="setting-sensors-auto-detect"
+                        :highlighted="highlightId === 'setting-sensors-auto-detect'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.sensorsAutoDetect'),
@@ -924,6 +983,8 @@ onUnmounted(() => {
                         />
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-sensors-config"
+                        :highlighted="highlightId === 'setting-sensors-config'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.sensorsConfig'),
@@ -949,6 +1010,8 @@ onUnmounted(() => {
                         />
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-device-listener"
+                        :highlighted="highlightId === 'setting-device-listener'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.deviceListener'),
@@ -974,6 +1037,8 @@ onUnmounted(() => {
                         />
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-drive-power-state"
+                        :highlighted="highlightId === 'setting-drive-power-state'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.drivePowerState'),
@@ -1001,6 +1066,8 @@ onUnmounted(() => {
                 </UiSettingGroup>
                 <UiSettingGroup :title="t('layout.settings.groups.liquidctl')">
                     <UiSettingRow
+                        id="setting-liquidctl-integration"
+                        :highlighted="highlightId === 'setting-liquidctl-integration'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.liquidctlIntegration'),
@@ -1027,6 +1094,8 @@ onUnmounted(() => {
                         />
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-liquidctl-device-init"
+                        :highlighted="highlightId === 'setting-liquidctl-device-init'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.liquidctlDeviceInit'),
@@ -1039,6 +1108,8 @@ onUnmounted(() => {
                         />
                     </UiSettingRow>
                     <UiSettingRow
+                        id="setting-hide-duplicate-devices"
+                        :highlighted="highlightId === 'setting-hide-duplicate-devices'"
                         v-tooltip.top="{
                             escape: false,
                             value: t('layout.settings.tooltips.hideDuplicateDevices'),
@@ -1073,6 +1144,8 @@ onUnmounted(() => {
                 :title="t('layout.settings.desktop')"
             >
                 <UiSettingRow
+                    id="setting-start-in-tray"
+                    :highlighted="highlightId === 'setting-start-in-tray'"
                     v-tooltip.top="{
                         escape: false,
                         value: t('layout.settings.tooltips.startInTray'),
@@ -1082,6 +1155,8 @@ onUnmounted(() => {
                     <UiSwitch v-model="settingsStore.startInSystemTray" />
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-close-to-tray"
+                    :highlighted="highlightId === 'setting-close-to-tray'"
                     v-tooltip.top="{
                         escape: false,
                         value: t('layout.settings.tooltips.closeToTray'),
@@ -1091,6 +1166,8 @@ onUnmounted(() => {
                     <UiSwitch v-model="settingsStore.closeToSystemTray" />
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-zoom"
+                    :highlighted="highlightId === 'setting-zoom'"
                     v-tooltip.top="{
                         escape: false,
                         value: t('layout.settings.tooltips.zoom'),
@@ -1106,6 +1183,8 @@ onUnmounted(() => {
                     />
                 </UiSettingRow>
                 <UiSettingRow
+                    id="setting-desktop-startup-delay"
+                    :highlighted="highlightId === 'setting-desktop-startup-delay'"
                     v-tooltip.top="{
                         escape: false,
                         value: t('layout.settings.tooltips.desktopStartupDelay'),

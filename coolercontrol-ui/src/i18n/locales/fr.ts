@@ -72,6 +72,15 @@ export default {
     },
     layout: {
         shell: {
+            search: {
+                hint: 'Rechercher des appareils, capteurs, paramètres et actions',
+                recent: 'Récent',
+                jumpTo: 'Aller à',
+                noResults: 'Aucun résultat.',
+                more: '{count} de plus',
+                kindAction: 'Actions',
+                kindPage: 'Pages',
+            },
             home: 'Accueil',
             cooling: 'Refroidissement',
             monitoring: 'Surveillance',
@@ -994,6 +1003,9 @@ export default {
             locations: 'Emplacements',
         },
         onboarding: {
+            search: 'Recherche',
+            searchDesc:
+                "Trouvez ici n'importe quel appareil, capteur, paramètre ou action. Appuyez sur Ctrl+K depuis n'importe où dans l'application.",
             welcome: 'Bienvenue dans CoolerControl !',
             gettingStartedIntro:
                 "Faites une visite rapide pour vous orienter. Elle parcourt la barre de navigation et les principales zones de l'application.",
