@@ -6589,14 +6589,28 @@
       "AlertLog": {
         "type": "object",
         "properties": {
+          "kind": {
+            "description": "What happened, independent of whether it interrupts the user.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertLogKind"
+              }
+            ],
+            "default": "unknown"
+          },
           "message": {
             "type": "string"
           },
           "name": {
             "type": "string"
           },
+          "quiet": {
+            "description": "A per-source detail rather than an alert-level change; clients record it\n but raise no toast.",
+            "type": "boolean",
+            "default": false
+          },
           "resolved": {
-            "description": "The change was a source recovery; clients toast it as informational\n even when other sources keep the alert Active.",
+            "description": "DEPRECATED: derivable from `kind`. Still written for downgrade compatibility.",
             "type": "boolean",
             "default": false
           },
@@ -6622,6 +6636,26 @@
           "state",
           "message",
           "timestamp"
+        ]
+      },
+      "AlertLogKind": {
+        "description": "What a log entry represents. Clients pick their wording from this: `state` is\n the worst of all sources, so it cannot say which of the two announcement\n machines moved. A trigger arriving while another source sits in Error carries\n `state: Error` and would otherwise be indistinguishable from an Error itself.",
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "triggered",
+              "stillActive",
+              "resolved",
+              "error",
+              "errorResolved"
+            ]
+          },
+          {
+            "description": "Written before this field existed; clients fall back to `state`.",
+            "type": "string",
+            "const": "unknown"
+          }
         ]
       },
       "AlertPath": {
