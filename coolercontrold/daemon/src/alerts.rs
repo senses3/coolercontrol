@@ -773,6 +773,7 @@ impl AlertController {
             .source_states
             .clone_from(&existing_alert.source_states);
         alert.notified = existing_alert.notified;
+        alert.error_notified = existing_alert.error_notified;
         alert.last_notified = existing_alert.last_notified;
         alert.shutdown_scheduled = existing_alert.shutdown_scheduled;
     }
@@ -2644,6 +2645,39 @@ mod tests {
         assert!(alert.notified);
         assert_eq!(alert.last_notified, existing_alert.last_notified);
         assert!(alert.shutdown_scheduled);
+    }
+
+    #[test]
+    fn carry_runtime_state_preserves_an_announced_error() {
+        // Goal: an unrelated edit while a sensor is unreadable must not re-arm the
+        // Error catch-up, which has no repeat by design, nor lose the recovery.
+        let mut existing_alert = make_edge_alert(AlertState::Error, AlertState::Inactive);
+        existing_alert.error_notified = true;
+        let mut alert = make_edge_alert(AlertState::Error, AlertState::Inactive);
+        alert.name = "renamed".to_string();
+        alert.error_notified = false;
+
+        AlertController::carry_runtime_state(&mut alert, &existing_alert);
+
+        assert!(alert.error_notified);
+        let outcomes = SourceOutcomes {
+            unreadable: vec!["fan1: Device not found".to_string()],
+            ..Default::default()
+        };
+        assert!(
+            AlertController::build_quiet_event(&mut alert, &outcomes).is_none(),
+            "an edit must not re-announce an Error the user was already told about"
+        );
+
+        let before = alert.machine_state();
+        alert.source_states = vec![AlertState::Inactive; 2];
+        alert.state = alert.worst_of_visible();
+        let event = AlertController::build_edit_event(&mut alert, before).unwrap();
+        assert!(matches!(event.kind, AlertEventKind::ErrorResolved));
+        assert!(
+            event.notify_desktop,
+            "the recovery still announces because the Error was carried"
+        );
     }
 
     #[test]
