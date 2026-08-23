@@ -3,8 +3,8 @@
 
 use crate::api::{
     alerts, auth, base, calibration, custom_sensors, detect, device_health, functions,
-    hardware_report, metrics, modes, plugins, profile_generation, profiles, settings, sse, stats,
-    status, stress_test, tokens,
+    hardware_report, metrics, modes, plugins, power_profiles, profile_generation, profiles,
+    settings, sse, stats, status, stress_test, tokens,
 };
 use crate::api::{devices, AppState};
 #[cfg(debug_assertions)]
@@ -44,6 +44,7 @@ pub fn documented_routes() -> ApiRouter<AppState> {
         .merge(function_routes())
         .merge(custom_sensor_routes())
         .merge(mode_routes())
+        .merge(power_profile_routes())
         .merge(settings_routes())
         .merge(plugins_routes())
         .merge(alert_routes())
@@ -666,6 +667,41 @@ fn custom_sensor_routes() -> ApiRouter<AppState> {
                 o.summary("Save Custom Sensor Order")
                     .description("Saves the order of the Custom Sensors as given.")
                     .tag("custom-sensor")
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
+        )
+}
+
+/// The system power profile integration: what the system offers, and which Mode each profile
+/// activates. Reads need only read access; changing the mapping is a write.
+fn power_profile_routes() -> ApiRouter<AppState> {
+    ApiRouter::new()
+        .api_route(
+            "/power-profiles",
+            get_with(power_profiles::get, |o| {
+                o.summary("Retrieve Power Profile State")
+                    .description(
+                        "Returns the power profiles the system offers, the active one, and the \
+                         profile to Mode mapping. An empty `available` list means no power \
+                         profile daemon is reachable over D-Bus.",
+                    )
+                    .tag("power-profile")
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_middleware)),
+        )
+        .api_route(
+            "/power-profiles/modes",
+            put_with(power_profiles::update_modes, |o| {
+                o.summary("Set Power Profile Mode Mapping")
+                    .description(
+                        "Replaces the mapping of system power profile to Mode. Every referenced \
+                         Mode must exist. Profiles left out are unmapped.",
+                    )
+                    .tag("power-profile")
                     .security_requirement("CookieAuth")
                     .security_requirement("BearerAuth")
             })
@@ -1518,8 +1554,8 @@ fn sse_routes() -> ApiRouter<AppState> {
                         "Subscribes to every event stream on one connection. Optional \
                          `events` query parameter narrows the subscription to a \
                          comma-separated subset of: status, health, logs, modes, alerts, \
-                         notifications. Prefer this over the per-stream endpoints: browsers \
-                         cap concurrent connections per origin over HTTP/1.1.",
+                         notifications, system. Prefer this over the per-stream endpoints: \
+                         browsers cap concurrent connections per origin over HTTP/1.1.",
                     )
                     .tag("sse")
                     .response::<200, sse::SseStream>()

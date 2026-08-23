@@ -9,6 +9,7 @@ use crate::api::{AppState, CCError};
 use crate::device_health::{DeviceHealthDto, FailsafeDelta, HealthEvent, SourceDelta};
 use crate::logger::LogBufHandle;
 use crate::notifier::{DesktopNotification, NotificationHandle};
+use crate::system_event::{SystemEvent, SystemEventHandle};
 use aide::generate::GenContext;
 use aide::openapi::{Example, MediaType, Operation, ReferenceOr, Response, SchemaObject};
 use aide::operation::OperationOutput;
@@ -70,6 +71,8 @@ pub enum SseEvent {
     Alert(AlertLog),
     /// A desktop notification for the client to display.
     Notification(DesktopNotification),
+    /// A change in observed system state, discriminated by its `kind`.
+    System(SystemEvent),
 }
 
 impl From<SseEvent> for Event {
@@ -85,6 +88,7 @@ impl From<SseEvent> for Event {
             SseEvent::Mode(payload) => json_event("mode", &payload),
             SseEvent::Alert(payload) => json_event("alert", &payload),
             SseEvent::Notification(payload) => json_event("notification", &payload),
+            SseEvent::System(payload) => json_event("system", &payload),
         }
     }
 }
@@ -192,6 +196,14 @@ fn wire_examples() -> IndexMap<String, ReferenceOr<Example>> {
             ),
         ),
         (
+            "system".to_string(),
+            sample(
+                "System state changed outside CoolerControl",
+                "event: system\ndata: {\"kind\":\"power_profile\",\
+                 \"value\":\"performance\",\"previous\":\"balanced\"}\n\n",
+            ),
+        ),
+        (
             "keep-alive".to_string(),
             sample(
                 "Sent only when the subscription has been idle; ignore it",
@@ -211,17 +223,19 @@ pub enum Substream {
     Modes,
     Alerts,
     Notifications,
+    System,
 }
 
 impl Substream {
     /// Every substream, the default when `?events=` is absent.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Status,
         Self::Health,
         Self::Logs,
         Self::Modes,
         Self::Alerts,
         Self::Notifications,
+        Self::System,
     ];
 
     fn parse(token: &str) -> Option<Self> {
@@ -232,6 +246,7 @@ impl Substream {
             "modes" => Some(Self::Modes),
             "alerts" => Some(Self::Alerts),
             "notifications" => Some(Self::Notifications),
+            "system" => Some(Self::System),
             _ => None,
         }
     }
@@ -270,7 +285,7 @@ fn parse_substreams(events: Option<&str>) -> Result<Vec<Substream>, CCError> {
         let substream = Substream::parse(token).ok_or_else(|| CCError::UserError {
             msg: format!(
                 "Unknown SSE event stream: '{token}'. \
-                 Valid values: status, health, logs, modes, alerts, notifications"
+                 Valid values: status, health, logs, modes, alerts, notifications, system"
             ),
         })?;
         if selected.contains(&substream).not() {
@@ -296,6 +311,7 @@ fn sse_response(app_state: &AppState, selected: &[Substream]) -> SseResponse {
             Substream::Modes => mode_stream(&app_state.mode_handle),
             Substream::Alerts => alert_stream(&app_state.alert_handle),
             Substream::Notifications => notification_stream(&app_state.notification_handle),
+            Substream::System => system_stream(&app_state.system_event_handle),
         });
     }
     NoApi(Sse::new(select_all(streams)).keep_alive(
@@ -418,10 +434,20 @@ fn notification_stream(notification_handle: &NotificationHandle) -> EventStream 
     Box::pin(stream)
 }
 
+fn system_stream(system_event_handle: &SystemEventHandle) -> EventStream {
+    let cancel_token = system_event_handle.cancel_token();
+    let stream = BroadcastStream::new(system_event_handle.broadcaster().subscribe())
+        .take_until(async move { cancel_token.cancelled().await })
+        .filter_map(|result| async { result.ok() })
+        .map(|event| Ok(SseEvent::System(event).into()));
+    Box::pin(stream)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::notifier::NotificationIcon;
+    use crate::system_event::SystemEventKind;
 
     use tokio_util::sync::CancellationToken;
 
@@ -453,6 +479,11 @@ mod tests {
                 audio: false,
                 urgency: 1,
             }),
+            SseEvent::System(SystemEvent {
+                kind: SystemEventKind::PowerProfile,
+                value: "balanced".to_string(),
+                previous: None,
+            }),
         ];
         for event in &all {
             // Exhaustiveness check only; the compiler rejects a missing variant here.
@@ -465,7 +496,8 @@ mod tests {
                 | SseEvent::Log(_)
                 | SseEvent::Mode(_)
                 | SseEvent::Alert(_)
-                | SseEvent::Notification(_) => {}
+                | SseEvent::Notification(_)
+                | SseEvent::System(_) => {}
             }
         }
         all
@@ -519,6 +551,7 @@ mod tests {
                 "mode",
                 "alert",
                 "notification",
+                "system",
             ]
         );
     }
@@ -554,7 +587,13 @@ mod tests {
             ("modes", Substream::Modes),
             ("alerts", Substream::Alerts),
             ("notifications", Substream::Notifications),
+            ("system", Substream::System),
         ];
+        assert_eq!(
+            cases.len(),
+            Substream::ALL.len(),
+            "every substream needs a token case here"
+        );
         for (token, expected) in cases {
             let selected = parse_substreams(Some(token)).expect("token is valid");
             assert_eq!(selected, vec![expected], "token '{token}' mis-mapped");

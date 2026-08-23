@@ -5,7 +5,7 @@ use crate::api::actor::{run_api_actor, ApiActor};
 use crate::api::settings::{CoolerControlDeviceSettingsDto, CoolerControlSettingsDto};
 use crate::api::CCError;
 use crate::config::Config;
-use crate::device::{ChannelName, DeviceInfo, DeviceName, DeviceType, DeviceUID};
+use crate::device::{ChannelName, DeviceInfo, DeviceName, DeviceType, DeviceUID, UID};
 use crate::overrides::{OverridesController, OverridesDocument};
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, CoolerControlSettings, CustomSensor, DeviceExtensions,
@@ -35,6 +35,10 @@ enum SettingMessage {
     },
     UpdateCC {
         update: CoolerControlSettingsDto,
+        respond_to: oneshot::Sender<Result<()>>,
+    },
+    SetPowerProfileModes {
+        modes: HashMap<String, UID>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     GetAllCCDevices {
@@ -216,6 +220,14 @@ impl ApiActor<SettingMessage> for SettingActor {
                     let current_settings = self.config.get_settings()?;
                     let settings_to_set = update.merge(current_settings);
                     self.config.set_settings(&settings_to_set);
+                    self.config.save_config_file().await
+                }
+                .await;
+                let _ = respond_to.send(result);
+            }
+            SettingMessage::SetPowerProfileModes { modes, respond_to } => {
+                let result = async {
+                    self.config.set_power_profile_modes(&modes);
                     self.config.save_config_file().await
                 }
                 .await;
@@ -458,6 +470,18 @@ impl SettingHandle {
         let (tx, rx) = oneshot::channel();
         let msg = SettingMessage::UpdateCC {
             update,
+            respond_to: tx,
+        };
+        let _ = self.sender.send(msg).await;
+        rx.await?
+    }
+
+    /// Persists the power profile to Mode mapping. Goes through the actor so the config write is
+    /// serialized with every other settings write.
+    pub async fn set_power_profile_modes(&self, modes: HashMap<String, UID>) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        let msg = SettingMessage::SetPowerProfileModes {
+            modes,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;

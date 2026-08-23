@@ -3368,6 +3368,88 @@
         ]
       }
     },
+    "/power-profiles": {
+      "get": {
+        "tags": [
+          "power-profile"
+        ],
+        "summary": "Retrieve Power Profile State",
+        "description": "Returns the power profiles the system offers, the active one, and the profile to Mode mapping. An empty `available` list means no power profile daemon is reachable over D-Bus.",
+        "responses": {
+          "200": {
+            "description": "A point-in-time view of the power profile integration, for API consumers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PowerProfileSnapshot"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
+    "/power-profiles/modes": {
+      "put": {
+        "tags": [
+          "power-profile"
+        ],
+        "summary": "Set Power Profile Mode Mapping",
+        "description": "Replaces the mapping of system power profile to Mode. Every referenced Mode must exist. Profiles left out are unmapped.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PowerProfileModesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "no content"
+          },
+          "400": {
+            "description": "Bad Request. The request is invalid"
+          },
+          "401": {
+            "description": "Unauthorized. Invalid credentials were provided."
+          },
+          "403": {
+            "description": "Forbidden. Insufficient permissions."
+          },
+          "404": {
+            "description": "Whatever you're looking for, it's not here."
+          },
+          "500": {
+            "description": "An internal error has occurred."
+          },
+          "429": {
+            "description": "Too Many Requests. Login attempts have been rate limited."
+          },
+          "502": {
+            "description": "Bad Gateway. An error has occurred with an external library."
+          }
+        },
+        "security": [
+          {
+            "CookieAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ]
+      }
+    },
     "/settings": {
       "get": {
         "tags": [
@@ -6233,7 +6315,7 @@
           "sse"
         ],
         "summary": "Server Sent Events",
-        "description": "Subscribes to every event stream on one connection. Optional `events` query parameter narrows the subscription to a comma-separated subset of: status, health, logs, modes, alerts, notifications. Prefer this over the per-stream endpoints: browsers cap concurrent connections per origin over HTTP/1.1.",
+        "description": "Subscribes to every event stream on one connection. Optional `events` query parameter narrows the subscription to a comma-separated subset of: status, health, logs, modes, alerts, notifications, system. Prefer this over the per-stream endpoints: browsers cap concurrent connections per origin over HTTP/1.1.",
         "parameters": [
           {
             "in": "query",
@@ -6302,6 +6384,10 @@
                   "notification": {
                     "summary": "A desktop notification to display",
                     "value": "event: notification\ndata: {\"title\":\"CoolerControl\",\"body\":\"CPU too hot\",\"icon\":\"triggered\",\"audio\":true,\"urgency\":2}\n\n"
+                  },
+                  "system": {
+                    "summary": "System state changed outside CoolerControl",
+                    "value": "event: system\ndata: {\"kind\":\"power_profile\",\"value\":\"performance\",\"previous\":\"balanced\"}\n\n"
                   },
                   "keep-alive": {
                     "summary": "Sent only when the subscription has been idle; ignore it",
@@ -9874,6 +9960,52 @@
           "plugins"
         ]
       },
+      "PowerProfileModesDto": {
+        "type": "object",
+        "properties": {
+          "modes": {
+            "description": "Power profile name to Mode UID. Profiles left out are unmapped and are ignored when the\n system switches to them.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "modes"
+        ]
+      },
+      "PowerProfileSnapshot": {
+        "description": "A point-in-time view of the power profile integration, for API consumers.",
+        "type": "object",
+        "properties": {
+          "active": {
+            "description": "The profile currently in effect, if one has been observed.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "available": {
+            "description": "Profiles the system daemon offers. Empty when no power profile daemon is present, which\n is how a client knows to hide the feature.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "modes": {
+            "description": "Profile name to Mode UID. Profiles absent here are deliberately unmapped.",
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "available",
+          "modes"
+        ]
+      },
       "Preset": {
         "description": "The noise/performance tradeoff applied to a generated profile.",
         "type": "string",
@@ -10591,6 +10723,23 @@
               "event",
               "data"
             ]
+          },
+          {
+            "description": "A change in observed system state, discriminated by its `kind`.",
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/SystemEvent"
+              },
+              "event": {
+                "type": "string",
+                "const": "system"
+              }
+            },
+            "required": [
+              "event",
+              "data"
+            ]
           }
         ]
       },
@@ -10947,6 +11096,38 @@
         },
         "required": [
           "name"
+        ]
+      },
+      "SystemEvent": {
+        "description": "A change in observed system state, broadcast to connected clients via SSE.\n\n The daemon reports what changed; clients decide what to do about it. `previous` is `None` for\n the first observation after the daemon connects to the source.",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SystemEventKind"
+          },
+          "previous": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ]
+      },
+      "SystemEventKind": {
+        "description": "What kind of system state the event describes.\n\n This exists so external consumers can subscribe to one stream and dispatch on `kind` rather\n than needing a new event name, and a new SSE substream, per integration.",
+        "oneOf": [
+          {
+            "description": "The system power profile, as reported by `power-profiles-daemon` or `tuned-ppd`.",
+            "type": "string",
+            "const": "power_profile"
+          }
         ]
       },
       "SystemFinding": {

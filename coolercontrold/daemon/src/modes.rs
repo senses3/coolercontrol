@@ -61,6 +61,15 @@ impl ModeController {
         self.mode_handle.replace(Some(mode_handle));
     }
 
+    /// The `ModeHandle`, once the API has set it. `None` before `start_server` has run.
+    ///
+    /// The handle is `Send` while the controller is not, so this is how off-thread callers such
+    /// as the power profile listener activate a Mode through the actor rather than reaching into
+    /// the controller directly.
+    pub fn mode_handle(&self) -> Option<ModeHandle> {
+        self.mode_handle.borrow().clone()
+    }
+
     /// Apply all saved device settings to the devices if the `apply_on_boot` setting is true
     pub async fn handle_settings_at_boot(&self) {
         if self

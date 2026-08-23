@@ -160,6 +160,17 @@ drivetemp_suspend = false
 # Disable this in containers or environments without netlink socket access.
 # device_listener_enabled = true
 
+# Power profile to Mode mapping:
+# When the system power profile changes, CoolerControl activates the Mode mapped to the new
+# profile. The profile is read over D-Bus from power-profiles-daemon or the tuned-ppd shim;
+# TLP does not expose one. Profiles left unmapped are ignored, and the mapping is also editable
+# from the Modes page in the UI. Every change is published on the SSE "system" event whether or
+# not a Mode is mapped.
+# [power_profile_modes]
+# power-saver = "<mode uid>"
+# balanced = "<mode uid>"
+# performance = "<mode uid>"
+
 # CoolerControl Device settings Example:
 # [settings.4b9cd1bc5fb2921253e6b7dd5b1b011086ea529d915a86b3560c236084452807]
 # disabled = true

@@ -55,12 +55,14 @@ mod modes;
 mod notifier;
 mod overrides;
 mod paths;
+mod power_profile_listener;
 mod repositories;
 mod rt;
 mod sensors_conf;
 mod setting;
 mod sidecar;
 mod sleep_listener;
+mod system_event;
 mod token;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -395,6 +397,9 @@ fn main() -> Result<()> {
                     main_scope,
                 );
                 let notification_handle = notifier::NotificationHandle::new(run_token.clone());
+                let system_event_handle = system_event::SystemEventHandle::new(run_token.clone());
+                let power_profiles =
+                    power_profile_listener::PowerProfiles::new(config.get_power_profile_modes());
                 alert_controller.set_notification_handle(notification_handle.clone());
                 engine.set_notification_handle(notification_handle.clone());
                 engine.set_alert_gate(alert_controller.clone());
@@ -430,6 +435,8 @@ fn main() -> Result<()> {
                     log_buf_handle,
                     status_handle.clone(),
                     notification_handle,
+                    system_event_handle.clone(),
+                    power_profiles.clone(),
                     run_token.clone(),
                     main_scope,
                 )
@@ -437,6 +444,16 @@ fn main() -> Result<()> {
                 {
                     Ok(()) => api_up_token.cancel(),
                     Err(err) => error!("Error initializing API Server: {err}"),
+                }
+                // Started after the API so the ModeHandle exists; the listener activates Modes
+                // through the actor rather than the !Send controller.
+                if let Some(mode_handle) = mode_controller.mode_handle() {
+                    power_profile_listener::start(
+                        system_event_handle,
+                        mode_handle,
+                        power_profiles,
+                        run_token.clone(),
+                    );
                 }
 
                 // give concurrent services a moment to finish initializing:
