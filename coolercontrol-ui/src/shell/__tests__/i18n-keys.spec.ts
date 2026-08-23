@@ -11,6 +11,7 @@ import en from '@/i18n/locales/en.ts'
 import { TOUR_KEY_PREFIX, TOUR_STEPS } from '@/shell/tour.ts'
 import { SENSOR_LINK_KINDS } from '@/shell/devices/devices.ts'
 import { CHAIN_PILL_KINDS } from '@/shell/cooling/channels.ts'
+import { POWER_PROFILE_NAMES } from '@/shell/cooling/powerProfiles.ts'
 
 const shellFiles = import.meta.glob('../**/*.{ts,vue}', {
     query: '?raw',
@@ -109,6 +110,24 @@ describe('shell i18n keys', () => {
             }
         }
         expect(stale).toEqual([])
+    })
+
+    // ModesPage builds the profile label key as a template literal from whatever the daemon
+    // reports, so the static sweep cannot see these three. A locale missing one shows the
+    // english word beside translated ones, which reads as a bug rather than a gap.
+    it('resolves every power profile name key in every locale', () => {
+        const locales = Object.entries(localeFiles).filter(([path]) => !path.endsWith('.d.ts'))
+        expect(locales).toHaveLength(LOCALE_COUNT)
+        expect(POWER_PROFILE_NAMES.length).toBeGreaterThan(0)
+
+        const missing: string[] = []
+        for (const [path, module] of locales) {
+            for (const profile of POWER_PROFILE_NAMES) {
+                const key = `layout.shell.coolingPage.powerProfiles.profileNames.${profile}`
+                if (!resolves(module.default, key)) missing.push(`${path}: ${key}`)
+            }
+        }
+        expect(missing).toEqual([])
     })
 
     // The enum labels are picked in a model helper rather than a shell file, so

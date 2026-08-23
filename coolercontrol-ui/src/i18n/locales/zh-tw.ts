@@ -257,6 +257,18 @@ export default {
                 previousMode: '先前',
                 activate: '啟用',
                 noModes: '尚未儲存任何模式。模式會擷取所有通道設定的快照，以便快速切換。',
+                powerProfiles: {
+                    title: '系統電源設定檔',
+                    description: '當系統電源設定檔變更時自動啟用模式。',
+                    activeProfile: '目前設定檔：{profile}',
+                    noMode: '無模式',
+                    saveFailed: '無法儲存電源設定檔對應。',
+                    profileNames: {
+                        'power-saver': '節能',
+                        balanced: '平衡',
+                        performance: '效能',
+                    },
+                },
                 miniCurveHint:
                     '已指派設定檔的曲線。圓點表示目前來源溫度下的目標佔空比；通道的功能決定實際佔空比。',
                 chain: {

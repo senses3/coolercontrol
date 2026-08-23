@@ -257,6 +257,18 @@ export default {
                 previousMode: '上一个',
                 activate: '激活',
                 noModes: '尚未保存模式。模式会快照所有通道设置，以便快速切换。',
+                powerProfiles: {
+                    title: '系统电源配置',
+                    description: '当系统电源配置发生变化时自动激活模式。',
+                    activeProfile: '当前配置：{profile}',
+                    noMode: '无模式',
+                    saveFailed: '无法保存电源配置映射。',
+                    profileNames: {
+                        'power-saver': '节能',
+                        balanced: '平衡',
+                        performance: '性能',
+                    },
+                },
                 miniCurveHint:
                     '已分配配置文件的曲线。圆点表示当前来源温度下的目标占空比；通道的功能决定实际占空比。',
                 chain: {

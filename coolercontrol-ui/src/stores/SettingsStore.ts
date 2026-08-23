@@ -61,6 +61,7 @@ import { CoolerControlDeviceSettingsDTO, CoolerControlSettingsDTO } from '@/mode
 import { ErrorResponse } from '@/models/ErrorResponse'
 import { CustomSensor } from '@/models/CustomSensor'
 import { CreateModeDTO, Mode, ModeOrderDTO, UpdateModeDTO } from '@/models/Mode.ts'
+import { PowerProfileModesDTO, SystemEventDTO } from '@/models/PowerProfile.ts'
 import { Dashboard } from '@/models/Dashboard.ts'
 import { Emitter, EventType } from 'mitt'
 import _ from 'lodash'
@@ -109,6 +110,11 @@ export const useSettingsStore = defineStore('settings', () => {
     const modes: Ref<Array<Mode>> = ref([])
 
     const modeActiveCurrent: Ref<UID | undefined> = ref()
+    // System power profile integration. `powerProfilesAvailable` stays empty when no power
+    // profile daemon is reachable, which is how the UI knows to hide the mapping entirely.
+    const powerProfilesAvailable: Ref<Array<string>> = ref([])
+    const powerProfileActive: Ref<string | undefined> = ref()
+    const powerProfileModes: Ref<Record<string, UID>> = ref({})
     const modeActivePrevious: Ref<UID | undefined> = ref()
 
     const modeInEdit: Ref<UID | undefined> = ref()
@@ -503,6 +509,7 @@ export const useSettingsStore = defineStore('settings', () => {
         await loadProfiles()
         await loadModes()
         await getActiveModes()
+        await loadPowerProfiles()
 
         await startWatchingToSaveChanges()
         adoptLanguageSetting()
@@ -815,6 +822,37 @@ export const useSettingsStore = defineStore('settings', () => {
         modes.value.length = 0
         modes.value = modesDTO.modes
         await syncSysTrayModes()
+    }
+
+    async function loadPowerProfiles(): Promise<void> {
+        console.debug('Loading Power Profiles')
+        const state = await deviceStore.daemonClient.getPowerProfiles()
+        powerProfilesAvailable.value = state.available
+        powerProfileActive.value = state.active ?? undefined
+        powerProfileModes.value = state.modes
+    }
+
+    /**
+     * Persists the power profile to Mode mapping. Profiles mapped to nothing are dropped, so
+     * clearing a row removes it rather than storing an empty UID the daemon would reject.
+     */
+    async function savePowerProfileModes(modeMapping: Record<string, UID>): Promise<boolean> {
+        console.debug('Saving Power Profile Modes')
+        const mapped: Record<string, UID> = {}
+        for (const [profile, modeUID] of Object.entries(modeMapping)) {
+            if (modeUID) mapped[profile] = modeUID
+        }
+        const saved = await deviceStore.daemonClient.savePowerProfileModes(
+            new PowerProfileModesDTO(mapped),
+        )
+        if (saved) powerProfileModes.value = mapped
+        return saved
+    }
+
+    /** Tracks the active profile from the SSE `system` event so the page stays live. */
+    function applySystemEvent(event: SystemEventDTO): void {
+        if (event.kind !== 'power_profile') return
+        powerProfileActive.value = event.value
     }
 
     async function saveModeOrder(): Promise<void> {
@@ -1782,6 +1820,12 @@ export const useSettingsStore = defineStore('settings', () => {
         functions,
         modes,
         modeActiveCurrent,
+        powerProfilesAvailable,
+        powerProfileActive,
+        powerProfileModes,
+        loadPowerProfiles,
+        savePowerProfileModes,
+        applySystemEvent,
         modeActivePrevious,
         modeInEdit,
         allUIDeviceSettings,

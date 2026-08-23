@@ -273,6 +273,19 @@ export default {
                 activate: 'Aktivieren',
                 noModes:
                     'Noch keine Modi gespeichert. Modi speichern alle Kanaleinstellungen für schnelles Umschalten.',
+                powerProfiles: {
+                    title: 'Systemenergieprofil',
+                    description:
+                        'Einen Modus automatisch aktivieren, wenn sich das Energieprofil des Systems aendert.',
+                    activeProfile: 'Aktuelles Profil: {profile}',
+                    noMode: 'Kein Modus',
+                    saveFailed: 'Die Zuordnung der Energieprofile konnte nicht gespeichert werden.',
+                    profileNames: {
+                        'power-saver': 'Energiesparmodus',
+                        balanced: 'Ausgeglichen',
+                        performance: 'Leistung',
+                    },
+                },
                 miniCurveHint:
                     'Kurve des zugewiesenen Profils. Der Punkt markiert das Ziel bei der aktuellen Temperatur der Quelle; die Funktion des Kanals formt den tatsächlichen Wert.',
                 chain: {
