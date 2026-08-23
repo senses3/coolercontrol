@@ -722,35 +722,13 @@ impl AlertController {
         if alert.enabled.not() {
             return None;
         }
+        debug_assert_eq!(alert.channel_sources.len(), alert.source_states.len());
         let after = alert.machine_state();
         let kind = Self::edge_kind(before, after)?;
         let silenced = alert.is_silenced();
-        let notify_desktop = silenced.not()
-            && alert.desktop_notify
-            && match kind {
-                AlertEventKind::Triggered | AlertEventKind::SourceError => true,
-                AlertEventKind::Resolved => alert.desktop_notify_recovery && alert.notified,
-                AlertEventKind::ErrorResolved => {
-                    alert.desktop_notify_recovery && alert.error_notified
-                }
-                AlertEventKind::StillActive | AlertEventKind::Repeat => false,
-            };
-        if silenced.not() {
-            match kind {
-                AlertEventKind::Triggered => alert.notified = true,
-                AlertEventKind::SourceError => alert.error_notified = true,
-                _ => {}
-            }
-        }
-        if notify_desktop {
-            alert.last_notified = Some(Local::now());
-        }
-        if after.active.not() {
-            alert.notified = false;
-        }
-        if after.error.not() {
-            alert.error_notified = false;
-        }
+        let notify_desktop = Self::apply_edge(alert, kind, silenced, false);
+        Self::clear_finished_episodes(alert, after);
+        debug_assert!(after.active || alert.notified.not());
         Some(AlertEvent {
             alert: alert.clone(),
             message: MESSAGE_SOURCES_CHANGED.to_string(),
@@ -1065,14 +1043,20 @@ impl AlertController {
 
     /// The user-facing label for an alert source: override > detected > raw.
     fn source_label(&self, source: &ChannelSource) -> String {
+        debug_assert!(source.channel_name.is_empty().not());
         let detected = self.all_devices.get(&source.device_uid).and_then(|device| {
             device
                 .borrow()
                 .info
                 .detected_channel_label(&source.channel_name)
         });
-        self.overrides
-            .resolve_channel_label(&source.device_uid, &source.channel_name, detected)
+        let label = self.overrides.resolve_channel_label(
+            &source.device_uid,
+            &source.channel_name,
+            detected,
+        );
+        debug_assert!(label.is_empty().not());
+        label
     }
 
     /// Reads the source's current metric value from the device status.
@@ -1124,7 +1108,7 @@ impl AlertController {
     /// The alert-level edge this tick crossed. Transitions crossing none are logged
     /// but never announced; simultaneous edges rank worse news first.
     fn edge_kind(before: MachineState, after: MachineState) -> Option<AlertEventKind> {
-        if after.error && before.error.not() {
+        let kind = if after.error && before.error.not() {
             Some(AlertEventKind::SourceError)
         } else if after.active && before.active.not() {
             Some(AlertEventKind::Triggered)
@@ -1134,19 +1118,73 @@ impl AlertController {
             Some(AlertEventKind::Resolved)
         } else {
             None
+        };
+        debug_assert!(kind.is_none() || before != after);
+        debug_assert!(before == after || kind.is_some());
+        kind
+    }
+
+    /// One edge's announcement bookkeeping, shared by a tick and an edit. Returns
+    /// whether to notify the desktop; a quiet or silenced edge announces nothing.
+    fn apply_edge(alert: &mut Alert, kind: AlertEventKind, silenced: bool, quiet: bool) -> bool {
+        debug_assert!(matches!(
+            kind,
+            AlertEventKind::Triggered
+                | AlertEventKind::Resolved
+                | AlertEventKind::SourceError
+                | AlertEventKind::ErrorResolved
+        ));
+        let announceable = quiet.not() && silenced.not();
+        let notify_desktop = announceable
+            && alert.desktop_notify
+            && match kind {
+                AlertEventKind::Triggered | AlertEventKind::SourceError => true,
+                // A recovery only notifies for an episode the user was told about.
+                AlertEventKind::Resolved => alert.desktop_notify_recovery && alert.notified,
+                AlertEventKind::ErrorResolved => {
+                    alert.desktop_notify_recovery && alert.error_notified
+                }
+                AlertEventKind::StillActive | AlertEventKind::Repeat => false,
+            };
+        if announceable {
+            match kind {
+                AlertEventKind::Triggered => alert.notified = true,
+                AlertEventKind::SourceError => alert.error_notified = true,
+                _ => {}
+            }
+        }
+        if notify_desktop {
+            alert.last_notified = Some(Local::now());
+        }
+        debug_assert!(notify_desktop.not() || announceable);
+        debug_assert!(notify_desktop.not() || alert.desktop_notify);
+        notify_desktop
+    }
+
+    /// An episode that is over no longer counts as announced, so the next one
+    /// starts from a clean slate.
+    fn clear_finished_episodes(alert: &mut Alert, after: MachineState) {
+        if after.active.not() {
+            alert.notified = false;
+        }
+        if after.error.not() {
+            alert.error_notified = false;
         }
     }
 
     /// Describes a transition that crossed no edge, so the log row still says what
     /// happened even though nothing is announced.
     fn detail_kind(outcomes: &SourceOutcomes) -> AlertEventKind {
-        if outcomes.fired.is_empty().not() {
+        debug_assert!(outcomes.has_transitions());
+        let kind = if outcomes.fired.is_empty().not() {
             AlertEventKind::Triggered
         } else if outcomes.errors.is_empty().not() {
             AlertEventKind::SourceError
         } else {
             AlertEventKind::Resolved
-        }
+        };
+        debug_assert!(kind != AlertEventKind::Resolved || outcomes.resolved.is_empty().not());
+        kind
     }
 
     /// Folds this tick's per-source transitions into one event, updating the
@@ -1178,39 +1216,16 @@ impl AlertController {
                 alert.shutdown_scheduled = false;
             }
         }
-        let notify_desktop = quiet.not()
-            && silenced.not()
-            && alert.desktop_notify
-            && match kind {
-                AlertEventKind::Triggered | AlertEventKind::SourceError => true,
-                // A recovery only notifies for an episode the user was told about.
-                AlertEventKind::Resolved => alert.desktop_notify_recovery && alert.notified,
-                AlertEventKind::ErrorResolved => {
-                    alert.desktop_notify_recovery && alert.error_notified
-                }
-                AlertEventKind::StillActive | AlertEventKind::Repeat => false,
-            };
-        if silenced.not() && quiet.not() {
-            match kind {
-                AlertEventKind::Triggered => alert.notified = true,
-                AlertEventKind::SourceError => alert.error_notified = true,
-                _ => {}
-            }
-        }
+        let notify_desktop = Self::apply_edge(alert, kind, silenced, quiet);
         if fire_shutdown {
             // The shutdown warning is delivered for any event kind, so a fired
             // shutdown always counts as announcing the episode.
             alert.notified = true;
+            if alert.desktop_notify {
+                alert.last_notified = Some(Local::now());
+            }
         }
-        if notify_desktop || (fire_shutdown && alert.desktop_notify) {
-            alert.last_notified = Some(Local::now());
-        }
-        if after.active.not() {
-            alert.notified = false;
-        }
-        if after.error.not() {
-            alert.error_notified = false;
-        }
+        Self::clear_finished_episodes(alert, after);
         Some(AlertEvent {
             alert: alert.clone(),
             message: Self::join_messages(outcomes),
@@ -1385,6 +1400,8 @@ impl AlertController {
     /// The single path out of the alert engine, so the tick and edit paths cannot
     /// drift in wording or wire shape.
     fn dispatch_event(&self, event: &AlertEvent) {
+        debug_assert!(event.notify_desktop.not() || event.silenced.not());
+        debug_assert!(event.quiet.not() || event.notify_desktop.not());
         self.send_notifications(event);
         if event.log.not() {
             return;
@@ -1405,6 +1422,7 @@ impl AlertController {
             message: event.message.clone(),
             timestamp: Local::now(),
             silenced: event.silenced,
+            // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): superseded by `kind`.
             resolved: event.kind == AlertEventKind::Resolved,
             kind: event.kind.into(),
             quiet: event.quiet,
@@ -1435,28 +1453,45 @@ impl AlertController {
             );
         }
         if event.fire_shutdown {
-            Self::fire_command(COMMAND_SHUTDOWN);
-            info!(
-                "Shutdown Alert Triggered: {} - Shutdown will commence in 1 Minute",
-                alert.name
-            );
-            if alert.desktop_notify {
-                let title = format!("Shutdown Alert Triggered: {}!", alert.name);
-                let body = format!("Shutdown will commence in 1 Minute.\n{}", event.message);
-                notifier::notify_all_sessions(
-                    &title,
-                    &body,
-                    NotificationIcon::Shutdown,
-                    alert.desktop_notify_audio,
-                    Some(2),
-                    self.notification_handle.borrow().as_ref(),
-                );
-            }
+            self.warn_of_shutdown(event);
             return;
         }
         if event.notify_desktop.not() {
             return;
         }
+        self.notify_of_event(event);
+    }
+
+    /// Commences the shutdown and warns every session, whatever the event kind
+    /// that carried it.
+    fn warn_of_shutdown(&self, event: &AlertEvent) {
+        debug_assert!(event.fire_shutdown);
+        let alert = &event.alert;
+        Self::fire_command(COMMAND_SHUTDOWN);
+        info!(
+            "Shutdown Alert Triggered: {} - Shutdown will commence in 1 Minute",
+            alert.name
+        );
+        if alert.desktop_notify.not() {
+            return;
+        }
+        let title = format!("Shutdown Alert Triggered: {}!", alert.name);
+        let body = format!("Shutdown will commence in 1 Minute.\n{}", event.message);
+        notifier::notify_all_sessions(
+            &title,
+            &body,
+            NotificationIcon::Shutdown,
+            alert.desktop_notify_audio,
+            Some(2),
+            self.notification_handle.borrow().as_ref(),
+        );
+    }
+
+    /// The desktop notification for an event the evaluation pass decided to announce.
+    fn notify_of_event(&self, event: &AlertEvent) {
+        debug_assert!(event.notify_desktop);
+        debug_assert!(event.fire_shutdown.not());
+        let alert = &event.alert;
         let handle_ref = self.notification_handle.borrow();
         let handle = handle_ref.as_ref();
         match event.kind {
@@ -1527,6 +1562,8 @@ impl AlertController {
         if alert.shutdown_scheduled {
             body.push_str(" Shutdown will commence in 1 Minute.");
         }
+        debug_assert!(body.is_empty().not());
+        debug_assert!(body.ends_with('.'));
         body
     }
 
@@ -1954,12 +1991,11 @@ mod tests {
         );
     }
 
-    // -- build_transition_event tests --
-
     /// The machine snapshot a tick would have taken before these transitions.
     fn machines(active: bool, error: bool) -> MachineState {
         MachineState { active, error }
     }
+
     // -- build_transition_event tests --
 
     #[test]
