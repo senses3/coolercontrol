@@ -45,8 +45,10 @@ const COMMAND_SHUTDOWN: &str =
     "shutdown +1 \"Critical CoolerControl Alert! System will shutdown in 1 minute.\"";
 const COMMAND_SHUTDOWN_CANCEL: &str = "shutdown -c";
 
-/// Log text for a state change caused by editing an alert's watched sources.
-const MESSAGE_SOURCES_CHANGED: &str = "Watched sources changed";
+/// Log text for an edit that cleared the alert, and for one that made every
+/// source readable again. True whether the source was removed or replaced.
+const MESSAGE_TRIGGER_UNWATCHED: &str = "The triggering sensor is no longer watched";
+const MESSAGE_UNREADABLE_UNWATCHED: &str = "The unreadable sensor is no longer watched";
 
 pub type AlertName = String;
 pub type AlertLogMessage = String;
@@ -719,6 +721,14 @@ impl AlertController {
 
     /// An edit that crossed an edge, using a tick's machines and gates.
     /// A disabled alert stays silent, as it always has.
+    /// Which machine the edit moved, so the text names the sensor that left.
+    fn edit_message(kind: AlertEventKind) -> &'static str {
+        match kind {
+            AlertEventKind::ErrorResolved => MESSAGE_UNREADABLE_UNWATCHED,
+            _ => MESSAGE_TRIGGER_UNWATCHED,
+        }
+    }
+
     fn build_edit_event(alert: &mut Alert, before: MachineState) -> Option<AlertEvent> {
         if alert.enabled.not() {
             return None;
@@ -732,7 +742,7 @@ impl AlertController {
         debug_assert!(after.active || alert.notified.not());
         Some(AlertEvent {
             alert: alert.clone(),
-            message: MESSAGE_SOURCES_CHANGED.to_string(),
+            message: Self::edit_message(kind).to_string(),
             kind,
             silenced,
             notify_desktop,
@@ -2654,7 +2664,7 @@ mod tests {
         let event = AlertController::build_edit_event(&mut alert, machines(true, false))
             .expect("dropping the firing source clears the alert");
         assert!(matches!(event.kind, AlertEventKind::Resolved));
-        assert_eq!(event.message, MESSAGE_SOURCES_CHANGED);
+        assert_eq!(event.message, MESSAGE_TRIGGER_UNWATCHED);
         assert!(
             event.notify_desktop,
             "the episode was announced, so is its end"
@@ -2718,6 +2728,10 @@ mod tests {
         alert.state = alert.worst_of_visible();
         let event = AlertController::build_edit_event(&mut alert, before).unwrap();
         assert!(matches!(event.kind, AlertEventKind::ErrorResolved));
+        assert_eq!(
+            event.message, MESSAGE_UNREADABLE_UNWATCHED,
+            "the text names the sensor that left, not the one still firing"
+        );
         assert!(
             event.notify_desktop,
             "the recovery still announces because the Error was carried"
@@ -3165,7 +3179,7 @@ mod tests {
                 .expect("the edit must announce the clearing edge");
             assert_eq!(entry.state, AlertState::Inactive);
             assert_eq!(entry.kind, AlertLogKind::Resolved);
-            assert_eq!(entry.message, MESSAGE_SOURCES_CHANGED);
+            assert_eq!(entry.message, MESSAGE_TRIGGER_UNWATCHED);
             assert!(entry.resolved, "the deprecated mirror still tracks kind");
             assert!(entry.quiet.not(), "an alert-level edge is not a detail row");
         });
