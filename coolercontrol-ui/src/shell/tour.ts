@@ -19,6 +19,10 @@ export const TOUR_KEY_PREFIX = 'components.onboarding.'
 // The caller drops any anchor the current shell does not render, so the simple
 // interface gets the subset of this that it has rather than a walk of its own.
 export const TOUR_STEPS: readonly TourStep[] = Object.freeze([
+    // Search leads: the walk opens with the way out of being lost. The anchor
+    // is absent in the simple interface, which has no palette, and the caller
+    // drops steps whose anchor the current shell does not render.
+    { selector: '#shell-search', key: 'search', placement: 'bottom-start' },
     { selector: '#rail-home', key: 'home' },
     { selector: '#rail-cooling', key: 'cooling' },
     { selector: '#rail-monitoring', key: 'monitoring' },
