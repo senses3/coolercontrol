@@ -38,7 +38,7 @@ import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { buildIndex } from '@/shell/search/index.ts'
 import { groupResults, searchEntries } from '@/shell/search/match.ts'
-import { paletteOpen } from '@/shell/search/palette.ts'
+import { openedByKeyboard, paletteOpen, shouldRestoreFocus } from '@/shell/search/palette.ts'
 import { PAGE_ENTRIES, PAGE_GROUPS } from '@/shell/search/pages.ts'
 import { recentIds, rememberRecent } from '@/shell/search/recents.ts'
 import { useSearchActions } from '@/shell/search/useSearchActions.ts'
@@ -94,13 +94,8 @@ watch(paletteOpen, (open) => {
     rebuild()
 })
 
-// Reka restores focus to the trigger on close, and a close driven by Enter
-// counts as keyboard-originated, so :focus-visible latches a ring onto the
-// header field. After taking a result the user is on a new page or in another
-// dialog, so there is nothing to return to; a dismissal still restores focus,
-// which is where a keyboard user does need to end up.
 const onCloseAutoFocus = (event: Event): void => {
-    if (activated.value) event.preventDefault()
+    if (!shouldRestoreFocus(activated.value, openedByKeyboard.value)) event.preventDefault()
 }
 
 const byId = computed(() => new Map(entries.value.map((entry) => [entry.id, entry])))

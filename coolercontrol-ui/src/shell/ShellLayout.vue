@@ -97,7 +97,7 @@ hotkeys('ctrl+/,ctrl+shift+/', (event) => {
 hotkeys('ctrl+k', (event) => {
     if (settingsStore.isSimpleMode) return
     event.preventDefault()
-    openPalette()
+    openPalette(true)
 })
 onUnmounted(() => {
     for (const combo of HOTKEY_SCOPES) hotkeys.unbind(combo)

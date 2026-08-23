@@ -34,6 +34,11 @@ const deviceStore = useDeviceStore()
 // Mirrors ShellLayout's breakpoint.
 const { width } = useWindowSize()
 const isMobile = computed(() => width.value < 768)
+
+// A button fires click for Enter and Space as well as for the mouse; those
+// carry detail 0. The palette uses this to decide whether closing should hand
+// focus back here.
+const onClick = (event: MouseEvent): void => openPalette(event.detail === 0)
 </script>
 
 <template>
@@ -43,7 +48,7 @@ const isMobile = computed(() => width.value < 768)
             type="button"
             :aria-label="t('common.search')"
             class="flex items-center justify-center rounded-lg p-1.5 text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-            @click="openPalette"
+            @click="onClick"
         >
             <svg-icon type="mdi" :path="mdiMagnify" :size="deviceStore.getREMSize(1.25)" />
         </button>
@@ -54,7 +59,7 @@ const isMobile = computed(() => width.value < 768)
         type="button"
         :aria-label="t('common.search')"
         class="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-3 text-left text-text-color-secondary outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-        @click="openPalette"
+        @click="onClick"
     >
         <svg-icon type="mdi" :path="mdiMagnify" :size="deviceStore.getREMSize(1.1)" />
         <span class="text-base">{{ t('common.search') }}</span>

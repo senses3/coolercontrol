@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearRecents, recentIds, rememberRecent, RECENTS_LIMIT } from '../recents.ts'
+import { shouldRestoreFocus } from '../palette.ts'
 
 beforeEach(() => localStorage.clear())
 afterEach(() => {
@@ -63,5 +64,22 @@ describe('recents', () => {
             throw new Error('quota')
         })
         expect(() => rememberRecent('a')).not.toThrow()
+    })
+})
+
+describe('shouldRestoreFocus', () => {
+    it('hands focus back when a keyboard user dismisses without taking anything', () => {
+        expect(shouldRestoreFocus(false, true)).toBe(true)
+    })
+
+    // Reka's restore lands on a keyboard-originated focus, so :focus-visible
+    // rings the trigger. A mouse user did not ask for that marker.
+    it('leaves focus alone when the palette was opened with the mouse', () => {
+        expect(shouldRestoreFocus(false, false)).toBe(false)
+    })
+
+    it('leaves focus alone after a result was taken, however it was opened', () => {
+        expect(shouldRestoreFocus(true, true)).toBe(false)
+        expect(shouldRestoreFocus(true, false)).toBe(false)
     })
 })
