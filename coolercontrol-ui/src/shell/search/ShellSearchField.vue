@@ -8,6 +8,10 @@
      the modal opened and moved focus. Collapses to an icon on mobile, where the
      header has no room.
 
+     Sized to its content rather than a fixed width: it opens a modal on click
+     instead of accepting text, so the wide field a real search bar needs would
+     only be dead header space.
+
      Styled as UiButton's outline variant at size md, so it sits level with the
      Modes button beside it. bg-control rather than a tinted overlay:
      surface-hover is itself an alpha wash (and 0.25 in the high-contrast
@@ -49,11 +53,11 @@ const isMobile = computed(() => width.value < 768)
         id="shell-search"
         type="button"
         :aria-label="t('common.search')"
-        class="flex h-10 w-64 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-3 text-left text-text-color-secondary outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+        class="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-border-one bg-control px-3 text-left text-text-color-secondary outline-none transition-colors hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
         @click="openPalette"
     >
         <svg-icon type="mdi" :path="mdiMagnify" :size="deviceStore.getREMSize(1.1)" />
-        <span class="flex-1 truncate text-base">{{ t('common.search') }}</span>
+        <span class="text-base">{{ t('common.search') }}</span>
         <!-- Composed rather than a translated string: the modifier already has
              a key, and only the literal K is untranslatable. -->
         <span class="shrink-0 rounded border border-border-one px-1 text-xs">
