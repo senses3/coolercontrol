@@ -59,6 +59,12 @@ currently, and is something we might take advantage of in the future.
 - libdrm (optional)
 - python3 (optional)
 - liquidctl (optional)
+- OpenRC >= 0.45 (optional, only for service plugins on OpenRC systems)
+
+Service plugins that run as their own user are started with `--no-new-privs`, which OpenRC added in
+0.45 (June 2022). An older `supervise-daemon` exits with a usage error rather than ignoring the
+unknown flag, so such a plugin will not start. Gentoo, Artix, and Alpine 3.17 or newer all ship a
+newer OpenRC. systemd has no equivalent minimum.
 
 ## Installation
 
