@@ -35,8 +35,9 @@ pub async fn get(
 
 /// Replaces the power profile to Mode mapping.
 ///
-/// Every referenced Mode is verified to exist first, so a mapping can never point at a deleted
-/// Mode and silently do nothing when the profile changes.
+/// Every referenced Mode is verified to exist first, and `ModeController::delete_mode` prunes
+/// any mapping that pointed at a deleted Mode, so a mapping can never point at a Mode that is
+/// gone and silently do nothing when the profile changes.
 pub async fn update_modes(
     State(AppState {
         power_profiles,
@@ -98,6 +99,11 @@ fn validate_shape(modes: &HashMap<String, UID>) -> Result<(), CCError> {
             });
         }
     }
+    debug_assert!(modes.len() <= MAX_MAPPED_PROFILES);
+    debug_assert!(modes.keys().all(|profile| profile.trim().is_empty().not()));
+    debug_assert!(modes
+        .values()
+        .all(|mode_uid| mode_uid.trim().is_empty().not()));
     Ok(())
 }
 

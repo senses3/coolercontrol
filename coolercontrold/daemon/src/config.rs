@@ -1162,20 +1162,35 @@ impl Config {
                 warn!("Ignoring non-string Mode UID for power profile '{profile}'");
                 continue;
             };
-            if mode_uid.is_empty() {
+            if profile.trim().is_empty() || mode_uid.is_empty() {
                 continue;
             }
             modes.insert(profile.to_string(), mode_uid.to_string());
         }
+        debug_assert!(
+            modes.len() <= table.len(),
+            "Reading the mapping must never invent entries"
+        );
         modes
     }
 
     /// Replaces the power profile to Mode mapping. An empty map clears the table entirely so a
     /// cleared mapping does not leave a stale section behind.
     pub fn set_power_profile_modes(&self, modes: &HashMap<String, UID>) {
+        debug_assert!(
+            modes.keys().all(|profile| profile.trim().is_empty().not()),
+            "Blank profile names are rejected at the API boundary"
+        );
+        debug_assert!(
+            modes
+                .values()
+                .all(|mode_uid| mode_uid.trim().is_empty().not()),
+            "Blank Mode UIDs are rejected at the API boundary"
+        );
         let mut document = self.document.borrow_mut();
         if modes.is_empty() {
             document.remove(POWER_PROFILE_MODES_KEY);
+            debug_assert!(document.get(POWER_PROFILE_MODES_KEY).is_none());
             return;
         }
         let table = document[POWER_PROFILE_MODES_KEY].or_insert(Item::Table(Table::new()));
@@ -1184,6 +1199,11 @@ impl Config {
         for (profile, mode_uid) in modes {
             table[profile.as_str()] = Item::Value(Value::String(Formatted::new(mode_uid.clone())));
         }
+        debug_assert_eq!(
+            table.as_table().map_or(0, Table::len),
+            modes.len(),
+            "Every submitted mapping must reach the config document"
+        );
     }
 
     /// Sets `CoolerControl` settings

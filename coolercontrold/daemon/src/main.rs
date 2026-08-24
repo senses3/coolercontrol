@@ -349,11 +349,14 @@ fn main() -> Result<()> {
             fan_state_map,
             Rc::clone(&overrides_controller),
         ));
+        let power_profiles =
+            power_profile_listener::PowerProfiles::new(config.get_power_profile_modes());
         let mode_controller = Rc::new(
             ModeController::init(
                 Rc::clone(&config),
                 Rc::clone(&all_devices),
                 Rc::clone(&engine),
+                power_profiles.clone(),
             )
             .await?,
         );
@@ -398,8 +401,6 @@ fn main() -> Result<()> {
                 );
                 let notification_handle = notifier::NotificationHandle::new(run_token.clone());
                 let system_event_handle = system_event::SystemEventHandle::new(run_token.clone());
-                let power_profiles =
-                    power_profile_listener::PowerProfiles::new(config.get_power_profile_modes());
                 alert_controller.set_notification_handle(notification_handle.clone());
                 engine.set_notification_handle(notification_handle.clone());
                 engine.set_alert_gate(alert_controller.clone());

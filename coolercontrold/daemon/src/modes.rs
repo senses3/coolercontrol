@@ -19,6 +19,7 @@ use crate::config::Config;
 use crate::device::{ChannelName, DeviceUID, UID};
 use crate::engine::main::Engine;
 use crate::paths;
+use crate::power_profile_listener::PowerProfiles;
 use crate::setting::{ProfileUID, Setting, SettingKind};
 use crate::{cc_fs, AllDevices};
 
@@ -32,6 +33,7 @@ pub struct ModeController {
     mode_order: RefCell<Vec<UID>>,
     active_modes: RefCell<ActiveModes>,
     mode_handle: RefCell<Option<ModeHandle>>,
+    power_profiles: PowerProfiles,
 }
 
 impl ModeController {
@@ -40,6 +42,7 @@ impl ModeController {
         config: Rc<Config>,
         all_devices: AllDevices,
         engine: Rc<Engine>,
+        power_profiles: PowerProfiles,
     ) -> Result<Self> {
         let mode_controller = Self {
             config,
@@ -49,6 +52,7 @@ impl ModeController {
             mode_order: RefCell::new(Vec::new()),
             active_modes: RefCell::new(ActiveModes::new()),
             mode_handle: RefCell::new(None),
+            power_profiles,
         };
         mode_controller.fill_data_from_mode_config_file().await?;
         Ok(mode_controller)
@@ -536,7 +540,33 @@ impl ModeController {
                 active_modes_lock.previous.as_ref(),
             );
         }
+        self.prune_power_profile_modes(mode_uid).await?;
         self.save_modes_data().await?;
+        Ok(())
+    }
+
+    /// Drops any power profile mapping that pointed at the deleted Mode.
+    ///
+    /// The API rejects a mapping to a Mode that does not exist, but that only holds at write
+    /// time. Without this, deleting a mapped Mode leaves an entry that silently does nothing the
+    /// next time the system switches to that profile.
+    async fn prune_power_profile_modes(&self, mode_uid: &UID) -> Result<()> {
+        let mut modes = self.config.get_power_profile_modes();
+        let before = modes.len();
+        modes.retain(|_, mapped_uid| mapped_uid != mode_uid);
+        if modes.len() == before {
+            return Ok(());
+        }
+        debug_assert!(
+            modes.values().all(|mapped_uid| mapped_uid != mode_uid),
+            "Every mapping to the deleted Mode must be gone"
+        );
+        debug_assert!(modes.len() < before, "Pruning must only remove entries");
+        self.config.set_power_profile_modes(&modes);
+        self.config.save_config_file().await?;
+        // Only after the write succeeds, so a failed save cannot leave the listener acting on a
+        // mapping that is still persisted.
+        self.power_profiles.set_modes(modes);
         Ok(())
     }
 
@@ -780,6 +810,7 @@ mod tests {
             mode_order: RefCell::new(Vec::new()),
             active_modes: RefCell::new(ActiveModes::new()),
             mode_handle: RefCell::new(None),
+            power_profiles: PowerProfiles::default(),
         }
     }
 
@@ -788,6 +819,87 @@ mod tests {
             channel_name: channel_name.to_string(),
             kind: SettingKind::SpeedFixed { speed_fixed: 50 },
         }
+    }
+
+    /// Goal: deleting a Mode must take its power profile mapping with it, in both the config
+    /// and the live map the listener reads, or the next switch to that profile would silently
+    /// do nothing.
+    /// Methodology: map two profiles, delete the Mode one of them points at, then read both the
+    /// persisted mapping and the shared one back.
+    #[test]
+    fn deleting_a_mode_prunes_its_power_profile_mapping() {
+        cc_fs::test_runtime(async {
+            let (all_devices, _) = devices_offering("fan1");
+            let config = Rc::new(Config::init_default_config().unwrap());
+            let controller = mode_controller(&all_devices, &config);
+            let deleted = "mode-to-delete".to_string();
+            let kept = "mode-to-keep".to_string();
+            for mode_uid in [&deleted, &kept] {
+                controller.modes.borrow_mut().insert(
+                    mode_uid.clone(),
+                    Mode {
+                        uid: mode_uid.clone(),
+                        name: mode_uid.clone(),
+                        all_device_settings: HashMap::new(),
+                    },
+                );
+                controller.mode_order.borrow_mut().push(mode_uid.clone());
+            }
+            let mapping = HashMap::from([
+                ("performance".to_string(), deleted.clone()),
+                ("balanced".to_string(), kept.clone()),
+            ]);
+            config.set_power_profile_modes(&mapping);
+            controller.power_profiles.set_modes(mapping);
+
+            controller.delete_mode(&deleted).await.unwrap();
+
+            let persisted = config.get_power_profile_modes();
+            assert_eq!(
+                persisted.get("performance"),
+                None,
+                "The mapping to the deleted Mode is gone"
+            );
+            assert_eq!(
+                persisted.get("balanced"),
+                Some(&kept),
+                "Mappings to surviving Modes are untouched"
+            );
+            assert_eq!(
+                controller.power_profiles.mode_for("performance"),
+                None,
+                "The listener must not act on the pruned mapping"
+            );
+            assert_eq!(controller.power_profiles.mode_for("balanced"), Some(kept));
+        });
+    }
+
+    /// Goal: deleting an unmapped Mode must leave the mapping alone, so an unrelated delete
+    /// never rewrites the config.
+    /// Methodology: delete a Mode no profile points at.
+    #[test]
+    fn deleting_an_unmapped_mode_leaves_the_mapping_alone() {
+        cc_fs::test_runtime(async {
+            let (all_devices, _) = devices_offering("fan1");
+            let config = Rc::new(Config::init_default_config().unwrap());
+            let controller = mode_controller(&all_devices, &config);
+            let unmapped = "unmapped-mode".to_string();
+            controller.modes.borrow_mut().insert(
+                unmapped.clone(),
+                Mode {
+                    uid: unmapped.clone(),
+                    name: unmapped.clone(),
+                    all_device_settings: HashMap::new(),
+                },
+            );
+            controller.mode_order.borrow_mut().push(unmapped.clone());
+            let mapping = HashMap::from([("balanced".to_string(), "another-mode".to_string())]);
+            config.set_power_profile_modes(&mapping);
+
+            controller.delete_mode(&unmapped).await.unwrap();
+
+            assert_eq!(config.get_power_profile_modes(), mapping);
+        });
     }
 
     #[test]
