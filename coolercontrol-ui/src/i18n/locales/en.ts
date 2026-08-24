@@ -266,6 +266,19 @@ export default {
                 activate: 'Activate',
                 noModes:
                     'No modes saved yet. Modes snapshot all channel settings for quick switching.',
+                powerProfiles: {
+                    title: 'System Power Profile',
+                    description:
+                        'Activate a mode automatically when the system power profile changes.',
+                    activeProfile: 'Current profile: {profile}',
+                    noMode: 'No mode',
+                    saveFailed: 'The power profile mapping could not be saved.',
+                    profileNames: {
+                        'power-saver': 'Power Saver',
+                        balanced: 'Balanced',
+                        performance: 'Performance',
+                    },
+                },
                 miniCurveHint:
                     "Assigned profile curve. The dot marks the target duty at the current source temperature; the channel's Function shapes the actual duty.",
                 chain: {

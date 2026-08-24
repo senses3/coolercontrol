@@ -16,6 +16,7 @@ mod hardware_report;
 mod metrics;
 pub mod modes;
 mod plugins;
+mod power_profiles;
 mod profile_generation;
 mod profiles;
 mod router;
@@ -123,6 +124,8 @@ pub async fn start_server<'s>(
     log_buf_handle: LogBufHandle,
     status_handle: StatusHandle,
     notification_handle: crate::notifier::NotificationHandle,
+    system_event_handle: crate::system_event::SystemEventHandle,
+    power_profiles: crate::power_profile_listener::PowerProfiles,
     cancel_token: CancellationToken,
     main_scope: &'s Scope<'s, 's, Result<()>>,
 ) -> Result<()> {
@@ -159,6 +162,8 @@ pub async fn start_server<'s>(
         log_buf_handle,
         status_handle,
         notification_handle,
+        system_event_handle,
+        power_profiles,
         &cancel_token,
         main_scope,
     )
@@ -646,6 +651,8 @@ async fn create_app_state<'s>(
     log_buf_handle: LogBufHandle,
     status_handle: StatusHandle,
     notification_handle: crate::notifier::NotificationHandle,
+    system_event_handle: crate::system_event::SystemEventHandle,
+    power_profiles: crate::power_profile_listener::PowerProfiles,
     cancel_token: &CancellationToken,
     main_scope: &'s Scope<'s, 's, Result<()>>,
 ) -> AppState {
@@ -730,6 +737,8 @@ async fn create_app_state<'s>(
         stress_test_handle,
         log_buf_handle,
         notification_handle,
+        system_event_handle,
+        power_profiles,
     }
 }
 
@@ -1320,6 +1329,8 @@ pub struct AppState {
     pub stress_test_handle: StressTestHandle,
     pub log_buf_handle: LogBufHandle,
     pub notification_handle: crate::notifier::NotificationHandle,
+    pub system_event_handle: crate::system_event::SystemEventHandle,
+    pub power_profiles: crate::power_profile_listener::PowerProfiles,
 }
 
 #[cfg(test)]

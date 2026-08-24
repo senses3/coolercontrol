@@ -268,6 +268,19 @@ export default {
                 activate: 'アクティブ化',
                 noModes:
                     '保存されたモードはまだありません。モードはすべてのチャンネル設定をスナップショットして素早く切り替えられます。',
+                powerProfiles: {
+                    title: 'システム電源プロファイル',
+                    description:
+                        'システムの電源プロファイルが変更されたときにモードを自動的に有効にします。',
+                    activeProfile: '現在のプロファイル: {profile}',
+                    noMode: 'モードなし',
+                    saveFailed: '電源プロファイルの割り当てを保存できませんでした。',
+                    profileNames: {
+                        'power-saver': '省電力',
+                        balanced: 'バランス',
+                        performance: 'パフォーマンス',
+                    },
+                },
                 miniCurveHint:
                     '割り当てられたプロファイルの曲線。ドットは現在のソース温度でのターゲットデューティを示し、チャンネルのファンクションが実際のデューティを決定します。',
                 chain: {

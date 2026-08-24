@@ -266,6 +266,18 @@ export default {
                 activate: '활성화',
                 noModes:
                     '아직 저장된 모드가 없습니다. 모드는 빠른 전환을 위해 모든 채널 설정을 스냅샷합니다.',
+                powerProfiles: {
+                    title: '시스템 전원 프로필',
+                    description: '시스템 전원 프로필이 변경되면 모드를 자동으로 활성화합니다.',
+                    activeProfile: '현재 프로필: {profile}',
+                    noMode: '모드 없음',
+                    saveFailed: '전원 프로필 매핑을 저장하지 못했습니다.',
+                    profileNames: {
+                        'power-saver': '절전',
+                        balanced: '균형',
+                        performance: '성능',
+                    },
+                },
                 miniCurveHint:
                     '할당된 프로파일 곡선입니다. 점은 현재 소스 온도에서의 목표 듀티를 나타내며, 채널의 기능이 실제 듀티를 결정합니다.',
                 chain: {

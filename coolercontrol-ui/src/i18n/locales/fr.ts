@@ -273,6 +273,20 @@ export default {
                 activate: 'Activer',
                 noModes:
                     'Aucun mode enregistré pour le moment. Les modes capturent tous les paramètres des canaux pour un basculement rapide.',
+                powerProfiles: {
+                    title: "Profil d'alimentation du systeme",
+                    description:
+                        "Activer automatiquement un mode lorsque le profil d'alimentation du systeme change.",
+                    activeProfile: 'Profil actuel : {profile}',
+                    noMode: 'Aucun mode',
+                    saveFailed:
+                        "L'association des profils d'alimentation n'a pas pu etre enregistree.",
+                    profileNames: {
+                        'power-saver': "Economie d'energie",
+                        balanced: 'Equilibre',
+                        performance: 'Performance',
+                    },
+                },
                 miniCurveHint:
                     'Courbe du profil assigné. Le point marque la cible à la température actuelle de la source ; la Fonction du canal détermine la valeur réelle.',
                 chain: {

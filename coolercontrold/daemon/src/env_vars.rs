@@ -84,7 +84,8 @@ pub const ENV_VARS: &[EnvVarDoc] = &[
     },
     EnvVarDoc {
         name: ENV_DBUS,
-        description: "D-Bus integration, used to detect suspend and resume.",
+        description: "D-Bus integration, used to detect suspend, resume, and system \
+                      power profile changes.",
         values: TOGGLE_VALUES,
         default: TOGGLE_DEFAULT,
     },

@@ -7,17 +7,57 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiBookmarkCheck, mdiBookmarkMinusOutline, mdiBookmarkMultipleOutline } from '@mdi/js'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
+import { useToast } from '@/shell/toast'
 import UiButton from '@/shell/ui/UiButton.vue'
+import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
+import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
+import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
+import { hasTranslatedLabel } from '@/shell/cooling/powerProfiles.ts'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
+const toast = useToast()
 const { openModeWizard } = useToolWizards()
 
 const activate = async (modeUID: string): Promise<void> => {
     await settingsStore.activateMode(modeUID)
+}
+
+// Only shown when the daemon actually reached a power profile daemon over D-Bus. On a system
+// without one (TLP only, or none at all) there is nothing to map, so the card stays hidden.
+const showPowerProfiles = computed(() => settingsStore.powerProfilesAvailable.length > 0)
+
+// The empty value is the "no mode" row, which clears the mapping for that profile.
+const modeOptions = computed<UiSelectOption[]>(() => [
+    { label: t('layout.shell.coolingPage.powerProfiles.noMode'), value: '' },
+    ...settingsStore.modes.map((mode) => ({ label: mode.name, value: mode.uid })),
+])
+
+const profileLabel = (profile: string): string =>
+    hasTranslatedLabel(profile)
+        ? t(`layout.shell.coolingPage.powerProfiles.profileNames.${profile}`)
+        : profile
+
+const mappedMode = (profile: string): string => settingsStore.powerProfileModes[profile] ?? ''
+
+const setMappedMode = async (profile: string, modeUID: string | undefined): Promise<void> => {
+    const saved = await settingsStore.savePowerProfileModes({
+        ...settingsStore.powerProfileModes,
+        [profile]: modeUID ?? '',
+    })
+    if (saved) return
+    toast.add({
+        severity: 'error',
+        summary: t('common.error'),
+        detail: t('layout.shell.coolingPage.powerProfiles.saveFailed'),
+        life: 3000,
+    })
+    // Put the picker back on whatever the daemon actually holds.
+    await settingsStore.loadPowerProfiles()
 }
 </script>
 
@@ -83,5 +123,33 @@ const activate = async (modeUID: string): Promise<void> => {
         <div v-else class="flex flex-1 items-center justify-center text-text-color-secondary">
             {{ t('layout.shell.coolingPage.noModes') }}
         </div>
+        <UiSettingsCard
+            v-if="showPowerProfiles"
+            class="mt-6"
+            :title="t('layout.shell.coolingPage.powerProfiles.title')"
+        >
+            <UiSettingRow
+                :label="t('layout.shell.coolingPage.powerProfiles.description')"
+                :description="
+                    settingsStore.powerProfileActive
+                        ? t('layout.shell.coolingPage.powerProfiles.activeProfile', {
+                              profile: profileLabel(settingsStore.powerProfileActive),
+                          })
+                        : ''
+                "
+            />
+            <UiSettingRow
+                v-for="profile in settingsStore.powerProfilesAvailable"
+                :key="profile"
+                :label="profileLabel(profile)"
+            >
+                <UiSelect
+                    class="w-56"
+                    :options="modeOptions"
+                    :model-value="mappedMode(profile)"
+                    @update:model-value="setMappedMode(profile, $event)"
+                />
+            </UiSettingRow>
+        </UiSettingsCard>
     </div>
 </template>

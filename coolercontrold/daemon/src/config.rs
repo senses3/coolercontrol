@@ -29,6 +29,8 @@ use crate::setting::{
 const DEFAULT_CONFIG_FILE_BYTES: &[u8] = include_bytes!("../resources/config-default.toml");
 /// The `f_type` written by pre-4.4.0 daemons for the removed EMA Function type.
 const REMOVED_EMA_FUNCTION_TYPE: &str = "ExponentialMovingAvg";
+/// Top-level table mapping a system power profile name to the Mode UID to activate.
+const POWER_PROFILE_MODES_KEY: &str = "power_profile_modes";
 
 pub struct Config {
     path: PathBuf,
@@ -1140,6 +1142,68 @@ impl Config {
         } else {
             Err(anyhow!("Setting table not found in configuration file"))
         }
+    }
+
+    /// Reads the power profile to Mode mapping.
+    ///
+    /// Absent, malformed, and empty all mean "no mapping", since an unmapped system must simply
+    /// never switch Modes rather than fail to start.
+    pub fn get_power_profile_modes(&self) -> HashMap<String, UID> {
+        let document = self.document.borrow();
+        let Some(table) = document
+            .get(POWER_PROFILE_MODES_KEY)
+            .and_then(Item::as_table)
+        else {
+            return HashMap::with_capacity(0);
+        };
+        let mut modes = HashMap::with_capacity(table.len());
+        for (profile, mode_uid) in table {
+            let Some(mode_uid) = mode_uid.as_str() else {
+                warn!("Ignoring non-string Mode UID for power profile '{profile}'");
+                continue;
+            };
+            if profile.trim().is_empty() || mode_uid.is_empty() {
+                continue;
+            }
+            modes.insert(profile.to_string(), mode_uid.to_string());
+        }
+        debug_assert!(
+            modes.len() <= table.len(),
+            "Reading the mapping must never invent entries"
+        );
+        modes
+    }
+
+    /// Replaces the power profile to Mode mapping. An empty map clears the table entirely so a
+    /// cleared mapping does not leave a stale section behind.
+    pub fn set_power_profile_modes(&self, modes: &HashMap<String, UID>) {
+        debug_assert!(
+            modes.keys().all(|profile| profile.trim().is_empty().not()),
+            "Blank profile names are rejected at the API boundary"
+        );
+        debug_assert!(
+            modes
+                .values()
+                .all(|mode_uid| mode_uid.trim().is_empty().not()),
+            "Blank Mode UIDs are rejected at the API boundary"
+        );
+        let mut document = self.document.borrow_mut();
+        if modes.is_empty() {
+            document.remove(POWER_PROFILE_MODES_KEY);
+            debug_assert!(document.get(POWER_PROFILE_MODES_KEY).is_none());
+            return;
+        }
+        let table = document[POWER_PROFILE_MODES_KEY].or_insert(Item::Table(Table::new()));
+        // Rebuild rather than merge, so a removed profile does not linger.
+        *table = Item::Table(Table::new());
+        for (profile, mode_uid) in modes {
+            table[profile.as_str()] = Item::Value(Value::String(Formatted::new(mode_uid.clone())));
+        }
+        debug_assert_eq!(
+            table.as_table().map_or(0, Table::len),
+            modes.len(),
+            "Every submitted mapping must reach the config document"
+        );
     }
 
     /// Sets `CoolerControl` settings
@@ -2587,9 +2651,10 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use crate::cc_fs;
-    use crate::config::Config;
+    use crate::config::{Config, POWER_PROFILE_MODES_KEY};
     use serial_test::serial;
     use std::cell::{Cell, RefCell};
+    use std::collections::HashMap;
     use std::path::Path;
     use toml_edit::{DocumentMut, Item};
 
@@ -2622,6 +2687,91 @@ mod tests {
         };
         assert_eq!(config.device_name("uid1"), Some("NZXT Kraken".to_string()));
         assert_eq!(config.device_name("unknown"), None);
+    }
+
+    fn config_with(toml: &str) -> Config {
+        Config {
+            path: Path::new("/tmp/config.toml").to_path_buf(),
+            path_ui: Path::new("/tmp/config-ui.json").to_path_buf(),
+            document: RefCell::new(toml.parse::<DocumentMut>().unwrap()),
+            generation: Cell::new(0),
+        }
+    }
+
+    /// Goal: a hand-edited mapping table must load, and anything unusable in it must be skipped
+    /// rather than break startup, since an unmapped system simply never switches Modes.
+    /// Methodology: parse a table holding a good entry, a non-string, and an empty value.
+    #[test]
+    fn power_profile_modes_skip_unusable_entries() {
+        let config = config_with(
+            "[power_profile_modes]\n\
+             performance = \"mode-a\"\n\
+             balanced = \"\"\n\
+             power-saver = 7\n",
+        );
+
+        let modes = config.get_power_profile_modes();
+
+        assert_eq!(modes.get("performance").map(String::as_str), Some("mode-a"));
+        assert_eq!(modes.get("balanced"), None, "Empty UID must be skipped");
+        assert_eq!(modes.get("power-saver"), None, "Non-string must be skipped");
+        assert_eq!(modes.len(), 1);
+    }
+
+    /// Goal: an absent table is the default and must read as no mapping.
+    /// Methodology: read from a config that has never had the section.
+    #[test]
+    fn power_profile_modes_absent_table_is_empty() {
+        let config = config_with("[settings]\napply_on_boot = true\n");
+
+        assert!(config.get_power_profile_modes().is_empty());
+    }
+
+    /// Goal: a written mapping must read back identically, and clearing it must remove the
+    /// section rather than leave a stale one behind.
+    /// Methodology: write, read back, then write an empty map and confirm the key is gone.
+    #[test]
+    fn power_profile_modes_round_trip_and_clear() {
+        let config = config_with("[settings]\n");
+        let written = HashMap::from([
+            ("balanced".to_string(), "mode-b".to_string()),
+            ("performance".to_string(), "mode-p".to_string()),
+        ]);
+
+        config.set_power_profile_modes(&written);
+        assert_eq!(config.get_power_profile_modes(), written);
+
+        config.set_power_profile_modes(&HashMap::with_capacity(0));
+        assert!(config.get_power_profile_modes().is_empty());
+        assert!(
+            config
+                .document
+                .borrow()
+                .get(POWER_PROFILE_MODES_KEY)
+                .is_none(),
+            "Clearing must remove the table, not leave it empty"
+        );
+    }
+
+    /// Goal: removing one profile from the mapping must not leave the old entry behind, since
+    /// the table is rebuilt rather than merged.
+    /// Methodology: write two profiles, then write only one.
+    #[test]
+    fn power_profile_modes_drop_removed_profiles() {
+        let config = config_with("[settings]\n");
+        config.set_power_profile_modes(&HashMap::from([
+            ("balanced".to_string(), "mode-b".to_string()),
+            ("performance".to_string(), "mode-p".to_string()),
+        ]));
+
+        config.set_power_profile_modes(&HashMap::from([(
+            "balanced".to_string(),
+            "mode-b".to_string(),
+        )]));
+
+        let modes = config.get_power_profile_modes();
+        assert_eq!(modes.len(), 1);
+        assert_eq!(modes.get("performance"), None);
     }
 
     // Goal: the startup delay accepts the full documented range and clamps

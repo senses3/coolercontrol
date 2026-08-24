@@ -21,6 +21,7 @@ import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { AlertLog, alertToast, AlertState } from '@/models/Alert.ts'
 import { DeviceHealthDTO, FailsafeDelta, SourceDelta } from '@/models/DeviceHealth.ts'
+import { SystemEventDTO } from '@/models/PowerProfile.ts'
 import { TempInfo } from '@/models/TempInfo.ts'
 import { Emitter, EventType } from 'mitt'
 import { ModeActivated } from '@/models/Mode.ts'
@@ -977,6 +978,11 @@ export const useDeviceStore = defineStore('device', () => {
                     return
                 case 'alert':
                     handleAlert(data)
+                    return
+                case 'system':
+                    settingsStore.applySystemEvent(
+                        plainToInstance(SystemEventDTO, JSON.parse(data) as object),
+                    )
                     return
                 case 'notification':
                     // Only when the service worker is not carrying them for us.

@@ -271,6 +271,19 @@ export default {
                 activate: 'Ativar',
                 noModes:
                     'Nenhum modo salvo ainda. Os modos capturam todas as configurações de canal para troca rápida.',
+                powerProfiles: {
+                    title: 'Perfil de energia do sistema',
+                    description:
+                        'Ativar um modo automaticamente quando o perfil de energia do sistema mudar.',
+                    activeProfile: 'Perfil atual: {profile}',
+                    noMode: 'Nenhum modo',
+                    saveFailed: 'Nao foi possivel salvar o mapeamento dos perfis de energia.',
+                    profileNames: {
+                        'power-saver': 'Economia de energia',
+                        balanced: 'Equilibrado',
+                        performance: 'Desempenho',
+                    },
+                },
                 miniCurveHint:
                     'Curva do perfil atribuído. O ponto marca o alvo na temperatura atual da fonte; a Função do canal define o valor real.',
                 chain: {

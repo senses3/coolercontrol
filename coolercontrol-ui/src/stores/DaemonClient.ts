@@ -36,6 +36,7 @@ import {
 } from '@/models/Mode'
 import defaultHealthCheck, { HealthCheck } from '@/models/HealthCheck.ts'
 import { Alert, AlertsDTO } from '@/models/Alert.ts'
+import { PowerProfileModesDTO, PowerProfileStateDTO } from '@/models/PowerProfile.ts'
 import { DetectionDTO, DeviceHealthDTO } from '@/models/DeviceHealth.ts'
 import type {
     Calibration,
@@ -522,6 +523,37 @@ export default class DaemonClient {
         try {
             const response = await this.getClient().patch('/settings', instanceToPlain(ccSettings))
             this.logDaemonResponse(response, 'Save CC Settings')
+            return true
+        } catch (err) {
+            this.logError(err)
+            return false
+        }
+    }
+
+    /**
+     * Retrieves the system power profiles, the active one, and the profile to Mode mapping.
+     */
+    async getPowerProfiles(): Promise<PowerProfileStateDTO> {
+        try {
+            const response = await this.getClient().get('/power-profiles')
+            this.logDaemonResponse(response, 'Get Power Profiles')
+            return plainToInstance(PowerProfileStateDTO, response.data as object)
+        } catch (err) {
+            this.logError(err)
+            return new PowerProfileStateDTO()
+        }
+    }
+
+    /**
+     * Replaces the power profile to Mode mapping. Every referenced Mode must exist.
+     */
+    async savePowerProfileModes(dto: PowerProfileModesDTO): Promise<boolean> {
+        try {
+            const response = await this.getClient().put(
+                '/power-profiles/modes',
+                instanceToPlain(dto),
+            )
+            this.logDaemonResponse(response, 'Save Power Profile Modes')
             return true
         } catch (err) {
             this.logError(err)
