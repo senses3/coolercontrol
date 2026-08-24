@@ -358,7 +358,7 @@ pub async fn secure_plugin_folder(path: &Path, owner: Option<&str>) -> Result<()
 /// Returns `manifest.toml` to root and drops any group or world write bit left on it.
 async fn secure_manifest(plugin_dir: &Path) -> Result<()> {
     let manifest_path = plugin_dir.join(SERVICE_MANIFEST_FILE_NAME);
-    if manifest_path.exists().not() {
+    if cc_fs::exists(&manifest_path).not() {
         return Ok(());
     }
     cc_fs::set_permissions(
@@ -380,6 +380,14 @@ pub async fn secure_config_file(path: &Path, owner: Option<&str>) -> Result<()> 
 /// Builds the `chown` argument vector. Extracted from the I/O so the argument boundaries can be
 /// asserted directly: the path must stay a single argument no matter what characters it holds.
 fn chown_args(path: &str, owner: &str, recursive: bool) -> Vec<String> {
+    assert!(
+        path.is_empty().not(),
+        "chown must never be run against an empty path"
+    );
+    assert!(
+        owner.is_empty().not(),
+        "chown must never be run without an owner"
+    );
     let mut args = Vec::with_capacity(3);
     if recursive {
         // -R: recursive, -h: do not follow symlinks (set ownership on the link itself)
@@ -387,6 +395,12 @@ fn chown_args(path: &str, owner: &str, recursive: bool) -> Vec<String> {
     }
     args.push(format!("{owner}:{owner}"));
     args.push(path.to_string());
+    assert_eq!(args.len(), if recursive { 3 } else { 2 });
+    assert_eq!(
+        args.last().map(String::as_str),
+        Some(path),
+        "The path must stay one trailing argument, whatever characters it holds"
+    );
     args
 }
 
