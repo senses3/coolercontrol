@@ -24,6 +24,8 @@ const SERVICE_FILE_PERMISSIONS: u32 = 0o755;
 /// process has gone. These bound the wait for it to actually leave.
 const STOP_VERIFY_INTERVAL: Duration = Duration::from_millis(250);
 const STOP_VERIFY_ATTEMPTS: u8 = 20;
+/// A single poll would race every shutdown that is not instant.
+const _: () = assert!(STOP_VERIFY_ATTEMPTS > 1);
 
 #[derive(Clone, Debug, Default)]
 pub struct OpenRcManager {}
@@ -237,14 +239,6 @@ mod tests {
             window <= RC_SERVICE_TIMEOUT,
             "the verify window must not outlast the command timeout that precedes it"
         );
-    }
-
-    /// Goal: the verify window has to be long enough that a normal stop is not reported
-    /// as a failure. A single poll would race every shutdown that is not instant.
-    /// Method: require more than one attempt.
-    #[test]
-    fn stop_verification_polls_more_than_once() {
-        assert!(STOP_VERIFY_ATTEMPTS > 1);
     }
 
     #[test]
