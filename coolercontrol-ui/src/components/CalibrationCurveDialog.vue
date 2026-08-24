@@ -426,7 +426,7 @@ const chartOption = (cal: Calibration) => {
         <div v-if="loading" class="py-10 text-center text-text-color-secondary">
             {{ t('components.calibrationCurve.loading') }}
         </div>
-        <div v-else-if="loadError" class="py-10 text-center text-red">
+        <div v-else-if="loadError" class="py-10 text-center text-error">
             {{ loadError }}
         </div>
         <template v-else-if="calibration != null">

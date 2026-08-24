@@ -602,7 +602,7 @@ const isRouteActive = useRouteActive()
                 {{ t('layout.menu.alerts') }}
                 <span
                     v-if="activeAlertCount > 0"
-                    class="rounded-full bg-error px-1.5 text-xs normal-case text-white"
+                    class="rounded-full bg-error px-1.5 text-xs normal-case text-error-fg"
                 >
                     {{ activeAlertCount }}
                 </span>
