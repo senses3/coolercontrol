@@ -125,14 +125,20 @@ fn find_on_path(executable: &str) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    fn is_root() -> bool {
+        nix::unistd::geteuid().is_root()
+    }
+
     #[tokio::test]
     async fn test_plugin_user_exists_returns_true_for_root() {
         // root always exists on Linux
+        crate::sidecar::ensure_test_handle();
         assert!(plugin_user_exists("root").await);
     }
 
     #[tokio::test]
     async fn test_plugin_user_exists_returns_false_for_nonexistent() {
+        crate::sidecar::ensure_test_handle();
         assert!(!plugin_user_exists("nonexistent_user_xyz_12345").await);
     }
 
@@ -140,6 +146,12 @@ mod tests {
     async fn test_ensure_plugin_user_does_not_panic_for_nonexistent() {
         // Should not panic; will log a warning when user creation fails
         // (expected in test environment without root privileges).
+        crate::sidecar::ensure_test_handle();
+        if is_root() {
+            // Skip: as root `useradd` would succeed and leave a real account behind on the
+            // build host, and the second run would no longer exercise the failure path at all.
+            return;
+        }
         ensure_plugin_user("cc-plugin-test-nonexistent").await;
     }
 }
