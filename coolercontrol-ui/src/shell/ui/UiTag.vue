@@ -13,13 +13,18 @@ const props = withDefaults(defineProps<{ value?: string; severity?: Severity }>(
     severity: 'primary',
 })
 
+// Themed tokens, not the palette hues. The hues are fixed globals that no theme
+// overrides, so a tag drawn from them keeps one color under every theme and skips the
+// contrast floor `themes.spec.ts` holds the status colors to. On the light themes that
+// gap is visible: `green` stays #00ff7f where `success` darkens to #166534 to stay
+// readable.
 const severities: Record<Severity, string> = {
     primary: 'bg-accent/40',
     secondary: 'bg-border-one',
-    success: 'bg-green/40',
-    info: 'bg-blue/40',
-    warn: 'bg-yellow/40',
-    danger: 'bg-red/40',
+    success: 'bg-success/40',
+    info: 'bg-info/40',
+    warn: 'bg-warning/40',
+    danger: 'bg-error/40',
 }
 
 const classes = computed(() => severities[props.severity])

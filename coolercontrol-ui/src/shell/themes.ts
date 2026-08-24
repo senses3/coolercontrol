@@ -5,8 +5,10 @@
  * Installed color themes.
  *
  * Each theme carries the tokens a theme is allowed to define. The palette
- * hues (pink/green/red/yellow/blue/white) are deliberately NOT themed: they only
- * tint tag backgrounds and stay global.
+ * hues (pink/green/red/yellow/blue/white) are deliberately NOT themed and stay
+ * global. Nothing that carries meaning may use them: a status color comes from
+ * `success`/`warning`/`error`/`info`, which follow the theme and hold the contrast
+ * floor below. The hues do neither.
  *
  * Themes are applied as inline `--colors-*` variables rather than compiled
  * tailwind themes, so adding one is a single entry here. `surface-hover` and the
