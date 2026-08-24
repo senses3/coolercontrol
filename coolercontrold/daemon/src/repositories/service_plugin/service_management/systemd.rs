@@ -215,6 +215,11 @@ fn create_unit_file(
     if let Some(username) = service_definition.username {
         writeln!(service, "User={username}")?;
         writeln!(service, "Group={username}")?;
+        // Stops the plugin user escalating through a setuid binary or a file capability, which
+        // is the whole point of running it unprivileged. Deliberately not applied to a
+        // `privileged = true` plugin: that one already runs as root, so this would add nothing
+        // while breaking any setuid or capability helper it legitimately calls.
+        writeln!(service, "NoNewPrivileges=true")?;
     }
     if let Some(working_directory) = service_definition.wrk_dir {
         writeln!(
@@ -263,6 +268,52 @@ pub enum SystemdServiceRestartType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn base_definition() -> ServiceDefinition {
+        ServiceDefinition {
+            service_id: "test-plugin".to_string(),
+            executable: PathBuf::from("/usr/bin/test-plugin"),
+            args: Vec::with_capacity(0),
+            username: Some(CC_PLUGIN_USER.to_string()),
+            wrk_dir: None,
+            envs: None,
+            disable_restart_on_failure: false,
+        }
+    }
+
+    /// Goal: an unprivileged plugin must not be able to climb back out through a setuid binary
+    /// or a file capability, since running it as its own user is the only thing containing it.
+    /// Methodology: the default definition carries a username, which is the unprivileged case.
+    #[test]
+    fn unit_file_blocks_privilege_escalation_for_an_unprivileged_plugin() {
+        let unit = create_unit_file(
+            &SystemdConfig::default(),
+            &"Test".to_string(),
+            base_definition(),
+        )
+        .expect("unit must render");
+
+        assert!(unit.contains("NoNewPrivileges=true"), "{unit}");
+    }
+
+    /// Goal: a plugin the user deliberately gave root must keep working. The directive would add
+    /// nothing there (it is already root) but would break a setuid or capability helper it calls.
+    /// Methodology: a privileged plugin is expressed by the absence of a username, which is also
+    /// what makes systemd default the unit to root.
+    #[test]
+    fn unit_file_does_not_restrict_a_privileged_plugin() {
+        let mut definition = base_definition();
+        definition.username = None;
+
+        let unit = create_unit_file(&SystemdConfig::default(), &"Test".to_string(), definition)
+            .expect("unit must render");
+
+        assert!(unit.contains("NoNewPrivileges").not(), "{unit}");
+        assert!(
+            unit.contains("User=").not(),
+            "a privileged plugin runs as root: {unit}"
+        );
+    }
 
     /// Goal: pin the exact strings written to `Restart=` in a generated unit
     /// file. systemd rejects the unit outright if these drift, and the Display

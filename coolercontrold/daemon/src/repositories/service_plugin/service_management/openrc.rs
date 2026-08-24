@@ -198,6 +198,9 @@ fn build_supervise_daemon_args(service_definition: &ServiceDefinition) -> String
     let mut parts = Vec::with_capacity(4);
     if let Some(username) = &service_definition.username {
         parts.push(format!("-u {username}"));
+        // Same rule as the systemd unit: harden the unprivileged plugin, leave a plugin the
+        // user deliberately gave root alone. `--no-new-privs` is a bare flag.
+        parts.push("--no-new-privs".to_string());
     }
     if let Some(envs) = &service_definition.envs {
         for (var, val) in envs {
@@ -288,7 +291,31 @@ mod tests {
         let mut def = base_definition();
         def.username = Some("cc-plugin-user".to_string());
         let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
-        assert!(script.contains("supervise_daemon_args=\"-u cc-plugin-user\""));
+        assert!(script.contains("supervise_daemon_args=\"-u cc-plugin-user --no-new-privs\""));
+    }
+
+    /// Goal: an unprivileged plugin must not be able to climb back out through a setuid binary
+    /// or a file capability, since running it as its own user is the only thing containing it.
+    /// Methodology: generate with a username and check for the bare flag.
+    #[test]
+    fn service_file_blocks_privilege_escalation_for_an_unprivileged_plugin() {
+        let mut def = base_definition();
+        def.username = Some("cc-plugin-user".to_string());
+
+        let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
+
+        assert!(script.contains("--no-new-privs"), "{script}");
+    }
+
+    /// Goal: a plugin the user deliberately gave root must keep working. The flag would add
+    /// nothing there (it is already root) but would break a setuid or capability helper it calls.
+    /// Methodology: generate without a username, which is how a privileged plugin is expressed.
+    #[test]
+    fn service_file_does_not_restrict_a_privileged_plugin() {
+        let script =
+            create_service_file("Test Plugin", "cc-plugin-test-plugin", &base_definition());
+
+        assert!(script.contains("--no-new-privs").not(), "{script}");
     }
 
     #[test]
@@ -317,7 +344,8 @@ mod tests {
         def.username = Some("cc-plugin-user".to_string());
         def.envs = Some(vec![("KEY".to_string(), "val".to_string())]);
         let script = create_service_file("Test Plugin", "cc-plugin-test-plugin", &def);
-        assert!(script.contains("supervise_daemon_args=\"-u cc-plugin-user -e KEY=val\""));
+        assert!(script
+            .contains("supervise_daemon_args=\"-u cc-plugin-user --no-new-privs -e KEY=val\""));
     }
 
     #[test]
