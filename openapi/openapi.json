@@ -9987,7 +9987,7 @@
             ]
           },
           "available": {
-            "description": "Profiles the system daemon offers. Empty when no power profile daemon is present, which\n is how a client knows to hide the feature.",
+            "description": "Profiles the system daemon offers. Empty when no power profile daemon has been reached,\n which is how a client knows to hide the feature.",
             "type": "array",
             "items": {
               "type": "string"
