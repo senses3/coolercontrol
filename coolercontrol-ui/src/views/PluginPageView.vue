@@ -254,7 +254,7 @@ onUnmounted(() => {
     </div>
     <div v-else class="flex flex-col w-full h-full">
         <!-- Header toolbar -->
-        <div class="flex items-center justify-between px-4 pt-4">
+        <div class="flex items-center justify-between p-4">
             <div class="flex items-center gap-3">
                 <svg-icon
                     type="mdi"

@@ -80,7 +80,7 @@ async function deleteToken(tokenId: string): Promise<void> {
         message: t('auth.tokenDeleteConfirm'),
         header: t('auth.tokenDeleteHeader'),
         icon: mdiAlertOutline,
-        acceptClass: '!bg-red-500 hover:!bg-red-600',
+        acceptClass: '!bg-error !text-error-fg hover:!bg-error/90',
         accept: async () => {
             const result = await deviceStore.daemonClient.deleteToken(tokenId)
             if (result instanceof ErrorResponse) {

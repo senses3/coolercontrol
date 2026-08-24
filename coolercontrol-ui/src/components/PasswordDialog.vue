@@ -198,7 +198,7 @@ nextTick(async () => {
                     type="mdi"
                     :path="mdiCloseCircle"
                     :size="12"
-                    class="text-red"
+                    class="text-error"
                 />
             </div>
         </template>
@@ -228,7 +228,7 @@ nextTick(async () => {
                     type="mdi"
                     :path="mdiCloseCircle"
                     :size="12"
-                    class="text-red"
+                    class="text-error"
                 />
             </div>
 
@@ -254,11 +254,11 @@ nextTick(async () => {
             <div v-if="setPasswd" class="min-h-[1.2rem] flex items-center gap-1 mb-16">
                 <template v-if="confirmPasswdTouched">
                     <template v-if="passwordIsInvalid(confirmPasswdInput)">
-                        <svg-icon type="mdi" :path="mdiCloseCircle" :size="12" class="text-red" />
+                        <svg-icon type="mdi" :path="mdiCloseCircle" :size="12" class="text-error" />
                     </template>
                     <template v-else-if="passwordsMismatch()">
-                        <svg-icon type="mdi" :path="mdiCloseCircle" :size="12" class="text-red" />
-                        <span class="text-red text-xs">{{
+                        <svg-icon type="mdi" :path="mdiCloseCircle" :size="12" class="text-error" />
+                        <span class="text-error text-xs">{{
                             t('components.password.passwordMismatch')
                         }}</span>
                     </template>
@@ -266,7 +266,7 @@ nextTick(async () => {
             </div>
         </template>
 
-        <p v-if="submitError" class="text-red text-sm text-center mb-2 mt-[-2.5rem]">
+        <p v-if="submitError" class="text-error text-sm text-center mb-2 mt-[-2.5rem]">
             {{ submitError }}
         </p>
         <footer class="flex flex-col items-center place-content-between mt-4">

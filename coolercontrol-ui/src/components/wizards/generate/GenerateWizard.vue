@@ -660,7 +660,7 @@ const createAndApply = async (): Promise<void> => {
                                             assignment.channel_name,
                                         )
                                     "
-                                    class="block text-xs text-yellow-500"
+                                    class="block text-xs text-warning"
                                 >
                                     {{
                                         t('components.wizards.generate.replaces', {

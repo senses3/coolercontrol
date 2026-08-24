@@ -182,17 +182,17 @@ impl PluginController {
             .with_context(|| format!("Stopping plugin service: {plugin_id}"))
     }
 
-    /// Restart a managed integration plugin's service (stop then start).
+    /// Restart a managed integration plugin's service.
+    ///
+    /// Handed to the init system as one operation. Doing it as a stop then a start leaves a
+    /// window where the old process has not gone yet, and starting into that window is what
+    /// leaves two of them running.
     pub async fn restart_plugin(&self, plugin_id: &str) -> Result<()> {
         let service_id = self.get_integration_service_id(plugin_id)?;
         self.service_manager
-            .stop(&service_id)
+            .restart(&service_id)
             .await
-            .with_context(|| format!("Stopping plugin service for restart: {plugin_id}"))?;
-        self.service_manager
-            .start(&service_id)
-            .await
-            .with_context(|| format!("Starting plugin service for restart: {plugin_id}"))
+            .with_context(|| format!("Restarting plugin service: {plugin_id}"))
     }
 
     /// Get the status of a plugin's service.
@@ -260,13 +260,41 @@ impl PluginController {
             config.set_disabled_plugins(&disabled);
             config.save_config_file().await?;
         }
-        // Start integration plugins immediately
-        if manifest.service_type == ServiceType::Integration && manifest.is_managed() {
-            if let Err(err) = self.start_plugin(plugin_id).await {
-                info!("Could not start plugin service on enable: {err}");
-            }
+        // Start integration plugins immediately.
+        if manifest.service_type != ServiceType::Integration {
+            return Ok(());
+        }
+        if manifest.is_managed().not() {
+            return Ok(());
+        }
+        if let Err(err) = self.install_and_restart(plugin_id, manifest).await {
+            info!("Could not start plugin service on enable: {err}");
         }
         Ok(())
+    }
+
+    /// Installs a plugin's service definition, then brings the service up.
+    ///
+    /// A plugin that was disabled when the daemon started was skipped during registration,
+    /// so nothing ever wrote its service definition and the init system does not know it
+    /// exists. Starting it in that state fails and the plugin stays `Unmanaged` until the
+    /// daemon is restarted. Installing first is what makes enabling take effect right away.
+    async fn install_and_restart(&self, plugin_id: &str, manifest: &ServiceManifest) -> Result<()> {
+        let service_id = self.get_integration_service_id(plugin_id)?;
+        let definition =
+            ServicePluginRepo::service_definition(&service_id, manifest).ok_or_else(|| {
+                CCError::UserError {
+                    msg: "Plugin manifest has no executable to manage".to_string(),
+                }
+            })?;
+        self.service_manager
+            .add(definition)
+            .await
+            .with_context(|| format!("Installing plugin service: {plugin_id}"))?;
+        self.service_manager
+            .restart(&service_id)
+            .await
+            .with_context(|| format!("Starting plugin service: {plugin_id}"))
     }
 
     /// Check if a plugin is disabled in config.
@@ -333,9 +361,94 @@ pub async fn secure_config_file(path: &Path, owner: Option<&str>) -> Result<()> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repositories::service_plugin::service_manifest::ConnectionType;
 
     fn is_root() -> bool {
         nix::unistd::geteuid().is_root()
+    }
+
+    /// Goal: a plugin disabled when the daemon started is skipped during registration, so
+    /// nothing writes its service definition. Enabling it later has to install one before
+    /// it can start, and the definition has to be the same one registration would have
+    /// written. Method: build it from a manifest and pin the fields that matter.
+    #[test]
+    fn service_definition_is_built_from_the_manifest() {
+        let manifest = ServiceManifest {
+            id: "test-plugin".to_string(),
+            service_type: ServiceType::Integration,
+            description: None,
+            version: None,
+            url: None,
+            executable: Some(PathBuf::from("/usr/bin/test-plugin")),
+            args: vec!["--verbose".to_string()],
+            envs: vec![("MY_VAR".to_string(), "value".to_string())],
+            address: ConnectionType::None,
+            privileged: true,
+            proxy: None,
+            path: PathBuf::from("/etc/coolercontrol/plugins/test-plugin"),
+        };
+
+        let definition =
+            ServicePluginRepo::service_definition(&"test-plugin".to_string(), &manifest)
+                .expect("a manifest with an executable yields a definition");
+
+        assert_eq!(definition.executable, PathBuf::from("/usr/bin/test-plugin"));
+        assert_eq!(definition.args, vec!["--verbose".to_string()]);
+        // Privileged plugins run as root, so no user is set for the supervisor.
+        assert!(definition.username.is_none());
+        let envs = definition.envs.expect("log level is always passed through");
+        assert!(envs.contains(&("MY_VAR".to_string(), "value".to_string())));
+    }
+
+    /// Goal: a manifest without an executable has nothing for an init system to manage, and
+    /// must not produce a definition that would be installed as an empty service.
+    /// Method: drop the executable and require nothing back.
+    #[test]
+    fn service_definition_is_absent_without_an_executable() {
+        let manifest = ServiceManifest {
+            id: "test-plugin".to_string(),
+            service_type: ServiceType::Integration,
+            description: None,
+            version: None,
+            url: None,
+            executable: None,
+            args: Vec::new(),
+            envs: Vec::new(),
+            address: ConnectionType::None,
+            privileged: false,
+            proxy: None,
+            path: PathBuf::from("/etc/coolercontrol/plugins/test-plugin"),
+        };
+
+        assert!(
+            ServicePluginRepo::service_definition(&"test-plugin".to_string(), &manifest).is_none()
+        );
+    }
+
+    /// Goal: an unprivileged plugin must be supervised as the dedicated plugin user rather
+    /// than root. Method: flip `privileged` and check the user that comes back.
+    #[test]
+    fn unprivileged_plugins_run_as_the_plugin_user() {
+        let manifest = ServiceManifest {
+            id: "test-plugin".to_string(),
+            service_type: ServiceType::Integration,
+            description: None,
+            version: None,
+            url: None,
+            executable: Some(PathBuf::from("/usr/bin/test-plugin")),
+            args: Vec::new(),
+            envs: Vec::new(),
+            address: ConnectionType::None,
+            privileged: false,
+            proxy: None,
+            path: PathBuf::from("/etc/coolercontrol/plugins/test-plugin"),
+        };
+
+        let definition =
+            ServicePluginRepo::service_definition(&"test-plugin".to_string(), &manifest)
+                .expect("a manifest with an executable yields a definition");
+
+        assert_eq!(definition.username.as_deref(), Some(CC_PLUGIN_USER));
     }
 
     #[test]

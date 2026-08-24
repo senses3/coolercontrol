@@ -10,6 +10,7 @@ import { useConfirm } from '@/shell/confirm'
 import { useI18n } from 'vue-i18n'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import { validatePluginFetchPath, buildSafeOptions } from '@/composables/pluginFetchValidation.ts'
+import { THEME_CSS_VAR_NAMES } from '@/shell/themes.ts'
 
 export type PluginIframeMode = 'modal' | 'full_page'
 
@@ -122,16 +123,16 @@ export function usePluginIframe(pluginId: string, mode: PluginIframeMode) {
             case 'customStyle': {
                 // Always read the resolved CSS variable values from the parent document so
                 // the iframe gets the correct colours for any theme (not just Custom).
+                // Sent from the theme's own variable list rather than a copy of it here, so
+                // a token added to a theme reaches plugin UIs instead of silently resolving
+                // to nothing in an iframe that asked for it.
                 const rootStyle = getComputedStyle(document.documentElement)
-                const getVar = (name: string): string => rootStyle.getPropertyValue(name).trim()
-                const customStyle = {
-                    '--colors-accent': getVar('--colors-accent'),
-                    '--colors-bg-one': getVar('--colors-bg-one'),
-                    '--colors-bg-two': getVar('--colors-bg-two'),
-                    '--colors-border-one': getVar('--colors-border-one'),
-                    '--colors-text-color': getVar('--colors-text-color'),
-                    '--colors-text-color-secondary': getVar('--colors-text-color-secondary'),
-                }
+                const customStyle = Object.fromEntries(
+                    THEME_CSS_VAR_NAMES.map((name) => [
+                        name,
+                        rootStyle.getPropertyValue(name).trim(),
+                    ]),
+                )
                 postToIframe('customStyle', customStyle)
                 break
             }

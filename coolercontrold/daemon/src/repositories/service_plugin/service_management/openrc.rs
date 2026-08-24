@@ -8,6 +8,7 @@ use crate::repositories::service_plugin::service_management::manager::{
 };
 use crate::repositories::service_plugin::service_plugin_repo::CC_PLUGIN_USER;
 use crate::repositories::utils::DirectCommand;
+use crate::rt::sleep;
 use anyhow::{anyhow, Result};
 use std::fmt::Write;
 use std::fs::Permissions;
@@ -19,6 +20,10 @@ use std::time::Duration;
 const RC_SERVICE: &str = "rc-service";
 const RC_SERVICE_TIMEOUT: Duration = Duration::from_secs(10);
 const SERVICE_FILE_PERMISSIONS: u32 = 0o755;
+/// `rc-service stop` returns once it has signalled the supervisor, not once the supervised
+/// process has gone. These bound the wait for it to actually leave.
+const STOP_VERIFY_INTERVAL: Duration = Duration::from_millis(250);
+const STOP_VERIFY_ATTEMPTS: u8 = 20;
 
 #[derive(Clone, Debug, Default)]
 pub struct OpenRcManager {}
@@ -35,6 +40,29 @@ impl OpenRcManager {
             .arg(cmd)
             .run_with_code()
             .await
+    }
+
+    /// Waits until the service is no longer running.
+    ///
+    /// Acting on a stop that has been reported but not finished is what leaves two
+    /// processes alive: the old supervisor is still up when the next start creates a
+    /// second one, and `supervise-daemon` keeps respawning the child of each.
+    async fn await_stopped(&self, service_id: &ServiceId) -> Result<()> {
+        for _ in 0..STOP_VERIFY_ATTEMPTS {
+            // Any status but running means there is nothing left to wait for: stopped, or
+            // the script is already gone. A status that cannot be read is not proof that
+            // the service went down, so it keeps waiting.
+            if let Ok(status) = self.status(service_id).await {
+                if matches!(status, ServiceStatus::Running).not() {
+                    return Ok(());
+                }
+            }
+            sleep(STOP_VERIFY_INTERVAL).await;
+        }
+        Err(anyhow!(
+            "Service {} was still running after its stop was reported",
+            service_id.to_service_name()
+        ))
     }
 }
 
@@ -59,7 +87,15 @@ impl ServiceManager for OpenRcManager {
     }
 
     async fn remove(&self, service_id: &ServiceId) -> Result<()> {
-        let _ = self.stop(service_id).await;
+        // The stop has to be confirmed before the script goes. `rc-service` needs the
+        // script to address the service at all, so unlinking it after a failed stop
+        // strands a supervised process that no later service command can reach, and
+        // `supervise-daemon` goes on respawning its child until the machine reboots.
+        if let ServiceStatus::Unmanaged = self.status(service_id).await? {
+            // Never installed, or already removed: there is nothing to stop or unlink.
+            return Ok(());
+        }
+        self.stop(service_id).await?;
         let service_path = service_dir_path().join(service_id.to_service_name());
         cc_fs::remove_file(service_path).await
     }
@@ -79,8 +115,19 @@ impl ServiceManager for OpenRcManager {
     async fn stop(&self, service_id: &ServiceId) -> Result<()> {
         let (code, _, stderr) = Self::rc_service("stop", service_id).await?;
         if code != 0 {
-            Err(anyhow!(
+            return Err(anyhow!(
                 "rc-service stop {} failed: {stderr}",
+                service_id.to_service_name()
+            ));
+        }
+        self.await_stopped(service_id).await
+    }
+
+    async fn restart(&self, service_id: &ServiceId) -> Result<()> {
+        let (code, _, stderr) = Self::rc_service("restart", service_id).await?;
+        if code != 0 {
+            Err(anyhow!(
+                "rc-service restart {} failed: {stderr}",
                 service_id.to_service_name()
             ))
         } else {
@@ -174,6 +221,27 @@ mod tests {
             envs: None,
             disable_restart_on_failure: false,
         }
+    }
+
+    /// Goal: the wait for a reported stop to finish must terminate. An unbounded wait
+    /// here would hang plugin registration on a service that never goes down, which is
+    /// worse than the orphan it exists to prevent. Method: bound the loop arithmetic.
+    #[test]
+    fn stop_verification_terminates() {
+        let window = STOP_VERIFY_INTERVAL * u32::from(STOP_VERIFY_ATTEMPTS);
+        assert!(window > Duration::ZERO, "a zero window verifies nothing");
+        assert!(
+            window <= RC_SERVICE_TIMEOUT,
+            "the verify window must not outlast the command timeout that precedes it"
+        );
+    }
+
+    /// Goal: the verify window has to be long enough that a normal stop is not reported
+    /// as a failure. A single poll would race every shutdown that is not instant.
+    /// Method: require more than one attempt.
+    #[test]
+    fn stop_verification_polls_more_than_once() {
+        assert!(STOP_VERIFY_ATTEMPTS > 1);
     }
 
     #[test]
