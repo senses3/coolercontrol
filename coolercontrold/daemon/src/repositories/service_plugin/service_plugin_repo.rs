@@ -300,6 +300,33 @@ impl ServicePluginRepo {
         services
     }
 
+    /// The service definition for a plugin, or `None` when its manifest names no
+    /// executable and there is therefore nothing to manage.
+    ///
+    /// Shared so that a plugin enabled while the daemon runs is installed exactly as one
+    /// installed at startup. Building this in two places is how the two drift apart.
+    pub fn service_definition(
+        service_id: &ServiceId,
+        service_manifest: &ServiceManifest,
+    ) -> Option<ServiceDefinition> {
+        let executable = service_manifest.executable.clone()?;
+        let username = service_manifest
+            .privileged
+            .not()
+            .then_some(CC_PLUGIN_USER.to_string());
+        let mut envs = Self::env_log_level();
+        envs.append(&mut service_manifest.envs.clone());
+        Some(ServiceDefinition {
+            service_id: service_id.clone(),
+            executable,
+            args: service_manifest.args.clone(),
+            username,
+            wrk_dir: None,
+            envs: Some(envs),
+            disable_restart_on_failure: false,
+        })
+    }
+
     fn env_log_level() -> Vec<(String, String)> {
         match log::max_level() {
             LevelFilter::Off => {
@@ -353,30 +380,13 @@ impl ServicePluginRepo {
         poll_rate: f64,
         api_up_token: CancellationToken,
     ) {
-        let username = service_manifest
-            .privileged
-            .not()
-            .then_some(CC_PLUGIN_USER.to_string());
-        let mut envs = Self::env_log_level();
-        envs.append(&mut service_manifest.envs.clone());
         // The definition is overwritten in place rather than removed and re-added. Removing
         // it stops the service and unlinks its script, and under OpenRC a stop that has not
         // finished leaves a supervised process the missing script can no longer address, so
         // the start below would add a second one. `restart` further down applies the new
         // definition to a service that is already up.
-        if let Some(exe) = &service_manifest.executable {
-            if let Err(e) = service_manager
-                .add(ServiceDefinition {
-                    service_id: service_id.clone(),
-                    executable: exe.clone(),
-                    args: service_manifest.args.clone(),
-                    username,
-                    wrk_dir: None,
-                    envs: Some(envs),
-                    disable_restart_on_failure: false,
-                })
-                .await
-            {
+        if let Some(definition) = Self::service_definition(&service_id, &service_manifest) {
+            if let Err(e) = service_manager.add(definition).await {
                 error!(
                     "Error adding plugin service. This service {service_id} will be skipped: {e}"
                 );
