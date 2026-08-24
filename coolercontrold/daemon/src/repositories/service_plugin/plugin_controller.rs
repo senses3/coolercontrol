@@ -182,17 +182,17 @@ impl PluginController {
             .with_context(|| format!("Stopping plugin service: {plugin_id}"))
     }
 
-    /// Restart a managed integration plugin's service (stop then start).
+    /// Restart a managed integration plugin's service.
+    ///
+    /// Handed to the init system as one operation. Doing it as a stop then a start leaves a
+    /// window where the old process has not gone yet, and starting into that window is what
+    /// leaves two of them running.
     pub async fn restart_plugin(&self, plugin_id: &str) -> Result<()> {
         let service_id = self.get_integration_service_id(plugin_id)?;
         self.service_manager
-            .stop(&service_id)
+            .restart(&service_id)
             .await
-            .with_context(|| format!("Stopping plugin service for restart: {plugin_id}"))?;
-        self.service_manager
-            .start(&service_id)
-            .await
-            .with_context(|| format!("Starting plugin service for restart: {plugin_id}"))
+            .with_context(|| format!("Restarting plugin service: {plugin_id}"))
     }
 
     /// Get the status of a plugin's service.

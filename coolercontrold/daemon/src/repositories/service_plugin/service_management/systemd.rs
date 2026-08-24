@@ -10,6 +10,7 @@ use crate::repositories::service_plugin::service_management::{
 };
 use crate::repositories::service_plugin::service_plugin_repo::CC_PLUGIN_USER;
 use crate::repositories::utils::DirectCommand;
+use crate::rt::sleep;
 use anyhow::{anyhow, Result};
 use std::fs::Permissions;
 use std::ops::Not;
@@ -21,6 +22,10 @@ use strum::Display;
 const SYSTEMCTL: &str = "systemctl";
 const SYSTEMCTL_TIMEOUT: Duration = Duration::from_secs(10);
 const SERVICE_FILE_PERMISSIONS: u32 = 0o644;
+/// `systemctl stop` waits for the unit, but a unit that ignores its stop signal outlives it.
+/// These bound the wait for the unit to actually leave.
+const STOP_VERIFY_INTERVAL: Duration = Duration::from_millis(250);
+const STOP_VERIFY_ATTEMPTS: u8 = 20;
 
 #[derive(Clone, Debug)]
 pub struct SystemdConfig {
@@ -66,6 +71,34 @@ impl SystemdManager {
             .run_with_code()
             .await
     }
+
+    /// Runs a `systemctl` subcommand that takes no unit argument.
+    async fn systemctl_global(cmd: &str) -> Result<(i32, String, String)> {
+        DirectCommand::new(SYSTEMCTL, SYSTEMCTL_TIMEOUT)
+            .arg(cmd)
+            .run_with_code()
+            .await
+    }
+
+    /// Waits until the unit is no longer running, so no caller acts on a stop that has
+    /// been reported but has not finished.
+    async fn await_stopped(&self, service_id: &ServiceId) -> Result<()> {
+        for _ in 0..STOP_VERIFY_ATTEMPTS {
+            // Any status but running means there is nothing left to wait for: stopped, or
+            // the unit file is already gone. A status that cannot be read is not proof that
+            // the unit went down, so it keeps waiting.
+            if let Ok(status) = self.status(service_id).await {
+                if matches!(status, ServiceStatus::Running).not() {
+                    return Ok(());
+                }
+            }
+            sleep(STOP_VERIFY_INTERVAL).await;
+        }
+        Err(anyhow!(
+            "Service {} was still running after its stop was reported",
+            service_id.to_service_name()
+        ))
+    }
 }
 
 impl ServiceManager for SystemdManager {
@@ -84,14 +117,29 @@ impl ServiceManager for SystemdManager {
             &service_path,
             Permissions::from_mode(SERVICE_FILE_PERMISSIONS),
         )
-        .await
+        .await?;
+        // The definition on disk just changed. systemd serves the copy it already has
+        // until it is told to re-read them, so without this the unit keeps running under
+        // the old definition and the write above has no effect.
+        let (code, _, stderr) = Self::systemctl_global("daemon-reload").await?;
+        if code != 0 {
+            return Err(anyhow!("systemctl daemon-reload failed: {stderr}"));
+        }
+        Ok(())
     }
 
     async fn remove(&self, service_id: &ServiceId) -> Result<()> {
+        // The stop has to be confirmed before the unit file goes, for the same reason it
+        // does under OpenRC: removing the definition of a unit that is still up leaves a
+        // process behind that no later service command can address.
+        if let ServiceStatus::Unmanaged = self.status(service_id).await? {
+            // Never installed, or already removed: there is nothing to stop or unlink.
+            return Ok(());
+        }
+        self.stop(service_id).await?;
         let dir_path = systemd_global_dir_path();
         let service_name = service_id.to_service_name();
         let service_path = dir_path.join(format!("{service_name}.service"));
-        let _ = self.stop(service_id).await;
         cc_fs::remove_file(service_path).await
     }
 
@@ -110,8 +158,19 @@ impl ServiceManager for SystemdManager {
     async fn stop(&self, service_id: &ServiceId) -> Result<()> {
         let (code, _, stderr) = Self::systemctl("stop", service_id).await?;
         if code != 0 {
-            Err(anyhow!(
+            return Err(anyhow!(
                 "systemctl stop {} failed: {stderr}",
+                service_id.to_service_name()
+            ));
+        }
+        self.await_stopped(service_id).await
+    }
+
+    async fn restart(&self, service_id: &ServiceId) -> Result<()> {
+        let (code, _, stderr) = Self::systemctl("restart", service_id).await?;
+        if code != 0 {
+            Err(anyhow!(
+                "systemctl restart {} failed: {stderr}",
                 service_id.to_service_name()
             ))
         } else {

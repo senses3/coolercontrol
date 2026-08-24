@@ -359,8 +359,11 @@ impl ServicePluginRepo {
             .then_some(CC_PLUGIN_USER.to_string());
         let mut envs = Self::env_log_level();
         envs.append(&mut service_manifest.envs.clone());
-        // This will also reload this daemon unit if already installed:
-        let _ = service_manager.remove(&service_id).await;
+        // The definition is overwritten in place rather than removed and re-added. Removing
+        // it stops the service and unlinks its script, and under OpenRC a stop that has not
+        // finished leaves a supervised process the missing script can no longer address, so
+        // the start below would add a second one. `restart` further down applies the new
+        // definition to a service that is already up.
         if let Some(exe) = &service_manifest.executable {
             if let Err(e) = service_manager
                 .add(ServiceDefinition {
@@ -415,7 +418,7 @@ impl ServicePluginRepo {
             }
             ServiceType::Device => {
                 if service_manifest.is_managed() {
-                    if let Err(err) = service_manager.start(&service_id).await {
+                    if let Err(err) = service_manager.restart(&service_id).await {
                         error!(
                             "Error starting plugin service. This service {service_id} will be skipped: {err}"
                         );
@@ -587,7 +590,7 @@ impl ServicePluginRepo {
                 () = sleep(Duration::from_secs(TIMEOUT_API_UP_SECONDS)) => warn!("Timeout waiting for the daemon's API to come up. Will start integration services anyway."),
                 () = api_up_token.cancelled() => info!("API startup complete, starting integration service: {service_id}"),
             }
-            if let Err(err) = service_manager.start(&service_id).await {
+            if let Err(err) = service_manager.restart(&service_id).await {
                 error!("Error starting plugin service: {err}");
                 return;
             }
