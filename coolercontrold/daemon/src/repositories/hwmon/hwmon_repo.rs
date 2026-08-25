@@ -2016,8 +2016,15 @@ impl Repository for HwmonRepo {
             )
             .await
             .map_err(|err| {
+                // pwm_enable is the first write a ThinkPad with fan control
+                // off rejects, so the hint belongs here too.
+                let hint = if hwmon_driver.name == devices::DEVICE_NAME_THINK_PAD {
+                    thinkpad::FAN_CONTROL_HINT
+                } else {
+                    ""
+                };
                 anyhow!(
-                    "Error on {}:{channel_name} for Manual Control - {err}",
+                    "Error on {}:{channel_name} for Manual Control - {err}{hint}",
                     hwmon_driver.name
                 )
             })
