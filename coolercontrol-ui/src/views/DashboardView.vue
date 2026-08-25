@@ -696,7 +696,16 @@ onUnmounted(() => {
                 class="w-full mx-2 mb-2"
             />
         </div>
-        <Fullscreen v-model="fullPage" :teleport="true" :page-only="true" class="min-h-0 flex-1">
+        <!-- z-index while full page: the wrapper is fixed but z-auto, so any
+             positioned shell element with a z-index (the panel's scroll fades)
+             paints over the chart. -->
+        <Fullscreen
+            v-model="fullPage"
+            :teleport="true"
+            :page-only="true"
+            class="min-h-0 flex-1"
+            :class="{ 'z-[1200]': fullPage }"
+        >
             <div class="h-full" :class="{ 'full-page-wrapper': fullPage }">
                 <div
                     v-if="fullPage"
