@@ -137,8 +137,8 @@ const finishStep = (): any => ({
 const filterPresent = (list: any[]): any[] =>
     list.filter((s) => document.querySelector(s.attachTo.element) !== null)
 
-// filterPresent drops any absent anchor: #rail-plugins when no plugins are
-// installed, and the rail entries the simple interface does not render.
+// filterPresent drops any absent anchor, such as #rail-plugins when no plugins
+// are installed.
 const buildTourSteps = (): any[] =>
     filterPresent([
         ...TOUR_STEPS.map((step) => makeStep(step.selector, step.key, step.placement)),
@@ -228,9 +228,7 @@ onMounted(async () => {
     // root URL (startedAtRoot), not on a direct/deep link like /#/home. The
     // `startup-page` route resolves this too, but it ran before settings had
     // loaded, so it landed on the default; re-apply now that they are in.
-    // Simple mode always opens on Home: the other startup pages are full-shell
-    // surfaces, and its rail has no way back to them.
-    if (startedAtRoot && !settingsStore.isSimpleMode) {
+    if (startedAtRoot) {
         const target = startupRouteName(settingsStore.startupPage)
         if (target !== 'section-home') {
             await router.replace({ name: target })
@@ -461,11 +459,7 @@ onMounted(async () => {
                                 <p class="mt-4 text-base text-text-color-secondary leading-relaxed">
                                     {{ t('components.onboarding.gettingStartedIntro') }}
                                 </p>
-                                <!-- Guided Setup, Profiles and Auto-Create are all
-                                     full-interface machinery, so this drops out with
-                                     the interface. -->
                                 <div
-                                    v-if="!settingsStore.isSimpleMode"
                                     class="mt-4 p-3 rounded-md bg-accent/10 border-l-4 border-accent"
                                 >
                                     <p class="text-text-color-secondary font-semibold leading-snug">

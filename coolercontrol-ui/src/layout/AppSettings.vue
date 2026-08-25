@@ -38,11 +38,9 @@ import {
     defaultCustomTheme,
     getInterfaceFontDisplayName,
     getThemeModeDisplayName,
-    getUiModeDisplayName,
     InterfaceFont,
     StartupPage,
     ThemeMode,
-    UiMode,
 } from '@/models/UISettings.ts'
 import {
     INSTALLED_THEMES,
@@ -269,9 +267,6 @@ const lineThicknessSelectOptions = computed(() =>
     })),
 )
 
-const uiModeOptions = computed(() =>
-    Object.values(UiMode).map((mode) => ({ value: mode, label: getUiModeDisplayName(mode) })),
-)
 const startupPageOptions = computed(() => [
     { value: StartupPage.AppInfo, label: t('layout.shell.home') },
     { value: StartupPage.Controls, label: t('layout.shell.cooling') },
@@ -610,23 +605,8 @@ onUnmounted(() => {
                     }}</UiButton>
                 </UiSettingRow>
                 <UiSettingRow
-                    id="setting-ui-mode"
-                    :highlighted="highlightId === 'setting-ui-mode'"
-                    v-tooltip.top="t('layout.settings.tooltips.uiMode')"
-                    :label="t('layout.settings.uiMode')"
-                >
-                    <UiSelect
-                        :model-value="settingsStore.uiMode"
-                        :options="uiModeOptions"
-                        class="w-full"
-                        @update:model-value="(mode) => settingsStore.setUiMode(mode as UiMode)"
-                    />
-                </UiSettingRow>
-                <!-- Simple mode always opens on Home, so the choice would do nothing. -->
-                <UiSettingRow
                     id="setting-startup-page"
                     :highlighted="highlightId === 'setting-startup-page'"
-                    v-if="!settingsStore.isSimpleMode"
                     v-tooltip.top="t('layout.settings.tooltips.startupPage')"
                     :label="t('layout.settings.startupPage')"
                 >
@@ -744,11 +724,9 @@ onUnmounted(() => {
                 >
                     <UiSwitch v-model="settingsStore.eyeCandy" />
                 </UiSettingRow>
-                <!-- Simple mode has no menu panel, so there is nothing to collapse. -->
                 <UiSettingRow
                     id="setting-rail-to-collapse"
                     :highlighted="highlightId === 'setting-rail-to-collapse'"
-                    v-if="!settingsStore.isSimpleMode"
                     v-tooltip.top="t('layout.settings.tooltips.railToCollapse')"
                     :label="t('layout.settings.railToCollapse')"
                 >

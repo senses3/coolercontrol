@@ -75,6 +75,8 @@ export default {
                 jumpTo: 'الانتقال إلى',
                 noResults: 'لا توجد نتائج مطابقة.',
                 more: '{count} أخرى',
+                kindFan: 'المراوح',
+                kindSensor: 'المستشعرات',
                 kindAction: 'الإجراءات',
                 kindPage: 'الصفحات',
             },
@@ -89,25 +91,6 @@ export default {
             access: 'الوصول',
             power: 'الطاقة',
             noModes: 'لا توجد أوضاع محفوظة',
-            simple: {
-                fans: 'المراوح',
-                sensors: 'المستشعرات',
-                sensorsHint: 'حدد مستشعرًا لعرض سجله.',
-                noSensors: 'لم يتم اكتشاف أي مستشعرات.',
-                modeCurve: 'منحنى',
-                modeFixed: 'سرعة ثابتة',
-                useCurve: 'استخدام منحنى بسيط',
-                useCurveAccept: 'إنشاء منحنى',
-                forkMessage:
-                    "نسخ هذا المنحنى إلى منحنى جديد '{copy}' تستخدمه {channel} وحدها.\n\nتحتفظ المراوح التي تشارك الأصل به.",
-                seedMessage:
-                    'إنشاء منحنى لـ {channel} انطلاقًا من منحنى المروحة القياسي.\n\nاضبط شكله في المحرر بالأسفل.',
-                sharedSummary:
-                    'هذا المنحنى يتحكم في هذه المروحة فقط | هذا المنحنى يتحكم أيضًا في {count} مروحة أخرى، لذا تعديله هنا سيغيّرها أيضًا. | هذا المنحنى يتحكم أيضًا في {count} مراوح أخرى، لذا تعديله هنا سيغيّرها أيضًا.',
-                otherSummary: '{profile} يتحكم في هذه المروحة، وهو ليس منحنى بسيطًا.',
-                noCurveSummary: 'لا يوجد منحنى لهذه المروحة بعد.',
-                curveNameSuffix: ' منحنى',
-            },
             supportWizards: {
                 summary: 'تم تفعيل سحرة الدعم!',
                 detail: 'شكرًا للمتطوعين الذين يساعدون مستخدمينا على تشغيل أجهزتهم وبرامج التشغيل الخاصة بها.',
@@ -339,7 +322,6 @@ export default {
             time24h: '24 ساعة',
             time12h: '12 ساعة',
             frequencyPrecision: 'دقة التردد',
-            uiMode: 'وضع الواجهة',
             startupPage: 'صفحة البدء',
             dashboardLineSize: 'حجم خط لوحة المعلومات',
             themeStyle: 'نمط السمة',
@@ -394,7 +376,6 @@ export default {
             tooltips: {
                 timeFormat: 'تنسيق الوقت: 12 ساعة (صباحًا/مساءً) أو 24 ساعة',
                 frequencyPrecision: 'ضبط دقة قيم التردد المعروضة.',
-                uiMode: 'الوضع البسيط يعرض التحكم في المراوح والمستشعرات فقط. الواجهة الكاملة تعرض كل شيء.',
                 startupPage: 'الصفحة المعروضة بعد تحميل التطبيق.',
                 railToCollapse: 'استخدم أيضًا المنطقة الفارغة في شريط التنقل لتوسيع أو طي القائمة.',
                 eyeCandy:
@@ -1537,10 +1518,6 @@ export default {
         channelViewType: {
             control: 'تحكم',
             dashboard: 'لوحة معلومات',
-        },
-        uiMode: {
-            simple: 'بسيطة',
-            full: 'الواجهة الكاملة',
         },
         startupPage: {
             appInfo: 'معلومات وأدوات',

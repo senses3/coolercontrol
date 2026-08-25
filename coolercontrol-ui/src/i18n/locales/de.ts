@@ -78,6 +78,8 @@ export default {
                 jumpTo: 'Springen zu',
                 noResults: 'Keine Treffer gefunden.',
                 more: '{count} weitere',
+                kindFan: 'Lüfter',
+                kindSensor: 'Sensoren',
                 kindAction: 'Aktionen',
                 kindPage: 'Seiten',
             },
@@ -92,25 +94,6 @@ export default {
             access: 'Zugriff',
             power: 'Ein/Aus',
             noModes: 'Keine Modi gespeichert',
-            simple: {
-                fans: 'Lüfter',
-                sensors: 'Sensoren',
-                sensorsHint: 'Wählen Sie einen Sensor, um seinen Verlauf zu sehen.',
-                noSensors: 'Es wurden keine Sensoren erkannt.',
-                modeCurve: 'Kurve',
-                modeFixed: 'Feste Drehzahl',
-                useCurve: 'Einfache Kurve verwenden',
-                useCurveAccept: 'Kurve erstellen',
-                forkMessage:
-                    "Diese Kurve in eine neue Kurve '{copy}' kopieren, die nur {channel} verwendet.\n\nDie Lüfter, die sich das Original teilen, behalten es.",
-                seedMessage:
-                    'Eine Kurve für {channel} erstellen, ausgehend von der Standard-Lüfterkurve.\n\nForme sie im Editor darunter.',
-                sharedSummary:
-                    'Diese Kurve steuert nur diesen Lüfter | Diese Kurve steuert auch {count} weiteren Lüfter, eine Änderung hier würde ihn ebenfalls ändern. | Diese Kurve steuert auch {count} weitere Lüfter, eine Änderung hier würde sie ebenfalls ändern.',
-                otherSummary: '{profile} steuert diesen Lüfter und ist keine einfache Kurve.',
-                noCurveSummary: 'Dieser Lüfter hat noch keine Kurve.',
-                curveNameSuffix: ' Kurve',
-            },
             supportWizards: {
                 summary: 'Support-Zauberer aktiviert!',
                 detail: 'Mit Dank an die Freiwilligen, die unseren Nutzern helfen, Hardware und Treiber zum Laufen zu bringen.',
@@ -348,7 +331,6 @@ export default {
             time24h: '24 Stunden',
             time12h: '12 Stunden',
             frequencyPrecision: 'Frequenzgenauigkeit',
-            uiMode: 'Oberflächenmodus',
             startupPage: 'Startseite',
             dashboardLineSize: 'Dashboard-Liniengröße',
             themeStyle: 'Theme-Stil',
@@ -404,7 +386,6 @@ export default {
                 timeFormat: 'Zeitformat: 12-Stunden (AM/PM) oder 24-Stunden',
                 frequencyPrecision:
                     'Stellen Sie die Genauigkeit der angezeigten Frequenzwerte ein.',
-                uiMode: 'Einfach zeigt nur die Lüftersteuerung und Sensoren. Die vollständige Oberfläche zeigt alles.',
                 startupPage: 'Die Seite, die nach dem Laden der Anwendung angezeigt wird.',
                 railToCollapse:
                     'Auch den leeren Bereich der Navigationsleiste nutzen, um das Menü auszuklappen oder einzuklappen.',
@@ -1594,10 +1575,6 @@ export default {
         channelViewType: {
             control: 'Steuerung',
             dashboard: 'Dashboard',
-        },
-        uiMode: {
-            simple: 'Einfach',
-            full: 'Vollständige Oberfläche',
         },
         startupPage: {
             appInfo: 'Info & Werkzeuge',

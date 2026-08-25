@@ -75,6 +75,8 @@ export default {
                 jumpTo: '移動',
                 noResults: '一致する項目がありません。',
                 more: '他 {count} 件',
+                kindFan: 'ファン',
+                kindSensor: 'センサー',
                 kindAction: '操作',
                 kindPage: 'ページ',
             },
@@ -89,25 +91,6 @@ export default {
             access: 'アクセス',
             power: '電源',
             noModes: '保存されたモードがありません',
-            simple: {
-                fans: 'ファン',
-                sensors: 'センサー',
-                sensorsHint: 'センサーを選択すると履歴が表示されます。',
-                noSensors: 'センサーは検出されませんでした。',
-                modeCurve: 'カーブ',
-                modeFixed: '固定速度',
-                useCurve: 'シンプルなカーブを使う',
-                useCurveAccept: 'カーブを作成',
-                forkMessage:
-                    'このカーブを新しいカーブ「{copy}」にコピーし、{channel} だけで使用します。\n\n元のカーブを共有しているファンはそのままです。',
-                seedMessage:
-                    '{channel} 用のカーブを、標準のファンカーブから作成します。\n\n下のエディターで形を整えてください。',
-                sharedSummary:
-                    'このカーブはこのファンだけを制御しています | このカーブは他に {count} 台のファンも制御しているため、ここで編集するとそれらも変わります。 | このカーブは他に {count} 台のファンも制御しているため、ここで編集するとそれらも変わります。',
-                otherSummary: '{profile} がこのファンを制御しており、単純なカーブではありません。',
-                noCurveSummary: 'このファンにはまだカーブがありません。',
-                curveNameSuffix: ' カーブ',
-            },
             supportWizards: {
                 summary: 'サポートの魔法使いを召喚！',
                 detail: 'ハードウェアとドライバーを動かす手助けをしてくれるボランティアの皆さんに感謝します。',
@@ -342,7 +325,6 @@ export default {
             time24h: '24時間',
             time12h: '12時間',
             frequencyPrecision: '周波数の精度',
-            uiMode: 'インターフェースモード',
             startupPage: '起動時のページ',
             dashboardLineSize: 'ダッシュボードの線のサイズ',
             themeStyle: 'テーマスタイル',
@@ -397,7 +379,6 @@ export default {
             tooltips: {
                 timeFormat: '時間形式：12時間（AM/PM）または24時間',
                 frequencyPrecision: '表示される周波数値の精度を調整します。',
-                uiMode: 'シンプルはファン制御とセンサーのみを表示します。完全なインターフェースはすべてを表示します。',
                 startupPage: 'アプリケーション読み込み後に表示されるページ。',
                 railToCollapse:
                     'ナビゲーションバーの空いている領域でもメニューを展開または折りたたみます。',
@@ -1562,10 +1543,6 @@ export default {
         channelViewType: {
             control: '制御',
             dashboard: 'ダッシュボード',
-        },
-        uiMode: {
-            simple: 'シンプル',
-            full: '完全なインターフェース',
         },
         startupPage: {
             appInfo: '情報とツール',

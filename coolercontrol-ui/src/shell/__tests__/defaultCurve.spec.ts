@@ -5,8 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 
 describe('default graph curve', () => {
-    // What the profile editor draws when a Graph profile has no points yet, and
-    // therefore what the simple interface has to save for a new curve.
+    // What the profile editor draws when a Graph profile has no points yet.
     it('ramps from off to full across the temp range in five points', () => {
         expect(defaultGraphCurve(20, 100, 2, 17)).toEqual([
             [20, 0],

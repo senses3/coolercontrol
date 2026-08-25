@@ -13,7 +13,7 @@ import ShellRail from '@/shell/ShellRail.vue'
 import ShellHeader from '@/shell/ShellHeader.vue'
 import ShellPanel from '@/shell/ShellPanel.vue'
 import ShellBottomNav from '@/shell/ShellBottomNav.vue'
-import { hotkeySections } from '@/shell/sections.ts'
+import { HOTKEY_SECTIONS } from '@/shell/sections.ts'
 import hotkeys from 'hotkeys-js'
 import { useRouter } from 'vue-router'
 import { useShortcutsDialog } from '@/composables/useShortcutsDialog.ts'
@@ -62,11 +62,9 @@ const toggleMainMenu = (): void => {
 }
 provide('toggleMainMenu', toggleMainMenu)
 
-// Section hotkeys: ctrl+N opens the Nth section of the current mode, so simple
-// mode renumbers along with its shorter rail. Browsers reserve Ctrl+number for
-// tab switching, so the Ctrl+Alt variants exist for web use; plain Ctrl+number
-// works in the Qt app. The mode is read inside the handler because the bindings
-// are registered once, at setup.
+// Section hotkeys: ctrl+N opens the Nth section. Browsers reserve Ctrl+number
+// for tab switching, so the Ctrl+Alt variants exist for web use; plain
+// Ctrl+number works in the Qt app.
 const router = useRouter()
 const { openShortcutsDialog } = useShortcutsDialog()
 const SECTION_DIGITS = ['1', '2', '3', '4', '5', '6']
@@ -75,7 +73,7 @@ for (const [index, digit] of SECTION_DIGITS.entries()) {
     const combo = `ctrl+${digit},ctrl+alt+${digit}`
     HOTKEY_SCOPES.push(combo)
     hotkeys(combo, (event) => {
-        const section = hotkeySections(settingsStore.uiMode)[index]
+        const section = HOTKEY_SECTIONS[index]
         if (section == null) return
         if (section.id === 'plugins' && deviceStore.plugins.length === 0) return
         event.preventDefault()
@@ -92,10 +90,7 @@ hotkeys('ctrl+/,ctrl+shift+/', (event) => {
 })
 // Firefox and Chrome bind ctrl+k to the address bar, so preventDefault has to
 // win here; the header field is the mouse path when the page is not focused.
-// Simple mode has no palette, checked in the handler because the binding is
-// registered once, at setup.
 hotkeys('ctrl+k', (event) => {
-    if (settingsStore.isSimpleMode) return
     event.preventDefault()
     openPalette(true)
 })
@@ -133,23 +128,7 @@ onUnmounted(() => {
         <ShellRail />
         <div class="flex min-w-0 flex-1 flex-col pb-2 pr-2">
             <ShellHeader />
-            <!-- Simple mode has no contextual panel: the page owns the width. -->
-            <div
-                v-if="settingsStore.isSimpleMode"
-                class="min-h-0 flex-1 overflow-hidden rounded-lg border border-border-one bg-bg-one"
-            >
-                <router-view v-slot="{ Component, route }">
-                    <Suspense>
-                        <component :is="Component" :key="route.path + (route.query?.key ?? '')" />
-                    </Suspense>
-                </router-view>
-            </div>
-            <SplitterGroup
-                v-else
-                direction="horizontal"
-                :keyboard-resize-by="10"
-                class="min-h-0 flex-1"
-            >
+            <SplitterGroup direction="horizontal" :keyboard-resize-by="10" class="min-h-0 flex-1">
                 <SplitterPanel
                     ref="panelRef"
                     collapsible

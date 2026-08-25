@@ -34,8 +34,8 @@ export function kindRank(kind: SearchKind): number {
 // inline `t()` calls, so an unused-key sweep cannot see them: the search spec
 // walks this map for exactly that reason.
 export const KIND_LABEL_KEYS: Readonly<Record<SearchKind, string>> = Object.freeze({
-    fan: 'layout.shell.simple.fans',
-    sensor: 'layout.shell.simple.sensors',
+    fan: 'layout.shell.search.kindFan',
+    sensor: 'layout.shell.search.kindSensor',
     device: 'layout.shell.devices',
     lighting: 'layout.shell.sensorDest.lighting',
     lcd: 'layout.shell.sensorDest.lcd',

@@ -158,10 +158,8 @@ const failsafeTooltip = computed((): string => {
                 </div>
                 <div class="truncate text-sm text-text-color-secondary">{{ deviceLabel }}</div>
             </div>
-            <!-- Simple mode has no Alerts section, and CoolingLanding keeps the
-                 wizards out of Fans, so the card's shortcuts to both go too. -->
             <div
-                v-if="!settingsStore.isSimpleMode && (liveRpm != null || channel.controllable)"
+                v-if="liveRpm != null || channel.controllable"
                 class="ml-auto flex shrink-0 items-center gap-0.5"
             >
                 <button

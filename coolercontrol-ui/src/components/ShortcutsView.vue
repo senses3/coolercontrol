@@ -7,23 +7,20 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { hotkeySections } from '@/shell/sections.ts'
+import { HOTKEY_SECTIONS } from '@/shell/sections.ts'
 
 const { t } = useI18n()
 const deviceStore = useDeviceStore()
-const settingsStore = useSettingsStore()
 
 const ctrl = computed(() => t('views.shortcuts.ctrl'))
 // Driven by the same list ShellLayout binds, so the digits shown are the digits
-// that work in the current mode.
+// that work.
 const rows = computed((): Array<{ label: string; keys: string[] }> => {
-    const entries = [{ label: t('views.shortcuts.viewShortcuts'), keys: [ctrl.value, '/'] }]
-    // Simple mode has no palette, so it has no shortcut to document either.
-    if (!settingsStore.isSimpleMode) {
-        entries.unshift({ label: t('common.search'), keys: [ctrl.value, 'K'] })
-    }
-    for (const [index, section] of hotkeySections(settingsStore.uiMode).entries()) {
+    const entries = [
+        { label: t('common.search'), keys: [ctrl.value, 'K'] },
+        { label: t('views.shortcuts.viewShortcuts'), keys: [ctrl.value, '/'] },
+    ]
+    for (const [index, section] of HOTKEY_SECTIONS.entries()) {
         if (section.id === 'plugins' && deviceStore.plugins.length === 0) continue
         entries.push({ label: t(section.labelKey), keys: [ctrl.value, String(index + 1)] })
     }

@@ -67,10 +67,7 @@ const settingsStore = useSettingsStore()
 
 const sensorMode: boolean = props.deviceUID != null && props.channelName != null
 
-// Simple mode calls the cooling section Fans; this button opens that page.
-const coolingLabel = computed(() =>
-    settingsStore.isSimpleMode ? t('layout.shell.simple.fans') : t('layout.shell.cooling'),
-)
+const coolingLabel = computed(() => t('layout.shell.cooling'))
 
 // Entity-first companion link: fan/pump channels also have a Cooling page.
 const hasCoolingPage = computed((): boolean => {
@@ -661,13 +658,7 @@ onUnmounted(() => {
                         :suffix="t('common.minuteAbbr')"
                         v-tooltip.top="t('views.dashboard.timeRange')"
                     />
-                    <!-- Axis limits and the chart type are configuration, which
-                         the simple sensor page does without. -->
-                    <axis-options
-                        v-if="!settingsStore.isSimpleMode"
-                        class="h-10 ml-3"
-                        :dashboard="dashboard"
-                    />
+                    <axis-options class="h-10 ml-3" :dashboard="dashboard" />
                 </div>
                 <div
                     v-if="dashboard.chartType == ChartType.TABLE"
@@ -686,7 +677,7 @@ onUnmounted(() => {
                         <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
                     </UiButton>
                 </div>
-                <div v-if="!settingsStore.isSimpleMode" class="p-2 bg-bg-one">
+                <div class="p-2 bg-bg-one">
                     <span v-tooltip.top="t('views.dashboard.chartType')">
                         <UiSelect
                             v-model="dashboard.chartType"

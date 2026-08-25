@@ -36,10 +36,7 @@ const noticeKind = computed(() =>
     ),
 )
 
-// Simple mode calls the section Fans, and keeps the wizards out of it.
-const title = computed(() =>
-    settingsStore.isSimpleMode ? t('layout.shell.simple.fans') : t('layout.shell.cooling'),
-)
+const title = computed(() => t('layout.shell.cooling'))
 
 const deviceLabel = (deviceUID: UID): string =>
     settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
@@ -57,7 +54,7 @@ const { openCalibrationWizard, openGenerateWizard } = useToolWizards()
             <span class="text-base text-text-color-secondary">
                 {{ t('layout.shell.coolingPage.landingHint') }}
             </span>
-            <span v-if="!settingsStore.isSimpleMode" class="ml-auto flex items-center gap-2">
+            <span class="ml-auto flex items-center gap-2">
                 <UiButton
                     v-if="features.coolingWizard"
                     variant="outline"
