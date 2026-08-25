@@ -1673,6 +1673,9 @@ export const useSettingsStore = defineStore('settings', () => {
                 life: 4000,
             })
         } else {
+            // the daemon keeps its own device info in sync, this reflects it
+            // in the UI without waiting for a device reload
+            thinkPadFanControlEnabled.value = enable
             toast.add({
                 severity: 'success',
                 summary: t('common.success'),

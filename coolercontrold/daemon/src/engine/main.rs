@@ -1116,8 +1116,23 @@ impl Engine {
     pub async fn thinkpad_fan_control(&self, enable: &bool) -> Result<()> {
         repositories::utils::thinkpad_fan_control(enable)
             .await
-            .map(|()| info!("Successfully enabled ThinkPad Fan Control"))
-            .inspect_err(|err| error!("Error attempting to enable ThinkPad Fan Control: {err}"))
+            .map(|()| {
+                let state = if *enable { "enabled" } else { "disabled" };
+                info!("Successfully {state} ThinkPad Fan Control");
+                Self::set_thinkpad_fan_control_info(&self.all_devices, *enable);
+            })
+            .inspect_err(|err| error!("Error attempting to set ThinkPad Fan Control: {err}"))
+    }
+
+    /// Keeps the cached device info in sync with the applied `fan_control` option,
+    /// so clients see the new state without a daemon restart.
+    fn set_thinkpad_fan_control_info(all_devices: &AllDevices, enable: bool) {
+        for device in all_devices.values() {
+            let mut device = device.borrow_mut();
+            if device.info.thinkpad_fan_control.is_some() {
+                device.info.thinkpad_fan_control = Some(enable);
+            }
+        }
     }
 
     /// This function finds out if the give Profile UID is in use, and if so, updates
@@ -2260,7 +2275,55 @@ impl DiagnosisHost for Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::{Device, DeviceInfo};
     use crate::setting::{LcdModeKind, LcdSettings, Setting, SettingKind};
+    use std::cell::RefCell;
+
+    fn device_with_thinkpad_info(name: &str, thinkpad_fan_control: Option<bool>) -> Device {
+        Device::new(
+            name.to_string(),
+            DeviceType::Hwmon,
+            0,
+            None,
+            DeviceInfo {
+                thinkpad_fan_control,
+                ..Default::default()
+            },
+            Some(name.to_string()),
+            1.0,
+        )
+    }
+
+    // Only ThinkPad devices get their cached fan control state updated.
+    #[test]
+    fn thinkpad_fan_control_info_updated() {
+        let thinkpad = device_with_thinkpad_info("thinkpad", Some(false));
+        let other = device_with_thinkpad_info("other", None);
+        let all_devices: AllDevices = Rc::new(HashMap::from([
+            (thinkpad.uid.clone(), Rc::new(RefCell::new(thinkpad))),
+            (other.uid.clone(), Rc::new(RefCell::new(other))),
+        ]));
+
+        Engine::set_thinkpad_fan_control_info(&all_devices, true);
+        for device in all_devices.values() {
+            let device = device.borrow();
+            if device.name == "thinkpad" {
+                assert_eq!(device.info.thinkpad_fan_control, Some(true));
+            } else {
+                assert_eq!(device.info.thinkpad_fan_control, None);
+            }
+        }
+
+        Engine::set_thinkpad_fan_control_info(&all_devices, false);
+        for device in all_devices.values() {
+            let device = device.borrow();
+            if device.name == "thinkpad" {
+                assert_eq!(device.info.thinkpad_fan_control, Some(false));
+            } else {
+                assert_eq!(device.info.thinkpad_fan_control, None);
+            }
+        }
+    }
 
     fn lcd_settings_with_image(image_path: Option<String>) -> LcdSettings {
         LcdSettings {
