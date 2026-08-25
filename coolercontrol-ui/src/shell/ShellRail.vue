@@ -12,7 +12,13 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { PLUGINS_SECTION, type SectionId, sectionsFor, startupRouteName } from '@/shell/sections.ts'
+import {
+    PLUGINS_SECTION,
+    type SectionId,
+    SHELL_SECTIONS,
+    type ShellSection,
+    startupRouteName,
+} from '@/shell/sections.ts'
 import UiDropdownMenu from '@/shell/ui/UiDropdownMenu.vue'
 import ShellRailLabel from '@/shell/ShellRailLabel.vue'
 import ShellAccessMenuItems from '@/shell/ShellAccessMenuItems.vue'
@@ -27,13 +33,11 @@ const settingsStore = useSettingsStore()
 
 // Settings is docked at the rail bottom (below), so it is dropped from the top list.
 // Plugins is always shown so its overview (a getting-started page) stays discoverable
-// even before any plugin is installed. Simple mode has no Plugins section.
-const railSections = computed(() => {
-    const sections = sectionsFor(settingsStore.uiMode).filter(
-        (section) => section.id !== 'settings',
-    )
-    return settingsStore.isSimpleMode ? sections : [...sections, PLUGINS_SECTION]
-})
+// even before any plugin is installed.
+const railSections: readonly ShellSection[] = [
+    ...SHELL_SECTIONS.filter((section) => section.id !== 'settings'),
+    PLUGINS_SECTION,
+]
 const activeSection = computed(() => route.meta.section as SectionId | undefined)
 
 // A label clips when its translation outgrows the rail, and the tooltip is the
@@ -53,9 +57,8 @@ const labelTooltip = (key: string, label: string) => ({
 // The logo resets to the configured startup page, which is what sets it apart
 // from the Home rail button. Resolved here rather than in the `startup-page`
 // route because that runs outside a component, where the store cannot be built.
-// Simple mode boots to Home whatever the setting says, so the logo goes there too.
 const startupTarget = computed(() => ({
-    name: settingsStore.isSimpleMode ? 'section-home' : startupRouteName(settingsStore.startupPage),
+    name: startupRouteName(settingsStore.startupPage),
 }))
 
 // Provided by ShellLayout; toggles the menu panel, same as the header button.
@@ -123,9 +126,9 @@ const onLogoTap = (): void => {
         </RouterLink>
         <!-- The rail's empty space doubles as a collapse target when asked for.
              The icon rests in the rail's own background color, so it reads as blank
-             space until hovered. Simple mode renders no panel to toggle. -->
+             space until hovered. -->
         <button
-            v-if="settingsStore.hideMenuCollapseIcon && !settingsStore.isSimpleMode"
+            v-if="settingsStore.hideMenuCollapseIcon"
             id="rail-collapse"
             type="button"
             v-tooltip.right="

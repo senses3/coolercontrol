@@ -75,6 +75,8 @@ export default {
                 jumpTo: '跳至',
                 noResults: '找不到相符項目。',
                 more: '還有 {count} 項',
+                kindFan: '風扇',
+                kindSensor: '感測器',
                 kindAction: '操作',
                 kindPage: '頁面',
             },
@@ -89,25 +91,6 @@ export default {
             access: '存取',
             power: '電源',
             noModes: '尚未儲存模式',
-            simple: {
-                fans: '風扇',
-                sensors: '感測器',
-                sensorsHint: '選擇一個感測器以檢視其歷史記錄。',
-                noSensors: '未偵測到感測器。',
-                modeCurve: '曲線',
-                modeFixed: '固定轉速',
-                useCurve: '使用簡單曲線',
-                useCurveAccept: '建立曲線',
-                forkMessage:
-                    '將此曲線複製為新曲線「{copy}」，僅供 {channel} 使用。\n\n共用原曲線的風扇維持不變。',
-                seedMessage:
-                    '為 {channel} 建立一條曲線，以標準風扇曲線為起點。\n\n在下方編輯器中調整形狀。',
-                sharedSummary:
-                    '此曲線僅控制此風扇 | 此曲線還控制另外 {count} 個風扇，在此編輯也會改變它們。 | 此曲線還控制另外 {count} 個風扇，在此編輯也會改變它們。',
-                otherSummary: '{profile} 控制此風扇，且不是簡單曲線。',
-                noCurveSummary: '此風扇尚未有曲線。',
-                curveNameSuffix: ' 曲線',
-            },
             supportWizards: {
                 summary: '支援魔法師已啟動！',
                 detail: '感謝幫助我們的使用者讓硬體與驅動程式正常運作的志工們。',
@@ -328,7 +311,6 @@ export default {
             time24h: '24小時制',
             time12h: '12小時制',
             frequencyPrecision: '頻率精度',
-            uiMode: '介面模式',
             startupPage: '啟動頁面',
             dashboardLineSize: '儀表板線條大小',
             themeStyle: '主題樣式',
@@ -383,7 +365,6 @@ export default {
             tooltips: {
                 timeFormat: '時間格式：12小時（AM/PM）或24小時',
                 frequencyPrecision: '調整顯示頻率值的精確度。',
-                uiMode: '簡潔模式僅顯示風扇控制與感測器。完整介面顯示全部內容。',
                 startupPage: '應用程式載入後顯示的頁面。',
                 railToCollapse: '也可使用導覽列的空白區域展開或摺疊選單。',
                 eyeCandy: '啟用視覺動畫，例如旋轉的風扇圖示。\n這將使用一些額外的 GPU 資源。',
@@ -1489,10 +1470,6 @@ export default {
         channelViewType: {
             control: '控制',
             dashboard: '儀表板',
-        },
-        uiMode: {
-            simple: '簡潔',
-            full: '完整介面',
         },
         startupPage: {
             appInfo: '資訊與工具',

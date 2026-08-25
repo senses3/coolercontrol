@@ -4,8 +4,7 @@
 /**
  * The control state a fan or pump page works in: how the daemon drives the
  * channel right now, the values the page edits, and the apply flow that writes
- * them back. Shared by the full channel page and the simple fan page so the two
- * cannot drift on what applying means.
+ * them back.
  */
 
 import { storeToRefs } from 'pinia'
@@ -97,8 +96,7 @@ export function useChannelControl(deviceUID: UID, channelName: string) {
     watch(() => daemonSetting.value?.profile_uid, rememberProfile)
 
     // Returning a channel to a profile offers back the one it last ran, instead
-    // of an empty picker (or, in the simple interface, no picker at all). Only
-    // a preselection: nothing is written until apply.
+    // of an empty picker. Only a preselection: nothing is written until apply.
     watch(controlMode, (mode) => {
         if (mode !== 'automatic' || selectedProfileUID.value != null) return
         const remembered = uiSetting.value?.lastProfileUID

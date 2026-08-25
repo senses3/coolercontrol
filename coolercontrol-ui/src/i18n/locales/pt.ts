@@ -77,6 +77,8 @@ export default {
                 jumpTo: 'Ir para',
                 noResults: 'Nenhuma correspondência encontrada.',
                 more: 'mais {count}',
+                kindFan: 'Ventoinhas',
+                kindSensor: 'Sensores',
                 kindAction: 'Ações',
                 kindPage: 'Páginas',
             },
@@ -91,25 +93,6 @@ export default {
             access: 'Acesso',
             power: 'Energia',
             noModes: 'Nenhum modo salvo',
-            simple: {
-                fans: 'Ventoinhas',
-                sensors: 'Sensores',
-                sensorsHint: 'Selecione um sensor para ver seu histórico.',
-                noSensors: 'Nenhum sensor foi detectado.',
-                modeCurve: 'Curva',
-                modeFixed: 'Velocidade fixa',
-                useCurve: 'Usar uma curva simples',
-                useCurveAccept: 'Criar curva',
-                forkMessage:
-                    "Copiar esta curva para uma nova, '{copy}', usada somente por {channel}.\n\nAs ventoinhas que compartilham a original a mantêm.",
-                seedMessage:
-                    'Criar uma curva para {channel}, partindo da curva de ventoinha padrão.\n\nAjuste o formato no editor abaixo.',
-                sharedSummary:
-                    'Esta curva controla apenas esta ventoinha | Esta curva também controla mais {count} ventoinha, então editá-la aqui mudaria essa também. | Esta curva também controla mais {count} ventoinhas, então editá-la aqui mudaria essas também.',
-                otherSummary: '{profile} controla esta ventoinha e não é uma curva simples.',
-                noCurveSummary: 'Esta ventoinha ainda não tem curva.',
-                curveNameSuffix: ' Curva',
-            },
             supportWizards: {
                 summary: 'Magos do suporte ativados!',
                 detail: 'Agradecemos aos voluntários que ajudam nossos usuários a fazer o hardware e os drivers funcionarem.',
@@ -345,7 +328,6 @@ export default {
             time24h: '24 horas',
             time12h: '12 horas',
             frequencyPrecision: 'Precisão de frequência',
-            uiMode: 'Modo da interface',
             startupPage: 'Página inicial',
             dashboardLineSize: 'Tamanho da linha do painel',
             themeStyle: 'Estilo do tema',
@@ -400,7 +382,6 @@ export default {
             tooltips: {
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) ou 24 horas',
                 frequencyPrecision: 'Ajustar a precisão dos valores de frequência exibidos.',
-                uiMode: 'Simples mostra apenas o controle de ventoinhas e os sensores. A interface completa mostra tudo.',
                 startupPage: 'A página exibida após o carregamento do aplicativo.',
                 railToCollapse:
                     'Usar também a área vazia da barra de navegação para expandir ou recolher o menu.',
@@ -1580,10 +1561,6 @@ export default {
         channelViewType: {
             control: 'Controle',
             dashboard: 'Painel',
-        },
-        uiMode: {
-            simple: 'Simples',
-            full: 'Interface completa',
         },
         startupPage: {
             appInfo: 'Info e Ferramentas',

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The channel control state both the full channel page and the simple fan page
-// run on. The real stores need a component setup (they call useI18n/inject), so
-// the composable is driven against stand-ins with the same shapes.
+// The channel control state the channel page runs on. The real stores need a
+// component setup (they call useI18n/inject), so the composable is driven
+// against stand-ins with the same shapes.
 
 import 'reflect-metadata'
 import { beforeEach, describe, expect, it, vi } from 'vitest'

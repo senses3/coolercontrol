@@ -5,13 +5,12 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import en from '@/i18n/locales/en.ts'
-import { StartupPage, UiMode } from '@/models/UISettings.ts'
+import { StartupPage } from '@/models/UISettings.ts'
 import {
-    hotkeySections,
+    HOTKEY_SECTIONS,
     PLUGINS_SECTION,
     SHELL_SECTIONS,
     sectionById,
-    sectionsFor,
     startupRouteName,
 } from '../sections.ts'
 
@@ -64,27 +63,8 @@ describe('shell sections', () => {
         expect(routerSource).not.toMatch(/use[A-Za-z]*Store\s*\(/)
     })
 
-    it('trims the simple rail to fans, sensors and the two fixed sections', () => {
-        expect(sectionsFor(UiMode.SIMPLE).map((s) => s.id)).toEqual([
-            'home',
-            'cooling',
-            'monitoring',
-            'settings',
-        ])
-        expect(sectionsFor(UiMode.FULL)).toBe(SHELL_SECTIONS)
-    })
-
-    // Simple mode is a lens over the same routes, so every deep link, bookmark
-    // and Qt navigation target still resolves after a switch.
-    it('keeps the full shell routes in simple mode', () => {
-        for (const section of sectionsFor(UiMode.SIMPLE)) {
-            const full = SHELL_SECTIONS.find((s) => s.id === section.id)
-            expect(section.routeName, section.id).toBe(full?.routeName)
-        }
-    })
-
-    it('has an english translation for every simple label key', () => {
-        for (const section of sectionsFor(UiMode.SIMPLE)) {
+    it('has an english translation for every section label key', () => {
+        for (const section of HOTKEY_SECTIONS) {
             const path = section.labelKey.split('.')
             let node: any = en
             for (const part of path) node = node?.[part]
@@ -94,20 +74,14 @@ describe('shell sections', () => {
 
     // ctrl+N is the Nth entry of this list, so a gap or a reorder silently
     // rebinds a digit.
-    it('numbers the hotkey sections per interface, plugins last', () => {
-        expect(hotkeySections(UiMode.FULL).map((s) => s.id)).toEqual([
+    it('numbers the hotkey sections, plugins last', () => {
+        expect(HOTKEY_SECTIONS.map((s) => s.id)).toEqual([
             'home',
             'cooling',
             'monitoring',
             'devices',
             'settings',
             'plugins',
-        ])
-        expect(hotkeySections(UiMode.SIMPLE).map((s) => s.id)).toEqual([
-            'home',
-            'cooling',
-            'monitoring',
-            'settings',
         ])
     })
 

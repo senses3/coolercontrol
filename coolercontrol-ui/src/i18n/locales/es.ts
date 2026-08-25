@@ -77,6 +77,8 @@ export default {
                 jumpTo: 'Ir a',
                 noResults: 'No se encontraron coincidencias.',
                 more: '{count} más',
+                kindFan: 'Ventiladores',
+                kindSensor: 'Sensores',
                 kindAction: 'Acciones',
                 kindPage: 'Páginas',
             },
@@ -91,25 +93,6 @@ export default {
             access: 'Acceso',
             power: 'Energía',
             noModes: 'No hay modos guardados',
-            simple: {
-                fans: 'Ventiladores',
-                sensors: 'Sensores',
-                sensorsHint: 'Seleccione un sensor para ver su historial.',
-                noSensors: 'No se detectaron sensores.',
-                modeCurve: 'Curva',
-                modeFixed: 'Velocidad fija',
-                useCurve: 'Usar una curva simple',
-                useCurveAccept: 'Crear curva',
-                forkMessage:
-                    "Copiar esta curva a una nueva, '{copy}', que solo usará {channel}.\n\nLos ventiladores que comparten la original la conservan.",
-                seedMessage:
-                    'Crear una curva para {channel}, partiendo de la curva de ventilador estándar.\n\nDele forma en el editor de abajo.',
-                sharedSummary:
-                    'Esta curva solo controla este ventilador | Esta curva también controla {count} ventilador más, así que editarla aquí también lo cambiaría. | Esta curva también controla {count} ventiladores más, así que editarla aquí también los cambiaría.',
-                otherSummary: '{profile} controla este ventilador y no es una curva simple.',
-                noCurveSummary: 'Este ventilador aún no tiene curva.',
-                curveNameSuffix: ' Curva',
-            },
             supportWizards: {
                 summary: '¡Magos del soporte activados!',
                 detail: 'Gracias a los voluntarios que ayudan a nuestros usuarios a hacer funcionar su hardware y sus controladores.',
@@ -345,7 +328,6 @@ export default {
             time24h: '24 horas',
             time12h: '12 horas',
             frequencyPrecision: 'Precisión de frecuencia',
-            uiMode: 'Modo de interfaz',
             startupPage: 'Página de inicio',
             dashboardLineSize: 'Tamaño de línea del panel',
             themeStyle: 'Estilo del tema',
@@ -400,7 +382,6 @@ export default {
             tooltips: {
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) o 24 horas',
                 frequencyPrecision: 'Ajustar la precisión de los valores de frecuencia mostrados.',
-                uiMode: 'Simple muestra solo el control de ventiladores y los sensores. La interfaz completa lo muestra todo.',
                 startupPage: 'La página que se muestra después de cargar la aplicación.',
                 railToCollapse:
                     'Usar también el área vacía de la barra de navegación para expandir o contraer el menú.',
@@ -1582,10 +1563,6 @@ export default {
         channelViewType: {
             control: 'Control',
             dashboard: 'Panel',
-        },
-        uiMode: {
-            simple: 'Simple',
-            full: 'Interfaz completa',
         },
         startupPage: {
             appInfo: 'Info y Herramientas',

@@ -5,11 +5,8 @@
  * The curve a new Graph profile starts from: a straight ramp across the temp
  * source's usable range, from off to full.
  *
- * One definition, because three surfaces draw it. The profile editor and the
- * new-profile wizard both open on it, and the simple interface saves it as the
- * starting point for a fan that has no curve. A fan given a curve in the simple
- * interface has to be the same fan given one in the full interface, or the two
- * would disagree about what a new profile is.
+ * One definition, because the profile editor and the new-profile wizard both
+ * open on it and must agree about what a new profile is.
  */
 
 /** Point count, when the device's own limits leave room for it. */

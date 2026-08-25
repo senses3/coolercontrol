@@ -7,28 +7,24 @@ import ShellLayout from '@/shell/ShellLayout.vue'
 
 // Shell section routes. Placeholder pages until each section's phase lands;
 // the settings section reuses the existing settings route.
-//
-// `meta.simple` marks the pages the simple interface owns. Static data, not a
-// guard: every route stays reachable in either interface, and only an explicit
-// interface switch consults this (see shell/simple/uiModeRoute.ts).
 const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'home',
         name: 'section-home',
         component: () => import('@/shell/home/HomePage.vue'),
-        meta: { section: 'home', simple: true },
+        meta: { section: 'home' },
     },
     {
         path: 'home/logs',
         name: 'home-logs',
         component: () => import('@/shell/home/LogsPage.vue'),
-        meta: { section: 'home', simple: true },
+        meta: { section: 'home' },
     },
     {
         path: 'cooling',
         name: 'section-cooling',
         component: () => import('@/shell/cooling/CoolingLanding.vue'),
-        meta: { section: 'cooling', simple: true },
+        meta: { section: 'cooling' },
     },
     {
         path: 'cooling/modes',
@@ -39,16 +35,16 @@ const sectionRoutes: RouteRecordRaw[] = [
     {
         path: 'cooling/:deviceUID/:channelName',
         name: 'cooling-channel',
-        component: () => import('@/shell/simple/CoolingChannelRoute.vue'),
+        component: () => import('@/shell/cooling/ChannelPage.vue'),
         props: true,
-        meta: { section: 'cooling', simple: true },
+        meta: { section: 'cooling' },
     },
     {
         // Section landing is the home dashboard (DashboardView's no-param fallback).
         path: 'monitoring',
         name: 'section-monitoring',
-        component: () => import('@/shell/simple/MonitoringSectionRoute.vue'),
-        meta: { section: 'monitoring', simple: true },
+        component: () => import('@/views/DashboardView.vue'),
+        meta: { section: 'monitoring' },
     },
     {
         path: 'monitoring/dashboards/:dashboardUID',
@@ -62,7 +58,7 @@ const sectionRoutes: RouteRecordRaw[] = [
         name: 'monitoring-sensor',
         component: () => import('@/views/DashboardView.vue'),
         props: true,
-        meta: { section: 'monitoring', simple: true },
+        meta: { section: 'monitoring' },
     },
     {
         path: 'monitoring/alerts',
@@ -181,7 +177,7 @@ const router = createRouter({
                     name: 'settings',
                     component: () => import('@/layout/AppSettings.vue'),
                     props: true,
-                    meta: { section: 'settings', simple: true },
+                    meta: { section: 'settings' },
                 },
                 {
                     path: '/dashboards/:dashboardUID?',

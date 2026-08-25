@@ -21,7 +21,6 @@ import {
     TagSettings,
     type TablePosition,
     ThemeMode,
-    UiMode,
     UISettingsDTO,
 } from '@/models/UISettings'
 import {
@@ -43,7 +42,6 @@ import { useDeviceStore } from '@/stores/DeviceStore'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
 import { buildPinnedSensors } from '@/shell/qtPinnedSensors.ts'
 import { channelRoute } from '@/shell/channelRoute.ts'
-import { routeAfterUiModeSwitch } from '@/shell/simple/uiModeRoute.ts'
 import router from '@/router'
 import type { AllDaemonDeviceSettings } from '@/models/DaemonSettings'
 import type { NameOverrides } from '@/models/NameOverrides'
@@ -297,21 +295,6 @@ export const useSettingsStore = defineStore('settings', () => {
     const ramStressBackend: Ref<'stress_ng' | 'built_in'> = ref('stress_ng')
     const driveStressBackend: Ref<'stress_ng' | 'built_in'> = ref('built_in')
     const startupPage: Ref<StartupPage> = ref(StartupPage.AppInfo)
-    // Which shell renders. Simple is a lens over the same daemon config, so
-    // switching either way is lossless and needs no migration.
-    const uiMode: Ref<UiMode> = ref(UiMode.FULL)
-    const isSimpleMode = computed(() => uiMode.value === UiMode.SIMPLE)
-    /**
-     * Switches the interface. The only way to change `uiMode` from a user
-     * action: the page has to move with it when the interface being left behind
-     * is the one that owned it.
-     */
-    function setUiMode(chosen: UiMode): void {
-        if (uiMode.value === chosen) return
-        uiMode.value = chosen
-        const target = routeAfterUiModeSwitch(chosen, router.currentRoute.value.meta)
-        if (target != null) router.push({ name: target })
-    }
     const tags: Ref<Map<string, TagSettings>> = ref(new Map<string, TagSettings>())
 
     async function initializeSettings(allDevicesIter: IterableIterator<Device>): Promise<void> {
@@ -450,9 +433,6 @@ export const useSettingsStore = defineStore('settings', () => {
         ramStressBackend.value = uiSettings.ramStressBackend ?? 'stress_ng'
         driveStressBackend.value = uiSettings.driveStressBackend ?? 'built_in'
         startupPage.value = uiSettings.startupPage ?? StartupPage.AppInfo
-        // A config that has never chosen opens in the full interface. Simple
-        // is reached from the Settings page only.
-        uiMode.value = uiSettings.uiMode ?? UiMode.FULL
         tags.value.clear()
         if (uiSettings.tagNames.length === uiSettings.tagColors.length) {
             for (const [i, name] of uiSettings.tagNames.entries()) {
@@ -1369,7 +1349,6 @@ export const useSettingsStore = defineStore('settings', () => {
                 ramStressBackend,
                 driveStressBackend,
                 startupPage,
-                uiMode,
                 tags.value,
             ],
             _.debounce(
@@ -1430,7 +1409,6 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.ramStressBackend = ramStressBackend.value
                     uiSettings.driveStressBackend = driveStressBackend.value
                     uiSettings.startupPage = startupPage.value
-                    uiSettings.uiMode = uiMode.value
                     tags.value.forEach((tagSettings, name) => {
                         uiSettings.tagNames.push(name)
                         uiSettings.tagColors.push(tagSettings.color)
@@ -1860,9 +1838,6 @@ export const useSettingsStore = defineStore('settings', () => {
         ramStressBackend,
         driveStressBackend,
         startupPage,
-        uiMode,
-        isSimpleMode,
-        setUiMode,
         allDaemonDeviceSettings,
         ccSettings,
         ccDeviceSettings,

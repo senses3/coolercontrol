@@ -331,7 +331,6 @@ const shortcutClasses =
                     CoolerControl v{{ appVersion }}
                 </a>
                 <RouterLink
-                    v-if="!settingsStore.isSimpleMode"
                     :to="{ name: 'settings', params: { tabNumber: '0' } }"
                     class="text-accent"
                 >
@@ -429,10 +428,8 @@ const shortcutClasses =
                 </div>
             </div>
 
-            <!-- Mode and alerts. Modes and alerts are full-shell surfaces, so
-                 simple mode keeps the diagnostics cards and drops this one, the
-                 links, and the stress tests. -->
-            <div v-if="!settingsStore.isSimpleMode" :class="cardClasses">
+            <!-- Mode and alerts -->
+            <div :class="cardClasses">
                 <span :class="cardTitleClasses">{{
                     t('layout.shell.homePage.modeAndAlerts')
                 }}</span>
@@ -481,7 +478,7 @@ const shortcutClasses =
             </div>
 
             <!-- Shortcuts, grouped: tasks / learning / external resources -->
-            <div v-if="!settingsStore.isSimpleMode" :class="cardClasses">
+            <div :class="cardClasses">
                 <span :class="cardTitleClasses">{{ t('views.appInfo.helpfulLinks') }}</span>
                 <!-- auto-fit, not a viewport breakpoint: this card lives in a splitter
                      pane, so the column count has to follow the pane. Dropping a
@@ -620,7 +617,7 @@ const shortcutClasses =
             </div>
 
             <!-- Stress tests -->
-            <StressTestsCard v-if="!settingsStore.isSimpleMode" />
+            <StressTestsCard />
         </div>
         <div class="pb-8" />
     </div>

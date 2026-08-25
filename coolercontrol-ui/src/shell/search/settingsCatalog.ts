@@ -54,12 +54,6 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = Object.freeze([
         keywords: ['keybindings', 'hotkeys', 'keys'],
     },
     {
-        id: 'setting-ui-mode',
-        cardKey: GENERAL,
-        labelKey: 'layout.settings.uiMode',
-        keywords: ['simple', 'advanced', 'full', 'basic'],
-    },
-    {
         id: 'setting-startup-page',
         cardKey: GENERAL,
         labelKey: 'layout.settings.startupPage',

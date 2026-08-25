@@ -75,6 +75,8 @@ export default {
                 jumpTo: 'Jump to',
                 noResults: 'No matches found.',
                 more: '{count} more',
+                kindFan: 'Fans',
+                kindSensor: 'Sensors',
                 kindAction: 'Actions',
                 kindPage: 'Pages',
             },
@@ -89,25 +91,6 @@ export default {
             access: 'Access',
             power: 'Power',
             noModes: 'No modes saved',
-            simple: {
-                fans: 'Fans',
-                sensors: 'Sensors',
-                sensorsHint: 'Select a sensor to see its history.',
-                noSensors: 'No sensors were detected.',
-                modeCurve: 'Curve',
-                modeFixed: 'Fixed speed',
-                useCurve: 'Use a simple curve',
-                useCurveAccept: 'Create curve',
-                forkMessage:
-                    "Copy this curve to a new one, '{copy}', used by {channel} alone.\n\nThe fans that share the original keep it.",
-                seedMessage:
-                    'Create a curve for {channel}, starting from the standard fan curve.\n\nShape it in the editor below.',
-                sharedSummary:
-                    'This curve drives only this fan | This curve also drives {count} other fan, so editing it here would change that one too. | This curve also drives {count} other fans, so editing it here would change them too.',
-                otherSummary: '{profile} controls this fan, and it is not a plain curve.',
-                noCurveSummary: 'This fan has no curve yet.',
-                curveNameSuffix: ' Curve',
-            },
             supportWizards: {
                 summary: 'Support Wizards Activated!',
                 detail: 'With thanks to the volunteers who help our users get their hardware and drivers working.',
@@ -339,7 +322,6 @@ export default {
             time24h: '24hr',
             time12h: '12hr',
             frequencyPrecision: 'Frequency Precision',
-            uiMode: 'Interface Mode',
             startupPage: 'Startup Page',
             dashboardLineSize: 'Dashboard Line Size',
             themeStyle: 'Theme Style',
@@ -394,7 +376,6 @@ export default {
             tooltips: {
                 timeFormat: 'Time format: 12-hour (AM/PM) or 24-hour',
                 frequencyPrecision: 'Adjust the precision of displayed frequency values.',
-                uiMode: 'Simple shows only fan control and sensors. Full interface shows everything.',
                 startupPage: 'The page shown after the application loads.',
                 railToCollapse:
                     'Also use the empty space in the navigation rail to expand or collapse the menu.',
@@ -1554,10 +1535,6 @@ export default {
         channelViewType: {
             control: 'Control',
             dashboard: 'Dashboard',
-        },
-        uiMode: {
-            simple: 'Simple',
-            full: 'Full interface',
         },
         startupPage: {
             appInfo: 'Info & Tools',

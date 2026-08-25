@@ -76,6 +76,8 @@ export default {
                 jumpTo: 'यहाँ जाएँ',
                 noResults: 'कोई मिलान नहीं मिला।',
                 more: '{count} और',
+                kindFan: 'पंखे',
+                kindSensor: 'सेंसर',
                 kindAction: 'क्रियाएँ',
                 kindPage: 'पृष्ठ',
             },
@@ -90,25 +92,6 @@ export default {
             access: 'पहुंच',
             power: 'पावर',
             noModes: 'कोई मोड सहेजा नहीं गया',
-            simple: {
-                fans: 'पंखे',
-                sensors: 'सेंसर',
-                sensorsHint: 'इतिहास देखने के लिए एक सेंसर चुनें।',
-                noSensors: 'कोई सेंसर नहीं मिला।',
-                modeCurve: 'कर्व',
-                modeFixed: 'निश्चित गति',
-                useCurve: 'सरल कर्व का उपयोग करें',
-                useCurveAccept: 'कर्व बनाएं',
-                forkMessage:
-                    "इस कर्व की एक नई प्रति '{copy}' बनाएं, जिसे केवल {channel} उपयोग करेगा।\n\nमूल कर्व साझा करने वाले पंखे उसे बनाए रखेंगे।",
-                seedMessage:
-                    '{channel} के लिए एक कर्व बनाएं, मानक फैन कर्व से शुरू करते हुए।\n\nनीचे दिए संपादक में इसे आकार दें।',
-                sharedSummary:
-                    'यह कर्व केवल इसी पंखे को चलाता है | यह कर्व {count} अन्य पंखे को भी चलाता है, इसलिए इसे यहां बदलने से वह भी बदलेगा। | यह कर्व {count} अन्य पंखों को भी चलाता है, इसलिए इसे यहां बदलने से वे भी बदलेंगे।',
-                otherSummary: '{profile} इस पंखे को नियंत्रित करता है और वह सरल कर्व नहीं है।',
-                noCurveSummary: 'इस पंखे का अभी कोई कर्व नहीं है।',
-                curveNameSuffix: ' कर्व',
-            },
             supportWizards: {
                 summary: 'सपोर्ट के जादूगर सक्रिय!',
                 detail: 'उन स्वयंसेवकों का धन्यवाद जो हमारे उपयोगकर्ताओं का हार्डवेयर और ड्राइवर चलाने में मदद करते हैं।',
@@ -341,7 +324,6 @@ export default {
             time24h: '24 घंटे',
             time12h: '12 घंटे',
             frequencyPrecision: 'आवृत्ति सटीकता',
-            uiMode: 'इंटरफ़ेस मोड',
             startupPage: 'स्टार्टअप पेज',
             dashboardLineSize: 'डैशबोर्ड रेखा आकार',
             themeStyle: 'थीम स्टाइल',
@@ -396,7 +378,6 @@ export default {
             tooltips: {
                 timeFormat: 'समय प्रारूप: 12-घंटे (AM/PM) या 24-घंटे',
                 frequencyPrecision: 'प्रदर्शित आवृत्ति मानों की सटीकता समायोजित करें।',
-                uiMode: 'सरल केवल पंखा नियंत्रण और सेंसर दिखाता है। पूर्ण इंटरफ़ेस सब कुछ दिखाता है।',
                 startupPage: 'एप्लिकेशन लोड होने के बाद दिखाया जाने वाला पेज।',
                 railToCollapse:
                     'मेनू को विस्तारित या संकुचित करने के लिए नेविगेशन बार के खाली क्षेत्र का भी उपयोग करें।',
@@ -1555,10 +1536,6 @@ export default {
         channelViewType: {
             control: 'नियंत्रण',
             dashboard: 'डैशबोर्ड',
-        },
-        uiMode: {
-            simple: 'सरल',
-            full: 'पूर्ण इंटरफ़ेस',
         },
         startupPage: {
             appInfo: 'जानकारी और उपकरण',
