@@ -1319,6 +1319,7 @@ const createDraggableGraphics = (): void => {
     // Add shadow circles (which is not visible) to enable drag.
     createGraphicDataFromPointData()
     controlGraph.value?.setOption({ graphic: graphicData })
+    graphicsCreated = true
 }
 
 const addPointToLine = (params: any) => {
@@ -1714,6 +1715,13 @@ const canAddPointAfter = (idx: number): boolean => {
 // releasing the previous observer and timeout first keeps exactly one of each alive.
 let resizeObserver: ResizeObserver | null = null
 let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
+let debouncedUpdatePosition: _.DebouncedFunc<() => void> | null = null
+// The drag circles only exist once createDraggableGraphics has run for the
+// current chart instance. A position-only update before that asks ECharts to
+// create a graphic with no type, which throws and leaves the layer broken.
+// The shell swaps its whole tree at 768px, so a narrow drag remounts this view
+// and lands in that window on every resize event until the circles are back.
+let graphicsCreated = false
 
 const showGraph = computed(() => {
     const shouldShow =
@@ -1723,27 +1731,12 @@ const showGraph = computed(() => {
     if (shouldShow) {
         if (graphicsTimeout !== null) clearTimeout(graphicsTimeout)
         resizeObserver?.disconnect()
+        debouncedUpdatePosition?.cancel()
+        graphicsCreated = false
         graphicsTimeout = setTimeout(() => {
             // debounce because we need to wait for the graph to be rendered
-            resizeObserver = new ResizeObserver(
-                _.debounce(
-                    () => {
-                        controlGraph.value?.setOption({
-                            graphic: data.map(function (item, _dataIndex) {
-                                return {
-                                    type: 'circle',
-                                    position: controlGraph.value?.convertToPixel(
-                                        'grid',
-                                        item.value,
-                                    ),
-                                }
-                            }),
-                        })
-                    },
-                    200,
-                    { leading: false },
-                ),
-            )
+            debouncedUpdatePosition = _.debounce(updatePosition, 200, { leading: false })
+            resizeObserver = new ResizeObserver(debouncedUpdatePosition)
             resizeObserver.observe(controlGraph.value?.$el)
             createDraggableGraphics() // we need to create AFTER the element is visible and rendered
         }, 500) // due to graph resizing, we really need a substantial delay on creation
@@ -2209,6 +2202,9 @@ const updateResponsiveGraphHeight = (): void => {
     }
 }
 const updatePosition = (): void => {
+    if (!graphicsCreated) {
+        return
+    }
     controlGraph.value?.setOption({
         graphic: data.slice(0, data.length - 1).map((item, dataIndex) => ({
             id: dataIndex,
@@ -2355,6 +2351,9 @@ onUnmounted(() => {
     }
     resizeObserver?.disconnect()
     resizeObserver = null
+    debouncedUpdatePosition?.cancel()
+    debouncedUpdatePosition = null
+    graphicsCreated = false
 })
 
 // Prevent the knob from consuming non-left mouse button clicks (e.g. browser
