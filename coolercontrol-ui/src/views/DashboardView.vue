@@ -710,12 +710,17 @@ onUnmounted(() => {
             :class="{ 'z-[1200]': fullPage }"
         >
             <div class="h-full" :class="{ 'full-page-wrapper': fullPage }">
+                <!-- pr-2 plus the w-10 box put the icon where the header's
+                     full-page button sits, so it does not jump on toggle. -->
                 <div
                     v-if="fullPage"
-                    class="flex flex-row pt-0.5 fixed left-0 top-0 z-50 w-full justify-between"
+                    class="fixed left-0 top-0 z-50 flex w-full flex-row justify-end pr-2 pt-0.5"
                 >
-                    <div />
-                    <div v-tooltip.top="t('views.dashboard.exitFullPage')" @click="toggleFullPage">
+                    <div
+                        class="flex w-10 justify-center"
+                        v-tooltip.top="t('views.dashboard.exitFullPage')"
+                        @click="toggleFullPage"
+                    >
                         <svg-icon
                             type="mdi"
                             class="text-text-color-secondary"
@@ -723,7 +728,6 @@ onUnmounted(() => {
                             :size="deviceStore.getREMSize(1.325)"
                         />
                     </div>
-                    <div />
                 </div>
                 <TimeChart
                     v-if="dashboard.chartType == ChartType.TIME_CHART"
