@@ -470,8 +470,12 @@ const updateResponsiveGraphHeight = (): void => {
     }
 }
 
-const toggleFullPage = (): void => {
+const toggleFullPage = async (): Promise<void> => {
     fullPage.value = !fullPage.value
+    // The chart is teleported in and out of the full-page wrapper, so measuring
+    // it before the re-render reads its old position: leaving full page would
+    // otherwise keep a viewport-tall chart.
+    await nextTick()
     updateResponsiveGraphHeight()
 }
 
