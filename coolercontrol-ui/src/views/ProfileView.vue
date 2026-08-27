@@ -76,6 +76,7 @@ import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import { Emitter, EventType } from 'mitt'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
 import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
@@ -2375,51 +2376,14 @@ defineExpose({ saveProfileState, contextIsDirty })
 </script>
 
 <template>
-    <div id="control-panel" class="flex flex-wrap items-center justify-between px-2 pt-2">
-        <entity-title-rename
-            :current-name="currentProfile.name"
-            :save-name-function="saveNameFunction"
-        />
-        <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
-            <template v-if="!hideSave">
-                <UiButton
-                    variant="ghost"
-                    size="icon"
-                    v-tooltip.top="t('components.wizards.profileApply.applyProfile')"
-                    @click="openProfileApplyWizard(currentProfile.uid)"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiExportVariant"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-                <UiButton
-                    variant="ghost"
-                    size="icon"
-                    v-tooltip.top="t('layout.menu.tooltips.duplicate')"
-                    @click="duplicateProfile"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiContentDuplicate"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-                <UiButton
-                    v-if="currentProfile.uid !== '0'"
-                    variant="ghost"
-                    size="icon"
-                    v-tooltip.top="t('views.profiles.deleteProfile')"
-                    @click="deleteProfile"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiDeleteOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </UiButton>
-            </template>
+    <entity-page-header id="control-panel">
+        <template #title>
+            <entity-title-rename
+                :current-name="currentProfile.name"
+                :save-name-function="saveNameFunction"
+            />
+        </template>
+        <template #controls>
             <div class="p-2 pr-0">
                 <span
                     v-tooltip.top="{
@@ -2520,6 +2484,47 @@ defineExpose({ saveProfileState, contextIsDirty })
                     v-tooltip.top="t('views.profiles.fixedDuty')"
                 />
             </div>
+        </template>
+        <template #actions>
+            <template v-if="!hideSave">
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('components.wizards.profileApply.applyProfile')"
+                    @click="openProfileApplyWizard(currentProfile.uid)"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiExportVariant"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('layout.menu.tooltips.duplicate')"
+                    @click="duplicateProfile"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentDuplicate"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    v-if="currentProfile.uid !== '0'"
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.profiles.deleteProfile')"
+                    @click="deleteProfile"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDeleteOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+            </template>
             <div v-if="!hideSave" class="p-2">
                 <UiButton
                     class="w-32"
@@ -2535,7 +2540,7 @@ defineExpose({ saveProfileState, contextIsDirty })
                     />
                 </UiButton>
             </div>
-        </div>
+        </template>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
         <div
             v-if="!hideSave && usedByItems.length > 0"
@@ -2559,7 +2564,7 @@ defineExpose({ saveProfileState, contextIsDirty })
             </span>
         </div>
         <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
-    </div>
+    </entity-page-header>
     <!-- The UI Display: -->
     <div v-if="showGraph" class="flex flex-col w-full">
         <div class="flex flex-row justify-between mt-4 w-full">

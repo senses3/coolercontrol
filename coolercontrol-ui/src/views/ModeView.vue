@@ -29,6 +29,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useConfirm } from '@/shell/confirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import { Emitter, EventType } from 'mitt'
 
 interface Props {
@@ -217,24 +218,26 @@ const deleteMode = (): void => {
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
-            <div class="flex flex-row overflow-hidden">
-                <entity-title-rename
-                    :current-name="currentMode.name"
-                    :save-name-function="saveNameFunction"
-                />
-                <div
-                    class="px-4 py-2 flex flex-row leading-none items-center"
-                    v-tooltip.top="t('views.mode.modeHint')"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.25)"
+        <entity-page-header>
+            <template #title>
+                <div class="flex flex-row overflow-hidden">
+                    <entity-title-rename
+                        :current-name="currentMode.name"
+                        :save-name-function="saveNameFunction"
                     />
+                    <div
+                        class="px-4 py-2 flex flex-row leading-none items-center"
+                        v-tooltip.top="t('views.mode.modeHint')"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiInformationSlabCircleOutline"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </div>
                 </div>
-            </div>
-            <div class="flex flex-row items-center gap-x-1">
+            </template>
+            <template #actions>
                 <UiButton
                     variant="ghost"
                     size="icon"
@@ -292,8 +295,8 @@ const deleteMode = (): void => {
                         />
                     </UiButton>
                 </div>
-            </div>
-        </div>
+            </template>
+        </entity-page-header>
         <div class="min-h-0 flex-1 overflow-y-auto">
             <UiTable sticky-header>
                 <template #head>

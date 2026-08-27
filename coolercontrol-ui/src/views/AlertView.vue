@@ -30,6 +30,7 @@ import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { ChannelMetric, ChannelSource } from '@/models/ChannelSource.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import UiSettingRow from '@/shell/ui/UiSettingRow.vue'
 import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
@@ -463,12 +464,14 @@ onMounted(async () => {
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
-            <entity-title-rename
-                :current-name="chosenName"
-                :save-name-function="saveNameFunction"
-            />
-            <div class="flex flex-wrap items-center gap-x-1 justify-end">
+        <entity-page-header>
+            <template #title>
+                <entity-title-rename
+                    :current-name="chosenName"
+                    :save-name-function="saveNameFunction"
+                />
+            </template>
+            <template #actions>
                 <UiButton
                     v-if="!shouldCreateAlert"
                     variant="ghost"
@@ -511,8 +514,8 @@ onMounted(async () => {
                         />
                     </UiButton>
                 </div>
-            </div>
-        </div>
+            </template>
+        </entity-page-header>
         <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
             <ScrollAreaViewport class="p-4 h-full w-full">
                 <div class="flex flex-col-reverse items-start lg:flex-row mt-0 w-full">

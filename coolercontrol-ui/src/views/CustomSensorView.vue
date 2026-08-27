@@ -43,6 +43,7 @@ import { v4 as uuidV4 } from 'uuid'
 import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
 import TimeChart from '@/components/TimeChart.vue'
 
@@ -650,13 +651,15 @@ onMounted(async () => {
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
-            <entity-title-rename
-                :current-name="currentName"
-                :fallback-name="defaultLabel"
-                :save-name-function="saveNameFunction"
-            />
-            <div class="flex flex-wrap items-center gap-x-1 justify-end">
+        <entity-page-header>
+            <template #title>
+                <entity-title-rename
+                    :current-name="currentName"
+                    :fallback-name="defaultLabel"
+                    :save-name-function="saveNameFunction"
+                />
+            </template>
+            <template #actions>
                 <UiButton
                     v-if="!shouldCreateSensor"
                     variant="ghost"
@@ -686,8 +689,8 @@ onMounted(async () => {
                         />
                     </UiButton>
                 </div>
-            </div>
-        </div>
+            </template>
+        </entity-page-header>
         <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
             <ScrollAreaViewport class="p-4 h-full w-full">
                 <health-warning

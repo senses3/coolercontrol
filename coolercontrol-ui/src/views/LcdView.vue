@@ -49,6 +49,7 @@ import UiSlider from '@/shell/ui/UiSlider.vue'
 import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import { Emitter, EventType } from 'mitt'
 import HealthWarning from '@/components/HealthWarning.vue'
 
@@ -550,13 +551,15 @@ onUnmounted(clearImages)
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="flex shrink-0 items-center justify-between px-2 pt-2">
-            <entity-title-rename
-                :current-name="channelLabel"
-                :fallback-name="defaultLabel"
-                :save-name-function="saveNameFunction"
-            />
-            <div class="flex flex-wrap gap-x-1 justify-end">
+        <entity-page-header>
+            <template #title>
+                <entity-title-rename
+                    :current-name="channelLabel"
+                    :fallback-name="defaultLabel"
+                    :save-name-function="saveNameFunction"
+                />
+            </template>
+            <template #actions>
                 <div class="p-2 flex flex-row">
                     <UiButton
                         class="w-32"
@@ -572,8 +575,8 @@ onUnmounted(clearImages)
                         />
                     </UiButton>
                 </div>
-            </div>
-        </div>
+            </template>
+        </entity-page-header>
         <ScrollAreaRoot id="lcd-control-pane" class="min-h-0 flex-1" style="--scrollbar-size: 10px">
             <ScrollAreaViewport class="p-4 h-full w-full">
                 <health-warning

@@ -30,6 +30,7 @@ import UiSettingsCard from '@/shell/ui/UiSettingsCard.vue'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { Emitter, EventType } from 'mitt'
 
@@ -303,12 +304,14 @@ onMounted(async () => {
 
 <template>
     <div class="flex h-full flex-col">
-        <div class="flex shrink-0 flex-wrap items-center justify-between px-2 pt-2">
-            <entity-title-rename
-                :current-name="currentFunction.name"
-                :save-name-function="saveNameFunction"
-            />
-            <div class="ml-auto flex flex-wrap items-center gap-x-1 justify-end">
+        <entity-page-header>
+            <template #title>
+                <entity-title-rename
+                    :current-name="currentFunction.name"
+                    :save-name-function="saveNameFunction"
+                />
+            </template>
+            <template #actions>
                 <UiButton
                     variant="ghost"
                     size="icon"
@@ -361,7 +364,7 @@ onMounted(async () => {
                         />
                     </UiButton>
                 </div>
-            </div>
+            </template>
             <div
                 v-if="usedByProfiles.length > 0"
                 class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
@@ -387,7 +390,7 @@ onMounted(async () => {
                     <span v-if="index < usedByProfiles.length - 1">,</span>
                 </span>
             </div>
-        </div>
+        </entity-page-header>
         <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
             <ScrollAreaViewport class="p-4 h-full w-full">
                 <!-- Responsive card grid: full-width cards when narrow, two
