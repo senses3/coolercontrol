@@ -4,9 +4,14 @@
 """Generate the desktop notification icons.
 
 Drawn at the app icon's stroke weight (25 on a 256 canvas) with round caps and
-joins, so they read as one family with it. Each icon keeps the framing it has
-always had: round joins mean the heavier stroke still clears the canvas, and the
-ink only grows half a stroke per side.
+joins, so they read as one family with it.
+
+Each icon is then scaled about the canvas centre until its ink fits the same
+86% of the canvas the app mark uses, so the set is framed consistently: as
+drawn, the triangles filled 98% of the box while the checkmark filled 58% and
+the "i" 8%. Only positions scale -- stroke widths, bar widths and dot radii are
+divided by the same factor inside the scaled group, so they land back at 25 and
+the weight stays uniform across the set.
 
 The bars are filled rects, not strokes. As a stroked vertical path the geometry
 bbox is zero-width, and `#grad` is objectBoundingBox, so it degenerates to a
@@ -18,7 +23,7 @@ import argparse
 import io
 import pathlib
 
-__VERSION__ = "1"
+__VERSION__ = "2"
 
 try:
     import cairosvg
@@ -32,8 +37,9 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TARGETS = (ROOT / "packaging/metadata", ROOT / "coolercontrol-ui/public/icons")
 SIZE = 512
+CANVAS = 256
 STROKE = 25
-HALF = STROKE / 2
+PAD = 0.86  # matches PAD in gen-app-icons.py
 
 HEAD = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!--
@@ -53,38 +59,86 @@ HEAD = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 """
 
 ENDS = 'stroke-linecap="round" stroke-linejoin="round"'
-STROKED = f'fill="none" stroke="url(#grad)" stroke-width="{STROKE}" {ENDS}'
 
 
-def bar(cx, y, height):
-    """A filled rect, rounded to look like a round-capped stroke."""
+def stroked(k):
+    return f'fill="none" stroke="url(#grad)" stroke-width="{STROKE / k:g}" {ENDS}'
+
+
+def bar(k, cx, y, height):
+    """A filled rect, rounded to look like a round-capped stroke. Its width is
+    divided by k so the scaled group renders it at STROKE."""
+    w = STROKE / k
     return (
-        f'  <rect x="{cx - HALF:g}" y="{y:g}" width="{STROKE}" height="{height:g}"'
-        f' rx="{HALF:g}" fill="url(#grad)" />'
+        f'    <rect x="{cx - w / 2:g}" y="{y:g}" width="{w:g}" height="{height:g}"'
+        f' rx="{w / 2:g}" fill="url(#grad)" />'
     )
 
 
-def dot(cx, cy):
-    return f'  <circle cx="{cx:g}" cy="{cy:g}" r="{HALF:g}" fill="url(#grad)" />'
+def dot(k, cx, cy):
+    return f'    <circle cx="{cx:g}" cy="{cy:g}" r="{STROKE / k / 2:g}" fill="url(#grad)" />'
 
 
-ICONS = {
-    # Power symbol: a ring with the stem crossing its top.
-    "shutdown": [f'  <circle cx="128" cy="144" r="80" {STROKED} />', bar(128, 32, 80)],
-    "information": [bar(128, 112, 80), dot(128, 72)],
-    "alert-triggered": [
-        f'  <polygon points="128,32 240,224 16,224" {STROKED} />',
-        bar(128, 96, 64),
-        dot(128, 192),
-    ],
-    "alert-resolved": [f'  <path d="M 64,128 L 112,176 L 192,80" {STROKED} />'],
-    # Lines as paths: some renderers ignore the <line> element outright.
-    "alert-error": [
-        f'  <polygon points="128,32 240,224 16,224" {STROKED} />',
-        f'  <path d="M 92,132 L 164,204" {STROKED} />',
-        f'  <path d="M 164,132 L 92,204" {STROKED} />',
-    ],
-}
+def icons(k):
+    """Every icon's shapes at scale factor k. Positions are unscaled here; the
+    wrapping group applies k, and the width-like values above cancel it."""
+    return {
+        # Power symbol: a ring with the stem crossing its top.
+        "shutdown": [
+            f'    <circle cx="128" cy="144" r="80" {stroked(k)} />',
+            bar(k, 128, 32, 80),
+        ],
+        "information": [bar(k, 128, 112, 80), dot(k, 128, 72)],
+        # The dot and the X sit higher than the sources drew them: at this
+        # stroke weight, and scaled to the shared inset, their old positions
+        # collided with the triangle's base.
+        "alert-triggered": [
+            f'    <polygon points="128,32 240,224 16,224" {stroked(k)} />',
+            bar(k, 128, 96, 64),
+            dot(k, 128, 186),
+        ],
+        "alert-resolved": [
+            f'    <path d="M 64,128 L 112,176 L 192,80" {stroked(k)} />'
+        ],
+        # Lines as paths: some renderers ignore the <line> element outright.
+        "alert-error": [
+            f'    <polygon points="128,32 240,224 16,224" {stroked(k)} />',
+            f'    <path d="M 104,140 L 152,188" {stroked(k)} />',
+            f'    <path d="M 152,140 L 104,188" {stroked(k)} />',
+        ],
+    }
+
+
+def svg(name, k):
+    c = CANVAS / 2
+    body = "\n".join(icons(k)[name])
+    return (
+        f'{HEAD}  <g transform="translate({c},{c}) scale({k:g}) translate(-{c},-{c})">\n'
+        f"{body}\n  </g>\n</svg>\n"
+    )
+
+
+def ink(name, k):
+    png = cairosvg.svg2png(
+        bytestring=svg(name, k).encode(), output_width=SIZE, output_height=SIZE
+    )
+    img = Image.open(io.BytesIO(png)).convert("RGBA")
+    bb = img.getchannel("A").point(lambda a: 255 if a > 96 else 0).getbbox()
+    return img, (bb[2] - bb[0], bb[3] - bb[1])
+
+
+def fit(name):
+    """Ink size is affine in k (ink = k * geometry + stroke), so two renders
+    solve it exactly. The tighter axis wins so nothing overflows the target."""
+    target = SIZE * PAD
+    (_, (w1, h1)), (_, (w2, h2)) = ink(name, 1.0), ink(name, 0.8)
+    ks = []
+    for m1, m2 in ((w1, w2), (h1, h2)):
+        a = (m1 - m2) / 0.2
+        if a < 1:  # that axis is all stroke (the "i" is one bar wide), so it
+            continue  # cannot constrain the fit
+        ks.append((target - (m1 - a)) / a)
+    return min(ks)
 
 
 def main():
@@ -92,15 +146,12 @@ def main():
     ap.add_argument("-v", "--version", action="version", version=f"\n {__VERSION__}")
     ap.parse_args()
 
-    for name, parts in ICONS.items():
-        svg = HEAD + "\n".join(parts) + "\n</svg>\n"
-        png = cairosvg.svg2png(
-            bytestring=svg.encode(), output_width=SIZE, output_height=SIZE
-        )
-        img = Image.open(io.BytesIO(png)).convert("RGBA")
+    for name in icons(1.0):
+        k = fit(name)
+        img, (w, h) = ink(name, k)
         for target in TARGETS:
             img.save(target / f"{name}.png")
-        print(f"wrote {name}.png")
+        print(f"{name:18} scale {k:.3f}   ink {w}x{h} of {SIZE} ({w * 100 // SIZE}%)")
 
 
 if __name__ == "__main__":
