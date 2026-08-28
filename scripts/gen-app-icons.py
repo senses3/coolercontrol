@@ -181,8 +181,8 @@ def _badge_clip(scale, offset, canvas, pad=1.0, indent="    "):
         f'{indent}<clipPath id="badge-cut" clipPathUnits="userSpaceOnUse">\n'
         f'{indent}  <path clip-rule="evenodd"\n'
         f'{indent}     d="M {origin:g},{origin:g} H {edge:g} V {edge:g} H {origin:g} Z'
-        f' M {bx - r:g},{by:g}'
-        f' A {r:g},{r:g} 0 1,0 {bx + r:g},{by:g}'
+        f" M {bx - r:g},{by:g}"
+        f" A {r:g},{r:g} 0 1,0 {bx + r:g},{by:g}"
         f' A {r:g},{r:g} 0 1,0 {bx - r:g},{by:g} Z" />\n'
         f"{indent}</clipPath>\n"
     )
