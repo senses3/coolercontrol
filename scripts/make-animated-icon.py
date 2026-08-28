@@ -38,8 +38,9 @@ SIZE = 512
 
 
 def hex_to_hls(h: str) -> tuple[float, float, float]:
-    h = h.lstrip("#")
-    r, g, b = (int(h[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
+    # fromhex rather than slicing: black writes `h[i : i + 2]` and flake8 then
+    # rejects the space before the colon, so the two linters cannot both pass.
+    r, g, b = (v / 255.0 for v in bytes.fromhex(h.lstrip("#")))
     return colorsys.rgb_to_hls(r, g, b)
 
 

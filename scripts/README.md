@@ -44,3 +44,7 @@ these after changing the mark, and commit what they write. They need `cairosvg`,
 Run `gen-app-icons.py` before `make-animated-icon.py`: the GIF is rendered from the colour SVG the
 first one writes. `gen-app-icons.py --check` renders everything without writing, which catches an
 SVG that a renderer silently drops.
+
+Follow any of them with `make ci-fmt` from the repo root. They write plain PNGs, and CI runs oxipng
+over the tree, so a generated icon fails `make ci-check` until it has been optimised. Optimisation
+is lossless, so it never changes what the icon looks like.

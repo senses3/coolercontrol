@@ -145,8 +145,8 @@ int main(int argc, char* argv[]) {
 
   // Colour icon, not symbolic: the symbolic one is drawn for 16px trays and
   // reads as coarse in a task switcher.
-  QApplication::setWindowIcon(QIcon::fromTheme(
-      APP_ID.data(), QIcon(":/icons/org.coolercontrol.CoolerControl.svg")));
+  QApplication::setWindowIcon(
+      QIcon::fromTheme(APP_ID.data(), QIcon(":/icons/org.coolercontrol.CoolerControl.svg")));
   QCoreApplication::setOrganizationName(APP_ID.data());
   QApplication::setApplicationName("CoolerControl");
   QApplication::setDesktopFileName(APP_ID.data());
