@@ -1296,8 +1296,11 @@ void MainWindow::applyTrayIconNotificationBadge(const bool forceBadge) const {
   if (forceBadge || m_daemonHasErrors || m_daemonHasWarnings || m_uiAlertsActive) {
     m_sysTrayIcon->setIcon(QIcon::fromTheme(
         APP_ID_ALERT_SYMBOLIC.data(),
-        QIcon::fromTheme(APP_ID_ALERT.data(),
-                         QIcon(":/icons/org.coolercontrol.CoolerControl-alert-symbolic.svg"))));
+        QIcon::fromTheme(
+            APP_ID_ALERT_SYMBOLIC_LEGACY.data(),
+            QIcon::fromTheme(
+                APP_ID_ALERT.data(),
+                QIcon(":/icons/org.coolercontrol.CoolerControl-alert-symbolic.svg")))));
   } else {
     m_sysTrayIcon->setIcon(QIcon::fromTheme(
         APP_ID_SYMBOLIC.data(),
