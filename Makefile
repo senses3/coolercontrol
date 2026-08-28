@@ -152,7 +152,7 @@ install-source: build install
 	@install -Dm644 packaging/metadata/$(ap_id).svg -t $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
 	@install -Dm644 packaging/metadata/$(ap_id)-alert.svg -t $(DESTDIR)/usr/share/icons/hicolor/scalable/apps/
 	@install -Dm644 packaging/metadata/$(ap_id)-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
-	@install -Dm644 packaging/metadata/$(ap_id)-symbolic-alert.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
+	@install -Dm644 packaging/metadata/$(ap_id)-alert-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
 	@install -Dm644 packaging/systemd/coolercontrold.service -t $(DESTDIR)/etc/systemd/system/
 
 uninstall:

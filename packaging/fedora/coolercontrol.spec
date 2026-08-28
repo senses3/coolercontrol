@@ -47,7 +47,7 @@ desktop-file-install --dir=%{buildroot}%{_datadir}/applications metadata/%{ap_id
 install -Dpm 644 metadata/%{ap_id}.svg -t %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
 install -Dpm 644 metadata/%{ap_id}-alert.svg -t %{buildroot}%{_datadir}/icons/hicolor/scalable/apps
 install -Dpm 644 metadata/%{ap_id}-symbolic.svg -t %{buildroot}%{_datadir}/icons/hicolor/symbolic/apps
-install -Dpm 644 metadata/%{ap_id}-symbolic-alert.svg -t %{buildroot}%{_datadir}/icons/hicolor/symbolic/apps
+install -Dpm 644 metadata/%{ap_id}-alert-symbolic.svg -t %{buildroot}%{_datadir}/icons/hicolor/symbolic/apps
 install -Dpm 644 metadata/%{ap_id}.png -t %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
 install -Dpm 644 metadata/%{ap_id}-alert.png -t %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
 install -Dpm 644 metadata/%{ap_id}.metainfo.xml -t %{buildroot}%{_metainfodir}
@@ -60,7 +60,7 @@ appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/*.metainfo.xml
 %{_bindir}/%{name}
 %{_datadir}/applications/%{ap_id}.desktop
 %{_datadir}/icons/hicolor/scalable/apps/%{ap_id}*
-%{_datadir}/icons/hicolor/symbolic/apps/%{ap_id}-symbolic*
+%{_datadir}/icons/hicolor/symbolic/apps/%{ap_id}*
 %{_datadir}/icons/hicolor/256x256/apps/%{ap_id}*
 %{_metainfodir}/%{ap_id}.metainfo.xml
 %{_mandir}/man1/%{name}.1*

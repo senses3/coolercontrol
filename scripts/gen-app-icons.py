@@ -21,7 +21,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "2"
+__VERSION__ = "6"
 
 try:
     import cairosvg
@@ -160,10 +160,44 @@ def _badge_defs(scale, offset, canvas, pad=1.0, indent="    "):
     )
 
 
-def _badge_circle(scale, offset, pad=1.0):
+def _badge_clip(scale, offset, canvas, pad=1.0, indent="    "):
+    """The same gap as `_badge_defs`, cut geometrically instead of by luminance.
+
+    GTK's symbolic pipeline rewrites the fills inside a <mask>, which drops the
+    mask's white to the foreground colour and takes the whole mark down to about
+    70% opacity. A clip path carries no colour to rewrite, so it survives."""
+    bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
+    r = (BADGE[2] + HALO) * pad * scale
+    origin, box = canvas
+    edge = origin + box
+    return (
+        f"{indent}<!-- Carves a transparent gap around the badge so it reads on any\n"
+        f"{indent}     background: an outline in a fixed colour cannot, since the panel\n"
+        f"{indent}     colour is unknown. Cut geometrically rather than with a mask:\n"
+        f"{indent}     GTK's symbolic pipeline rewrites the fills inside a mask and takes\n"
+        f"{indent}     the whole mark down to about 70% opacity. A renderer that ignores\n"
+        f"{indent}     clip paths just draws the badge over the mark, which is still\n"
+        f"{indent}     correct. -->\n"
+        f'{indent}<clipPath id="badge-cut" clipPathUnits="userSpaceOnUse">\n'
+        f'{indent}  <path clip-rule="evenodd"\n'
+        f'{indent}     d="M {origin:g},{origin:g} H {edge:g} V {edge:g} H {origin:g} Z'
+        f' M {bx - r:g},{by:g}'
+        f' A {r:g},{r:g} 0 1,0 {bx + r:g},{by:g}'
+        f' A {r:g},{r:g} 0 1,0 {bx - r:g},{by:g} Z" />\n'
+        f"{indent}</clipPath>\n"
+    )
+
+
+def _badge_circle(scale, offset, pad=1.0, symbolic=False):
+    # GTK recolours a symbolic icon wholesale unless an element opts into one of
+    # its four named colours, which would flatten the badge into the mark. The
+    # class picks the theme's error colour; the fill stays as the brand red for
+    # renderers that do not know the class.
+    cls = ' class="error"' if symbolic else ""
     bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
     return (
-        f'  <circle id="badge" cx="{bx:g}" cy="{by:g}" r="{BADGE[2] * pad * scale:g}"\n'
+        f'  <circle id="badge"{cls} cx="{bx:g}" cy="{by:g}"'
+        f' r="{BADGE[2] * pad * scale:g}"\n'
         f'     style="fill:#dc3545" />\n'
     )
 
@@ -188,15 +222,15 @@ def symbolic(alert):
         "    </style>",
     ]
     if alert:
-        out.append(_badge_defs(1.0, 0.0, (0, 16), k).rstrip("\n"))
+        out.append(_badge_clip(1.0, 0.0, (0, 16), k).rstrip("\n"))
     out.append("  </defs>")
-    mask = ' mask="url(#badge-cut)"' if alert else ""
-    out.append(f'  <g class="ColorScheme-Text" style="fill:currentColor"{mask}>')
+    cut = ' clip-path="url(#badge-cut)"' if alert else ""
+    out.append(f'  <g class="ColorScheme-Text" style="fill:currentColor"{cut}>')
     out.append(f'    <path d="{heads}" />')
     out.append(f'    <path d="{stems}" />')
     out.append("  </g>")
     if alert:
-        out.append(_badge_circle(1.0, 0.0, k).rstrip("\n"))
+        out.append(_badge_circle(1.0, 0.0, k, symbolic=True).rstrip("\n"))
     out.append("</svg>")
     return "\n".join(out) + "\n"
 
@@ -293,9 +327,12 @@ def main():
     )
     args = ap.parse_args()
 
+    # The alert icon was renamed from -symbolic-alert in 5.0.0. A symlink under
+    # the old name sits beside it so out-of-tree packaging that still installs
+    # that filename keeps building; drop it once those have caught up.
     files = {
         META / "org.coolercontrol.CoolerControl-symbolic.svg": symbolic(False),
-        META / "org.coolercontrol.CoolerControl-symbolic-alert.svg": symbolic(True),
+        META / "org.coolercontrol.CoolerControl-alert-symbolic.svg": symbolic(True),
         META / "org.coolercontrol.CoolerControl.svg": colour(False),
         META / "org.coolercontrol.CoolerControl-alert.svg": colour(True),
         PUBLIC

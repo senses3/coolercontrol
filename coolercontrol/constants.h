@@ -10,7 +10,13 @@ const std::string COOLER_CONTROL_VERSION = "5.0.0";
 const std::string APP_ID = "org.coolercontrol.CoolerControl";
 const std::string APP_ID_ALERT = "org.coolercontrol.CoolerControl-alert";
 const std::string APP_ID_SYMBOLIC = "org.coolercontrol.CoolerControl-symbolic";
-const std::string APP_ID_SYMBOLIC_ALERT = "org.coolercontrol.CoolerControl-symbolic-alert";
+// The variant qualifier goes before "-symbolic": panels key their recolouring
+// off that suffix, and lose the icon entirely when it comes and goes.
+const std::string APP_ID_ALERT_SYMBOLIC = "org.coolercontrol.CoolerControl-alert-symbolic";
+// Pre-5.0.0 name for the same icon. Tried before the colour fallback so a
+// third-party package that still installs it keeps the symbolic badge.
+// Goes when the packaging/metadata symlink under that name goes.
+const std::string APP_ID_ALERT_SYMBOLIC_LEGACY = "org.coolercontrol.CoolerControl-symbolic-alert";
 const std::string DBUS_SERVICE_NAME = "org.coolercontrol.CoolerControl.SingleInstance";
 const std::string DBUS_PATH = "/";
 const std::string SETTING_DAEMON_ADDRESS = "daemonAddress";
