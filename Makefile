@@ -150,7 +150,7 @@ install:
 # `sudo make install-source` would otherwise build as root and leave a root-owned
 # target/, node_modules/ and build/ behind.
 install-data:
-	@install -Dm644 packaging/metadata/$(ap_id).desktop -t $(DESTDIR)/usr/local/share/applications/
+	@install -Dm644 packaging/metadata/$(ap_id).desktop -t $(DESTDIR)/usr/share/applications/
 	@install -Dm644 packaging/metadata/$(ap_id).metainfo.xml -t $(DESTDIR)/usr/share/metainfo/
 	@install -Dm644 packaging/metadata/$(ap_id).png -t $(DESTDIR)/usr/share/icons/hicolor/256x256/apps/
 	@install -Dm644 packaging/metadata/$(ap_id)-alert.png -t $(DESTDIR)/usr/share/icons/hicolor/256x256/apps/
@@ -160,10 +160,13 @@ install-data:
 	@install -Dm644 packaging/metadata/$(ap_id)-alert-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
 	@install -Dm644 packaging/systemd/coolercontrold.service -t $(DESTDIR)/etc/systemd/system/
 # Distro packages refresh these from a post-install hook. Without it a panel keeps
-# resolving the stale cache and a newly added icon name never appears.
+# resolving the stale cache and a newly added icon name never appears. The stale
+# entry is from source installs before the desktop file moved out of /usr/local;
+# leaving it behind shows the app twice in the launcher.
 ifeq ($(strip $(DESTDIR)),)
+	@-$(RM) -f /usr/local/share/applications/$(ap_id).desktop
 	@-gtk-update-icon-cache -f -t /usr/share/icons/hicolor
-	@-update-desktop-database /usr/local/share/applications
+	@-update-desktop-database /usr/share/applications
 endif
 
 # `sudo make install-source` is the documented way to install from source, so the
@@ -188,6 +191,8 @@ endif
 uninstall:
 	@$(MAKE) -C $(daemon_dir) $@
 	@$(MAKE) -C $(qt_dir) $@
+	@-$(RM) -f $(DESTDIR)/usr/share/applications/$(ap_id).desktop
+# Pre-5.0.0 source installs put it under /usr/local; drop that too.
 	@-$(RM) -f $(DESTDIR)/usr/local/share/applications/$(ap_id).desktop
 	@-$(RM) -f $(DESTDIR)/usr/share/metainfo/$(ap_id).metainfo.xml
 	@-$(RM) -f $(DESTDIR)/usr/share/pixmaps/$(ap_id).png
