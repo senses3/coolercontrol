@@ -19,7 +19,7 @@ CARGO := $(shell command -v cargo || command -v cargo-1.91 || command -v cargo-1
 	ci-install ci-test ci-test-ui ci-test-daemon ci-test-qt \
 	ci-check ci-fmt ci-local pr-check validate-metadata \
 	copyright-check copyright-fix \
-	clean clean-ui install install-source uninstall dev-run dev-install openapi
+	clean clean-ui install install-data install-source uninstall dev-run dev-install openapi
 
 # Run `make help` for the common developer targets.
 help:
@@ -44,6 +44,7 @@ help:
 	@printf '  \033[1mRun & install\033[0m\n'
 	@printf '    make dev-run          Incremental build + run daemon locally (sudo)\n'
 	@printf '    make install          Install daemon + Qt binaries (DESTDIR aware)\n'
+	@printf '    make install-source   Build + install everything from source (sudo)\n'
 	@printf '    make dev-install      Install release binaries + restart the service\n'
 	@printf '    make clean            Remove all build artifacts\n\n'
 	@printf '  Maintainer targets (appimages, docker-*, bump, release, vendor, assets)\n'
@@ -144,7 +145,11 @@ install:
 	@$(MAKE) -C $(daemon_dir) $@
 	@$(MAKE) -C $(qt_dir) $@ 
 
-install-source: build install
+# The data half of a source install. Split out of install-source so that target can
+# run it under sudo on its own: prerequisites cannot be elevated selectively, so
+# `sudo make install-source` would otherwise build as root and leave a root-owned
+# target/, node_modules/ and build/ behind.
+install-data:
 	@install -Dm644 packaging/metadata/$(ap_id).desktop -t $(DESTDIR)/usr/local/share/applications/
 	@install -Dm644 packaging/metadata/$(ap_id).metainfo.xml -t $(DESTDIR)/usr/share/metainfo/
 	@install -Dm644 packaging/metadata/$(ap_id).png -t $(DESTDIR)/usr/share/icons/hicolor/256x256/apps/
@@ -154,6 +159,24 @@ install-source: build install
 	@install -Dm644 packaging/metadata/$(ap_id)-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
 	@install -Dm644 packaging/metadata/$(ap_id)-alert-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
 	@install -Dm644 packaging/systemd/coolercontrold.service -t $(DESTDIR)/etc/systemd/system/
+# `sudo make install-source` is the documented way to install from source, so the
+# build has to be handed back to the invoking user: run as root it leaves a
+# root-owned target/, node_modules/ and build/ that later builds cannot write.
+build_as_user = $(if $(SUDO_USER),sudo -u $(SUDO_USER) -H $(MAKE) build,$(MAKE) build)
+# Empty when already root, so one recipe covers `make` and `sudo make` alike.
+as_root = $(if $(filter 0,$(shell id -u)),,sudo)
+
+# DESTDIR set means a staged install for packaging: no elevation, and the packager's
+# own triggers own the caches.
+install-source:
+ifeq ($(strip $(DESTDIR)),)
+	@$(sudo_keepalive) \
+	$(build_as_user) && $(as_root) $(MAKE) install && $(as_root) $(MAKE) install-data
+else
+	@$(MAKE) build
+	@$(MAKE) install
+	@$(MAKE) install-data
+endif
 
 uninstall:
 	@$(MAKE) -C $(daemon_dir) $@
