@@ -21,7 +21,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "3"
+__VERSION__ = "4"
 
 try:
     import cairosvg
@@ -293,6 +293,9 @@ def main():
     )
     args = ap.parse_args()
 
+    # The alert icon was renamed from -symbolic-alert in 5.0.0. A symlink under
+    # the old name sits beside it so out-of-tree packaging that still installs
+    # that filename keeps building; drop it once those have caught up.
     files = {
         META / "org.coolercontrol.CoolerControl-symbolic.svg": symbolic(False),
         META / "org.coolercontrol.CoolerControl-alert-symbolic.svg": symbolic(True),
