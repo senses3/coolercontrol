@@ -159,6 +159,13 @@ install-data:
 	@install -Dm644 packaging/metadata/$(ap_id)-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
 	@install -Dm644 packaging/metadata/$(ap_id)-alert-symbolic.svg -t $(DESTDIR)/usr/share/icons/hicolor/symbolic/apps/
 	@install -Dm644 packaging/systemd/coolercontrold.service -t $(DESTDIR)/etc/systemd/system/
+# Distro packages refresh these from a post-install hook. Without it a panel keeps
+# resolving the stale cache and a newly added icon name never appears.
+ifeq ($(strip $(DESTDIR)),)
+	@-gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	@-update-desktop-database /usr/local/share/applications
+endif
+
 # `sudo make install-source` is the documented way to install from source, so the
 # build has to be handed back to the invoking user: run as root it leaves a
 # root-owned target/, node_modules/ and build/ that later builds cannot write.
