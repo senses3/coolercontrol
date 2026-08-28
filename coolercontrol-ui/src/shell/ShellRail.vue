@@ -84,18 +84,20 @@ const onLogoTap = (): void => {
         <RouterLink
             id="logo"
             :to="startupTarget"
-            class="group rounded-lg p-1 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+            class="group flex w-full items-center justify-center rounded-lg py-2 outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
             @click="onLogoTap"
         >
             <!-- The glyph is a single gradient path, so cycling the hue on the
                  image matches what the old animated variant did to the path.
                  The identity filter is the resting state the transition eases
                  back to when the pointer leaves mid-cycle; without it the base
-                 is `none`, which the transition would fight over on hover-in. -->
+                 is `none`, which the transition would fight over on hover-in.
+                 The link is w-full with the same py-2 as the section rows, so the
+                 logo has their hit area rather than a box the size of the glyph. -->
             <img
                 src="/logo.svg"
                 alt="CoolerControl"
-                class="h-10 w-10 [filter:hue-rotate(0deg)] transition-[filter] duration-300 motion-safe:group-hover:animate-hue-rotate"
+                class="h-8 w-8 [filter:hue-rotate(0deg)] transition-[filter] duration-300 motion-safe:group-hover:animate-hue-rotate"
             />
         </RouterLink>
         <RouterLink
@@ -112,10 +114,12 @@ const onLogoTap = (): void => {
             "
         >
             <!-- Brand mark for the current section. A theme whose gradient end
-                 equals its accent renders this as a plain accent bar. -->
+                 equals its accent renders this as a plain accent bar. The width
+                 tracks the logo's stroke: the mark's band is 10% of its box, so
+                 3px against the 32px logo above. -->
             <span
                 v-if="activeSection === section.id"
-                class="absolute inset-y-1.5 -left-1 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
+                class="absolute inset-y-1.5 -left-1 w-[3px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
             />
             <svg-icon type="mdi" :path="section.icon" :size="deviceStore.getREMSize(1.5)" />
             <ShellRailLabel
@@ -155,7 +159,7 @@ const onLogoTap = (): void => {
         >
             <span
                 v-if="activeSection === 'settings'"
-                class="absolute inset-y-1.5 -left-1 w-[2px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
+                class="absolute inset-y-1.5 -left-1 w-[3px] rounded-full bg-gradient-to-b from-accent to-accent-gradient-to"
             />
             <svg-icon type="mdi" :path="mdiCog" :size="deviceStore.getREMSize(1.5)" />
             <ShellRailLabel
