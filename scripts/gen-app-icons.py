@@ -21,7 +21,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "2"
+__VERSION__ = "3"
 
 try:
     import cairosvg
@@ -295,7 +295,7 @@ def main():
 
     files = {
         META / "org.coolercontrol.CoolerControl-symbolic.svg": symbolic(False),
-        META / "org.coolercontrol.CoolerControl-symbolic-alert.svg": symbolic(True),
+        META / "org.coolercontrol.CoolerControl-alert-symbolic.svg": symbolic(True),
         META / "org.coolercontrol.CoolerControl.svg": colour(False),
         META / "org.coolercontrol.CoolerControl-alert.svg": colour(True),
         PUBLIC

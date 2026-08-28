@@ -10,7 +10,9 @@ const std::string COOLER_CONTROL_VERSION = "5.0.0";
 const std::string APP_ID = "org.coolercontrol.CoolerControl";
 const std::string APP_ID_ALERT = "org.coolercontrol.CoolerControl-alert";
 const std::string APP_ID_SYMBOLIC = "org.coolercontrol.CoolerControl-symbolic";
-const std::string APP_ID_SYMBOLIC_ALERT = "org.coolercontrol.CoolerControl-symbolic-alert";
+// The variant qualifier goes before "-symbolic": panels key their recolouring
+// off that suffix, and lose the icon entirely when it comes and goes.
+const std::string APP_ID_ALERT_SYMBOLIC = "org.coolercontrol.CoolerControl-alert-symbolic";
 const std::string DBUS_SERVICE_NAME = "org.coolercontrol.CoolerControl.SingleInstance";
 const std::string DBUS_PATH = "/";
 const std::string SETTING_DAEMON_ADDRESS = "daemonAddress";

@@ -44,7 +44,7 @@ target_link_libraries(
 set(cc_resource_files
     "icons/org.coolercontrol.CoolerControl.svg"
     "icons/org.coolercontrol.CoolerControl-symbolic.svg"
-    "icons/org.coolercontrol.CoolerControl-symbolic-alert.svg")
+    "icons/org.coolercontrol.CoolerControl-alert-symbolic.svg")
 
 qt_add_resources(
   coolercontrol "coolercontrol" PREFIX "/"
