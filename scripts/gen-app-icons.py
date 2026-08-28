@@ -21,7 +21,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "4"
+__VERSION__ = "5"
 
 try:
     import cairosvg
@@ -160,10 +160,16 @@ def _badge_defs(scale, offset, canvas, pad=1.0, indent="    "):
     )
 
 
-def _badge_circle(scale, offset, pad=1.0):
+def _badge_circle(scale, offset, pad=1.0, symbolic=False):
+    # GTK recolours a symbolic icon wholesale unless an element opts into one of
+    # its four named colours, which would flatten the badge into the mark. The
+    # class picks the theme's error colour; the fill stays as the brand red for
+    # renderers that do not know the class.
+    cls = ' class="error"' if symbolic else ""
     bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
     return (
-        f'  <circle id="badge" cx="{bx:g}" cy="{by:g}" r="{BADGE[2] * pad * scale:g}"\n'
+        f'  <circle id="badge"{cls} cx="{bx:g}" cy="{by:g}"'
+        f' r="{BADGE[2] * pad * scale:g}"\n'
         f'     style="fill:#dc3545" />\n'
     )
 
@@ -196,7 +202,7 @@ def symbolic(alert):
     out.append(f'    <path d="{stems}" />')
     out.append("  </g>")
     if alert:
-        out.append(_badge_circle(1.0, 0.0, k).rstrip("\n"))
+        out.append(_badge_circle(1.0, 0.0, k, symbolic=True).rstrip("\n"))
     out.append("</svg>")
     return "\n".join(out) + "\n"
 
