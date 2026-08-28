@@ -139,8 +139,9 @@ def mark(band, scale=1.0, offset=0.0, fmt="g"):
 
 
 def _badge_defs(scale, offset, canvas, pad=1.0, indent="    "):
-    """`scale`/`offset` map the 16 grid onto the canvas; `pad` insets the mark and
-    the badge together, so the badge keeps the mark's margin."""
+    """`scale`/`offset` map the 16 grid onto the canvas; `pad` insets the mark,
+    the badge and the halo together, so the badge keeps the mark's margin and the
+    ring keeps its width relative to the badge."""
     bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
     origin, box = canvas
     return (
@@ -154,7 +155,7 @@ def _badge_defs(scale, offset, canvas, pad=1.0, indent="    "):
         f'{indent}  <rect x="{offset:g}" y="{offset:g}" width="{box:g}"'
         f' height="{box:g}" fill="#fff" />\n'
         f'{indent}  <circle cx="{bx:g}" cy="{by:g}"'
-        f' r="{(BADGE[2] + HALO) * scale:g}" fill="#000" />\n'
+        f' r="{(BADGE[2] + HALO) * pad * scale:g}" fill="#000" />\n'
         f"{indent}</mask>\n"
     )
 
@@ -251,8 +252,11 @@ def stamp_badge(img):
     ss = 4  # supersample, then downscale, for clean edges
     size = img.width
     k = size / 16.0
-    bx, by, br = (v * k for v in BADGE)
-    halo = (BADGE[2] + HALO) * k
+    # PAD applies here exactly as it does in the SVG's mask, or the raster's
+    # badge would sit further out and larger than the one the SVG describes.
+    bx, by = (_pad(v, PAD) * k for v in BADGE[:2])
+    br = BADGE[2] * PAD * k
+    halo = (BADGE[2] + HALO) * PAD * k
 
     def circle(radius, mode, bg, fill):
         big = Image.new(mode, (size * ss, size * ss), bg)

@@ -26,7 +26,7 @@
          (the object bounding box) already covers the canvas here. -->
     <mask id="badge-cut">
       <rect x="0" y="0" width="256" height="256" fill="#fff" />
-      <circle cx="194.048" cy="194.048" r="62.4" fill="#000" />
+      <circle cx="194.048" cy="194.048" r="53.664" fill="#000" />
     </mask>
   </defs>
   <g id="g2" mask="url(#badge-cut)">

@@ -20,7 +20,7 @@
          (the object bounding box) already covers the canvas here. -->
     <mask id="badge-cut">
       <rect x="0" y="0" width="16" height="16" fill="#fff" />
-      <circle cx="12.128" cy="12.128" r="3.9" fill="#000" />
+      <circle cx="12.128" cy="12.128" r="3.354" fill="#000" />
     </mask>
   </defs>
   <g class="ColorScheme-Text" style="fill:currentColor" mask="url(#badge-cut)">
