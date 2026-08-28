@@ -188,9 +188,11 @@ else
 	@$(MAKE) install-data
 endif
 
+# Best effort throughout: a half-installed tree must still be removable, so no
+# step may abort the rest.
 uninstall:
-	@$(MAKE) -C $(daemon_dir) $@
-	@$(MAKE) -C $(qt_dir) $@
+	@-$(MAKE) -C $(daemon_dir) $@
+	@-$(MAKE) -C $(qt_dir) $@
 	@-$(RM) -f $(DESTDIR)/usr/share/applications/$(ap_id).desktop
 # Pre-5.0.0 source installs put it under /usr/local; drop that too.
 	@-$(RM) -f $(DESTDIR)/usr/local/share/applications/$(ap_id).desktop
