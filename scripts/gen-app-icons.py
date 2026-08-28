@@ -21,7 +21,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "5"
+__VERSION__ = "6"
 
 try:
     import cairosvg
@@ -160,6 +160,34 @@ def _badge_defs(scale, offset, canvas, pad=1.0, indent="    "):
     )
 
 
+def _badge_clip(scale, offset, canvas, pad=1.0, indent="    "):
+    """The same gap as `_badge_defs`, cut geometrically instead of by luminance.
+
+    GTK's symbolic pipeline rewrites the fills inside a <mask>, which drops the
+    mask's white to the foreground colour and takes the whole mark down to about
+    70% opacity. A clip path carries no colour to rewrite, so it survives."""
+    bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
+    r = (BADGE[2] + HALO) * pad * scale
+    origin, box = canvas
+    edge = origin + box
+    return (
+        f"{indent}<!-- Carves a transparent gap around the badge so it reads on any\n"
+        f"{indent}     background: an outline in a fixed colour cannot, since the panel\n"
+        f"{indent}     colour is unknown. Cut geometrically rather than with a mask:\n"
+        f"{indent}     GTK's symbolic pipeline rewrites the fills inside a mask and takes\n"
+        f"{indent}     the whole mark down to about 70% opacity. A renderer that ignores\n"
+        f"{indent}     clip paths just draws the badge over the mark, which is still\n"
+        f"{indent}     correct. -->\n"
+        f'{indent}<clipPath id="badge-cut" clipPathUnits="userSpaceOnUse">\n'
+        f'{indent}  <path clip-rule="evenodd"\n'
+        f'{indent}     d="M {origin:g},{origin:g} H {edge:g} V {edge:g} H {origin:g} Z'
+        f' M {bx - r:g},{by:g}'
+        f' A {r:g},{r:g} 0 1,0 {bx + r:g},{by:g}'
+        f' A {r:g},{r:g} 0 1,0 {bx - r:g},{by:g} Z" />\n'
+        f"{indent}</clipPath>\n"
+    )
+
+
 def _badge_circle(scale, offset, pad=1.0, symbolic=False):
     # GTK recolours a symbolic icon wholesale unless an element opts into one of
     # its four named colours, which would flatten the badge into the mark. The
@@ -194,10 +222,10 @@ def symbolic(alert):
         "    </style>",
     ]
     if alert:
-        out.append(_badge_defs(1.0, 0.0, (0, 16), k).rstrip("\n"))
+        out.append(_badge_clip(1.0, 0.0, (0, 16), k).rstrip("\n"))
     out.append("  </defs>")
-    mask = ' mask="url(#badge-cut)"' if alert else ""
-    out.append(f'  <g class="ColorScheme-Text" style="fill:currentColor"{mask}>')
+    cut = ' clip-path="url(#badge-cut)"' if alert else ""
+    out.append(f'  <g class="ColorScheme-Text" style="fill:currentColor"{cut}>')
     out.append(f'    <path d="{heads}" />')
     out.append(f'    <path d="{stems}" />')
     out.append("  </g>")
