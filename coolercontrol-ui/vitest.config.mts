@@ -11,6 +11,7 @@ export default mergeConfig(viteConfig, {
     test: {
         watch: false,
         environment: 'jsdom',
+        setupFiles: ['./vitest.setup.ts'],
         exclude: [...configDefaults.exclude, 'e2e/*'],
         root: fileURLToPath(new URL('./', import.meta.url)),
         transformMode: {
