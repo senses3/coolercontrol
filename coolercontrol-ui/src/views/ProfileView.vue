@@ -296,8 +296,8 @@ const offsetMemberProfileOptions: Ref<Array<Profile>> = computed(() =>
     ),
 )
 const chosenMemberProfiles: Ref<Array<Profile>> = ref(
-    currentProfile.value.member_profile_uids.map(
-        (uid) => settingsStore.profiles.find((profile) => profile.uid === uid)!,
+    currentProfile.value.member_profile_uids.map((uid) =>
+        settingsStore.profiles.find((profile) => profile.uid === uid)!,
     ),
 )
 const chosenOverlayMemberProfile: Ref<Profile | undefined> = ref(

@@ -97,20 +97,16 @@ class CoolerControlCLI:
         response = self.req.get(f"{DAEMON_ADDRESS}/devices")
         response.raise_for_status()
         for device in response.json().get("devices"):
-            print(
-                f"""{device.get('name')}
+            print(f"""{device.get('name')}
     {device.get("uid")}
-================================================================"""
-            )
+================================================================""")
             for channel_name in device.get("info").get("channels").keys():
                 print(f"  {channel_name}")
             print()
         response = self.req.get(f"{DAEMON_ADDRESS}/modes")
         response.raise_for_status()
-        print(
-            """Modes:
-================================================================"""
-        )
+        print("""Modes:
+================================================================""")
         for mode in response.json().get("modes"):
             print(f"{mode.get('name')}")
 

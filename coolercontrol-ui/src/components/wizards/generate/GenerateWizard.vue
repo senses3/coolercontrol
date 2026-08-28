@@ -46,8 +46,7 @@ const step: Ref<number> = ref(1)
 // A single-channel preselect scopes the whole wizard to just that fan; when
 // absent it enumerates every controllable fan (whole-system).
 const preselect = dialogRef.value.data?.preselect as
-    | { deviceUID: string; channelName: string }
-    | undefined
+    { deviceUID: string; channelName: string } | undefined
 
 // Step 1: assign each controllable fan a role (or leave unset to skip).
 interface FanRow {

@@ -43,8 +43,8 @@ const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
-const currentMode: Ref<Mode> = computed(
-    () => settingsStore.modes.find((mode) => mode.uid === props.modeUID)!,
+const currentMode: Ref<Mode> = computed(() =>
+    settingsStore.modes.find((mode) => mode.uid === props.modeUID)!,
 )
 const deviceTableData: Ref<Array<DeviceData>> = ref([])
 

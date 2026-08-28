@@ -17,6 +17,7 @@ SPDX-License-Identifier are left alone, which makes this safe to re-run.
 Non-source files (docs, configs, binary assets) are covered by REUSE.toml
 instead and are never touched here.
 """
+
 import shutil
 import subprocess  # nosec B404
 import sys

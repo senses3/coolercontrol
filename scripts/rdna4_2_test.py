@@ -28,6 +28,7 @@ Written to answer three questions on cards where CoolerControl fails to apply fa
 
 Run with sudo. Safe phases run by default; the zero-RPM phase requires --destructive.
 """
+
 import argparse
 import errno as errno_mod
 import glob

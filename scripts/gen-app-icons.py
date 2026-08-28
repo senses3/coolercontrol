@@ -16,6 +16,7 @@ so it takes 1.25x the original band instead.
 Usage:  scripts/gen-app-icons.py            # writes into the working tree
         scripts/gen-app-icons.py --check    # render only, touch nothing
 """
+
 import argparse
 import io
 import math

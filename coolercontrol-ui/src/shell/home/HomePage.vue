@@ -91,21 +91,19 @@ const getDaemonStatusTranslationKey = (daemonStatus: DaemonStatus) =>
         [DaemonStatus.ERROR]: () => 'hasErrors',
     })
 
-const statusRows = computed(
-    (): Array<[string, string]> => [
-        [t('views.appInfo.host'), healthCheck.value.system.name],
-        [t('views.appInfo.uptime'), healthCheck.value.details.uptime],
-        [t('views.appInfo.version'), healthCheck.value.details.version],
-        [t('views.appInfo.processId'), String(healthCheck.value.details.pid)],
-        [t('views.appInfo.memoryUsage'), `${healthCheck.value.details.memory_mb} MB`],
-        [
-            t('views.appInfo.liquidctl'),
-            healthCheck.value.details.liquidctl_connected
-                ? t('views.appInfo.connected')
-                : t('views.appInfo.disconnected'),
-        ],
+const statusRows = computed((): Array<[string, string]> => [
+    [t('views.appInfo.host'), healthCheck.value.system.name],
+    [t('views.appInfo.uptime'), healthCheck.value.details.uptime],
+    [t('views.appInfo.version'), healthCheck.value.details.version],
+    [t('views.appInfo.processId'), String(healthCheck.value.details.pid)],
+    [t('views.appInfo.memoryUsage'), `${healthCheck.value.details.memory_mb} MB`],
+    [
+        t('views.appInfo.liquidctl'),
+        healthCheck.value.details.liquidctl_connected
+            ? t('views.appInfo.connected')
+            : t('views.appInfo.disconnected'),
     ],
-)
+])
 
 // Device health rows, ported from AppInfoView with new-shell route targets.
 interface HealthRow {

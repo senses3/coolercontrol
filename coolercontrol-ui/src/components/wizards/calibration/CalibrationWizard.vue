@@ -73,8 +73,7 @@ const fanRows: Ref<Array<FanRow>> = ref([])
 // instead of the default (all uncalibrated).
 const preselectKeys = ((): Set<string> | null => {
     const preselect = dialogRef.value.data?.preselect as
-        | Array<{ deviceUID: string; channelName: string }>
-        | undefined
+        Array<{ deviceUID: string; channelName: string }> | undefined
     return preselect == null
         ? null
         : new Set(preselect.map((fan) => `${fan.deviceUID}||${fan.channelName}`))

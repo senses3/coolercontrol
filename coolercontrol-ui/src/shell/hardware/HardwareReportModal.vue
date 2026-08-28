@@ -96,8 +96,7 @@ async function copy(): Promise<void> {
             <pre
                 v-if="!loading"
                 class="max-h-[60vh] overflow-auto rounded-lg bg-bg-two p-3 text-sm text-text-color"
-                >{{ report || t('views.appInfo.hardwareReportEmpty') }}</pre
-            >
+                >{{ report || t('views.appInfo.hardwareReportEmpty') }}</pre>
             <div v-else class="flex items-center gap-2 p-3 text-base text-text-color-secondary">
                 <svg-icon type="mdi" :path="mdiLoading" :size="20" class="animate-spin" />
                 {{ t('common.loading') }}

@@ -17,6 +17,7 @@ Usage:
 
 Run with sudo only if /proc is hidden (hidepid); CPU and ctxt-switch fields are normally readable.
 """
+
 import argparse
 import glob
 import os

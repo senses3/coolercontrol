@@ -19,6 +19,7 @@ flat colour there and the bar loses its gradient.
 
 Usage:  scripts/gen-notification-icons.py
 """
+
 import argparse
 import io
 import pathlib

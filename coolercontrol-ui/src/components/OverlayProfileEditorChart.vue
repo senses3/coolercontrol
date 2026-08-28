@@ -72,8 +72,8 @@ const settingsStore = useSettingsStore()
 const colors = useThemeColorsStore()
 const { t } = useI18n()
 
-const currentProfile = computed(
-    () => settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
+const currentProfile = computed(() =>
+    settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
 )
 
 const selectedDuty: Ref<number | undefined> = ref()

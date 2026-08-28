@@ -55,8 +55,8 @@ const devianceMax: number = 100
 const delayMin: number = 0
 const delayMax: number = 30
 
-const currentFunction = computed(
-    () => settingsStore.functions.find((fun) => fun.uid === props.functionUID)!,
+const currentFunction = computed(() =>
+    settingsStore.functions.find((fun) => fun.uid === props.functionUID)!,
 )
 // All-off hysteresis values (0/0/false) are the Identity type on the wire.
 let startingDelay = currentFunction.value.response_delay ?? 0
@@ -271,11 +271,10 @@ const deleteFunction = (): void => {
 const { openFunctionApplyWizard } = useToolWizards()
 
 // Profiles currently using this function (where-used).
-const usedByProfiles = computed(
-    (): Array<{ uid: string; name: string }> =>
-        settingsStore.profiles
-            .filter((profile) => profile.function_uid === currentFunction.value.uid)
-            .map((profile) => ({ uid: profile.uid, name: profile.name })),
+const usedByProfiles = computed((): Array<{ uid: string; name: string }> =>
+    settingsStore.profiles
+        .filter((profile) => profile.function_uid === currentFunction.value.uid)
+        .map((profile) => ({ uid: profile.uid, name: profile.name })),
 )
 
 onMounted(async () => {

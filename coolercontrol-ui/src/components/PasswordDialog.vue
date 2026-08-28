@@ -96,8 +96,8 @@ const closeAndProcess = async (): Promise<void> => {
         return
     }
     const onSubmit:
-        | ((currentPasswd: string, passwd: string) => Promise<string | null>)
-        | undefined = dialogRef.value.data.onSubmit
+        ((currentPasswd: string, passwd: string) => Promise<string | null>) | undefined =
+        dialogRef.value.data.onSubmit
     if (onSubmit) {
         submitError.value = null
         submitting.value = true

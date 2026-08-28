@@ -56,10 +56,7 @@ function channelKey(deviceUid: UID, channelName: string): ChannelKey {
  * manual-duty slider bounds need to refresh from `device.info`.
  */
 type PendingPromptKind =
-    | 'rpm_only_completed'
-    | 'rpm_only_cleared'
-    | 'duty_range_completed'
-    | 'duty_range_cleared'
+    'rpm_only_completed' | 'rpm_only_cleared' | 'duty_range_completed' | 'duty_range_cleared'
 
 interface PendingPromptEntry {
     channelName: string
