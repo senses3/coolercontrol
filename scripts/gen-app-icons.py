@@ -42,13 +42,24 @@ CENTRES = (2.535, 8.0, 13.465)
 CY = (2.535, 13.465, 2.535)  # head centres: top, bottom, top
 FREE_TOP, FREE_BOT = 0.5, 15.5
 GAP = 90  # the C's opening, centred on 45 degrees
-BAND_SYMBOLIC = 1.75
+BAND_SYMBOLIC = 1.60
 BAND_COLOUR = 1.5623  # 1.25x the mark's original band
 BADGE = (12.8, 12.8, 3.2)  # 40% of the box, bottom right
 HALO = 0.7  # transparent gap carved around the badge
+# Fraction of the canvas the symbolic mark spans. Breeze insets its tray icons by
+# about a quarter; at full bleed ours was the loudest thing in the tray. Padding
+# alone is not enough: it shrinks the C's hole along with everything else, and
+# under about 2px at tray size the ring fills in and the mark reads mushy. The
+# band is thinned with the inset to hold the hole open (it is 2 * (R - band)).
+PAD_SYMBOLIC = 0.86
 
 MASKABLE_BG = "#1b1e23"  # manifest background_color
 ICO_SIZES = (256, 64, 48, 32, 24, 16)
+
+
+def _pad(v, pad):
+    """Inset a 16-grid coordinate about the canvas centre."""
+    return v * pad + 8 * (1 - pad)
 
 
 def _pt(cx, cy, r, angle):
@@ -127,10 +138,11 @@ def mark(band, scale=1.0, offset=0.0, fmt="g"):
     return " ".join(heads), " ".join(stems)
 
 
-def _badge_defs(scale, offset, indent="    "):
-    bx, by, _br = (v * scale + offset for v in BADGE[:2]), None, BADGE[2] * scale
-    bx, by = bx
-    box = 16 * scale
+def _badge_defs(scale, offset, canvas, pad=1.0, indent="    "):
+    """`scale`/`offset` map the 16 grid onto the canvas; `pad` insets the mark and
+    the badge together, so the badge keeps the mark's margin."""
+    bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
+    origin, box = canvas
     return (
         f"{indent}<!-- Carves a transparent gap around the badge so it reads on any\n"
         f"{indent}     background: an outline in a fixed colour cannot, since the panel\n"
@@ -147,16 +159,17 @@ def _badge_defs(scale, offset, indent="    "):
     )
 
 
-def _badge_circle(scale, offset):
-    bx, by = (v * scale + offset for v in BADGE[:2])
+def _badge_circle(scale, offset, pad=1.0):
+    bx, by = (_pad(v, pad) * scale + offset for v in BADGE[:2])
     return (
-        f'  <circle id="badge" cx="{bx:g}" cy="{by:g}" r="{BADGE[2] * scale:g}"\n'
+        f'  <circle id="badge" cx="{bx:g}" cy="{by:g}" r="{BADGE[2] * pad * scale:g}"\n'
         f'     style="fill:#dc3545" />\n'
     )
 
 
 def symbolic(alert):
-    heads, stems = mark(BAND_SYMBOLIC)
+    k = PAD_SYMBOLIC
+    heads, stems = mark(BAND_SYMBOLIC / k, scale=k, offset=8 * (1 - k))
     out = [
         '<?xml version="1.0" encoding="UTF-8" standalone="no"?>',
         "<!--",
@@ -174,7 +187,7 @@ def symbolic(alert):
         "    </style>",
     ]
     if alert:
-        out.append(_badge_defs(1.0, 0.0).rstrip("\n"))
+        out.append(_badge_defs(1.0, 0.0, (0, 16), k).rstrip("\n"))
     out.append("  </defs>")
     mask = ' mask="url(#badge-cut)"' if alert else ""
     out.append(f'  <g class="ColorScheme-Text" style="fill:currentColor"{mask}>')
@@ -182,7 +195,7 @@ def symbolic(alert):
     out.append(f'    <path d="{stems}" />')
     out.append("  </g>")
     if alert:
-        out.append(_badge_circle(1.0, 0.0).rstrip("\n"))
+        out.append(_badge_circle(1.0, 0.0, k).rstrip("\n"))
     out.append("</svg>")
     return "\n".join(out) + "\n"
 
@@ -213,7 +226,7 @@ def colour(alert, year="2021", holders="Guy Boldon and contributors"):
         "    </linearGradient>",
     ]
     if alert:
-        out.append(_badge_defs(16.0, 0.0).rstrip("\n"))
+        out.append(_badge_defs(16.0, 0.0, (0, 256)).rstrip("\n"))
     out.append("  </defs>")
     mask = ' mask="url(#badge-cut)"' if alert else ""
     out.append(f'  <g id="g2"{mask}>')
