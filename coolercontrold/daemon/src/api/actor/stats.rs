@@ -54,6 +54,8 @@ impl ApiActor<StatsMessage> for StatsActor {
         &mut self.receiver
     }
 
+    // The trait declares this async; a body that happens not to await cannot drop it.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn handle_message(&mut self, msg: StatsMessage) {
         match msg {
             StatsMessage::GetAll { respond_to } => {

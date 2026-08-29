@@ -46,6 +46,8 @@ impl ApiActor<DeviceHealthMessage> for DeviceHealthActor {
         &mut self.receiver
     }
 
+    // The trait declares this async; a body that happens not to await cannot drop it.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn handle_message(&mut self, msg: DeviceHealthMessage) {
         match msg {
             DeviceHealthMessage::GetAll { respond_to } => {

@@ -87,6 +87,8 @@ impl BasicAuth {
 impl<S: Send + Sync> FromRequestParts<S> for BasicAuth {
     type Rejection = CCError;
 
+    // Signature is fixed by axum's FromRequestParts; this body needs no await.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let auth_value = parts.headers.get(header::AUTHORIZATION).ok_or_else(|| {
             CCError::InvalidCredentials {
