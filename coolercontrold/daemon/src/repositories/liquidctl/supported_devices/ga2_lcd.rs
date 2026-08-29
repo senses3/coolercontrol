@@ -136,7 +136,7 @@ impl DeviceSupport for Ga2LcdSupport {
             Some(LIQUIDCTL_FAN_COLOR_CHANNEL) => Self::fan_color_modes(),
             _ => {
                 error!("Unknown lighting channel name {channel_name:?}");
-                Vec::with_capacity(0)
+                Vec::new()
             }
         };
         self.convert_to_channel_lighting_modes(color_modes)

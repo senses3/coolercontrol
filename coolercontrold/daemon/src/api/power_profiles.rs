@@ -128,7 +128,7 @@ mod tests {
     /// Methodology: validate an empty map.
     #[test]
     fn an_empty_mapping_passes_validation() {
-        assert!(validate_shape(&HashMap::with_capacity(0)).is_ok());
+        assert!(validate_shape(&HashMap::new()).is_ok());
     }
 
     /// Goal: blank names and blank UIDs must be rejected at the boundary rather than written to

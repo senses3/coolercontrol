@@ -273,7 +273,7 @@ mod tests {
         ServiceDefinition {
             service_id: "test-plugin".to_string(),
             executable: PathBuf::from("/usr/bin/test-plugin"),
-            args: Vec::with_capacity(0),
+            args: Vec::new(),
             username: Some(CC_PLUGIN_USER.to_string()),
             wrk_dir: None,
             envs: None,

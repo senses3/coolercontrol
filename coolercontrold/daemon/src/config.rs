@@ -1154,7 +1154,7 @@ impl Config {
             .get(POWER_PROFILE_MODES_KEY)
             .and_then(Item::as_table)
         else {
-            return HashMap::with_capacity(0);
+            return HashMap::new();
         };
         let mut modes = HashMap::with_capacity(table.len());
         for (profile, mode_uid) in table {
@@ -2741,7 +2741,7 @@ mod tests {
         config.set_power_profile_modes(&written);
         assert_eq!(config.get_power_profile_modes(), written);
 
-        config.set_power_profile_modes(&HashMap::with_capacity(0));
+        config.set_power_profile_modes(&HashMap::new());
         assert!(config.get_power_profile_modes().is_empty());
         assert!(
             config

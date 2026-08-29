@@ -564,8 +564,8 @@ impl AlertController {
         } else {
             info!("Writing a new Alerts configuration file");
             let default_json = serde_json::to_string(&AlertConfigFile {
-                alerts: Vec::with_capacity(0),
-                logs: Vec::with_capacity(0),
+                alerts: Vec::new(),
+                logs: Vec::new(),
             })?;
             cc_fs::write_string(&path, default_json)
                 .await
@@ -649,7 +649,7 @@ impl AlertController {
     async fn save_alert_data_to_config(&self) -> Result<()> {
         let alert_config = AlertConfigFile {
             alerts: self.alerts.borrow().values().cloned().collect(),
-            logs: Vec::with_capacity(0),
+            logs: Vec::new(),
         };
         let alert_config_json = serde_json::to_string(&alert_config)?;
         cc_fs::write_string(paths::alert_config_file(), alert_config_json)

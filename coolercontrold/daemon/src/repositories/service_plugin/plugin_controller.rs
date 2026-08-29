@@ -61,7 +61,7 @@ impl PluginController {
     /// Used when the service plugin repo fails to initialize.
     pub fn new_disabled() -> Self {
         Self {
-            plugins: HashMap::with_capacity(0),
+            plugins: HashMap::new(),
             config: None,
             service_manager: Manager::Disabled,
             is_systemd: false,

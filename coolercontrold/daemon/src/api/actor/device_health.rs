@@ -90,21 +90,21 @@ impl DeviceHealthHandle {
         let msg = DeviceHealthMessage::GetAll { respond_to: tx };
         if self.sender.send(msg).await.is_err() {
             return DeviceHealthDto {
-                failsafe: Vec::with_capacity(0),
-                missing: Vec::with_capacity(0),
-                stale_source: Vec::with_capacity(0),
-                firmware_overrides: Vec::with_capacity(0),
-                channel_capabilities: Vec::with_capacity(0),
-                system_findings: Vec::with_capacity(0),
+                failsafe: Vec::new(),
+                missing: Vec::new(),
+                stale_source: Vec::new(),
+                firmware_overrides: Vec::new(),
+                channel_capabilities: Vec::new(),
+                system_findings: Vec::new(),
             };
         }
         rx.await.unwrap_or(DeviceHealthDto {
-            failsafe: Vec::with_capacity(0),
-            missing: Vec::with_capacity(0),
-            stale_source: Vec::with_capacity(0),
-            firmware_overrides: Vec::with_capacity(0),
-            channel_capabilities: Vec::with_capacity(0),
-            system_findings: Vec::with_capacity(0),
+            failsafe: Vec::new(),
+            missing: Vec::new(),
+            stale_source: Vec::new(),
+            firmware_overrides: Vec::new(),
+            channel_capabilities: Vec::new(),
+            system_findings: Vec::new(),
         })
     }
 

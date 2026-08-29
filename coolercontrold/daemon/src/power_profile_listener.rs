@@ -80,7 +80,7 @@ impl PowerProfiles {
         );
         Self {
             state: Arc::new(RwLock::new(PowerProfileState {
-                available: Vec::with_capacity(0),
+                available: Vec::new(),
                 active: None,
                 modes,
             })),
@@ -440,7 +440,7 @@ async fn available_profiles(proxy: &Proxy<'static>) -> Vec<String> {
         .await
     else {
         warn!("Could not read the list of available power profiles.");
-        return Vec::with_capacity(0);
+        return Vec::new();
     };
     profiles
         .iter()

@@ -456,18 +456,18 @@ mod tests {
     fn sample_of_every_variant() -> Vec<SseEvent> {
         let all = vec![
             SseEvent::Status(StatusResponse {
-                devices: Vec::with_capacity(0),
+                devices: Vec::new(),
             }),
-            SseEvent::Missing(Vec::with_capacity(0)),
-            SseEvent::StaleSource(Vec::with_capacity(0)),
-            SseEvent::Failsafe(Vec::with_capacity(0)),
+            SseEvent::Missing(Vec::new()),
+            SseEvent::StaleSource(Vec::new()),
+            SseEvent::Failsafe(Vec::new()),
             SseEvent::Health(DeviceHealthDto {
-                failsafe: Vec::with_capacity(0),
-                missing: Vec::with_capacity(0),
-                stale_source: Vec::with_capacity(0),
-                firmware_overrides: Vec::with_capacity(0),
-                channel_capabilities: Vec::with_capacity(0),
-                system_findings: Vec::with_capacity(0),
+                failsafe: Vec::new(),
+                missing: Vec::new(),
+                stale_source: Vec::new(),
+                firmware_overrides: Vec::new(),
+                channel_capabilities: Vec::new(),
+                system_findings: Vec::new(),
             }),
             SseEvent::Log("a log line\n".to_string()),
             SseEvent::Mode(ActiveMode::default()),

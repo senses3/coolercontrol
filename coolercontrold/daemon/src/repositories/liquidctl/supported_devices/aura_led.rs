@@ -89,6 +89,6 @@ impl DeviceSupport for AuraLedSupport {
         _device_index: u8,
     ) -> Vec<ChannelStatus> {
         // no standard statuses for AuraLed (RGB only)
-        Vec::with_capacity(0)
+        Vec::new()
     }
 }

@@ -266,7 +266,7 @@ impl ApiActor<SettingMessage> for SettingActor {
                                     name: device_name,
                                     disable: false,
                                     extensions: DeviceExtensions::default(),
-                                    channel_settings: HashMap::with_capacity(0),
+                                    channel_settings: HashMap::new(),
                                 },
                             );
                         }
@@ -329,7 +329,7 @@ impl ApiActor<SettingMessage> for SettingActor {
                             name: current_device_name,
                             disable: false,
                             extensions: DeviceExtensions::default(),
-                            channel_settings: HashMap::with_capacity(0),
+                            channel_settings: HashMap::new(),
                         }
                     };
                     self.resolve_cc_device_dto(&mut dto);

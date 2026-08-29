@@ -168,7 +168,7 @@ impl CalibrationStore {
         } else {
             info!("Writing a new Calibration configuration file");
             let default = serde_json::to_string(&CalibrationConfigFile {
-                calibrations: Vec::with_capacity(0),
+                calibrations: Vec::new(),
             })?;
             cc_fs::write_string(&path, default).await.map_err(|err| {
                 anyhow!("Writing new configuration file: {} - {err}", path.display())
@@ -595,7 +595,7 @@ mod tests {
         // must contain an empty calibrations array, not null or absent.
         // A malformed default would block the daemon at startup.
         let file = CalibrationConfigFile {
-            calibrations: Vec::with_capacity(0),
+            calibrations: Vec::new(),
         };
         let json = serde_json::to_string(&file).expect("serializes");
         assert!(json.contains("\"calibrations\":[]"));
