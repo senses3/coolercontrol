@@ -6,6 +6,9 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+// Imported rather than referenced from public/: vite content-hashes it, so a
+// changed logo gets a new URL instead of being pinned behind the old one.
+import logoUrl from '@/assets/logo.svg?url'
 import { mdiCog, mdiDockLeft, mdiLockOutline, mdiPower } from '@mdi/js'
 import { computed, inject, reactive } from 'vue'
 import { useRoute } from 'vue-router'
@@ -95,7 +98,7 @@ const onLogoTap = (): void => {
                  The link is w-full with the same py-2 as the section rows, so the
                  logo has their hit area rather than a box the size of the glyph. -->
             <img
-                src="/logo.svg"
+                :src="logoUrl"
                 alt="CoolerControl"
                 class="h-8 w-8 [filter:hue-rotate(0deg)] transition-[filter] duration-300 motion-safe:group-hover:animate-hue-rotate"
             />

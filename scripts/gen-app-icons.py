@@ -36,6 +36,9 @@ except ImportError:
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 META = ROOT / "packaging/metadata"
 PUBLIC = ROOT / "coolercontrol-ui/public"
+# The logo is imported by the UI, so it is bundled and content-hashed, not served
+# from public/ under a fixed name.
+ASSETS = ROOT / "coolercontrol-ui/src/assets"
 
 # Geometry on a 16 grid. Everything else is this, scaled.
 R = 2.535  # ring outer radius
@@ -367,7 +370,7 @@ def main():
         META / "org.coolercontrol.CoolerControl-alert-symbolic.svg": symbolic(True),
         META / "org.coolercontrol.CoolerControl.svg": colour(False),
         META / "org.coolercontrol.CoolerControl-alert.svg": colour(True),
-        PUBLIC
+        ASSETS
         / "logo.svg": colour(
             False, year="2023", holders="Guy Boldon, Eren Simsek and contributors"
         ),
@@ -395,7 +398,7 @@ def main():
         META / "org.coolercontrol.CoolerControl-alert.png"
     )
 
-    logo = files[PUBLIC / "logo.svg"]
+    logo = files[ASSETS / "logo.svg"]
     render(logo, 192).save(PUBLIC / "icons/app-192.png")
     render(logo, 512).save(PUBLIC / "icons/app-512.png")
     # Maskable: the mark at 70% on an opaque canvas, inside the 80% safe zone.

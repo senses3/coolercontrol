@@ -103,7 +103,11 @@ export default defineConfig({
     build: {
         minify: 'oxc',
         cssMinify: 'lightningcss',
-        assetsInlineLimit: 10_240_000,
+        // Everything is inlined so the app loads in as few requests as possible, but
+        // not the fonts: base64 costs ~33% and welds them to the CSS bundle, so every
+        // release would re-send all of them. Emitted as files they are content-hashed,
+        // fetched once, and reused until the bytes actually change.
+        assetsInlineLimit: (filePath: string) => !filePath.endsWith('.woff2'),
         cssCodeSplit: false,
         chunkSizeWarningLimit: 2_500,
         rollupOptions: {
