@@ -22,7 +22,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "9"
+__VERSION__ = "10"
 
 try:
     import cairosvg
@@ -61,8 +61,13 @@ PAD = 0.86
 MASKABLE_BG = "#1b1e23"  # manifest background_color
 ICO_SIZES = (256, 64, 48, 32, 24, 16)
 # The LCD shutdown screen. The daemon resizes it per device, so this is only a
-# source size; black because an LCD's unlit pixels are black.
+# source size; black because an LCD's unlit pixels are black. AIO screens sit
+# behind a round bezel that crops the panel to its inscribed circle, and the
+# mark's outer heads reach past that circle when it spans the square, so the
+# mark is inset until its farthest corner sits inside LCD_SAFE of the circle's
+# radius. The remainder is a black ring between the mark and the bezel.
 LCD_SHUTDOWN = 320
+LCD_SAFE = 0.90
 # gdk-pixbuf identifies a file by sniffing its first 256 bytes, so <svg> has to
 # open inside that window. Past it the load fails outright ("Could not load a
 # pixbuf from icon theme") for GTK, GNOME Shell, and every tray that goes
@@ -349,6 +354,25 @@ def stamp_badge(img):
     return img
 
 
+def corner_reach(img):
+    """The distance from centre to the farthest opaque pixel, as a fraction of
+    the image's half-width. Above 1.0 the artwork leaves the inscribed circle.
+    Measured rather than derived: it follows from the ring and stem geometry
+    plus PAD, so a hardcoded number would rot the next time those move."""
+    alpha = img.getchannel("A").point(lambda v: 255 if v > 128 else 0)
+    size = img.width
+    centre = (size - 1) / 2
+    reach = 0.0
+    for y in range(size):
+        row = alpha.crop((0, y, size, y + 1)).getbbox()
+        if row is None:
+            continue
+        dy = y - centre
+        for x in (row[0], row[2] - 1):
+            reach = max(reach, math.hypot(x - centre, dy))
+    return reach / (size / 2)
+
+
 def render(svg_text, size):
     png = cairosvg.svg2png(
         bytestring=svg_text.encode(), output_width=size, output_height=size
@@ -412,8 +436,10 @@ def main():
     canvas.alpha_composite(art, ((512 - box) // 2, (512 - box) // 2))
     canvas.convert("RGB").save(PUBLIC / "icons/app-maskable-512.png")
 
+    box = round(LCD_SHUTDOWN * LCD_SAFE / corner_reach(render(logo, LCD_SHUTDOWN)))
     screen = Image.new("RGBA", (LCD_SHUTDOWN, LCD_SHUTDOWN), "#000000")
-    screen.alpha_composite(render(logo, LCD_SHUTDOWN))
+    offset = (LCD_SHUTDOWN - box) // 2
+    screen.alpha_composite(render(logo, box), (offset, offset))
     screen.convert("RGB").save(CC_IMAGE / "lcd-shutdown.png")
 
     ico = PUBLIC / "favicon.ico"
