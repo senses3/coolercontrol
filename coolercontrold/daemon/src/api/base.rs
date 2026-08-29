@@ -83,8 +83,11 @@ impl CachePolicy {
         }
         match path {
             "/" | "/index.html" => Self::Document,
-            "/manifest.webmanifest" | "/notification-sw.js" => Self::Revalidate,
-            _ => Self::Pinned,
+            // Everything else comes from public/ under a name that never changes, so
+            // pinning it would strand clients on the build that first cached it. The
+            // static service answers If-Modified-Since with a 304, so revalidating
+            // costs a conditional request rather than the body.
+            _ => Self::Revalidate,
         }
     }
 }
@@ -357,14 +360,39 @@ mod tests {
             // A hashed bundle named after an unhashed path must not steal its policy.
             ("/assets/notification-sw-abc123.js", CachePolicy::Pinned),
             ("/assets/manifest.webmanifest", CachePolicy::Pinned),
-            // Unhashed but stable, and not one of the named paths.
-            ("/logo.svg", CachePolicy::Pinned),
-            ("/fonts/ibm-plex-sans-latin-400.woff2", CachePolicy::Pinned),
-            ("/icons/app-512.png", CachePolicy::Pinned),
+            // Unhashed and served under a fixed name, so they have to revalidate.
+            ("/favicon.ico", CachePolicy::Revalidate),
+            ("/icons/app-512.png", CachePolicy::Revalidate),
+            ("/icons/alert-triggered.png", CachePolicy::Revalidate),
         ];
         for (path, expected) in cases {
             assert_eq!(CachePolicy::for_path(path), expected, "{path}");
         }
+    }
+
+    // Goal: prove the metadata feature is actually on. Without it the static service sends
+    // no validator, so `no-cache` on an unhashed asset means the whole body every load
+    // rather than a 304 - the opposite of what the revalidate policy is for, and nothing
+    // else in this suite would notice. Method: drive the real fallback service, which is
+    // the only place `include_dir` metadata reaches, and require the header.
+    #[tokio::test]
+    async fn test_unhashed_assets_carry_a_validator() {
+        let app = Router::new().fallback_service(web_app_service());
+        let response = app
+            .oneshot(
+                http::Request::builder()
+                    .uri("/index.html")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert!(
+            response.headers().contains_key("last-modified"),
+            "the metadata feature must stay enabled, or revalidation costs a full body"
+        );
     }
 
     // Goal: the charset override keys off the extension, not off /assets/, so an unhashed

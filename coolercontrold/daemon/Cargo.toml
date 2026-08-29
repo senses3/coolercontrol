@@ -102,7 +102,10 @@ tower-sessions-core = { version = "0.15.0", features = ["deletion-task"] }
 # Held at 0.22 to share one base64 with cookie, pem/rcgen and tonic.
 base64 = "=0.22"
 time = "0.3"
-tower-serve-static = "0.1.2"
+# The `metadata` feature bakes each embedded file's mtime in at compile time and
+# answers If-Modified-Since with a 304, so unhashed assets can revalidate cheaply
+# instead of being pinned for a year with no way to ever update.
+tower-serve-static = { version = "0.1.2", features = ["metadata"] }
 include_dir = "0.7.4"
 aide = { version = "0.15.1", features = [
   "axum",
