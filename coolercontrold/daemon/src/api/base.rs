@@ -377,6 +377,12 @@ mod tests {
     // the only place `include_dir` metadata reaches, and require the header.
     #[tokio::test]
     async fn test_unhashed_assets_carry_a_validator() {
+        // A daemon-only build embeds an empty dir (build.rs warns rather than fails in
+        // debug, and CI's ci-test runs cargo build without sync-app), so there is
+        // nothing to serve and nothing to assert.
+        if ASSETS_DIR.get_file("index.html").is_none() {
+            return;
+        }
         let app = Router::new().fallback_service(web_app_service());
         let response = app
             .oneshot(
