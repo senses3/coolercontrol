@@ -972,6 +972,70 @@ impl HwmonRepo {
         }
     }
 
+    /// Moves settings written under the pre-`wwid` UID onto `device_uid`.
+    ///
+    /// Runs before this device's first settings lookup, so the very first boot after the
+    /// change already resolves them. A no-op for every device whose identifier chain is
+    /// unchanged, which is everything that is not an `sd` disk.
+    ///
+    /// The document is persisted on the normal save path rather than here. Re-running is
+    /// harmless: once the legacy entry is gone there is nothing left to move.
+    async fn migrate_legacy_device_uid(
+        &self,
+        path: &Path,
+        device_name: &str,
+        device_uid: &DeviceUID,
+        assigned_uids: &HashSet<UID>,
+    ) {
+        let legacy_identifier = devices::get_legacy_device_unique_id(path, device_name).await;
+        let legacy_uid =
+            Device::create_uid_from(device_name, DeviceType::Hwmon, 0, Some(&legacy_identifier));
+        if legacy_uid == *device_uid {
+            return;
+        }
+        // Another device in this batch answers to the legacy UID, so those settings are its
+        // own. Reachable when two drives share a serial: the first keeps the serial-derived
+        // UID while this one falls back to its wwid.
+        if assigned_uids.contains(&legacy_uid) {
+            return;
+        }
+        let mut rewrites = self.config.migrate_device_uid(&legacy_uid, device_uid);
+        rewrites += usize::from(
+            self.migrate_legacy_uid_side_stores(&legacy_uid, device_uid)
+                .await,
+        );
+        if rewrites == 0 {
+            return;
+        }
+        info!(
+            "Migrated {rewrites} saved setting(s) for {device_name} onto a hardware-derived \
+             identifier, so they no longer depend on a sysfs path that can change between boots"
+        );
+    }
+
+    /// Overrides are already in memory so they move through their controller; alerts are still
+    /// on disk. Failures are swallowed: a stale entry beats aborting startup.
+    async fn migrate_legacy_uid_side_stores(
+        &self,
+        legacy_uid: &DeviceUID,
+        device_uid: &DeviceUID,
+    ) -> bool {
+        let mut migrated = false;
+        match self
+            .overrides
+            .migrate_device_uid(legacy_uid, device_uid)
+            .await
+        {
+            Ok(moved) => migrated |= moved,
+            Err(err) => warn!("Could not migrate label overrides to the new device UID: {err}"),
+        }
+        match crate::alerts::migrate_device_uid_in_file(legacy_uid, device_uid).await {
+            Ok(moved) => migrated |= moved,
+            Err(err) => warn!("Could not migrate alerts to the new device UID: {err}"),
+        }
+        migrated
+    }
+
     /// Logging slow devices is triggered once the polling loop overlaps and the
     /// `DEVICE_READ_PERMIT_TIMEOUT` is reached.
     /// This only outputs a log on the 2nd occurrence, which then avoids outputting a log during
@@ -1479,8 +1543,12 @@ impl Repository for HwmonRepo {
         debug!("Detected HWMon device paths: {base_paths:?}");
         let mut hwmon_drivers: Vec<HwmonDriverInfo> = Vec::new();
         let settings = self.config.get_settings()?;
-        // Guards against two devices resolving to the same UID (e.g. serial-less duplicates that
-        // both hash blank). base_paths is path-sorted, so the assignment is stable across boots.
+        // Guards against two devices resolving to the same UID (e.g. two drives whose firmware
+        // reports the same wwid, or serial-less duplicates that both hash blank). Candidates are
+        // tried strongest first, so a device only loses its hardware identity when every one is
+        // shared. The final rung is the sysfs path, which is NOT stable across boots on
+        // SCSI/SAS/SATA: which device holds which UID can flip there. Kept as a last resort
+        // because location is all that is left to tell two otherwise identical devices apart.
         let mut assigned_uids: HashSet<UID> = HashSet::new();
         for path in base_paths {
             debug!("Processing HWMon device path: {}", path.display());
@@ -1497,7 +1565,22 @@ impl Repository for HwmonRepo {
                 continue;
             }
             let raw_id = devices::get_device_unique_id(&path, &device_name).await;
-            // Distinct per-device sysfs path, used only if raw_id collides (e.g. a blank serial).
+            // Tried before location on a collision. The wwid leads here even though the serial
+            // is the preferred primary: the primary is about not re-keying what already works,
+            // a tiebreak is about uniqueness, and only the wwid is vendor scoped.
+            let wwid_id = devices::get_scsi_device_wwid(&path)
+                .await
+                .unwrap_or_default();
+            // The `serial` attribute is absent on many drives even when the data exists. Kept
+            // out of `get_device_serial_number`: that feeds the legacy chain too, so shifting it
+            // would make the migration below see no change and skip these drives.
+            let serial_id = match devices::get_device_serial_number(&path).await {
+                Some(serial) => serial,
+                None => devices::get_scsi_vpd_serial(&path)
+                    .await
+                    .unwrap_or_default(),
+            };
+            // Distinct per-device sysfs path. Last resort only: see the note on `assigned_uids`.
             let path_id = devices::get_static_device_path_str(&path)
                 .unwrap_or_else(|| path.to_string_lossy().into_owned());
             let (u_id, device_uid) = Device::assign_unique(
@@ -1505,9 +1588,11 @@ impl Repository for HwmonRepo {
                 DeviceType::Hwmon,
                 &device_name,
                 &raw_id,
-                &path_id,
+                &[wwid_id.as_str(), serial_id.as_str(), path_id.as_str()],
             );
             debug!("Detected UID: {u_id}");
+            self.migrate_legacy_device_uid(&path, &device_name, &device_uid, &assigned_uids)
+                .await;
             let cc_device_setting = self
                 .config
                 .get_cc_settings_for_device(&device_uid)
@@ -5385,6 +5470,131 @@ mod init_timeout_tests {
             }
 
             teardown_dir(&base).await;
+        });
+    }
+}
+
+#[cfg(test)]
+mod uid_migration_tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::setting::{Setting, SettingKind};
+    use serial_test::serial;
+    use uuid::Uuid;
+
+    const TEST_BASE_PATH_STR: &str = "/tmp/coolercontrol-tests-";
+    const SHARED_SERIAL: &str = "SHARED-SERIAL";
+
+    /// An hwmon dir whose `device/serial` is the shared serial, so the legacy chain
+    /// resolves to it exactly as it did before the wwid rung existed.
+    async fn seed_device_with_serial() -> PathBuf {
+        let path = Path::new(&(TEST_BASE_PATH_STR.to_string() + &Uuid::new_v4().to_string()))
+            .join("hwmon/hwmon1");
+        cc_fs::create_dir_all(path.join("device")).await.unwrap();
+        cc_fs::write(
+            path.join("device").join("serial"),
+            SHARED_SERIAL.as_bytes().to_vec(),
+        )
+        .await
+        .unwrap();
+        path
+    }
+
+    fn repo_with_setting(uid: &DeviceUID) -> HwmonRepo {
+        let config = Rc::new(Config::init_default_config().unwrap());
+        config.set_device_setting(
+            uid,
+            &Setting {
+                channel_name: "fan1".to_string(),
+                kind: SettingKind::SpeedFixed { speed_fixed: 42 },
+            },
+        );
+        HwmonRepo::new(
+            config,
+            vec![],
+            Rc::new(crate::overrides::OverridesController::empty()),
+        )
+    }
+
+    // Goal: two drives sharing a serial. The incumbent keeps the serial-derived UID while
+    // this one falls back to its wwid, so the legacy UID is NOT ours and its settings must
+    // stay put. Without the guard this moves the incumbent's live settings onto us.
+    #[test]
+    #[serial]
+    fn migration_skips_a_legacy_uid_another_device_claims() {
+        cc_fs::test_runtime(async {
+            let path = seed_device_with_serial().await;
+            let legacy_uid = Device::create_uid_from(
+                "drivetemp",
+                DeviceType::Hwmon,
+                0,
+                Some(&SHARED_SERIAL.to_string()),
+            );
+            let our_uid = Device::create_uid_from(
+                "drivetemp",
+                DeviceType::Hwmon,
+                0,
+                Some(&"naa.5000c500b".to_string()),
+            );
+            let repo = repo_with_setting(&legacy_uid);
+            let assigned: HashSet<UID> =
+                [legacy_uid.clone(), our_uid.clone()].into_iter().collect();
+
+            repo.migrate_legacy_device_uid(&path, "drivetemp", &our_uid, &assigned)
+                .await;
+
+            assert_eq!(
+                repo.config.get_device_settings(&legacy_uid).unwrap().len(),
+                1,
+                "the incumbent keeps its settings"
+            );
+            assert!(
+                repo.config
+                    .get_device_settings(&our_uid)
+                    .unwrap()
+                    .is_empty(),
+                "we must not adopt another device's settings"
+            );
+        });
+    }
+
+    // Goal: positive space for the guard. Nobody else claims the legacy UID, so the normal
+    // one-time migration still moves this device's own settings forward.
+    #[test]
+    #[serial]
+    fn migration_moves_settings_when_the_legacy_uid_is_unclaimed() {
+        cc_fs::test_runtime(async {
+            let path = seed_device_with_serial().await;
+            let legacy_uid = Device::create_uid_from(
+                "drivetemp",
+                DeviceType::Hwmon,
+                0,
+                Some(&SHARED_SERIAL.to_string()),
+            );
+            let our_uid = Device::create_uid_from(
+                "drivetemp",
+                DeviceType::Hwmon,
+                0,
+                Some(&"naa.5000c500b".to_string()),
+            );
+            let repo = repo_with_setting(&legacy_uid);
+            let assigned: HashSet<UID> = [our_uid.clone()].into_iter().collect();
+
+            repo.migrate_legacy_device_uid(&path, "drivetemp", &our_uid, &assigned)
+                .await;
+
+            assert!(
+                repo.config
+                    .get_device_settings(&legacy_uid)
+                    .unwrap()
+                    .is_empty(),
+                "the legacy entry moves"
+            );
+            assert_eq!(
+                repo.config.get_device_settings(&our_uid).unwrap().len(),
+                1,
+                "our settings arrive under the new UID"
+            );
         });
     }
 }

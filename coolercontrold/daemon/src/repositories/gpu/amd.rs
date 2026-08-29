@@ -111,7 +111,7 @@ impl GpuAMD {
                 DeviceType::GPU,
                 &device_name,
                 &raw_id,
-                &path_id,
+                &[path_id.as_str()],
             );
             let cc_device_setting = self
                 .config
