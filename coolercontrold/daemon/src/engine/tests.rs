@@ -2701,6 +2701,93 @@ mod lcd_shutdown_tests {
         });
     }
 
+    /// Goal: someone deletes the shutdown image by hand. The stored setting then describes a
+    /// file that is not there, so it must be dropped and the stock image used instead.
+    #[test]
+    #[serial]
+    fn a_hand_removed_shutdown_image_drops_its_setting_and_uses_the_stock_image() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Temp { temp_source: None }),
+            );
+            let user_image = paths::config_dir().join("lcd_shutdown/gone.png");
+            config.set_lcd_shutdown_setting(
+                &device_uid,
+                LCD_CHANNEL,
+                &LcdSettings {
+                    brightness: None,
+                    orientation: None,
+                    colors: Vec::new(),
+                    mode: LcdModeKind::Image {
+                        image_file_processed: Some(user_image.to_str().unwrap().to_string()),
+                    },
+                },
+            );
+            // The file was never written: this is the hand-deleted state.
+            assert_eq!(config.get_all_lcd_shutdown_settings().unwrap().len(), 1);
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert!(
+                config.get_all_lcd_shutdown_settings().unwrap().is_empty(),
+                "the stale shutdown setting must be dropped from the config"
+            );
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the stock image must stand in for the missing one"
+            );
+        });
+    }
+
+    /// Goal: negative space. A shutdown image that is still on disk must be applied and its
+    /// setting kept, or the pruning would eat working configurations.
+    #[test]
+    #[serial]
+    fn a_present_shutdown_image_is_applied_and_kept() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Temp { temp_source: None }),
+            );
+            let user_image = paths::config_dir().join("lcd_shutdown/present.png");
+            cc_fs::create_dir_all(&paths::config_dir().join("lcd_shutdown"))
+                .await
+                .unwrap();
+            cc_fs::write(&user_image, b"not-a-real-png".to_vec())
+                .await
+                .unwrap();
+            config.set_lcd_shutdown_setting(
+                &device_uid,
+                LCD_CHANNEL,
+                &LcdSettings {
+                    brightness: None,
+                    orientation: None,
+                    colors: Vec::new(),
+                    mode: LcdModeKind::Image {
+                        image_file_processed: Some(user_image.to_str().unwrap().to_string()),
+                    },
+                },
+            );
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert_eq!(
+                config.get_all_lcd_shutdown_settings().unwrap().len(),
+                1,
+                "a working shutdown setting must survive"
+            );
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the user's image must be applied"
+            );
+        });
+    }
+
     /// Goal: negative space. A user's own picture that is still on disk is theirs to keep,
     /// so widening the fallback must not paint the stock image over a working screen.
     #[test]

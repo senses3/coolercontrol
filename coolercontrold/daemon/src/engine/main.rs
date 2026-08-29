@@ -739,10 +739,26 @@ impl Engine {
             }
         };
         let mut channels_with_settings = HashSet::with_capacity(shutdown_settings.len());
+        let mut dropped_stale = false;
         for (device_uid, channel_name, lcd_settings) in shutdown_settings {
+            if Self::shutdown_setting_is_stale(&lcd_settings) {
+                warn!(
+                    "LCD shutdown image for {device_uid}:{channel_name} is gone; \
+                     dropping the stale setting and using the stock image"
+                );
+                self.config
+                    .remove_lcd_shutdown_setting(&device_uid, &channel_name);
+                dropped_stale = true;
+                continue;
+            }
             channels_with_settings.insert((device_uid.clone(), channel_name.clone()));
             self.apply_explicit_lcd_shutdown(&device_uid, &channel_name, lcd_settings)
                 .await;
+        }
+        if dropped_stale {
+            if let Err(err) = self.config.save_config_file().await {
+                warn!("Failed to save config after dropping stale LCD shutdown settings: {err}");
+            }
         }
         self.apply_default_lcd_shutdown_images(&channels_with_settings)
             .await;
@@ -863,11 +879,23 @@ impl Engine {
     fn needs_default_shutdown_image(lcd: &LcdSettings) -> bool {
         match lcd.mode_name() {
             LcdModeName::Temp | LcdModeName::Carousel => true,
-            LcdModeName::Image => lcd
-                .image_file_processed()
-                .is_none_or(|path| cc_fs::exists(path).not()),
+            LcdModeName::Image => Self::lcd_image_is_missing(lcd),
             LcdModeName::None | LcdModeName::Liquid => false,
         }
+    }
+
+    /// Whether an `Image` setting's file is gone. Only meaningful for `Image`: every other
+    /// mode carries no file at all and would read here as missing.
+    fn lcd_image_is_missing(lcd: &LcdSettings) -> bool {
+        lcd.image_file_processed()
+            .is_none_or(|path| cc_fs::exists(path).not())
+    }
+
+    /// A stored shutdown setting that can no longer be shown, because its image was removed
+    /// by hand or with the clear endpoint. The setting no longer describes anything, so it is
+    /// dropped and the channel falls back to the stock image.
+    fn shutdown_setting_is_stale(lcd: &LcdSettings) -> bool {
+        lcd.mode_name() == LcdModeName::Image && Self::lcd_image_is_missing(lcd)
     }
 
     /// Processes and applies the embedded default shutdown image to a single LCD channel.
