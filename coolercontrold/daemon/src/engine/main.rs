@@ -846,13 +846,28 @@ impl Engine {
                 let SettingKind::Lcd { ref lcd } = settings.kind else {
                     continue;
                 };
-                if lcd.mode_name() == LcdModeName::Temp || lcd.mode_name() == LcdModeName::Carousel
-                {
+                if Self::needs_default_shutdown_image(lcd) {
                     result.push((device_uid.clone(), channel_name.clone()));
                 }
             }
         }
         result
+    }
+
+    /// Whether a channel's live LCD setting should hand over to the stock shutdown image.
+    ///
+    /// Temp and Carousel are live readings that would otherwise freeze on screen. An Image
+    /// whose file is gone is included too: for an externally driven screen the engine
+    /// persists its own shutdown image as the current setting, so removing that image leaves
+    /// a dangling reference here, and a missing file cannot be shown at shutdown anyway.
+    fn needs_default_shutdown_image(lcd: &LcdSettings) -> bool {
+        match lcd.mode_name() {
+            LcdModeName::Temp | LcdModeName::Carousel => true,
+            LcdModeName::Image => lcd
+                .image_file_processed()
+                .is_none_or(|path| cc_fs::exists(path).not()),
+            LcdModeName::None | LcdModeName::Liquid => false,
+        }
     }
 
     /// Processes and applies the embedded default shutdown image to a single LCD channel.

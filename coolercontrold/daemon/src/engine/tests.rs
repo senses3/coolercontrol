@@ -2538,3 +2538,274 @@ mod engine_tests {
         });
     }
 }
+
+#[cfg(test)]
+mod lcd_shutdown_tests {
+    use crate::cc_fs;
+    use crate::config::Config;
+    use crate::device::{
+        ChannelInfo, ChannelKind, Device, DeviceInfo, DeviceType, DeviceUID, LcdInfo, UID,
+    };
+    use crate::engine::main::Engine;
+    use crate::paths;
+    use crate::repositories::repository::{DeviceList, DeviceLock, Repositories, Repository};
+    use crate::setting::{LcdModeKind, LcdSettings, Setting, SettingKind};
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use serial_test::serial;
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    const LCD_CHANNEL: &str = "lcd";
+
+    /// Records what actually reached the screen, so a test can tell the stock
+    /// shutdown image apart from a user's own.
+    struct LcdRecorder {
+        applied: Rc<RefCell<Vec<LcdSettings>>>,
+    }
+
+    #[async_trait(?Send)]
+    impl Repository for LcdRecorder {
+        fn device_type(&self) -> DeviceType {
+            DeviceType::Liquidctl
+        }
+        async fn initialize_devices(&mut self) -> Result<()> {
+            Ok(())
+        }
+        async fn devices(&self) -> DeviceList {
+            Vec::new()
+        }
+        async fn preload_statuses(self: Rc<Self>) {}
+        async fn update_statuses(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn shutdown(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_reset(&self, _d: &UID, _c: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_manual_control(&self, _d: &UID, _c: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_speed_fixed(&self, _d: &UID, _c: &str, _s: u8) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_speed_profile(
+            &self,
+            _d: &UID,
+            _c: &str,
+            _t: &crate::setting::TempSource,
+            _p: &[(f64, u8)],
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_lighting(
+            &self,
+            _d: &UID,
+            _c: &str,
+            _l: &crate::setting::LightingSettings,
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_lcd(&self, _d: &UID, _c: &str, lcd: &LcdSettings) -> Result<()> {
+            self.applied.borrow_mut().push(lcd.clone());
+            Ok(())
+        }
+        async fn apply_setting_pwm_mode(&self, _d: &UID, _c: &str, _m: u8) -> Result<()> {
+            Ok(())
+        }
+        async fn reinitialize_devices(&self) {}
+    }
+
+    fn setup_lcd_engine() -> (Engine, Rc<Config>, DeviceUID, Rc<RefCell<Vec<LcdSettings>>>) {
+        let applied = Rc::new(RefCell::new(Vec::new()));
+        let mut repos = Repositories::default();
+        repos.liquidctl = Some(Rc::new(LcdRecorder {
+            applied: Rc::clone(&applied),
+        }));
+
+        let mut info = DeviceInfo::default();
+        info.channels.insert(
+            LCD_CHANNEL.to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Lcd {
+                    modes: Vec::new(),
+                    info: Some(LcdInfo {
+                        screen_width: 320,
+                        screen_height: 320,
+                        max_image_size_bytes: 10_000_000,
+                        gif_supported: true,
+                    }),
+                },
+            },
+        );
+        let device = Rc::new(RefCell::new(Device::new(
+            "Test LCD Device".to_string(),
+            DeviceType::Liquidctl,
+            0,
+            None,
+            info,
+            None,
+            1.0,
+        )));
+        let device_uid = device.borrow().uid.clone();
+        let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
+        devices.insert(device_uid.clone(), device);
+
+        let all_devices = Rc::new(devices);
+        let config = Rc::new(Config::init_default_config().unwrap());
+        config.create_device_list(&all_devices);
+        let engine = Engine::new(
+            all_devices,
+            &Rc::new(repos),
+            Rc::clone(&config),
+            Rc::new(crate::calibration::CalibrationStore::empty()),
+            Rc::new(crate::calibration::FanStateMap::new()),
+            Rc::new(crate::overrides::OverridesController::empty()),
+        );
+        (engine, config, device_uid, applied)
+    }
+
+    fn lcd_setting(mode: LcdModeKind) -> Setting {
+        Setting {
+            channel_name: LCD_CHANNEL.to_string(),
+            kind: SettingKind::Lcd {
+                lcd: LcdSettings {
+                    brightness: None,
+                    orientation: None,
+                    colors: Vec::new(),
+                    mode,
+                },
+            },
+        }
+    }
+
+    /// Goal: a live Temp screen with no shutdown setting gets the stock image, which is
+    /// the baseline the bug report expects to hold after a removal.
+    #[test]
+    #[serial]
+    fn temp_mode_without_a_shutdown_setting_gets_the_stock_image() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Temp { temp_source: None }),
+            );
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert_eq!(applied.borrow().len(), 1, "the stock image must be applied");
+        });
+    }
+
+    /// Goal: negative space. A user's own picture that is still on disk is theirs to keep,
+    /// so widening the fallback must not paint the stock image over a working screen.
+    #[test]
+    #[serial]
+    fn a_present_user_image_is_left_alone() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            let picture = paths::config_dir().join("lcd_images/mine.png");
+            cc_fs::create_dir_all(&paths::config_dir().join("lcd_images"))
+                .await
+                .unwrap();
+            cc_fs::write(&picture, b"not-a-real-png".to_vec())
+                .await
+                .unwrap();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Image {
+                    image_file_processed: Some(picture.to_str().unwrap().to_string()),
+                }),
+            );
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert!(
+                applied.borrow().is_empty(),
+                "a screen showing an existing image must be left as the user set it"
+            );
+        });
+    }
+
+    /// Goal: negative space. None and Liquid mean the device drives its own screen, so the
+    /// engine must keep its hands off regardless of the Image widening.
+    #[test]
+    #[serial]
+    fn device_driven_modes_are_left_alone() {
+        cc_fs::test_runtime(async {
+            for mode in [LcdModeKind::None, LcdModeKind::Liquid] {
+                let (engine, config, device_uid, applied) = setup_lcd_engine();
+                config.set_device_setting(&device_uid, &lcd_setting(mode));
+
+                engine.apply_lcd_shutdown_images().await;
+
+                assert!(
+                    applied.borrow().is_empty(),
+                    "a device-driven screen must not get the stock image"
+                );
+            }
+        });
+    }
+
+    /// Goal: the reported bug. An externally driven screen (coolerdash and friends) has its
+    /// current setting rewritten to the shutdown image when that image is applied. After the
+    /// user removes the shutdown image, the stock embedded image must still take over.
+    #[test]
+    #[serial]
+    fn stock_image_returns_after_removing_an_applied_shutdown_image() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            // An external service owns the screen: its image lives outside the config dir.
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Image {
+                    image_file_processed: Some("/run/coolerdash/live.png".to_string()),
+                }),
+            );
+            // The user sets their own shutdown image.
+            let user_image = paths::config_dir().join("lcd_shutdown/user.png");
+            cc_fs::create_dir_all(&paths::config_dir().join("lcd_shutdown"))
+                .await
+                .unwrap();
+            cc_fs::write(&user_image, b"not-a-real-png".to_vec())
+                .await
+                .unwrap();
+            let shutdown = LcdSettings {
+                brightness: None,
+                orientation: None,
+                colors: Vec::new(),
+                mode: LcdModeKind::Image {
+                    image_file_processed: Some(user_image.to_str().unwrap().to_string()),
+                },
+            };
+            config.set_lcd_shutdown_setting(&device_uid, LCD_CHANNEL, &shutdown);
+
+            // First shutdown: the user's image is applied, and because the screen was
+            // externally driven the engine persists it as the current setting.
+            engine.apply_lcd_shutdown_images().await;
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the user's image must be applied"
+            );
+
+            // The user removes the shutdown image: the file goes and the setting goes.
+            cc_fs::remove_file(&user_image).await.unwrap();
+            config.remove_lcd_shutdown_setting(&device_uid, LCD_CHANNEL);
+            applied.borrow_mut().clear();
+
+            // Second shutdown: nothing is configured, so the stock image must be used.
+            engine.apply_lcd_shutdown_images().await;
+
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the stock embedded shutdown image must be applied once the user's is removed"
+            );
+        });
+    }
+}
