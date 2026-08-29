@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Not;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
@@ -43,8 +44,6 @@ use mime::Mime;
 use moro_local::Scope;
 use std::time::Instant;
 
-const IMAGE_FILENAME_PNG: &str = "lcd_image.png";
-const IMAGE_FILENAME_GIF: &str = "lcd_image.gif";
 const LCD_SHUTDOWN_IMAGE_DIR: &str = "lcd_shutdown";
 const SYNC_CHANNEL_NAME: &str = "sync";
 
@@ -686,20 +685,47 @@ impl Engine {
         })
     }
 
-    pub async fn save_lcd_image(&self, content_type: &Mime, file_data: Vec<u8>) -> Result<String> {
-        let image_path = if content_type == &mime::IMAGE_GIF {
-            paths::config_dir().join(IMAGE_FILENAME_GIF)
+    /// Saves the image a channel currently displays. One file per channel: a single shared
+    /// file let a second screen overwrite the first screen's image.
+    pub async fn save_lcd_image(
+        &self,
+        device_uid: &str,
+        channel_name: &str,
+        content_type: &Mime,
+        file_data: Vec<u8>,
+    ) -> Result<String> {
+        Self::save_channel_image(
+            paths::lcd_image_dir(),
+            device_uid,
+            channel_name,
+            content_type,
+            file_data,
+        )
+        .await
+    }
+
+    /// Writes a per-channel image into `dir` and returns its absolute path for the config.
+    async fn save_channel_image(
+        dir: &Path,
+        device_uid: &str,
+        channel_name: &str,
+        content_type: &Mime,
+        file_data: Vec<u8>,
+    ) -> Result<String> {
+        cc_fs::create_dir_all(dir).await?;
+        let extension = if content_type == &mime::IMAGE_GIF {
+            "gif"
         } else {
-            paths::config_dir().join(IMAGE_FILENAME_PNG)
+            "png"
         };
+        let image_path = dir.join(format!("{device_uid}-{channel_name}.{extension}"));
         cc_fs::write(&image_path, file_data).await?;
-        let image_location = image_path
-            .to_str()
-            .map(ToString::to_string)
-            .ok_or_else(|| CCError::InternalError {
+        image_path.to_str().map(ToString::to_string).ok_or_else(|| {
+            CCError::InternalError {
                 msg: "Path to str conversion".to_string(),
-            })?;
-        Ok(image_location)
+            }
+            .into()
+        })
     }
 
     /// Saves an LCD shutdown image to the dedicated subdirectory.
@@ -711,21 +737,14 @@ impl Engine {
         content_type: &Mime,
         file_data: Vec<u8>,
     ) -> Result<String> {
-        let shutdown_dir = paths::config_dir().join(LCD_SHUTDOWN_IMAGE_DIR);
-        cc_fs::create_dir_all(&shutdown_dir).await?;
-        let filename = if content_type == &mime::IMAGE_GIF {
-            format!("{device_uid}-{channel_name}.gif")
-        } else {
-            format!("{device_uid}-{channel_name}.png")
-        };
-        let image_path = shutdown_dir.join(&filename);
-        cc_fs::write(&image_path, file_data).await?;
-        image_path.to_str().map(ToString::to_string).ok_or_else(|| {
-            CCError::InternalError {
-                msg: "Path to str conversion".to_string(),
-            }
-            .into()
-        })
+        Self::save_channel_image(
+            &paths::config_dir().join(LCD_SHUTDOWN_IMAGE_DIR),
+            device_uid,
+            channel_name,
+            content_type,
+            file_data,
+        )
+        .await
     }
 
     /// Applies all persisted LCD shutdown images to their respective devices.
@@ -1013,7 +1032,10 @@ impl Engine {
             .map_err(|err| CCError::InternalError {
                 msg: err.to_string(),
             })?;
-        let content_type = if image_path.ends_with(IMAGE_FILENAME_GIF) {
+        let content_type = if Path::new(&image_path)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
+        {
             mime::IMAGE_GIF
         } else {
             mime::IMAGE_PNG

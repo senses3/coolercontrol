@@ -305,6 +305,11 @@ fn main() -> Result<()> {
         parse_cmd_args(&cmd_args).await?;
         config.verify_writeability()?;
         config.log_converted_function_warnings();
+        let moved_lcd_images = config.migrate_lcd_images_to_per_channel().await;
+        if moved_lcd_images > 0 {
+            info!("Moved {moved_lcd_images} LCD image setting(s) onto per-channel files");
+            config.save_config_file().await?;
+        }
         paths::ensure_data_dir().await?;
         // admin uses `sidecar_fs` (always Tokio); on the compio main thread there is no Tokio
         // reactor, so run it on the sidecar. Harmless on the Tokio backend too.

@@ -16,6 +16,7 @@ use toml_edit::{ArrayOfTables, DocumentMut, Formatted, Item, Table, TableLike, V
 use crate::api::CCError;
 use crate::cc_fs;
 use crate::device::{ChannelName, Duty, Temp, UID};
+use crate::paths;
 use crate::repositories::repository::DeviceLock;
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, ChannelExtensions, CoolerControlSettings, CustomSensor,
@@ -259,6 +260,87 @@ impl Config {
             .and_then(|devices| devices.get(device_uid))
             .and_then(Item::as_str)
             .map(str::to_owned)
+    }
+
+    /// Moves LCD image settings off the single shared image file and onto per-channel paths.
+    ///
+    /// Earlier daemons wrote every channel's image to one `lcd_image.png` (or `.gif`), so a
+    /// second screen overwrote the first and both settings named the same file. Each channel
+    /// still pointing at a shared file gets its own copy of it, leaving what every screen
+    /// shows today unchanged while making the next upload per channel.
+    ///
+    /// Returns how many settings moved, so the caller stays silent when nothing did.
+    pub async fn migrate_lcd_images_to_per_channel(&self) -> usize {
+        let legacy: Vec<String> = paths::legacy_lcd_image_files()
+            .iter()
+            .filter_map(|path| path.to_str().map(ToString::to_string))
+            .collect();
+        let mut moved = 0;
+        for (device_uid, channel_name, source) in self.channels_on_legacy_lcd_images(&legacy) {
+            let extension = if Path::new(&source)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
+            {
+                "gif"
+            } else {
+                "png"
+            };
+            let destination =
+                paths::lcd_image_dir().join(format!("{device_uid}-{channel_name}.{extension}"));
+            if let Err(err) = Self::copy_legacy_lcd_image(&source, &destination).await {
+                warn!("Failed to migrate the LCD image for {device_uid}:{channel_name}: {err}");
+                continue;
+            }
+            let Some(destination) = destination.to_str() else {
+                continue;
+            };
+            self.document.borrow_mut()["device-settings"][&device_uid][&channel_name]["lcd"]
+                ["image_file_processed"] =
+                Item::Value(Value::String(Formatted::new(destination.to_string())));
+            moved += 1;
+        }
+        moved
+    }
+
+    /// Every `device-settings` channel whose LCD image is one of the shared legacy files.
+    fn channels_on_legacy_lcd_images(&self, legacy: &[String]) -> Vec<(String, String, String)> {
+        let document = self.document.borrow();
+        let Some(devices) = document.get("device-settings").and_then(Item::as_table) else {
+            return Vec::new();
+        };
+        let mut found = Vec::new();
+        for (device_uid, device_item) in devices {
+            let Some(channels) = device_item.as_table() else {
+                continue;
+            };
+            for (channel_name, channel_item) in channels {
+                let image = channel_item
+                    .get("lcd")
+                    .and_then(|lcd| lcd.get("image_file_processed"))
+                    .and_then(Item::as_str);
+                if let Some(image) = image {
+                    if legacy.iter().any(|path| path == image) {
+                        found.push((
+                            device_uid.to_string(),
+                            channel_name.to_string(),
+                            image.to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+        found
+    }
+
+    /// Copies the shared image to its per-channel home. A destination that already exists is
+    /// left alone, so a re-run cannot overwrite an image the user has since replaced.
+    async fn copy_legacy_lcd_image(source: &str, destination: &Path) -> Result<()> {
+        if cc_fs::exists(destination) {
+            return Ok(());
+        }
+        let image = cc_fs::read_image(Path::new(source)).await?;
+        cc_fs::create_dir_all(paths::lcd_image_dir()).await?;
+        cc_fs::write(destination, image).await
     }
 
     /// Returns how many sites moved, so the caller stays silent when nothing did. A table
@@ -2780,6 +2862,7 @@ impl Config {
 mod tests {
     use crate::cc_fs;
     use crate::config::{Config, POWER_PROFILE_MODES_KEY};
+    use crate::paths;
     use serial_test::serial;
     use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
@@ -3039,6 +3122,98 @@ mod tests {
         let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
 
         assert_eq!(rewrites, 0);
+    }
+
+    /// Goal: the migration's whole point. Two channels sharing one legacy image file each
+    /// end up with their own copy, and the config names the new files.
+    #[test]
+    #[serial]
+    fn migrate_lcd_images_gives_each_channel_its_own_file() {
+        cc_fs::test_runtime(async {
+            let legacy = paths::config_dir().join("lcd_image.png");
+            cc_fs::write(&legacy, b"shared-image".to_vec())
+                .await
+                .unwrap();
+            let legacy = legacy.to_str().unwrap().to_string();
+            let config = config_from(&format!(
+                "[device-settings.dev1.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{legacy}\" }}\n\
+                 [device-settings.dev2.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{legacy}\" }}\n"
+            ));
+
+            let moved = config.migrate_lcd_images_to_per_channel().await;
+
+            assert_eq!(moved, 2, "both channels must move off the shared file");
+            let document = config.document.borrow().to_string();
+            assert!(
+                document.contains(&legacy).not(),
+                "no setting may still name the shared file"
+            );
+            assert!(document.contains("lcd_images/dev1-lcd.png"));
+            assert!(document.contains("lcd_images/dev2-lcd.png"));
+            for name in ["dev1-lcd.png", "dev2-lcd.png"] {
+                let copied = paths::lcd_image_dir().join(name);
+                assert_eq!(
+                    cc_fs::read_image(&copied).await.unwrap(),
+                    b"shared-image",
+                    "each copy must carry the image the screen was showing"
+                );
+            }
+        });
+    }
+
+    /// Goal: the migration re-runs on every boot until the config is saved, and must not
+    /// overwrite an image the user has replaced since the first pass.
+    #[test]
+    #[serial]
+    fn migrate_lcd_images_is_idempotent_and_keeps_a_newer_image() {
+        cc_fs::test_runtime(async {
+            let legacy = paths::config_dir().join("lcd_image.png");
+            cc_fs::write(&legacy, b"shared-image".to_vec())
+                .await
+                .unwrap();
+            let legacy_str = legacy.to_str().unwrap().to_string();
+            let config = config_from(&format!(
+                "[device-settings.dev1.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{legacy_str}\" }}\n"
+            ));
+
+            assert_eq!(config.migrate_lcd_images_to_per_channel().await, 1);
+            let migrated = paths::lcd_image_dir().join("dev1-lcd.png");
+            cc_fs::write(&migrated, b"user-replaced-it".to_vec())
+                .await
+                .unwrap();
+
+            assert_eq!(
+                config.migrate_lcd_images_to_per_channel().await,
+                0,
+                "a second pass has nothing left pointing at the shared file"
+            );
+            assert_eq!(
+                cc_fs::read_image(&migrated).await.unwrap(),
+                b"user-replaced-it",
+                "the newer image must survive"
+            );
+        });
+    }
+
+    /// Goal: negative space. Settings already on per-channel paths, and non-LCD settings,
+    /// must be left completely alone.
+    #[test]
+    #[serial]
+    fn migrate_lcd_images_leaves_current_settings_alone() {
+        cc_fs::test_runtime(async {
+            let current = paths::lcd_image_dir().join("dev1-lcd.png");
+            let current = current.to_str().unwrap().to_string();
+            let config = config_from(&format!(
+                "[device-settings.dev1.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{current}\" }}\n\
+                 [device-settings.dev1.fan1]\nspeed_fixed = 50\n"
+            ));
+            let before = config.document.borrow().to_string();
+
+            let moved = config.migrate_lcd_images_to_per_channel().await;
+
+            assert_eq!(moved, 0);
+            assert_eq!(config.document.borrow().to_string(), before);
+        });
     }
 
     // Goal: the startup delay accepts the full documented range and clamps

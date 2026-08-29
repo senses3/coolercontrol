@@ -218,7 +218,12 @@ impl ApiActor<DeviceMessage> for DeviceActor {
                         .await?;
                     let image_path = self
                         .engine
-                        .save_lcd_image(&processed_image_data.0, processed_image_data.1)
+                        .save_lcd_image(
+                            &device_uid,
+                            &channel_name,
+                            &processed_image_data.0,
+                            processed_image_data.1,
+                        )
                         .await?;
                     let lcd_settings = LcdSettings {
                         brightness,

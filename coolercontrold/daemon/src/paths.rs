@@ -73,6 +73,15 @@ static CALIBRATION_CONFIG_FILE: LazyLock<PathBuf> =
 static DETECT_OVERRIDE_FILE: LazyLock<PathBuf> = LazyLock::new(|| config_dir().join("detect.toml"));
 static OVERRIDES_FILE: LazyLock<PathBuf> = LazyLock::new(|| config_dir().join("overrides.toml"));
 
+// -- LCD images --
+// One file per device channel. Earlier daemons wrote a single shared file per content type,
+// so two screens overwrote each other's image; those names are kept only for the migration.
+static LCD_IMAGE_DIR: LazyLock<PathBuf> = LazyLock::new(|| config_dir().join("lcd_images"));
+static LEGACY_LCD_IMAGE_PNG: LazyLock<PathBuf> =
+    LazyLock::new(|| config_dir().join("lcd_image.png"));
+static LEGACY_LCD_IMAGE_GIF: LazyLock<PathBuf> =
+    LazyLock::new(|| config_dir().join("lcd_image.gif"));
+
 // -- auth (runtime session state in /var/lib) --
 static SESSION_KEY_FILE: LazyLock<PathBuf> = LazyLock::new(|| data_dir().join(".session_key"));
 static SESSIONS_DIR: LazyLock<PathBuf> = LazyLock::new(|| data_dir().join("sessions"));
@@ -153,6 +162,17 @@ pub fn detect_override_file() -> &'static Path {
 
 pub fn overrides_file() -> &'static Path {
     &OVERRIDES_FILE
+}
+
+/// Per-channel LCD image storage, so two screens cannot share and overwrite one image.
+pub fn lcd_image_dir() -> &'static Path {
+    &LCD_IMAGE_DIR
+}
+
+/// The single shared LCD image files written by earlier daemons, one per content type.
+/// Used only to migrate old configs onto per-channel paths.
+pub fn legacy_lcd_image_files() -> [&'static Path; 2] {
+    [&LEGACY_LCD_IMAGE_PNG, &LEGACY_LCD_IMAGE_GIF]
 }
 
 /// Ensures the plugins directory exists at its canonical location and

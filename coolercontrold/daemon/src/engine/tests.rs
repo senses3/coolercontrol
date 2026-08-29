@@ -2552,6 +2552,7 @@ mod lcd_shutdown_tests {
     use crate::setting::{LcdModeKind, LcdSettings, Setting, SettingKind};
     use anyhow::Result;
     use async_trait::async_trait;
+    use mime;
     use serial_test::serial;
     use std::cell::RefCell;
     use std::collections::HashMap;
@@ -2698,6 +2699,59 @@ mod lcd_shutdown_tests {
             engine.apply_lcd_shutdown_images().await;
 
             assert_eq!(applied.borrow().len(), 1, "the stock image must be applied");
+        });
+    }
+
+    /// Goal: two screens must not share one image file. A single shared name let the second
+    /// upload overwrite the first screen's picture, and both settings then named that file.
+    #[test]
+    #[serial]
+    fn each_channel_gets_its_own_live_image_file() {
+        cc_fs::test_runtime(async {
+            let (engine, _config, device_uid, _applied) = setup_lcd_engine();
+            let first = engine
+                .save_lcd_image(
+                    &device_uid,
+                    "lcd1",
+                    &mime::IMAGE_PNG,
+                    b"screen-one".to_vec(),
+                )
+                .await
+                .unwrap();
+            let second = engine
+                .save_lcd_image(
+                    &device_uid,
+                    "lcd2",
+                    &mime::IMAGE_PNG,
+                    b"screen-two".to_vec(),
+                )
+                .await
+                .unwrap();
+
+            assert_ne!(first, second, "each channel needs its own file");
+            let kept = cc_fs::read_image(std::path::Path::new(&first))
+                .await
+                .unwrap();
+            assert_eq!(
+                kept, b"screen-one",
+                "the second screen's upload must not overwrite the first"
+            );
+        });
+    }
+
+    /// Goal: a gif keeps its extension, since the retrieved content type is read back off the
+    /// path. The old check matched one fixed filename, which a per-channel path never is.
+    #[test]
+    #[serial]
+    fn a_gif_keeps_its_extension_on_a_per_channel_path() {
+        cc_fs::test_runtime(async {
+            let (engine, _config, device_uid, _applied) = setup_lcd_engine();
+            let path = engine
+                .save_lcd_image(&device_uid, LCD_CHANNEL, &mime::IMAGE_GIF, b"gif".to_vec())
+                .await
+                .unwrap();
+
+            assert!(path.ends_with(".gif"), "a gif must stay a gif: {path}");
         });
     }
 
