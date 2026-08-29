@@ -36,7 +36,7 @@ these after changing the mark, and commit what they write. They need `cairosvg`,
 `numpy` (`python3 -m pip install cairosvg pillow numpy`).
 
 ```bash
-./gen-app-icons.py             # symbolic + colour SVGs, PNGs, PWA icons, favicon
+./gen-app-icons.py             # symbolic + colour SVGs, PNGs, PWA icons, favicon, LCD shutdown
 ./gen-notification-icons.py    # shutdown, information, alert-*
 ./make-animated-icon.py        # coolercontrol-animated.gif, from the colour SVG
 ```
