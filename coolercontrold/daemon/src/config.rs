@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use log::{debug, error, info, trace, warn};
-use toml_edit::{ArrayOfTables, DocumentMut, Formatted, Item, Table, Value};
+use toml_edit::{ArrayOfTables, DocumentMut, Formatted, Item, Table, TableLike, Value};
 
 use crate::api::CCError;
 use crate::cc_fs;
@@ -31,6 +31,16 @@ const DEFAULT_CONFIG_FILE_BYTES: &[u8] = include_bytes!("../resources/config-def
 const REMOVED_EMA_FUNCTION_TYPE: &str = "ExponentialMovingAvg";
 /// Top-level table mapping a system power profile name to the Mode UID to activate.
 const POWER_PROFILE_MODES_KEY: &str = "power_profile_modes";
+
+/// Settings tables in config.toml whose keys are device UIDs. Kept together so the UID
+/// migration cannot miss one. `devices` is excluded: it is never pruned, so a migrated
+/// drive leaves its old row like any device that stopped being detected.
+const UID_KEYED_TABLES: [&str; 4] = [
+    "settings",
+    "device-settings",
+    "legacy690",
+    "lcd-shutdown-settings",
+];
 
 pub struct Config {
     path: PathBuf,
@@ -249,6 +259,124 @@ impl Config {
             .and_then(|devices| devices.get(device_uid))
             .and_then(Item::as_str)
             .map(str::to_owned)
+    }
+
+    /// Returns how many sites moved, so the caller stays silent when nothing did. A table
+    /// already holding an entry under `current` is left alone: merging would pick a winner.
+    pub fn migrate_device_uid(&self, legacy: &str, current: &str) -> usize {
+        debug_assert_eq!(legacy.len(), 64);
+        debug_assert_eq!(current.len(), 64);
+        debug_assert_ne!(legacy, current);
+        let mut doc = self.document.borrow_mut();
+        let mut rewrites = 0;
+        for table_name in UID_KEYED_TABLES {
+            rewrites += Self::rename_uid_keyed_entry(&mut doc, table_name, legacy, current);
+        }
+        rewrites += Self::repoint_profile_temp_sources(&mut doc, legacy, current);
+        rewrites += Self::repoint_custom_sensor_sources(&mut doc, legacy, current);
+        rewrites += Self::repoint_lcd_temp_sources(&mut doc, legacy, current);
+        rewrites
+    }
+
+    fn rename_uid_keyed_entry(
+        doc: &mut DocumentMut,
+        table_name: &str,
+        legacy: &str,
+        current: &str,
+    ) -> usize {
+        let Some(table) = doc.get_mut(table_name).and_then(Item::as_table_mut) else {
+            return 0;
+        };
+        if table.contains_key(current) {
+            return 0;
+        }
+        let Some(entry) = table.remove(legacy) else {
+            return 0;
+        };
+        table.insert(current, entry);
+        1
+    }
+
+    fn repoint_profile_temp_sources(doc: &mut DocumentMut, legacy: &str, current: &str) -> usize {
+        let Some(profiles) = doc
+            .get_mut("profiles")
+            .and_then(Item::as_array_of_tables_mut)
+        else {
+            return 0;
+        };
+        let mut rewrites = 0;
+        for profile in profiles.iter_mut() {
+            rewrites += Self::repoint_temp_source(profile, legacy, current);
+        }
+        rewrites
+    }
+
+    fn repoint_custom_sensor_sources(doc: &mut DocumentMut, legacy: &str, current: &str) -> usize {
+        let Some(sensors) = doc
+            .get_mut("custom_sensors")
+            .and_then(Item::as_array_of_tables_mut)
+        else {
+            return 0;
+        };
+        let mut rewrites = 0;
+        for sensor in sensors.iter_mut() {
+            let Some(sources) = sensor
+                .get_mut("sources")
+                .and_then(Item::as_array_of_tables_mut)
+            else {
+                continue;
+            };
+            for source in sources.iter_mut() {
+                rewrites += Self::repoint_temp_source(source, legacy, current);
+            }
+        }
+        rewrites
+    }
+
+    /// Repoints `lcd.temp_source.device_uid` under every `device-settings` channel. An LCD on
+    /// one device can show another's temp, so the reference outlives that device's own key
+    /// rename.
+    fn repoint_lcd_temp_sources(doc: &mut DocumentMut, legacy: &str, current: &str) -> usize {
+        let Some(device_settings) = doc.get_mut("device-settings").and_then(Item::as_table_mut)
+        else {
+            return 0;
+        };
+        let mut rewrites = 0;
+        for (_, device_entry) in device_settings.iter_mut() {
+            let Some(channels) = device_entry.as_table_like_mut() else {
+                continue;
+            };
+            for (_, channel_entry) in channels.iter_mut() {
+                let Some(lcd) = channel_entry
+                    .as_table_like_mut()
+                    .and_then(|channel| channel.get_mut("lcd"))
+                    .and_then(Item::as_table_like_mut)
+                else {
+                    continue;
+                };
+                rewrites += Self::repoint_temp_source(lcd, legacy, current);
+            }
+        }
+        rewrites
+    }
+
+    /// Rewrites a `temp_source.device_uid` in place when it points at `legacy`. Both tables
+    /// are taken as `TableLike` so an inline `temp_source` or a nested `lcd` both work.
+    fn repoint_temp_source(table: &mut dyn TableLike, legacy: &str, current: &str) -> usize {
+        let Some(temp_source) = table
+            .get_mut("temp_source")
+            .and_then(Item::as_table_like_mut)
+        else {
+            return 0;
+        };
+        let Some(device_uid) = temp_source.get_mut("device_uid") else {
+            return 0;
+        };
+        if device_uid.as_str() != Some(legacy) {
+            return 0;
+        }
+        *device_uid = Item::Value(Value::String(Formatted::new(current.to_owned())));
+        1
     }
 
     pub fn legacy690_ids(&self) -> Result<HashMap<String, bool>> {
@@ -2655,6 +2783,7 @@ mod tests {
     use serial_test::serial;
     use std::cell::{Cell, RefCell};
     use std::collections::HashMap;
+    use std::ops::Not;
     use std::path::Path;
     use toml_edit::{DocumentMut, Item};
 
@@ -2689,11 +2818,15 @@ mod tests {
         assert_eq!(config.device_name("unknown"), None);
     }
 
-    fn config_with(toml: &str) -> Config {
+    const LEGACY_UID: &str = "8ef08515338cc1f7727415a1d6bc45e84d5a818e94bd2072ac34b9d8d87f4210";
+    const CURRENT_UID: &str = "67ada747f6820bb2e4a9b5b639657e0971998a6f5ca5f50480ecf36b46c7ec29";
+    const OTHER_UID: &str = "4350edabc2d968f414830277d0062764b9ad664d481e517c1fe47019b750ce7b";
+
+    fn config_from(document: &str) -> Config {
         Config {
             path: Path::new("/tmp/config.toml").to_path_buf(),
             path_ui: Path::new("/tmp/config-ui.json").to_path_buf(),
-            document: RefCell::new(toml.parse::<DocumentMut>().unwrap()),
+            document: RefCell::new(document.parse::<DocumentMut>().unwrap()),
             generation: Cell::new(0),
         }
     }
@@ -2703,7 +2836,7 @@ mod tests {
     /// Methodology: parse a table holding a good entry, a non-string, and an empty value.
     #[test]
     fn power_profile_modes_skip_unusable_entries() {
-        let config = config_with(
+        let config = config_from(
             "[power_profile_modes]\n\
              performance = \"mode-a\"\n\
              balanced = \"\"\n\
@@ -2722,7 +2855,7 @@ mod tests {
     /// Methodology: read from a config that has never had the section.
     #[test]
     fn power_profile_modes_absent_table_is_empty() {
-        let config = config_with("[settings]\napply_on_boot = true\n");
+        let config = config_from("[settings]\napply_on_boot = true\n");
 
         assert!(config.get_power_profile_modes().is_empty());
     }
@@ -2732,7 +2865,7 @@ mod tests {
     /// Methodology: write, read back, then write an empty map and confirm the key is gone.
     #[test]
     fn power_profile_modes_round_trip_and_clear() {
-        let config = config_with("[settings]\n");
+        let config = config_from("[settings]\n");
         let written = HashMap::from([
             ("balanced".to_string(), "mode-b".to_string()),
             ("performance".to_string(), "mode-p".to_string()),
@@ -2758,7 +2891,7 @@ mod tests {
     /// Methodology: write two profiles, then write only one.
     #[test]
     fn power_profile_modes_drop_removed_profiles() {
-        let config = config_with("[settings]\n");
+        let config = config_from("[settings]\n");
         config.set_power_profile_modes(&HashMap::from([
             ("balanced".to_string(), "mode-b".to_string()),
             ("performance".to_string(), "mode-p".to_string()),
@@ -2772,6 +2905,140 @@ mod tests {
         let modes = config.get_power_profile_modes();
         assert_eq!(modes.len(), 1);
         assert_eq!(modes.get("performance"), None);
+    }
+
+    /// Mirrors the reporter's config: a per-device settings table, a Graph profile bound
+    /// to the drive's temp, and a Mix custom sensor listing it as a source.
+    fn migration_document() -> String {
+        format!(
+            "[settings.{LEGACY_UID}]\nname = \"SSD OS\"\ndisable = false\n\n\
+             [settings.{OTHER_UID}]\nname = \"it8728\"\n\n\
+             [[profiles]]\nuid = \"p1\"\n\
+             temp_source = {{ temp_name = \"temp1\", device_uid = \"{LEGACY_UID}\" }}\n\n\
+             [[profiles]]\nuid = \"p2\"\n\
+             temp_source = {{ temp_name = \"temp1\", device_uid = \"{OTHER_UID}\" }}\n\n\
+             [[custom_sensors]]\nid = \"sensor2\"\n\n\
+             [[custom_sensors.sources]]\n\
+             temp_source = {{ temp_name = \"temp1\", device_uid = \"{LEGACY_UID}\" }}\n\
+             weight = 1\n"
+        )
+    }
+
+    // Goal: the whole point of the migration. Settings keyed by the old path-derived UID,
+    // plus every cross-entity temp_source reference, move to the wwid-derived UID in one
+    // pass. Method: build the reporter's config shape and assert all three sites moved.
+    #[test]
+    fn migrate_device_uid_moves_settings_and_temp_sources() {
+        let config = config_from(&migration_document());
+
+        let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        let doc = config.document.borrow().to_string();
+        assert_eq!(
+            rewrites, 3,
+            "settings table + profile + custom sensor source"
+        );
+        assert!(doc.contains(LEGACY_UID).not(), "no legacy UID may remain");
+        assert!(doc.contains(&format!("[settings.{CURRENT_UID}]")));
+        assert!(doc.contains("SSD OS"), "the settings payload must survive");
+        assert_eq!(doc.matches(CURRENT_UID).count(), 3);
+    }
+
+    // Goal: an LCD on a DIFFERENT device showing the migrated drive's temp keeps working.
+    // That reference does not move with the drive's own entry, so it needs its own repoint.
+    #[test]
+    fn migrate_device_uid_repoints_lcd_temp_source_on_another_device() {
+        let document = format!(
+            "[device-settings.{OTHER_UID}.lcd]\n\
+             lcd.mode = \"temp\"\n\
+             lcd.temp_source = {{ temp_name = \"temp1\", device_uid = \"{LEGACY_UID}\" }}\n"
+        );
+        let config = config_from(&document);
+
+        let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        let doc = config.document.borrow().to_string();
+        assert_eq!(rewrites, 1, "the LCD temp_source is the only reference");
+        assert!(doc.contains(LEGACY_UID).not(), "no legacy UID may remain");
+        assert!(doc.contains(CURRENT_UID));
+        assert!(
+            doc.contains(&format!("[device-settings.{OTHER_UID}.lcd]")),
+            "the owning device's own entry must not move"
+        );
+    }
+
+    // Goal: negative space. Migrating one drive must not retarget an unrelated screen.
+    #[test]
+    fn migrate_device_uid_leaves_unrelated_lcd_temp_source_alone() {
+        let document = format!(
+            "[device-settings.{OTHER_UID}.lcd]\n\
+             lcd.temp_source = {{ temp_name = \"temp1\", device_uid = \"{OTHER_UID}\" }}\n"
+        );
+        let config = config_from(&document);
+
+        let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        let doc = config.document.borrow().to_string();
+        assert_eq!(rewrites, 0);
+        assert!(doc.contains(CURRENT_UID).not());
+    }
+
+    // Goal: negative space. Other devices must be untouched, or a migration for one drive
+    // would corrupt every other device's references.
+    #[test]
+    fn migrate_device_uid_leaves_other_devices_alone() {
+        let config = config_from(&migration_document());
+
+        config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        let doc = config.document.borrow().to_string();
+        assert!(doc.contains(&format!("[settings.{OTHER_UID}]")));
+        assert_eq!(doc.matches(OTHER_UID).count(), 2, "table key + its profile");
+    }
+
+    // Goal: never clobber real settings. If the user already has settings under the new
+    // UID, merging would silently pick a winner, so the table entry is left alone.
+    #[test]
+    fn migrate_device_uid_does_not_clobber_an_existing_entry() {
+        let document = format!(
+            "[settings.{LEGACY_UID}]\nname = \"old\"\n\n\
+             [settings.{CURRENT_UID}]\nname = \"already here\"\n"
+        );
+        let config = config_from(&document);
+
+        let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        let doc = config.document.borrow().to_string();
+        assert_eq!(rewrites, 0);
+        assert!(doc.contains("already here"));
+        assert!(
+            doc.contains(LEGACY_UID),
+            "the legacy entry is left for the user"
+        );
+    }
+
+    // Goal: the migration re-runs on every boot until the config is saved, so a second
+    // pass must be a no-op rather than double-applying or erroring.
+    #[test]
+    fn migrate_device_uid_is_idempotent() {
+        let config = config_from(&migration_document());
+
+        let first = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+        let second = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        assert_eq!(first, 3);
+        assert_eq!(second, 0);
+    }
+
+    // Goal: a config with none of the UID-keyed tables present (a fresh install) must not
+    // panic when the migration runs during first-boot device detection.
+    #[test]
+    fn migrate_device_uid_on_empty_config_is_a_noop() {
+        let config = config_from("[devices]\n");
+
+        let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
+
+        assert_eq!(rewrites, 0);
     }
 
     // Goal: the startup delay accepts the full documented range and clamps
