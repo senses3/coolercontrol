@@ -22,7 +22,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "8"
+__VERSION__ = "9"
 
 try:
     import cairosvg
@@ -39,6 +39,7 @@ PUBLIC = ROOT / "coolercontrol-ui/public"
 # The logo is imported by the UI, so it is bundled and content-hashed, not served
 # from public/ under a fixed name.
 ASSETS = ROOT / "coolercontrol-ui/src/assets"
+CC_IMAGE = ROOT / "coolercontrold/cc-image/resources"
 
 # Geometry on a 16 grid. Everything else is this, scaled.
 R = 2.535  # ring outer radius
@@ -59,6 +60,9 @@ PAD = 0.86
 
 MASKABLE_BG = "#1b1e23"  # manifest background_color
 ICO_SIZES = (256, 64, 48, 32, 24, 16)
+# The LCD shutdown screen. The daemon resizes it per device, so this is only a
+# source size; black because an LCD's unlit pixels are black.
+LCD_SHUTDOWN = 320
 # gdk-pixbuf identifies a file by sniffing its first 256 bytes, so <svg> has to
 # open inside that window. Past it the load fails outright ("Could not load a
 # pixbuf from icon theme") for GTK, GNOME Shell, and every tray that goes
@@ -408,13 +412,17 @@ def main():
     canvas.alpha_composite(art, ((512 - box) // 2, (512 - box) // 2))
     canvas.convert("RGB").save(PUBLIC / "icons/app-maskable-512.png")
 
+    screen = Image.new("RGBA", (LCD_SHUTDOWN, LCD_SHUTDOWN), "#000000")
+    screen.alpha_composite(render(logo, LCD_SHUTDOWN))
+    screen.convert("RGB").save(CC_IMAGE / "lcd-shutdown.png")
+
     ico = PUBLIC / "favicon.ico"
     render(logo, 256).save(ico, sizes=[(s, s) for s in ICO_SIZES])
     (PUBLIC / "icon/favicon.ico").write_bytes(ico.read_bytes())
 
     for path in files:
         print("wrote", path.relative_to(ROOT))
-    print("wrote the PNG, maskable and favicon rasters")
+    print("wrote the PNG, maskable, LCD shutdown and favicon rasters")
 
 
 if __name__ == "__main__":
