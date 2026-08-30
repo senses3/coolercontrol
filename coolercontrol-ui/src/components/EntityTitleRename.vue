@@ -4,6 +4,9 @@
 -->
 
 <script setup lang="ts">
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiPencilOutline } from '@mdi/js'
 import { type Ref, ref, computed } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
@@ -79,14 +82,21 @@ const handleBlur = (): void => {
             @keydown.esc="cancelEditName"
             @blur="handleBlur"
         />
-        <span
+        <button
             v-else
-            class="font-bold overflow-hidden overflow-ellipsis cursor-pointer hover:text-text-color-secondary"
+            type="button"
+            class="flex min-w-0 items-center gap-2 rounded-lg text-left outline-none hover:text-text-color-secondary focus-visible:ring-2 focus-visible:ring-accent"
+            :aria-label="t('layout.menu.tooltips.rename')"
             @click="startEditingName"
             v-tooltip.bottom="t('layout.menu.tooltips.rename')"
         >
-            {{ props.currentName }}
-        </span>
+            <span class="overflow-hidden overflow-ellipsis font-bold">
+                {{ props.currentName }}
+            </span>
+            <!-- Dimmed so the name stays the emphasis. Opacity is constant:
+                 the icon takes currentColor, so hover recolors it with the name. -->
+            <svg-icon type="mdi" :path="mdiPencilOutline" :size="18" class="shrink-0 opacity-40" />
+        </button>
     </div>
 </template>
 
