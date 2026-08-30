@@ -2914,6 +2914,12 @@ mod tests {
         }
     }
 
+    /// The LCD image dir is shared by every test in this sandbox, so each LCD migration
+    /// test starts from an empty one instead of inheriting another test's copies.
+    async fn reset_lcd_image_dir() {
+        let _ = cc_fs::remove_dir_all(paths::lcd_image_dir()).await;
+    }
+
     /// Goal: a hand-edited mapping table must load, and anything unusable in it must be skipped
     /// rather than break startup, since an unmapped system simply never switches Modes.
     /// Methodology: parse a table holding a good entry, a non-string, and an empty value.
@@ -3130,6 +3136,7 @@ mod tests {
     #[serial]
     fn migrate_lcd_images_gives_each_channel_its_own_file() {
         cc_fs::test_runtime(async {
+            reset_lcd_image_dir().await;
             let legacy = paths::config_dir().join("lcd_image.png");
             cc_fs::write(&legacy, b"shared-image".to_vec())
                 .await
@@ -3167,6 +3174,7 @@ mod tests {
     #[serial]
     fn migrate_lcd_images_is_idempotent_and_keeps_a_newer_image() {
         cc_fs::test_runtime(async {
+            reset_lcd_image_dir().await;
             let legacy = paths::config_dir().join("lcd_image.png");
             cc_fs::write(&legacy, b"shared-image".to_vec())
                 .await
@@ -3201,6 +3209,7 @@ mod tests {
     #[serial]
     fn migrate_lcd_images_leaves_current_settings_alone() {
         cc_fs::test_runtime(async {
+            reset_lcd_image_dir().await;
             let current = paths::lcd_image_dir().join("dev1-lcd.png");
             let current = current.to_str().unwrap().to_string();
             let config = config_from(&format!(
