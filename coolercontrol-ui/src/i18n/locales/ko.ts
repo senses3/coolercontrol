@@ -4,6 +4,9 @@
 export default {
     common: {
         save: '저장',
+        target: '목표',
+        mouseActions: '마우스 동작',
+        moreInfo: '자세한 정보',
         cancel: '취소',
         add: '추가',
         yes: '예',
@@ -631,7 +634,7 @@ export default {
             staleTempSource: '온도 소스가 페일세이프 값 사용 중',
             stressTest: '열 스트레스 테스트',
             stressTestTooltip:
-                '지속적인 열 부하를 생성하여<br>팬 곡선과 냉각 프로파일을 검증합니다.<br>결과는 하드웨어에 따라 다를 수 있습니다.<br>추가 백엔드를 위해 stress-ng를 설치하세요.',
+                '지속적인 열 부하를 생성하여\n팬 곡선과 냉각 프로파일을 검증합니다.\n결과는 하드웨어에 따라 다를 수 있습니다.\n추가 백엔드를 위해 stress-ng를 설치하세요.',
             cpuStress: 'CPU 스트레스',
             gpuStress: 'GPU 스트레스',
             gpuStressTooltip:

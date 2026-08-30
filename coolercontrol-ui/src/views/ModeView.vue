@@ -12,7 +12,6 @@ import {
     mdiContentDuplicate,
     mdiContentSaveOutline,
     mdiDeleteOutline,
-    mdiInformationSlabCircleOutline,
     mdiMemory,
     mdiMinusThick,
 } from '@mdi/js'
@@ -31,6 +30,7 @@ import { useConfirm } from '@/shell/confirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import { Emitter, EventType } from 'mitt'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 interface Props {
     modeUID: UID
@@ -225,16 +225,7 @@ const deleteMode = (): void => {
                         :current-name="currentMode.name"
                         :save-name-function="saveNameFunction"
                     />
-                    <div
-                        class="px-4 py-2 flex flex-row leading-none items-center"
-                        v-tooltip.top="t('views.mode.modeHint')"
-                    >
-                        <svg-icon
-                            type="mdi"
-                            :path="mdiInformationSlabCircleOutline"
-                            :size="deviceStore.getREMSize(1.25)"
-                        />
-                    </div>
+                    <HelpIcon class="px-4 py-2" :text="t('views.mode.modeHint')" />
                 </div>
             </template>
             <template #actions>

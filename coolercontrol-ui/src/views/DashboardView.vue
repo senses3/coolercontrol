@@ -28,7 +28,6 @@ import {
     mdiFan,
     mdiHome,
     mdiHomeOutline,
-    mdiInformationSlabCircleOutline,
     mdiOverscan,
     mdiRestart,
     mdiTrashCanOutline,
@@ -49,6 +48,7 @@ import UiSelect from '@/shell/ui/UiSelect.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 interface Props {
     dashboardUID?: UID
@@ -536,6 +536,13 @@ onUnmounted(() => {
                         class="w-full"
                     />
                 </span>
+                <HelpIcon
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    class="ml-1"
+                    :label="t('common.mouseActions')"
+                    :text="t('views.dashboard.mouseActions')"
+                    side="bottom"
+                />
             </template>
             <template #controls>
                 <UiButton
@@ -630,17 +637,6 @@ onUnmounted(() => {
                 </div>
             </template>
             <template #actions>
-                <div
-                    v-if="dashboard.chartType == ChartType.TIME_CHART"
-                    class="p-2 flex leading-none items-center"
-                    v-tooltip.top="t('views.dashboard.mouseActions')"
-                >
-                    <svg-icon
-                        type="mdi"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </div>
                 <template v-if="!sensorMode">
                     <UiButton
                         variant="ghost"

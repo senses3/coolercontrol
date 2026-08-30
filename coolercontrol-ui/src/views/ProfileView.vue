@@ -15,7 +15,6 @@ import {
     mdiDeleteOutline,
     mdiExportVariant,
     mdiFan,
-    mdiInformationSlabCircleOutline,
     mdiMinus,
     mdiPlus,
     mdiPlusCircleOutline,
@@ -88,6 +87,7 @@ import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 echarts.use([
     GridComponent,
@@ -1783,6 +1783,9 @@ const showOverlayChart = computed(
         selectedType.value === ProfileType.Overlay &&
         chosenOverlayMemberProfile.value != null,
 )
+// Both editable charts answer to the same mouse actions, so the header hint
+// covers either one.
+const showsEditableChart = computed(() => showGraph.value || showOverlayChart.value)
 const mixProfileKeys: Ref<string> = computed(() =>
     chosenMemberProfiles.value.map((p) => p.uid).join(':'),
 )
@@ -2382,6 +2385,20 @@ defineExpose({ saveProfileState, contextIsDirty })
                 :current-name="currentProfile.name"
                 :save-name-function="saveNameFunction"
             />
+            <HelpIcon
+                v-if="showsEditableChart"
+                class="ml-1"
+                :label="t('common.mouseActions')"
+                :text="t('views.profiles.graphProfileMouseActions')"
+                side="bottom"
+            />
+            <HelpIcon
+                v-else-if="showMixChart"
+                class="ml-1"
+                :label="t('common.target')"
+                :text="t('views.profiles.targetHint')"
+                side="bottom"
+            />
         </template>
         <template #controls>
             <div class="p-2 pr-0">
@@ -2579,17 +2596,6 @@ defineExpose({ saveProfileState, contextIsDirty })
                 v-tooltip.top="t('views.profiles.minProfileTemp')"
             />
             <div class="flex flex-row items-center">
-                <div
-                    class="p-2 mx-4 leading-none items-center"
-                    v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
-                >
-                    <svg-icon
-                        type="mdi"
-                        class="h-7"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </div>
                 <span v-if="selectedLimitInfo != null" class="text-sm opacity-70">
                     {{ selectedLimitInfo.message }}
                 </span>

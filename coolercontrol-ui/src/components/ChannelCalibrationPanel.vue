@@ -9,7 +9,8 @@ import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
-import { mdiChartLine, mdiInformationSlabCircleOutline } from '@mdi/js'
+import { mdiChartLine } from '@mdi/js'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
@@ -119,17 +120,10 @@ onMounted(() => {
 <template>
     <div>
         <div class="flex items-center mb-2">
-            <div
-                class="leading-none cursor-help"
-                v-tooltip.top="t('components.channelExtensionSettings.calibration.description')"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="mr-2"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
+            <HelpIcon
+                class="mr-2"
+                :text="t('components.channelExtensionSettings.calibration.description')"
+            />
             <span class="font-semibold">
                 {{ t('components.channelExtensionSettings.calibration.heading') }}
             </span>

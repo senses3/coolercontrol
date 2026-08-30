@@ -9,7 +9,6 @@ import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiArrowExpand,
     mdiArrowLeft,
-    mdiInformationSlabCircleOutline,
     mdiMinus,
     mdiPlus,
     mdiPlusCircleOutline,
@@ -38,6 +37,7 @@ import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { computed, onMounted, onUnmounted, ref, Ref, watch, type WatchStopHandle } from 'vue'
 import _ from 'lodash'
 import UiButton from '@/shell/ui/UiButton.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 echarts.use([
     GridComponent,
@@ -1347,17 +1347,11 @@ const nextStep = () => {
             </div>
         </div>
         <div class="flex flex-row justify-center mt-4">
-            <div
-                class="p-2 mx-4 leading-none items-center"
-                v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="h-7"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
+            <HelpIcon
+                class="p-2 mx-4"
+                :label="t('common.mouseActions')"
+                :text="t('views.profiles.graphProfileMouseActions')"
+            />
         </div>
         <div class="flex flex-row justify-between mt-4">
             <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">

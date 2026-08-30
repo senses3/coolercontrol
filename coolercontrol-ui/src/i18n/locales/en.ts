@@ -4,6 +4,9 @@
 export default {
     common: {
         save: 'Save',
+        target: 'Target',
+        mouseActions: 'Mouse actions',
+        moreInfo: 'More information',
         cancel: 'Cancel',
         add: 'Add',
         yes: 'Yes',
@@ -637,7 +640,7 @@ export default {
             staleTempSource: 'Temp source using failsafe values',
             stressTest: 'Thermal Stress Tests',
             stressTestTooltip:
-                'Generate sustained thermal load to validate<br>fan curves and cooling profiles.<br>Results may vary depending on hardware.<br>Install stress-ng for additional backends.',
+                'Generate sustained thermal load to validate\nfan curves and cooling profiles.\nResults may vary depending on hardware.\nInstall stress-ng for additional backends.',
             cpuStress: 'CPU Stress',
             gpuStress: 'GPU Stress',
             gpuStressTooltip:

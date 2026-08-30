@@ -7,7 +7,8 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { mdiAlertOutline, mdiCogs, mdiInformationSlabCircleOutline } from '@mdi/js'
+import { mdiAlertOutline, mdiCogs } from '@mdi/js'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChannelCalibrationPanel from '@/components/ChannelCalibrationPanel.vue'
@@ -184,20 +185,14 @@ defineExpose({
                                 <tr>
                                     <td class="w-24 text-end pl-4">
                                         <div class="flex flex-row leading-none items-center">
-                                            <div
-                                                v-tooltip.top="
+                                            <HelpIcon
+                                                class="mr-2"
+                                                :text="
                                                     t(
                                                         'components.channelExtensionSettings.firmwareControlledProfileDesc',
                                                     )
                                                 "
-                                            >
-                                                <svg-icon
-                                                    type="mdi"
-                                                    class="mr-2"
-                                                    :path="mdiInformationSlabCircleOutline"
-                                                    :size="deviceStore.getREMSize(1.25)"
-                                                />
-                                            </div>
+                                            />
                                             {{
                                                 t(
                                                     'components.channelExtensionSettings.firmwareControlledProfile',

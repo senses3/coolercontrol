@@ -20,7 +20,7 @@ import { useToast } from '@/shell/toast'
 import { DeviceType } from '@/models/Device'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import HelpTooltipIcon from '@/components/info/HelpTooltipIcon.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 import StressTestLabel from '@/components/info/StressTestLabel.vue'
 import StressBackendSelect from '@/components/info/StressBackendSelect.vue'
 
@@ -350,7 +350,7 @@ onMounted(async () => {
                     <span class="font-semibold text-xl text-text-color">{{
                         t('views.appInfo.stressTest')
                     }}</span>
-                    <help-tooltip-icon :tooltip="t('views.appInfo.stressTestTooltip')" />
+                    <HelpIcon variant="help" :text="t('views.appInfo.stressTestTooltip')" />
                 </div>
                 <UiButton
                     variant="danger"

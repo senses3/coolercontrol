@@ -6,7 +6,8 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiInformationSlabCircleOutline, mdiPlus, mdiToggleSwitchOffOutline } from '@mdi/js'
+import { mdiPlus, mdiToggleSwitchOffOutline } from '@mdi/js'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -27,7 +28,6 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import UiSwitch from '@/shell/ui/UiSwitch.vue'
-import UiTooltip from '@/shell/ui/UiTooltip.vue'
 
 const props = defineProps<{ deviceUID: UID }>()
 const { t } = useI18n()
@@ -301,16 +301,10 @@ const enableDevice = openManageSensors
                         class="flex items-center justify-between gap-8 px-4 py-3"
                     >
                         <span class="flex items-center gap-2 text-base text-text-color">
-                            <UiTooltip
+                            <HelpIcon
                                 :text="t('components.deviceExtensionSettings.directAccessDesc')"
-                            >
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiInformationSlabCircleOutline"
-                                    :size="18"
-                                    class="text-text-color-secondary"
-                                />
-                            </UiTooltip>
+                                :size="1.125"
+                            />
                             {{ t('components.deviceExtensionSettings.directAccess') }}
                         </span>
                         <UiSwitch
@@ -323,16 +317,10 @@ const enableDevice = openManageSensors
                         <UiSeparator />
                         <div class="flex items-center justify-between gap-8 px-4 py-3">
                             <span class="flex items-center gap-2 text-base text-text-color">
-                                <UiTooltip
+                                <HelpIcon
                                     :text="t('components.deviceExtensionSettings.useHwmonDesc')"
-                                >
-                                    <svg-icon
-                                        type="mdi"
-                                        :path="mdiInformationSlabCircleOutline"
-                                        :size="18"
-                                        class="text-text-color-secondary"
-                                    />
-                                </UiTooltip>
+                                    :size="1.125"
+                                />
                                 {{ t('components.deviceExtensionSettings.useHwmon') }}
                             </span>
                             <UiSwitch
@@ -346,16 +334,10 @@ const enableDevice = openManageSensors
                         <UiSeparator v-if="isLiquidctl" />
                         <div class="flex items-center justify-between gap-8 px-4 py-3">
                             <span class="flex items-center gap-2 text-base text-text-color">
-                                <UiTooltip
+                                <HelpIcon
                                     :text="t('components.deviceExtensionSettings.overdriveDesc')"
-                                >
-                                    <svg-icon
-                                        type="mdi"
-                                        :path="mdiInformationSlabCircleOutline"
-                                        :size="18"
-                                        class="text-text-color-secondary"
-                                    />
-                                </UiTooltip>
+                                    :size="1.125"
+                                />
                                 {{ t('components.deviceExtensionSettings.overdrive') }}
                             </span>
                             <span v-if="amdOverdriveEnabled" class="text-base text-success">
@@ -376,20 +358,14 @@ const enableDevice = openManageSensors
                         <UiSeparator v-if="isLiquidctl || isAmdGpuWithOverdrive" />
                         <div class="flex items-center justify-between gap-8 px-4 py-3">
                             <span class="flex items-center gap-2 text-base text-text-color">
-                                <UiTooltip
+                                <HelpIcon
                                     :text="
                                         t(
                                             'components.deviceExtensionSettings.thinkPadFanControlDesc',
                                         )
                                     "
-                                >
-                                    <svg-icon
-                                        type="mdi"
-                                        :path="mdiInformationSlabCircleOutline"
-                                        :size="18"
-                                        class="text-text-color-secondary"
-                                    />
-                                </UiTooltip>
+                                    :size="1.125"
+                                />
                                 {{ t('components.deviceExtensionSettings.thinkPadFanControl') }}
                             </span>
                             <UiSwitch v-model="thinkPadFanControl" />
@@ -397,20 +373,14 @@ const enableDevice = openManageSensors
                         <UiSeparator />
                         <div class="flex items-center justify-between gap-8 px-4 py-3">
                             <span class="flex items-center gap-2 text-base text-text-color">
-                                <UiTooltip
+                                <HelpIcon
                                     :text="
                                         t(
                                             'components.deviceExtensionSettings.thinkPadFullSpeedDesc',
                                         )
                                     "
-                                >
-                                    <svg-icon
-                                        type="mdi"
-                                        :path="mdiInformationSlabCircleOutline"
-                                        :size="18"
-                                        class="text-text-color-secondary"
-                                    />
-                                </UiTooltip>
+                                    :size="1.125"
+                                />
                                 {{ t('components.deviceExtensionSettings.thinkPadFullSpeed') }}
                             </span>
                             <UiSwitch v-model="thinkPadFullSpeed" />
@@ -419,16 +389,10 @@ const enableDevice = openManageSensors
                     <UiSeparator v-if="isLiquidctl || isAmdGpuWithOverdrive || isThinkPad" />
                     <div class="flex items-center justify-between gap-8 px-4 py-3">
                         <span class="flex items-center gap-2 text-base text-text-color">
-                            <UiTooltip
+                            <HelpIcon
                                 :text="t('components.deviceExtensionSettings.commandDelayDesc')"
-                            >
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiInformationSlabCircleOutline"
-                                    :size="18"
-                                    class="text-text-color-secondary"
-                                />
-                            </UiTooltip>
+                                :size="1.125"
+                            />
                             {{ t('components.deviceExtensionSettings.commandDelay') }}
                         </span>
                         <UiNumberInput

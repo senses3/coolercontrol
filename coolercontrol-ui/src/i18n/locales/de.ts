@@ -4,6 +4,9 @@
 export default {
     common: {
         save: 'Speichern',
+        target: 'Ziel',
+        mouseActions: 'Mausaktionen',
+        moreInfo: 'Weitere Informationen',
         cancel: 'Abbrechen',
         add: 'Hinzufügen',
         yes: 'Ja',
@@ -656,7 +659,7 @@ export default {
             staleTempSource: 'Temperaturquelle verwendet Failsafe-Werte',
             stressTest: 'Thermische Stresstests',
             stressTestTooltip:
-                'Erzeugt anhaltende Thermallast zur Validierung<br>von Lüfterkurven und Kühlprofilen.<br>Ergebnisse können je nach Hardware variieren.<br>Installieren Sie stress-ng für zusätzliche Backends.',
+                'Erzeugt anhaltende Thermallast zur Validierung\nvon Lüfterkurven und Kühlprofilen.\nErgebnisse können je nach Hardware variieren.\nInstallieren Sie stress-ng für zusätzliche Backends.',
             cpuStress: 'CPU-Stress',
             gpuStress: 'GPU-Stress',
             gpuStressTooltip:

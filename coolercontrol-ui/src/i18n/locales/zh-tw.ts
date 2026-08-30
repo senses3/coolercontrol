@@ -4,6 +4,9 @@
 export default {
     common: {
         save: '儲存',
+        target: '目標',
+        mouseActions: '滑鼠操作',
+        moreInfo: '更多資訊',
         cancel: '取消',
         add: '添加',
         yes: '是',
@@ -610,7 +613,7 @@ export default {
             staleTempSource: '溫度來源正在使用故障保護值',
             stressTest: '熱壓力測試',
             stressTestTooltip:
-                '生成持續熱負載以驗證<br>風扇曲線和冷卻配置文件。<br>結果可能因硬體而異。<br>安裝 stress-ng 以獲得額外的後端。',
+                '生成持續熱負載以驗證\n風扇曲線和冷卻配置文件。\n結果可能因硬體而異。\n安裝 stress-ng 以獲得額外的後端。',
             cpuStress: 'CPU 壓力',
             gpuStress: 'GPU 壓力',
             gpuStressTooltip: '使用內建後端時<br>可能需要 Vulkan 或 OpenGL ES 驅動程式。',

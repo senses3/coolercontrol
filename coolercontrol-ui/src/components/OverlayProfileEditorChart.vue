@@ -10,7 +10,6 @@ import VChart from 'vue-echarts'
 import {
     mdiArrowTopRightBottomLeft,
     mdiDeleteOutline,
-    mdiInformationSlabCircleOutline,
     mdiMinus,
     mdiPlus,
     mdiPlusCircleOutline,
@@ -1324,21 +1323,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex flex-row justify-center mt-4 mx-4 w-full">
-        <div class="flex flex-row">
-            <div
-                class="p-2 mx-4 leading-none items-center"
-                v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="h-7"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
-        </div>
-    </div>
     <div id="profile-display" class="flex flex-col h-full relative">
         <div class="relative">
             <v-chart

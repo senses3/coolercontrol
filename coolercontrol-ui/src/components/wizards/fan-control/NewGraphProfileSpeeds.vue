@@ -9,7 +9,6 @@ import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiArrowExpand,
     mdiArrowLeft,
-    mdiInformationSlabCircleOutline,
     mdiMinus,
     mdiPlus,
     mdiPlusCircleOutline,
@@ -48,6 +47,7 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
 import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 echarts.use([
     GridComponent,
@@ -1813,17 +1813,11 @@ const nextStep = () => {
                 v-tooltip.top="t('views.profiles.minProfileTemp')"
             />
             <div class="flex flex-row items-center">
-                <div
-                    class="p-2 mx-4 leading-none items-center"
-                    v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
-                >
-                    <svg-icon
-                        type="mdi"
-                        class="h-7"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.25)"
-                    />
-                </div>
+                <HelpIcon
+                    class="p-2 mx-4"
+                    :label="t('common.mouseActions')"
+                    :text="t('views.profiles.graphProfileMouseActions')"
+                />
                 <span v-if="selectedLimitInfo != null" class="text-sm opacity-70">
                     {{ selectedLimitInfo.message }}
                 </span>

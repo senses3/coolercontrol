@@ -6,7 +6,6 @@
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiInformationSlabCircleOutline } from '@mdi/js'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -704,13 +703,6 @@ watch(settingsStore.allUIDeviceSettings, () => {
             :autoresize="true"
             :manual-update="true"
         />
-        <!-- Centered like the Graph editor's info icon above the chart. -->
-        <div
-            class="absolute left-1/2 top-2 -translate-x-1/2 text-text-color-secondary"
-            v-tooltip.top="t('views.profiles.targetHint')"
-        >
-            <svg-icon type="mdi" :path="mdiInformationSlabCircleOutline" :size="18" />
-        </div>
     </div>
 </template>
 

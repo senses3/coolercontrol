@@ -4,6 +4,9 @@
 export default {
     common: {
         save: 'Salvar',
+        target: 'Alvo',
+        mouseActions: 'Ações do mouse',
+        moreInfo: 'Mais informações',
         cancel: 'Cancelar',
         add: 'Adicionar',
         yes: 'Sim',
@@ -647,7 +650,7 @@ export default {
             staleTempSource: 'A fonte de temperatura usa valores de segurança',
             stressTest: 'Testes de estresse térmico',
             stressTestTooltip:
-                'Gera carga térmica sustentada para validar<br>curvas de ventilador e perfis de resfriamento.<br>Os resultados podem variar dependendo do hardware.<br>Instale stress-ng para backends adicionais.',
+                'Gera carga térmica sustentada para validar\ncurvas de ventilador e perfis de resfriamento.\nOs resultados podem variar dependendo do hardware.\nInstale stress-ng para backends adicionais.',
             cpuStress: 'Estresse de CPU',
             gpuStress: 'Estresse de GPU',
             gpuStressTooltip:

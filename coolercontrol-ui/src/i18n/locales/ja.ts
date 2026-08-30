@@ -4,6 +4,9 @@
 export default {
     common: {
         save: '保存',
+        target: '目標',
+        mouseActions: 'マウス操作',
+        moreInfo: '詳細情報',
         cancel: 'キャンセル',
         add: '追加',
         yes: 'はい',
@@ -644,7 +647,7 @@ export default {
             staleTempSource: '温度ソースはフェイルセーフ値を使用中',
             stressTest: '熱ストレステスト',
             stressTestTooltip:
-                '持続的な熱負荷を生成して<br>ファンカーブと冷却プロファイルを検証します。<br>結果はハードウェアにより異なる場合があります。<br>stress-ngをインストールすると追加のバックエンドが利用できます。',
+                '持続的な熱負荷を生成して\nファンカーブと冷却プロファイルを検証します。\n結果はハードウェアにより異なる場合があります。\nstress-ngをインストールすると追加のバックエンドが利用できます。',
             cpuStress: 'CPUストレス',
             gpuStress: 'GPUストレス',
             gpuStressTooltip:
