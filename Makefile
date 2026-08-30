@@ -167,6 +167,9 @@ ifeq ($(strip $(DESTDIR)),)
 	@-$(RM) -f /usr/local/share/applications/$(ap_id).desktop
 	@-gtk-update-icon-cache -f -t /usr/share/icons/hicolor
 	@-update-desktop-database /usr/share/applications
+# A restart alone will not re-read a changed unit. Best effort: OpenRC and
+# container installs have no systemctl.
+	@-systemctl daemon-reload
 endif
 
 # `sudo make install-source` is the documented way to install from source, so the
