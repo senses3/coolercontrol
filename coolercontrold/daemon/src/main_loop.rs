@@ -51,6 +51,7 @@ use crate::engine::main::Engine;
 use crate::modes::ModeController;
 use crate::rt;
 use crate::sleep_listener::SleepListener;
+use crate::watchdog::Watchdog;
 use crate::Repos;
 use anyhow::Result;
 use log::{debug, error, info, trace, warn};
@@ -84,9 +85,11 @@ pub async fn run(
     alert_controller: Rc<AlertController>,
     device_health_controller: Rc<DeviceHealthController>,
     status_handle: StatusHandle,
+    watchdog: Rc<Watchdog>,
     run_token: CancellationToken,
 ) -> Result<()> {
     let poll_rate = config.get_settings()?.poll_rate;
+    watchdog.warn_if_poll_rate_too_slow(Duration::from_secs_f64(poll_rate));
     let snapshot_timeout_duration = Duration::from_millis(SNAPSHOT_TIMEOUT_MS);
     let mut lcd_update_trigger = LCDUpdateTrigger::new(poll_rate);
     moro_local::async_scope!(|scope| -> Result<()> {
@@ -117,6 +120,11 @@ pub async fn run(
                 fire_snapshots_and_processes(&repos, &engine, &mut lcd_update_trigger, &status_handle, scope).await;
                 alert_controller.process_alerts();
                 device_health_controller.process().await;
+                // At the foot of the working arm: a heartbeat asserts the tick
+                // did its work. The sleep-preparation arm below deliberately
+                // does nothing, so it must not claim liveness. The resume arm
+                // heartbeats from inside `wake_from_sleep`.
+                watchdog.ping();
             } else if sleep_listener.is_resuming() {
                 sleep_prepared = false;
                 wake_from_sleep(
@@ -124,6 +132,7 @@ pub async fn run(
                     &engine,
                     &mode_controller,
                     &sleep_listener,
+                    &watchdog,
                 )
                 .await?;
             } else {
@@ -263,6 +272,7 @@ async fn wake_from_sleep(
     engine: &Rc<Engine>,
     mode_controller: &Rc<ModeController>,
     sleep_listener: &SleepListener,
+    watchdog: &Watchdog,
 ) -> Result<()> {
     let startup_delay = config
         .get_settings()?
@@ -272,12 +282,21 @@ async fn wake_from_sleep(
         "Waiting {}s before resuming after waking from sleep.",
         startup_delay.as_secs()
     );
-    rt::sleep(startup_delay).await;
+    // `startup_delay` reaches 120s and blocks the loop. The daemon is idle here
+    // on purpose, which must not read to systemd as a wedged loop.
+    watchdog.sleep_with_heartbeat(startup_delay).await;
     if config.get_settings()?.apply_on_boot {
         info!("Re-initializing and re-applying settings after waking from sleep");
         engine.reinitialize_devices().await;
+        // Re-init and re-apply are each unbounded and can together outlast the
+        // watchdog deadline on a machine with many slow devices. A heartbeat
+        // between them keeps that from reading as a wedge. A single step
+        // blocking past the deadline is still a restart, which is correct: at
+        // that point the daemon really has stopped making progress.
+        watchdog.ping();
         moro_local::async_scope!(|scope| mode_controller.apply_all_saved_device_settings(scope))
             .await;
+        watchdog.ping();
     }
     engine.reinitialize_all_status_histories()?;
     sleep_listener.resuming(false);
