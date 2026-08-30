@@ -4,7 +4,6 @@
 export default {
     common: {
         save: 'Enregistrer',
-        target: 'Cible',
         mouseActions: 'Actions de la souris',
         moreInfo: "Plus d'informations",
         cancel: 'Annuler',

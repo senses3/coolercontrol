@@ -4,7 +4,6 @@
 export default {
     common: {
         save: 'Save',
-        target: 'Target',
         mouseActions: 'Mouse actions',
         moreInfo: 'More information',
         cancel: 'Cancel',

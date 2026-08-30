@@ -4,7 +4,6 @@
 export default {
     common: {
         save: 'सहेजें',
-        target: 'लक्ष्य',
         mouseActions: 'माउस क्रियाएं',
         moreInfo: 'अधिक जानकारी',
         cancel: 'रद्द करें',

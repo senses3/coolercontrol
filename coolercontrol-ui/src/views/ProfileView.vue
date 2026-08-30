@@ -2395,7 +2395,6 @@ defineExpose({ saveProfileState, contextIsDirty })
             <HelpIcon
                 v-else-if="showMixChart"
                 class="ml-1"
-                :label="t('common.target')"
                 :text="t('views.profiles.targetHint')"
                 side="bottom"
             />

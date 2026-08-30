@@ -539,7 +539,6 @@ onUnmounted(() => {
                 <HelpIcon
                     v-if="dashboard.chartType == ChartType.TIME_CHART"
                     class="ml-1"
-                    :label="t('common.mouseActions')"
                     :text="t('views.dashboard.mouseActions')"
                     side="bottom"
                 />

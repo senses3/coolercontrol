@@ -4,7 +4,6 @@
 export default {
     common: {
         save: '保存',
-        target: '目标',
         mouseActions: '鼠标操作',
         moreInfo: '更多信息',
         cancel: '取消',

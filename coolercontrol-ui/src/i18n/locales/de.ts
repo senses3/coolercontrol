@@ -4,7 +4,6 @@
 export default {
     common: {
         save: 'Speichern',
-        target: 'Ziel',
         mouseActions: 'Mausaktionen',
         moreInfo: 'Weitere Informationen',
         cancel: 'Abbrechen',
