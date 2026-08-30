@@ -96,7 +96,20 @@ Release notes are automatically generated from this file and git tags.
 - The web UI can be installed as an app from the browser, carrying a web app manifest and icons; an
   installed window gets the in-app back button that the desktop app already has
 - Debian and Ubuntu packages are published to `apt.coolercontrol.org`, including Ubuntu arm64 builds
-- `make pr-check` pre-PR gate and a gated-tests feature for the daemon test suite
+- The daemon reports readiness and liveness to systemd, so a wedged main loop is restarted by the
+  systemd watchdog
+- Global search over pages, entities, settings and actions, with recent results
+- System power profiles can be mapped to Modes, so switching the desktop's power profile switches
+  the cooling Mode
+- Cooling and Devices pages help explain missing and uncontrollable fans, with help lines that link
+  to the hardware report
+- Help icons across the UI now come from one shared component, and renameable titles are marked with
+  an edit icon
+- A failed fan write on a ThinkPad hints at enabling ThinkPad fan control, and the enabled state is
+  reflected without a daemon restart
+- Plugin UIs receive the whole theme palette, so plugin pages match the active theme
+- liqctld reports LCD frames that outgrow their bucket, and gif upload is hidden on firmware that
+  refuses it
 
 ### Changed
 
@@ -141,6 +154,18 @@ Release notes are automatically generated from this file and git tags.
   bump
 - Many upstream dependencies updated across Cargo and npm, and derive_more, axum-typed-multipart and
   zstd compression were dropped
+- Application icons were redrawn from generated sources: a symbolic tray icon sized to sit with its
+  peers, notification icons matching the app stroke, and an alert badge that stays error-red on
+  symbolic hosts
+- The logo and fonts are bundled so they are content-hashed, and unhashed assets are revalidated
+  rather than pinned, so a browser picks up a new UI build
+- The Kraken 2023 firmware 2 LCD frame is sent once per update instead of twice, and LCD images are
+  capped at liquidctl's gif size limit
+- Modals dim with opacity instead of a backdrop blur, which flickered on some GPU and QtWebEngine
+  combinations
+- Plugin services are restarted rather than replaced on a configuration change, and a service is
+  installed when its plugin is enabled
+- Plugins running under OpenRC require OpenRC 0.45 or newer
 
 ### Fixed
 
@@ -175,6 +200,22 @@ Release notes are automatically generated from this file and git tags.
   had drifted from the English source refreshed
 - Disabled IP family is logged at info instead of warning
 - FIFO pairing could wedge the test suite, and sysfs read tests handle ENODATA
+- SATA drive UIDs are derived from stable hardware identity, WWID first and then serial, with
+  existing settings copied forward, so a drive keeps its settings across reboots and reconnects
+  (#599)
+- Drive power state is also read through SAT passthrough, so a sleeping drive is not woken to be
+  measured
+- A transient read failure on a File custom sensor no longer drops the sensor
+- Each LCD channel renders to its own image file, shutdown settings whose image is gone are dropped,
+  and the stock image is used when a configured shutdown image cannot be read
+- Alerts re-evaluate when a source is removed, an edit that clears an alert notifies, an announced
+  Error survives an edit, messages name the sensor that left the watch list and use resolved channel
+  labels, the alert count follows silence expiry, and Error alerts are listed on Home
+- Off-scheme colors and tag severities are drawn from the themed tokens
+- The search field keeps a focus ring only for keyboard users and drops it after taking a result
+- The Qt tray alert icon keeps its `-symbolic` suffix and falls back to the pre-rename name
+- The application SVG opens within gdk-pixbuf's 256-byte sniff window, so more icon loaders render
+  it
 
 ### Removed
 
@@ -196,6 +237,7 @@ Release notes are automatically generated from this file and git tags.
 - Backup archives are created owner-only, bounded on extraction, and restore only files listed in
   the manifest; restored credentials are written owner-only
 - Dependencies updated to clear audit advisories
+- Plugin services run with new privileges denied, and plugin folder ownership is hardened
 
 ## [4.3.1] - 2026-05-23
 
