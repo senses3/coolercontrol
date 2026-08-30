@@ -101,7 +101,7 @@ onUnmounted(clearTimers)
                 ref="triggerRef"
                 v-bind="$attrs"
                 type="button"
-                class="flex cursor-help items-center gap-1.5 rounded text-warning outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                class="flex cursor-help items-center gap-1.5 rounded text-info outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 :aria-label="accessibleName"
                 aria-haspopup="dialog"
                 :aria-expanded="open"
