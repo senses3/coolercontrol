@@ -64,6 +64,7 @@ mod sidecar;
 mod sleep_listener;
 mod system_event;
 mod token;
+mod watchdog;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -315,6 +316,9 @@ fn main() -> Result<()> {
         // reactor, so run it on the sidecar. Harmless on the Tokio backend too.
         sidecar::handle().run(admin::load_passwd).await??;
 
+        // The startup pause below is covered by TimeoutStartSec: systemd does
+        // not start the watchdog until READY.
+        let watchdog = Rc::new(watchdog::Watchdog::init());
         pause_before_startup(&config).await?;
         let detection_results = run_sensors_detection(&config);
         rt::log_active_backend();
@@ -466,6 +470,9 @@ fn main() -> Result<()> {
                 rt::sleep(Duration::from_millis(10)).await;
                 set_cpu_affinity()?;
                 info!("Initialization Complete");
+                // Only now is the daemon serving, so this is what releases
+                // systemd's start job.
+                watchdog::notify_ready();
                 main_loop::run(
                     Rc::clone(&config),
                     Rc::clone(&repos),
@@ -474,6 +481,7 @@ fn main() -> Result<()> {
                     alert_controller,
                     device_health_controller,
                     status_handle,
+                    Rc::clone(&watchdog),
                     run_token.clone(),
                 )
                 .await?;
@@ -488,6 +496,7 @@ fn main() -> Result<()> {
             error!("Main scope failed to start: {err}");
         });
         // all tasks from the main scope must have completed by this point.
+        watchdog::notify_stopping();
         let shutdown_result = shutdown(repos, config).await;
         // Repos have finished their shutdown (incl. any sidecar round-trips like the service-plugin
         // gRPC shutdown), so the sidecar can now be torn down and joined (bounded, force-exit).
