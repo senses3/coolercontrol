@@ -31,9 +31,11 @@ const activate = async (modeUID: string): Promise<void> => {
 // without one (TLP only, or none at all) there is nothing to map, so the card stays hidden.
 const showPowerProfiles = computed(() => settingsStore.powerProfilesAvailable.length > 0)
 
-// The empty value is the "no mode" row, which clears the mapping for that profile.
+// The "no mode" row clears the mapping for that profile. It carries a sentinel
+// rather than an empty string: an empty value is reserved for clearing a Select.
+const NO_MODE = 'none'
 const modeOptions = computed<UiSelectOption[]>(() => [
-    { label: t('layout.shell.coolingPage.powerProfiles.noMode'), value: '' },
+    { label: t('layout.shell.coolingPage.powerProfiles.noMode'), value: NO_MODE },
     ...settingsStore.modes.map((mode) => ({ label: mode.name, value: mode.uid })),
 ])
 
@@ -42,12 +44,15 @@ const profileLabel = (profile: string): string =>
         ? t(`layout.shell.coolingPage.powerProfiles.profileNames.${profile}`)
         : profile
 
-const mappedMode = (profile: string): string => settingsStore.powerProfileModes[profile] ?? ''
+const mappedMode = (profile: string): string => {
+    const modeUID = settingsStore.powerProfileModes[profile]
+    return modeUID != null && modeUID !== '' ? modeUID : NO_MODE
+}
 
 const setMappedMode = async (profile: string, modeUID: string | undefined): Promise<void> => {
     const saved = await settingsStore.savePowerProfileModes({
         ...settingsStore.powerProfileModes,
-        [profile]: modeUID ?? '',
+        [profile]: modeUID == null || modeUID === NO_MODE ? '' : modeUID,
     })
     if (saved) return
     toast.add({
