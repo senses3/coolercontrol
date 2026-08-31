@@ -1,2 +1,3 @@
 usr/bin/coolercontrold
 lib/systemd/system/coolercontrold.service
+usr/share/keyrings/coolercontrol-archive-keyring.gpg

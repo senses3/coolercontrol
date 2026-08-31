@@ -1,0 +1,87 @@
+#!/bin/sh
+# Move the machine from the Cloudsmith repository to apt.coolercontrol.org.
+#
+# Everything here is best effort. A failure to rewrite apt sources must never fail the package
+# install, so the whole transition runs in a subshell whose status is discarded, and the script
+# still ends in the debhelper fragments that manage the service.
+set -e
+
+KEYRING=/usr/share/keyrings/coolercontrol-archive-keyring.gpg
+SOURCES=/etc/apt/sources.list.d/coolercontrol.sources
+REPO_URL=https://apt.coolercontrol.org
+
+# Map an old Cloudsmith entry to a package tree. By distribution only, never by architecture, the
+# same mapping setup.sh applies. Anything unrecognised goes to ubuntu, whose older glibc runs on
+# the widest range of systems.
+#
+# Takes the whole file content rather than just the URL: the suite that separates LMDE
+# (linuxmint bookworm) from regular Mint (linuxmint any-version) is a separate field in a .list
+# line and a separate line entirely in a deb822 .sources file.
+pick_tree_from_entry() {
+    case $1 in
+    *deb/debian* | *deb/otherdeb*) echo debian ;;
+    *deb/linuxmint*)
+        # Cloudsmith served LMDE from linuxmint/bookworm and regular Mint from any-version.
+        case $1 in
+        *bookworm*) echo debian ;;
+        *) echo ubuntu ;;
+        esac
+        ;;
+    *) echo ubuntu ;;
+    esac
+}
+
+transition() {
+    old=""
+    for file in /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+        [ -f "${file}" ] || continue
+        grep -q 'dl\.cloudsmith\.io' "${file}" 2>/dev/null || continue
+        grep -qi 'coolercontrol' "${file}" 2>/dev/null || continue
+        old=${file}
+        break
+    done
+
+    # Not a Cloudsmith install. Manual deb users still get the keyring from this package.
+    [ -n "${old}" ] || return 0
+
+    # A sources file that is not the Cloudsmith one we just found means a previous run or
+    # setup.sh already pointed this machine at the new repository. Note the path comparison:
+    # Cloudsmith's deb822 installer can write to the very file name we use, and treating that as
+    # "already transitioned" would disable it and write nothing, leaving apt with no CoolerControl
+    # repository at all.
+    transitioned=0
+    if [ -f "${SOURCES}" ] && [ "${SOURCES}" != "${old}" ]; then
+        transitioned=1
+    fi
+
+    if [ "${transitioned}" -eq 0 ]; then
+        # Work out the replacement before touching anything, and never retire the only working
+        # source without a keyring to write a usable one with.
+        [ -f "${KEYRING}" ] || return 0
+        entry=$(tr '\n' ' ' <"${old}" 2>/dev/null)
+        tree=$(pick_tree_from_entry "${entry}")
+    fi
+
+    # apt ignores unknown extensions, so renaming is enough to retire the old entry. This happens
+    # before the write because the two paths can be the same file.
+    mv "${old}" "${old}.disabled"
+    echo "CoolerControl: disabled the old Cloudsmith source ${old}"
+
+    [ "${transitioned}" -eq 0 ] || return 0
+
+    cat >"${SOURCES}" <<EOF
+Types: deb
+URIs: ${REPO_URL}/${tree}
+Suites: stable
+Components: main
+Architectures: amd64 arm64
+Signed-By: ${KEYRING}
+EOF
+    echo "CoolerControl: apt now reads ${REPO_URL}/${tree}"
+}
+
+if [ "$1" = "configure" ]; then
+    (transition) || echo "CoolerControl: could not update apt sources, leaving them unchanged" >&2
+fi
+
+#DEBHELPER#
