@@ -7,7 +7,7 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
 import { mdiCheck, mdiClose, mdiUnfoldMoreHorizontal } from '@mdi/js'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
     SelectContent,
     SelectGroup,
@@ -63,6 +63,28 @@ const optionGroups = computed(() => {
     return groups
 })
 
+// Closing returns focus to the trigger programmatically, and the browser
+// carries the content's focus-visible state over with it, so the ring appears
+// after a mouse pick. Suppress it for exactly that case: a pointer-driven
+// close. Any later keyboard use restores it.
+const suppressRing = ref(false)
+let pointerInteraction = false
+
+const notePointer = (): void => {
+    pointerInteraction = true
+}
+const noteKeyboard = (): void => {
+    pointerInteraction = false
+    suppressRing.value = false
+}
+const onCloseAutoFocus = (): void => {
+    suppressRing.value = pointerInteraction
+    pointerInteraction = false
+}
+const clearSuppression = (): void => {
+    suppressRing.value = false
+}
+
 defineOptions({ inheritAttrs: false })
 </script>
 
@@ -70,8 +92,14 @@ defineOptions({ inheritAttrs: false })
     <SelectRoot v-model="model" :disabled="disabled">
         <SelectTrigger
             v-bind="$attrs"
-            class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border bg-control px-3 text-base text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-            :class="invalid ? 'border-error' : 'border-border-one'"
+            class="inline-flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border bg-control px-3 text-base text-text-color outline-none hover:bg-surface-hover data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+            :class="[
+                invalid ? 'border-error' : 'border-border-one',
+                suppressRing ? '' : 'focus-visible:ring-2 focus-visible:ring-accent',
+            ]"
+            @pointerdown="notePointer"
+            @keydown="noteKeyboard"
+            @focusout="clearSuppression"
         >
             <SelectValue class="truncate">
                 <slot v-if="selectedOption" name="value" :option="selectedOption">
@@ -96,6 +124,9 @@ defineOptions({ inheritAttrs: false })
             <SelectContent
                 position="popper"
                 :side-offset="2"
+                @pointerdown="notePointer"
+                @keydown="noteKeyboard"
+                @close-auto-focus="onCloseAutoFocus"
                 class="z-[1300] max-h-80 min-w-40 overflow-hidden rounded-lg border border-border-one bg-bg-two shadow-overlay-lg"
             >
                 <SelectViewport class="p-1">
