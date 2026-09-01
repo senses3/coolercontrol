@@ -44,7 +44,7 @@ override_dh_auto_install:
 	@install -Dm 644 packaging/metadata/$(APP_ID)-alert.png -t $(DESTDIR)/usr/share/icons/hicolor/256x256/apps/
 	@install -Dm 644 packaging/metadata/$(APP_ID).metainfo.xml -t  $(DESTDIR)/usr/share/metainfo/
 	@install -Dm 644 packaging/systemd/coolercontrold.service -t $(DESTDIR)/lib/systemd/system/
-	@install -Dm 644 packaging/apt-repo/keys/coolercontrol-archive-keyring.gpg -t $(DESTDIR)/usr/share/keyrings/
+	@install -Dm 644 packaging/apt-repo/keys/coolercontrol-archive-keyring.gpg -t $(DESTDIR)/usr/share/coolercontrold/
 
 override_dh_installsystemd:
 	@dh_installsystemd --name=coolercontrold --restart-after-upgrade
