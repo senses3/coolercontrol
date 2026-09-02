@@ -6,6 +6,11 @@
 #
 #   curl -fsSL https://apt.coolercontrol.org/setup.sh | sudo sh
 #
+# Set TREE=debian or TREE=ubuntu to override the detected package tree, for derivatives that
+# report an ID this script does not know. Note the -E, without it sudo drops the variable:
+#
+#   curl -fsSL https://apt.coolercontrol.org/setup.sh | sudo -E TREE=debian sh
+#
 # Safe to re-run: it rewrites its own source file and leaves everything else alone.
 set -eu
 
@@ -88,7 +93,11 @@ disable_cloudsmith_sources() {
     [ "${found}" -eq 0 ] || log "the old repository can be removed with: rm ${SOURCES%/*}/*.disabled"
 }
 
-tree=$(pick_tree)
+case ${TREE:-} in
+"") tree=$(pick_tree) ;;
+debian | ubuntu) tree=${TREE} ;;
+*) die "TREE must be debian or ubuntu, got '${TREE}'" ;;
+esac
 log "using the ${tree} package tree at ${REPO_URL}/${tree}"
 
 log "installing signing key to ${KEYRING}"
