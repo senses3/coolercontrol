@@ -109,12 +109,13 @@ mv "${KEYRING}.new" "${KEYRING}"
 
 log "writing ${SOURCES}"
 mkdir -p "$(dirname "${SOURCES}")"
+# No Architectures field: apt takes the supported set from our signed Release file and skips
+# the rest, so listing them here only makes every machine fetch the other one's index.
 cat >"${SOURCES}" <<EOF
 Types: deb
 URIs: ${REPO_URL}/${tree}
 Suites: stable
 Components: main
-Architectures: amd64 arm64
 Signed-By: ${KEYRING}
 EOF
 
