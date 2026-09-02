@@ -1200,6 +1200,11 @@ upload_package_ubuntu_beta:
 upload_package_r2_debian:
   stage: upload_packages
   image: registry.gitlab.com/coolercontrol/coolercontrol/apt-publish:${IMAGE_VERSION}
+  variables:
+    # setup.sh and the keys belong to this project, so publish them from the tagged commit
+    # rather than from whatever copies the image happens to carry. Only this job and its ubuntu
+    # twin pass --refresh-root; the sibling package repositories publish packages only.
+    APT_REPO_SHARE: $CI_PROJECT_DIR/packaging/apt-repo
   dependencies:
     - build_deb_bookworm_amd64
     - build_deb_bookworm_arm64
@@ -1212,11 +1217,13 @@ upload_package_r2_debian:
     - if: $CI_COMMIT_TAG
   script:
     - ls -lah ./*.deb
-    - apt-repo-publish --repo debian ./*.deb
+    - apt-repo-publish --repo debian --refresh-root ./*.deb
 
 upload_package_r2_ubuntu:
   stage: upload_packages
   image: registry.gitlab.com/coolercontrol/coolercontrol/apt-publish:${IMAGE_VERSION}
+  variables:
+    APT_REPO_SHARE: $CI_PROJECT_DIR/packaging/apt-repo
   dependencies:
     - build_ubuntu
     - build_ubuntu_arm64
@@ -1230,7 +1237,7 @@ upload_package_r2_ubuntu:
     - if: $CI_COMMIT_TAG
   script:
     - ls -lah ./*.deb
-    - apt-repo-publish --repo ubuntu ./*.deb
+    - apt-repo-publish --repo ubuntu --refresh-root ./*.deb
 
 create_release:
   stage: release
