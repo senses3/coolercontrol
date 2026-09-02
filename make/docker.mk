@@ -1,19 +1,25 @@
 # CI docker image build/push/run targets (GitLab registry). Maintainer-only.
 docker_image_tag := v3
 
+# Docker 29 enables the containerd image store, which keeps buildx provenance and SBOM
+# attestations instead of flattening them away. That turns a local build into a manifest list
+# whose attestation blobs a later `docker push` cannot upload, failing with "blob unknown to
+# registry". The docker-arm64 target below is unaffected: buildx --push uploads them directly.
+docker_build_flags := --provenance=false --sbom=false
+
 .PHONY: docker-build-images docker-login docker-arm64 docker-push \
 	docker-ci-run docker-ci-run-deb-bookworm docker-ci-run-deb-bookworm-arm64 \
 	docker-ci-run-ubuntu docker-ci-run-ubuntu-arm64 docker-ci-run-appimage \
 	docker-ci-run-cloudsmith-cli docker-ci-run-apt-publish docker-clean
 
 docker-build-images:
-	@docker build -t registry.gitlab.com/coolercontrol/coolercontrol/pipeline:$(docker_image_tag) -f .gitlab/images/pipeline/Dockerfile ./
-	#@docker build -t registry.gitlab.com/coolercontrol/coolercontrol/deb-bookworm:$(docker_image_tag) -f .gitlab/images/bookworm/Dockerfile ./
+	@docker build $(docker_build_flags) -t registry.gitlab.com/coolercontrol/coolercontrol/pipeline:$(docker_image_tag) -f .gitlab/images/pipeline/Dockerfile ./
+	#@docker build $(docker_build_flags) -t registry.gitlab.com/coolercontrol/coolercontrol/deb-bookworm:$(docker_image_tag) -f .gitlab/images/bookworm/Dockerfile ./
 	# ubuntu is multi-arch, built and pushed by docker-arm64
-	#@docker build -t registry.gitlab.com/coolercontrol/coolercontrol/ubuntu:$(docker_image_tag) -f .gitlab/images/ubuntu/Dockerfile ./
-	@docker build -t registry.gitlab.com/coolercontrol/coolercontrol/appimage:$(docker_image_tag) -f .gitlab/images/appimage/Dockerfile ./
-	@docker build -t registry.gitlab.com/coolercontrol/coolercontrol/cloudsmith-cli:$(docker_image_tag) -f .gitlab/images/cloudsmith-cli/Dockerfile ./
-	@docker build -t registry.gitlab.com/coolercontrol/coolercontrol/apt-publish:$(docker_image_tag) -f .gitlab/images/apt-publish/Dockerfile ./
+	#@docker build $(docker_build_flags) -t registry.gitlab.com/coolercontrol/coolercontrol/ubuntu:$(docker_image_tag) -f .gitlab/images/ubuntu/Dockerfile ./
+	@docker build $(docker_build_flags) -t registry.gitlab.com/coolercontrol/coolercontrol/appimage:$(docker_image_tag) -f .gitlab/images/appimage/Dockerfile ./
+	@docker build $(docker_build_flags) -t registry.gitlab.com/coolercontrol/coolercontrol/cloudsmith-cli:$(docker_image_tag) -f .gitlab/images/cloudsmith-cli/Dockerfile ./
+	@docker build $(docker_build_flags) -t registry.gitlab.com/coolercontrol/coolercontrol/apt-publish:$(docker_image_tag) -f .gitlab/images/apt-publish/Dockerfile ./
 
 docker-login:
 	# this has now changed with 2FA to require a personal access token: docker login -u <username> -p <access_token> registry.gitlab.com
