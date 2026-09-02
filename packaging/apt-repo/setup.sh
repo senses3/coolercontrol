@@ -93,7 +93,7 @@ disable_cloudsmith_sources() {
     [ "${found}" -eq 0 ] || log "the old repository can be removed with: rm ${SOURCES%/*}/*.disabled"
 }
 
-case ${TREE:-} in
+case ${TREE-} in
 "") tree=$(pick_tree) ;;
 debian | ubuntu) tree=${TREE} ;;
 *) die "TREE must be debian or ubuntu, got '${TREE}'" ;;
