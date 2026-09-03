@@ -32,6 +32,7 @@ import {
     newFolderId,
     persistLibraryLists,
     removeFolder,
+    removeFolderEntry,
     setFolderName,
     type LibraryKind,
     type LibraryLists,
@@ -121,6 +122,8 @@ const discardFolder = (id: string): void => {
     lists.value = removeFolder(lists.value, id)
     settingsStore.libraryFolderNames = setFolderName(settingsStore.libraryFolderNames, id, '')
     setExpanded(id, false)
+    // Before the persist below, which keeps every folder entry it still finds.
+    settingsStore.menuOrder = removeFolderEntry(settingsStore.menuOrder, id)
     persist()
 }
 
@@ -224,6 +227,7 @@ const cancelRename = (): void => {
             handle=".root-drag-handle"
             :animation="150"
             :group="{ name: kind, pull: true, put: true }"
+            :force-auto-scroll-fallback="true"
             :on-move="openHoveredFolder"
             class="flex flex-col gap-0.5"
             @end="onDragEnd"
@@ -302,6 +306,7 @@ const cancelRename = (): void => {
                         handle=".child-drag-handle"
                         :animation="150"
                         :group="{ name: kind, pull: true, put: acceptsEntities }"
+                        :force-auto-scroll-fallback="true"
                         class="ml-5 flex min-h-6 flex-col gap-0.5 border-l border-border-one pl-1"
                         @end="onDragEnd"
                     >
