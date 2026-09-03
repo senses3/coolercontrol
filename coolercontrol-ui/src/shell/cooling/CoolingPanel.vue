@@ -241,6 +241,7 @@ const isRouteActive = useRouteActive()
         <template v-if="pinnedChannels.length > 0">
             <PanelHeader :label="t('layout.shell.coolingPanel.pinned')" />
             <VueDraggable
+                :force-auto-scroll-fallback="true"
                 v-model="pinnedChannels"
                 handle=".drag-handle"
                 :animation="150"
@@ -379,6 +380,7 @@ const isRouteActive = useRouteActive()
         </template>
 
         <VueDraggable
+            :force-auto-scroll-fallback="true"
             v-model="groups"
             handle=".device-drag-handle"
             :animation="150"
@@ -430,6 +432,7 @@ const isRouteActive = useRouteActive()
                     </span>
                 </PanelHeader>
                 <VueDraggable
+                    :force-auto-scroll-fallback="true"
                     v-model="group.channels"
                     handle=".drag-handle"
                     :animation="150"

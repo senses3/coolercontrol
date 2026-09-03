@@ -238,6 +238,7 @@ const isRouteActive = useRouteActive()
             <UiSeparator class="my-1" />
             <PanelHeader :label="t('layout.menu.pinned')" />
             <VueDraggable
+                :force-auto-scroll-fallback="true"
                 v-model="pinnedRows"
                 handle=".drag-handle"
                 :animation="150"

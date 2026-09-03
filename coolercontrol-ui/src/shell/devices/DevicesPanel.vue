@@ -178,6 +178,7 @@ const isRouteActive = useRouteActive()
 <template>
     <div class="flex flex-col gap-0.5 p-2 pb-24 text-base">
         <VueDraggable
+            :force-auto-scroll-fallback="true"
             v-model="devicesList"
             handle=".drag-handle"
             :animation="150"
@@ -257,6 +258,7 @@ const isRouteActive = useRouteActive()
                 </RouterLink>
                 <template v-if="device.type === DeviceType.CUSTOM_SENSORS">
                     <VueDraggable
+                        :force-auto-scroll-fallback="true"
                         :model-value="sensorNamesByDevice.get(device.uid) ?? []"
                         handle=".drag-handle"
                         :animation="150"

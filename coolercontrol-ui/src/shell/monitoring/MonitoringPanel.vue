@@ -367,6 +367,7 @@ const isRouteActive = useRouteActive()
         <template v-if="pinnedRows.length > 0">
             <PanelHeader :label="t('layout.menu.pinned')" />
             <VueDraggable
+                :force-auto-scroll-fallback="true"
                 v-model="pinnedRows"
                 handle=".drag-handle"
                 :animation="150"
@@ -538,6 +539,7 @@ const isRouteActive = useRouteActive()
             </button>
         </PanelHeader>
         <VueDraggable
+            :force-auto-scroll-fallback="true"
             v-model="orderedDashboards"
             handle=".drag-handle"
             :animation="150"
@@ -630,6 +632,7 @@ const isRouteActive = useRouteActive()
             <span class="truncate">{{ t('views.alerts.alertsOverview') }}</span>
         </RouterLink>
         <VueDraggable
+            :force-auto-scroll-fallback="true"
             v-model="orderedAlerts"
             handle=".drag-handle"
             :animation="150"
@@ -692,6 +695,7 @@ const isRouteActive = useRouteActive()
         </VueDraggable>
         <UiSeparator class="my-1" />
         <VueDraggable
+            :force-auto-scroll-fallback="true"
             v-model="groups"
             handle=".device-drag-handle"
             :animation="150"
@@ -743,6 +747,7 @@ const isRouteActive = useRouteActive()
                     </span>
                 </PanelHeader>
                 <VueDraggable
+                    :force-auto-scroll-fallback="true"
                     v-model="group.sensors"
                     handle=".drag-handle"
                     :animation="150"

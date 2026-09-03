@@ -127,6 +127,7 @@ const isRouteActive = useRouteActive()
         <!-- Every plugin links to its page: it doubles as the info/status
           page; the iframe UI only renders there when the plugin provides one. -->
         <VueDraggable
+            :force-auto-scroll-fallback="true"
             v-model="pluginRows"
             handle=".drag-handle"
             :animation="150"
