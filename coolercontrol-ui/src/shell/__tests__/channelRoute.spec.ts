@@ -5,7 +5,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { type Device, DeviceType } from '@/models/Device.ts'
-import { channelRoute, monitoringChannelRoute } from '../channelRoute.ts'
+import { channelRoute, controlChannelRoute, monitoringChannelRoute } from '../channelRoute.ts'
 
 function fakeDevice(
     uid: string,
@@ -106,5 +106,47 @@ describe('monitoringChannelRoute', () => {
         expect(monitoringChannelRoute([device], 'd1', 'temp1')).toEqual(
             channelRoute([device], 'd1', 'temp1'),
         )
+    })
+})
+
+describe('controlChannelRoute', () => {
+    const info = (over: Record<string, unknown>) =>
+        ({ lighting_modes: [], lcd_info: undefined, ...over }) as never
+
+    it('sends a fan to its cooling page', () => {
+        expect(controlChannelRoute(info({ speed_options: {} }), 'dev1', 'fan1')).toEqual({
+            name: 'cooling-channel',
+            params: { deviceUID: 'dev1', channelName: 'fan1' },
+        })
+    })
+
+    // The canonical route would send these to a Monitoring chart that has no
+    // data to draw, since neither is a sensor.
+    it('sends a lighting channel to its lighting editor', () => {
+        expect(controlChannelRoute(info({ lighting_modes: [{}] }), 'dev1', 'sync')).toEqual({
+            name: 'device-lighting',
+            params: { deviceUID: 'dev1', channelName: 'sync' },
+        })
+    })
+
+    it('sends an LCD channel to its LCD editor', () => {
+        expect(controlChannelRoute(info({ lcd_info: {} }), 'dev1', 'lcd')).toEqual({
+            name: 'device-lcd',
+            params: { deviceUID: 'dev1', channelName: 'lcd' },
+        })
+    })
+
+    // A fan that also carries lighting is a fan first: that is where its
+    // profile, the thing the Mode row names, is set.
+    it('prefers the cooling page when a channel does both', () => {
+        const both = info({ speed_options: {}, lighting_modes: [{}] })
+        expect(controlChannelRoute(both, 'dev1', 'fan1')).toMatchObject({ name: 'cooling-channel' })
+    })
+
+    it('falls back to the sensor chart', () => {
+        expect(controlChannelRoute(info({}), 'dev1', 'temp1')).toEqual({
+            name: 'monitoring-sensor',
+            params: { deviceUID: 'dev1', channelName: 'temp1' },
+        })
     })
 })

@@ -25,7 +25,8 @@ import { getProfileDisplayName } from '@/models/Profile.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiTable from '@/shell/ui/UiTable.vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { type RouteLocationRaw, useRouter } from 'vue-router'
+import { controlChannelRoute } from '@/shell/channelRoute.ts'
 import { useConfirm } from '@/shell/confirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
 import EntityPageHeader from '@/components/EntityPageHeader.vue'
@@ -57,7 +58,15 @@ interface DeviceData {
     channelLabel: string
     settingType: string
     settingInfo: string
+    channelTarget: RouteLocationRaw
+    // Set only for a row whose setting names a real profile, so Manual, LCD,
+    // Lighting and Unmanaged rows stay plain text.
+    profileUID?: UID
 }
+
+// Subtle in a dense table: the row reads as data until the pointer is on it.
+const linkClass =
+    'rounded outline-none hover:text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent'
 
 // First row of each device group carries the device cell, spanning the group.
 const isFirstOfDevice = (idx: number): boolean =>
@@ -96,6 +105,8 @@ const initTableData = () => {
             const channelModeSetting = modeSettings.get(device.uid)?.get(channelName)
             let settingType = 'Unknown'
             let settingInfo: string = 'Unknown'
+            let profileUID: UID | undefined = undefined
+            const channelTarget = controlChannelRoute(channelInfo, device.uid, channelName)
             if (channelInfo.speed_options != null) {
                 if (channelModeSetting == null) {
                     // This means there doesn't exist a setting for this channel.
@@ -119,6 +130,7 @@ const initTableData = () => {
                             : channelModeSetting.profile_uid === '0'
                               ? t('common.unmanaged')
                               : 'Unknown'
+                    if (profile != null && profile.uid !== '0') profileUID = profile.uid
                 }
             } else if (channelInfo.lighting_modes.length > 0) {
                 if (channelModeSetting == null) {
@@ -151,6 +163,8 @@ const initTableData = () => {
                 channelLabel: channelSettings.name,
                 settingType: settingType,
                 settingInfo: settingInfo,
+                channelTarget: channelTarget,
+                profileUID: profileUID,
             })
         }
     }
@@ -300,7 +314,11 @@ const deleteMode = (): void => {
                 </template>
                 <tr v-for="(row, idx) in deviceTableData" :key="row.rowID">
                     <td v-if="isFirstOfDevice(idx)" :rowspan="deviceRowSpan(idx)" class="align-top">
-                        <div class="flex leading-none items-center">
+                        <RouterLink
+                            :to="{ name: 'devices-device', params: { deviceUID: row.deviceUID } }"
+                            class="flex leading-none items-center"
+                            :class="linkClass"
+                        >
                             <svg-icon
                                 type="mdi"
                                 :path="mdiMemory"
@@ -308,10 +326,14 @@ const deleteMode = (): void => {
                                 class="mr-2"
                             />
                             {{ row.deviceName }}
-                        </div>
+                        </RouterLink>
                     </td>
                     <td>
-                        <div class="flex items-center gap-2">
+                        <RouterLink
+                            :to="row.channelTarget"
+                            class="flex items-center gap-2"
+                            :class="linkClass"
+                        >
                             <svg-icon
                                 type="mdi"
                                 :path="mdiMinusThick"
@@ -320,10 +342,19 @@ const deleteMode = (): void => {
                                 :style="{ color: row.channelColor }"
                             />
                             {{ row.channelLabel }}
-                        </div>
+                        </RouterLink>
                     </td>
                     <td>{{ row.settingType }}</td>
-                    <td>{{ row.settingInfo }}</td>
+                    <td>
+                        <RouterLink
+                            v-if="row.profileUID != null"
+                            :to="{ name: 'profiles', params: { profileUID: row.profileUID } }"
+                            :class="linkClass"
+                        >
+                            {{ row.settingInfo }}
+                        </RouterLink>
+                        <template v-else>{{ row.settingInfo }}</template>
+                    </td>
                 </tr>
             </UiTable>
         </div>

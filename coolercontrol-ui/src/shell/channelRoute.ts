@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { RouteLocationRaw } from 'vue-router'
+import type { ChannelInfo } from '@/models/ChannelInfo.ts'
 import { type Device, DeviceType, type UID } from '@/models/Device.ts'
 
 // Canonical page for a channel/sensor, entity-first: the same target no matter
@@ -46,4 +47,20 @@ export function monitoringChannelRoute(
         break
     }
     return channelRoute(devices, deviceUID, channelName)
+}
+
+// Target for a controllable channel listed by its capability rather than by a
+// device lookup, as the Mode table lists them. Lighting and LCD channels are
+// controllable but have no sensor chart, so the canonical route would send them
+// to an empty Monitoring page; they get their own editor instead.
+export function controlChannelRoute(
+    channelInfo: ChannelInfo,
+    deviceUID: UID,
+    channelName: string,
+): RouteLocationRaw {
+    const params = { deviceUID, channelName }
+    if (channelInfo.speed_options != null) return { name: 'cooling-channel', params }
+    if (channelInfo.lighting_modes.length > 0) return { name: 'device-lighting', params }
+    if (channelInfo.lcd_info != null) return { name: 'device-lcd', params }
+    return { name: 'monitoring-sensor', params }
 }
