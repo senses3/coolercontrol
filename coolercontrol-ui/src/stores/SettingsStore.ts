@@ -226,6 +226,9 @@ export const useSettingsStore = defineStore('settings', () => {
     const uiScale: Ref<number> = ref(100)
     const time24: Ref<boolean> = ref(false)
     const menuOrder: Ref<Array<MenuOrderIds>> = ref([])
+    // Replaced wholesale, never mutated in place: like menuOrder, the save
+    // watcher below only fires on a new array.
+    const libraryFolderNames: Ref<Array<[string, string]>> = ref([])
     const expandedMenuIds: Ref<Array<string> | undefined> = ref()
     const pinnedIds: Ref<Array<string>> = ref([])
 
@@ -406,6 +409,7 @@ export const useSettingsStore = defineStore('settings', () => {
         applyThemeMode()
         time24.value = uiSettings.time24
         menuOrder.value = uiSettings.menuOrder
+        libraryFolderNames.value = uiSettings.libraryFolderNames ?? []
         expandedMenuIds.value = uiSettings.expandedMenuIds
         pinnedIds.value = uiSettings.pinnedIds
         collapsedMainMenu.value = uiSettings.collapsedMainMenu
@@ -1331,6 +1335,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 uiScale,
                 time24,
                 menuOrder,
+                libraryFolderNames,
                 expandedMenuIds,
                 pinnedIds,
                 collapsedMainMenu,
@@ -1389,6 +1394,7 @@ export const useSettingsStore = defineStore('settings', () => {
                     uiSettings.themeMode = themeMode.value
                     uiSettings.time24 = time24.value
                     uiSettings.menuOrder = menuOrder.value
+                    uiSettings.libraryFolderNames = libraryFolderNames.value
                     uiSettings.expandedMenuIds = expandedMenuIds.value
                     uiSettings.pinnedIds = pinnedIds.value
                     uiSettings.collapsedMainMenu = collapsedMainMenu.value
@@ -1821,6 +1827,7 @@ export const useSettingsStore = defineStore('settings', () => {
         uiScale,
         time24,
         menuOrder,
+        libraryFolderNames,
         expandedMenuIds,
         pinnedIds,
         collapsedMainMenu,

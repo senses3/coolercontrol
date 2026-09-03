@@ -243,6 +243,9 @@ export class UISettingsDTO {
     chartLineScale: number = 1.5
     time24: boolean = false
     menuOrder: Array<MenuOrderIds> = []
+    // Library folder names, id -> name. The folders themselves are
+    // menuOrder entries; only their names need a home of their own.
+    libraryFolderNames: Array<[string, string]> = []
     expandedMenuIds: Array<string> | undefined
     pinnedIds: Array<string> = []
     collapsedMainMenu: boolean = false
