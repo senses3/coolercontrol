@@ -81,20 +81,31 @@ export function buildLibraryLists(
 
 // Callers must assign the result back to the store ref: the UI-settings save
 // watcher only fires on whole-array replacement, not on in-place mutation.
+//
+// A folder this write does not know about is kept, not dropped. UI settings are
+// saved as one blob, so a second client, or one whose copy predates the folder,
+// would otherwise take every folder with it on its next drag. Deleting is
+// `removeFolderEntry`, and nothing else.
 export function persistLibraryLists(
     menuOrder: MenuOrderIds[],
     kind: LibraryKind,
     lists: LibraryLists,
 ): MenuOrderIds[] {
-    const live = new Set(lists.rootIds.filter(isFolderId))
-    // Entries for folders this group no longer has are dropped; device entries
-    // and the other group's folders keep their slots.
-    let next = menuOrder.filter((entry) => !isFolderIdOfKind(entry.id, kind) || live.has(entry.id))
-    next = setGroupOrder(next, kind, lists.rootIds)
-    for (const id of live) {
+    const known = new Set(lists.rootIds)
+    const unknown = menuOrder
+        .filter((entry) => isFolderIdOfKind(entry.id, kind) && !known.has(entry.id))
+        .map((entry) => entry.id)
+    let next = setGroupOrder(menuOrder, kind, [...lists.rootIds, ...unknown])
+    for (const id of lists.rootIds.filter(isFolderId)) {
         next = setGroupOrder(next, id, lists.folderChildren[id] ?? [])
     }
     return next
+}
+
+// The one way a folder leaves the order. Callers drop the entry before
+// persisting, so the write above does not read it back as one to keep.
+export function removeFolderEntry(menuOrder: MenuOrderIds[], folderId: string): MenuOrderIds[] {
+    return menuOrder.filter((entry) => entry.id !== folderId)
 }
 
 // The order the rest of the app sees: the lists read top to bottom, folders

@@ -12,6 +12,7 @@ import {
     newFolderId,
     persistLibraryLists,
     removeFolder,
+    removeFolderEntry,
     setFolderName,
     sortEntitiesByTree,
 } from '../libraryFolders.ts'
@@ -130,16 +131,45 @@ describe('persistLibraryLists', () => {
         ])
     })
 
-    it('drops entries for folders the group no longer has', () => {
+    // UI settings save as one blob, so a client whose copy predates a folder
+    // would take every folder with it on its next drag. Keeping what it does
+    // not know about costs a stale row; dropping it costs the user's folders.
+    it('keeps a folder it does not know about', () => {
         const menuOrder: MenuOrderIds[] = [
             { id: 'profiles', children: ['pf:1', 'pf:2'] },
             { id: 'pf:1', children: ['a'] },
             { id: 'pf:2', children: ['b'] },
         ]
-        const lists = { rootIds: ['pf:1'], folderChildren: { 'pf:1': ['a', 'b'] } }
+        const lists = { rootIds: ['pf:1'], folderChildren: { 'pf:1': ['a'] } }
         expect(persistLibraryLists(menuOrder, 'profiles', lists)).toEqual([
-            { id: 'profiles', children: ['pf:1'] },
-            { id: 'pf:1', children: ['a', 'b'] },
+            { id: 'profiles', children: ['pf:1', 'pf:2'] },
+            { id: 'pf:1', children: ['a'] },
+            { id: 'pf:2', children: ['b'] },
+        ])
+    })
+
+    it('keeps a folder unknown to a list that has never seen one', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'profiles', children: ['pf:1', 'a'] },
+            { id: 'pf:1', children: ['b'] },
+        ]
+        const lists = { rootIds: ['a', 'b'], folderChildren: {} }
+        expect(persistLibraryLists(menuOrder, 'profiles', lists)).toEqual([
+            { id: 'profiles', children: ['a', 'b', 'pf:1'] },
+            { id: 'pf:1', children: ['b'] },
+        ])
+    })
+
+    it('leaves the other kind of folder alone', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'functions', children: ['fn:1'] },
+            { id: 'fn:1', children: ['f'] },
+        ]
+        const lists = { rootIds: ['a'], folderChildren: {} }
+        expect(persistLibraryLists(menuOrder, 'profiles', lists)).toEqual([
+            { id: 'functions', children: ['fn:1'] },
+            { id: 'fn:1', children: ['f'] },
+            { id: 'profiles', children: ['a'] },
         ])
     })
 
@@ -165,6 +195,27 @@ describe('persistLibraryLists', () => {
         }
         const menuOrder = persistLibraryLists([], 'profiles', lists)
         expect(buildLibraryLists(menuOrder, 'profiles', ['a', 'b', 'c', 'd'])).toEqual(lists)
+    })
+})
+
+describe('removeFolderEntry', () => {
+    it('drops the entry so the persist above cannot keep it', () => {
+        const menuOrder: MenuOrderIds[] = [
+            { id: 'profiles', children: ['pf:1', 'a'] },
+            { id: 'pf:1', children: ['b'] },
+        ]
+        const next = removeFolderEntry(menuOrder, 'pf:1')
+        expect(next).toEqual([{ id: 'profiles', children: ['pf:1', 'a'] }])
+
+        const lists = { rootIds: ['b', 'a'], folderChildren: {} }
+        expect(persistLibraryLists(next, 'profiles', lists)).toEqual([
+            { id: 'profiles', children: ['b', 'a'] },
+        ])
+    })
+
+    it('ignores an unknown id', () => {
+        const menuOrder: MenuOrderIds[] = [{ id: 'profiles', children: ['a'] }]
+        expect(removeFolderEntry(menuOrder, 'pf:9')).toEqual(menuOrder)
     })
 })
 
