@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick, ref } from 'vue'
 import { createI18n } from 'vue-i18n'
+import { VueDraggable } from 'vue-draggable-plus'
 import en from '@/i18n/locales/en.ts'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
 
@@ -183,5 +184,77 @@ describe('LibraryList', () => {
         const wrapper = await mountList()
         await wrapper.findAll('button')[1].trigger('click')
         expect(wrapper.emitted('add')).toHaveLength(1)
+    })
+})
+
+// The drag cannot be performed in jsdom, but the handlers sortable would call
+// are ordinary functions, so they are called here with the events sortable
+// passes. That tests the logic without pretending an item moved.
+describe('LibraryList drag handlers', () => {
+    const draggables = async () => {
+        const wrapper = await mountList()
+        const lists = wrapper.findAllComponents(VueDraggable)
+        return { wrapper, root: lists[0], folder: lists[1] }
+    }
+    const element = (folderId?: string): HTMLElement => {
+        const el = document.createElement('div')
+        if (folderId != null) el.dataset.folder = folderId
+        return el
+    }
+
+    it('keeps profiles and functions in separate drag groups', async () => {
+        const { root, folder } = await draggables()
+        expect((root.props('group') as { name: string }).name).toBe('profiles')
+        expect((folder.props('group') as { name: string }).name).toBe('profiles')
+    })
+
+    // Flat: the put predicate is the only thing standing between a folder and
+    // being dropped inside another one.
+    it('refuses a folder dropped into a folder', async () => {
+        const { folder } = await draggables()
+        const put = (folder.props('group') as { put: Function }).put
+        expect(put(null, null, element('pf:2'))).toBe(false)
+        expect(put(null, null, element())).toBe(true)
+    })
+
+    it('opens a collapsed folder the drag passes over', async () => {
+        expandedMenuIds.value = []
+        const { root } = await draggables()
+        const onMove = root.props('onMove') as Function
+
+        expect(onMove({ related: element('pf:1') })).toBe(true)
+        expect(expandedMenuIds.value).toEqual(['pf:1'])
+    })
+
+    it('closes what the drag opened, except where the item landed', async () => {
+        expandedMenuIds.value = []
+        const { root } = await draggables()
+        const onMove = root.props('onMove') as Function
+        const onEnd = root.props('onEnd') as Function
+        onMove({ related: element('pf:1') })
+        onMove({ related: element('pf:2') })
+        expect(expandedMenuIds.value).toEqual(['pf:1', 'pf:2'])
+
+        const landed = document.createElement('div')
+        landed.dataset.folderItems = 'pf:2'
+        onEnd({ to: landed })
+        expect(expandedMenuIds.value).toEqual(['pf:2'])
+    })
+
+    it('closes every folder the drag opened when the item lands outside one', async () => {
+        expandedMenuIds.value = []
+        const { root } = await draggables()
+        ;(root.props('onMove') as Function)({ related: element('pf:1') })
+        ;(root.props('onEnd') as Function)({ to: document.createElement('div') })
+        expect(expandedMenuIds.value).toEqual([])
+    })
+
+    // A folder the user opened themselves is not the drag's to close: only
+    // what the drag itself opened is taken back.
+    it('leaves a folder the user opened alone', async () => {
+        const { root } = await draggables()
+        ;(root.props('onMove') as Function)({ related: element('pf:1') })
+        ;(root.props('onEnd') as Function)({ to: document.createElement('div') })
+        expect(expandedMenuIds.value).toEqual(['pf:1'])
     })
 })

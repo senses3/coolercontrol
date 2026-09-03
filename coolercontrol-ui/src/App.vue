@@ -6,7 +6,7 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
 import { startupRouteName } from '@/shell/sections.ts'
-import { sortEntitiesByGroup } from '@/shell/panelOrder.ts'
+import { sortEntitiesByTree } from '@/shell/libraryFolders.ts'
 import { TOUR_STEPS } from '@/shell/tour.ts'
 import { buildQtStrings } from '@/shell/qtStrings.ts'
 import { useToolWizards } from '@/composables/useToolWizards.ts'
@@ -216,8 +216,10 @@ onMounted(async () => {
     // Apply the persisted panel order (devices, channels, profiles, functions);
     // the old tree menu did this on build, the shell applies it once at boot.
     deviceStore.reSortDevicesByMenuOrder()
-    sortEntitiesByGroup(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
-    sortEntitiesByGroup(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
+    // Folders expand in place, so a filed profile keeps the position its folder
+    // has: what the panel shows top to bottom is what every dropdown lists.
+    sortEntitiesByTree(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
+    sortEntitiesByTree(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
     // Prime the calibration cache before `loaded` flips below: the cooling
     // channel page reads `statusFor` on first paint.
     await calibrationStore.refreshAllStatuses()

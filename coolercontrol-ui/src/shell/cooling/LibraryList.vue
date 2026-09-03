@@ -138,6 +138,37 @@ const saveName = (): void => {
     settingsStore.libraryFolderNames = setFolderName(settingsStore.libraryFolderNames, id, name)
 }
 
+// One level: a folder dragged over another folder's list is refused rather
+// than nested, whatever the pointer says.
+const acceptsEntities = (_to: unknown, _from: unknown, dragged: HTMLElement): boolean =>
+    dragged.dataset.folder === undefined
+
+// A collapsed folder shows no items, so there is nothing to drop between.
+// Hovering it during a drag opens it, the way a file manager does. v-show keeps
+// the list mounted, so this only unhides it: no element the drag layer is
+// holding is created or destroyed mid-drag.
+const autoOpened = new Set<string>()
+const openHoveredFolder = (event: { related?: HTMLElement }): boolean => {
+    const id = event.related?.dataset?.folder
+    if (id != null && !isExpanded(id)) {
+        autoOpened.add(id)
+        setExpanded(id, true)
+    }
+    return true
+}
+
+// Only the folder the item landed in stays open. Without this, dragging past
+// three collapsed folders would leave all three open, which is the clutter the
+// user collapsed them to be rid of.
+const onDragEnd = (event: { to?: HTMLElement }): void => {
+    const landedIn = event.to?.dataset?.folderItems
+    for (const id of autoOpened) {
+        if (id !== landedIn) setExpanded(id, false)
+    }
+    autoOpened.clear()
+    persist()
+}
+
 const cancelRename = (): void => {
     const id = editingId.value
     editingId.value = null
@@ -172,8 +203,10 @@ const cancelRename = (): void => {
         v-model="lists.rootIds"
         handle=".root-drag-handle"
         :animation="150"
+        :group="{ name: kind, pull: true, put: true }"
+        :on-move="openHoveredFolder"
         class="flex flex-col gap-0.5"
-        @end="persist"
+        @end="onDragEnd"
     >
         <template v-for="id in lists.rootIds" :key="id">
             <div v-if="isFolderId(id)" :data-folder="id">
@@ -246,8 +279,9 @@ const cancelRename = (): void => {
                     v-model="lists.folderChildren[id]"
                     handle=".child-drag-handle"
                     :animation="150"
+                    :group="{ name: kind, pull: true, put: acceptsEntities }"
                     class="ml-5 flex min-h-6 flex-col gap-0.5 border-l border-border-one pl-1"
-                    @end="persist"
+                    @end="onDragEnd"
                 >
                     <RouterLink
                         v-for="uid in lists.folderChildren[id]"
