@@ -11,6 +11,8 @@ import UiButton from '@/shell/ui/UiButton.vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
 import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
@@ -72,8 +74,14 @@ const chosenOverlayMemberProfileUid = computed<string | undefined>({
         )
     },
 })
-const overlayBaseOptions = computed(() =>
-    offsetMemberProfileOptions.value.map((p) => ({ label: p.name, value: p.uid })),
+const overlayBaseGroups = computed(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        offsetMemberProfileOptions.value.map((p) => ({ uid: p.uid, name: p.name })),
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
 )
 const nextStep = () => {
     if (chosenOverlayMemberProfile.value == null) {
@@ -101,9 +109,9 @@ const nextStep = () => {
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.baseProfile') }}
                 </small>
-                <UiSelect
+                <UiGroupedSelect
                     v-model="chosenOverlayMemberProfileUid"
-                    :options="overlayBaseOptions"
+                    :groups="overlayBaseGroups"
                     :placeholder="t('views.profiles.baseProfile')"
                     :invalid="chosenOverlayMemberProfile == null"
                     class="w-full"

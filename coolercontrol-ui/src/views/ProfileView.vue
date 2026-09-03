@@ -86,6 +86,7 @@ import UiKnob from '@/shell/ui/UiKnob.vue'
 import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
+import { libraryOptionGroups, withLeadingOption } from '@/shell/cooling/libraryOptions.ts'
 import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
 import HelpIcon from '@/components/info/HelpIcon.vue'
 
@@ -350,15 +351,18 @@ const chosenOverlayOffsetTypeModel = computed<string | undefined>({
         if (value != null) chosenOverlayOffsetType.value = value
     },
 })
-const memberProfileGroups = computed<UiOptionGroup[]>(() => [
-    {
-        label: '',
-        options: memberProfileOptions.value.map((profile) => ({
-            label: profile.name,
-            value: profile.uid,
+const memberProfileGroups = computed<UiOptionGroup[]>(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        memberProfileOptions.value.map((profile) => ({
+            uid: profile.uid,
+            name: profile.name,
         })),
-    },
-])
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
+)
 const chosenMemberProfileUids = computed<string[]>({
     get: () => chosenMemberProfiles.value.map((profile) => profile.uid),
     set: (uids) => {
@@ -367,11 +371,17 @@ const chosenMemberProfileUids = computed<string[]>({
             .filter((profile): profile is Profile => profile != null)
     },
 })
-const overlayBaseOptions = computed(() =>
-    offsetMemberProfileOptions.value.map((profile) => ({
-        label: profile.name,
-        value: profile.uid,
-    })),
+const overlayBaseGroups = computed(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        offsetMemberProfileOptions.value.map((profile) => ({
+            uid: profile.uid,
+            name: profile.name,
+        })),
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
 )
 const chosenOverlayMemberProfileUid = computed<string | undefined>({
     get: () => chosenOverlayMemberProfile.value?.uid,
@@ -381,8 +391,23 @@ const chosenOverlayMemberProfileUid = computed<string | undefined>({
         )
     },
 })
-const functionOptions = computed(() =>
-    settingsStore.functions.map((fn) => ({ label: fn.name, value: fn.uid })),
+const defaultFunctionOption = computed(() => {
+    const found = settingsStore.functions.find((fn) => fn.uid === '0')
+    return found == null ? undefined : { label: found.name, value: found.uid }
+})
+const functionGroups = computed(() =>
+    withLeadingOption(
+        libraryOptionGroups(
+            settingsStore.menuOrder,
+            'functions',
+            settingsStore.functions
+                .filter((fn) => fn.uid !== '0')
+                .map((fn) => ({ uid: fn.uid, name: fn.name })),
+            settingsStore.libraryFolderNames,
+            t('layout.shell.coolingPanel.newFolder'),
+        ),
+        defaultFunctionOption.value,
+    ),
 )
 const chosenFunctionUid = computed<string | undefined>({
     get: () => chosenFunction.value.uid,
@@ -2455,9 +2480,9 @@ defineExpose({ saveProfileState, contextIsDirty })
                     />
                 </span>
                 <span v-tooltip.top="t('views.profiles.baseProfile')">
-                    <UiSelect
+                    <UiGroupedSelect
                         v-model="chosenOverlayMemberProfileUid"
-                        :options="overlayBaseOptions"
+                        :groups="overlayBaseGroups"
                         :placeholder="t('views.profiles.baseProfile')"
                         class="w-44"
                         :invalid="chosenOverlayMemberProfile == null"
@@ -2480,9 +2505,9 @@ defineExpose({ saveProfileState, contextIsDirty })
                 </div>
                 <div class="p-2 pr-0">
                     <span v-tooltip.top="t('views.profiles.functionToApply')">
-                        <UiSelect
+                        <UiGroupedSelect
                             v-model="chosenFunctionUid"
-                            :options="functionOptions"
+                            :groups="functionGroups"
                             :placeholder="t('views.profiles.function')"
                             class="w-44"
                         />

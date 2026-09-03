@@ -7,7 +7,8 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { libraryOptionGroups, withLeadingOption } from '@/shell/cooling/libraryOptions.ts'
 import { UID } from '@/models/Device.ts'
 import { Function } from '@/models/Profile.ts'
 import { computed, ref, Ref } from 'vue'
@@ -36,8 +37,23 @@ const selectedFunction: Ref<Function> = ref(
 
 const getFunctionOptions = (): any[] => settingsStore.functions
 
-const functionSelectOptions = computed(() =>
-    getFunctionOptions().map((f) => ({ label: f.name, value: f.uid })),
+const defaultFunction = computed(() => {
+    const found = getFunctionOptions().find((f) => f.uid === '0')
+    return found == null ? undefined : { label: found.name, value: found.uid }
+})
+const functionSelectGroups = computed(() =>
+    withLeadingOption(
+        libraryOptionGroups(
+            settingsStore.menuOrder,
+            'functions',
+            getFunctionOptions()
+                .filter((f) => f.uid !== '0')
+                .map((f) => ({ uid: f.uid, name: f.name })),
+            settingsStore.libraryFolderNames,
+            t('layout.shell.coolingPanel.newFolder'),
+        ),
+        defaultFunction.value,
+    ),
 )
 const selectedFunctionUidModel = computed<string | undefined>({
     get: () => selectedFunction.value?.uid,
@@ -63,9 +79,9 @@ const nextStep = () => {
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('components.wizards.fanControl.existingFunction') }}:
                 </small>
-                <UiSelect
+                <UiGroupedSelect
                     v-model="selectedFunctionUidModel"
-                    :options="functionSelectOptions"
+                    :groups="functionSelectGroups"
                     placeholder="Function"
                     class="w-full"
                 />

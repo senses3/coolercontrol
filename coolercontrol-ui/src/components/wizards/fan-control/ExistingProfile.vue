@@ -7,7 +7,8 @@
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
-import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
 import { UID } from '@/models/Device.ts'
 import { Profile, getProfileDisplayName } from '@/models/Profile.ts'
 import { computed, ref, Ref } from 'vue'
@@ -47,8 +48,14 @@ const selectedProfile: Ref<Profile> = ref(
     ) ?? getProfileOptions()[0],
 )
 
-const profileSelectOptions = computed(() =>
-    getProfileOptions().map((p) => ({ label: getProfileDisplayName(p), value: p.uid })),
+const profileSelectGroups = computed(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        getProfileOptions().map((p) => ({ uid: p.uid, name: getProfileDisplayName(p) })),
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
 )
 const selectedProfileUid = computed<string | undefined>({
     get: () => selectedProfile.value?.uid,
@@ -79,9 +86,9 @@ const saveSetting = async () => {
                 <small class="ml-2 mb-1 text-sm">
                     {{ t('components.wizards.fanControl.existingProfile') }}:
                 </small>
-                <UiSelect
+                <UiGroupedSelect
                     v-model="selectedProfileUid"
-                    :options="profileSelectOptions"
+                    :groups="profileSelectGroups"
                     placeholder="Profile"
                     class="w-full"
                 />

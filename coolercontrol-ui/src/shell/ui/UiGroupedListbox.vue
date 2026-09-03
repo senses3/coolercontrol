@@ -24,6 +24,11 @@ export interface UiGroupedOption {
 export interface UiOptionGroup {
     label: string
     options: UiGroupedOption[]
+    /** Keys the group. Needed only when two groups share a label, as
+     *  unlabelled runs between labelled groups do. */
+    id?: string
+    /** Heading icon; the memory chip when a group does not name one. */
+    icon?: string
 }
 
 // Grouped single- or multi-select option list with optional filtering.
@@ -110,13 +115,18 @@ onMounted(async () => {
             />
         </div>
         <div ref="scrollContainer" class="min-h-0 flex-1 overflow-y-auto p-1">
-            <template v-for="group in visibleGroups" :key="group.label">
+            <template v-for="group in visibleGroups" :key="group.id ?? group.label">
                 <div
                     v-if="group.label !== ''"
                     class="flex items-center gap-2 px-2 py-1.5 text-sm font-semibold text-text-color"
                 >
                     <slot name="group" :group="group">
-                        <svg-icon type="mdi" :path="mdiMemory" :size="18" class="shrink-0" />
+                        <svg-icon
+                            type="mdi"
+                            :path="group.icon ?? mdiMemory"
+                            :size="18"
+                            class="shrink-0"
+                        />
                         {{ group.label }}
                     </slot>
                 </div>

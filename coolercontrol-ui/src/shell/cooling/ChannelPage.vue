@@ -47,7 +47,8 @@ import {
 } from '@/shell/cooling/controlFlow.ts'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
-import UiSelect, { type UiSelectOption } from '@/shell/ui/UiSelect.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
 import UiSlider from '@/shell/ui/UiSlider.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
 
@@ -94,10 +95,14 @@ const controlModeOptions = computed(() => [
     { label: t('layout.shell.coolingPage.modeUnmanaged'), value: 'unmanaged' },
 ])
 
-const profileOptions = computed<UiSelectOption[]>(() =>
-    settingsStore.profiles
-        .filter((profile) => profile.uid !== '0')
-        .map((profile) => ({ label: profile.name, value: profile.uid })),
+const profileGroups = computed(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        settingsStore.profiles.filter((profile) => profile.uid !== '0'),
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
 )
 
 // ----- chain strip -----
@@ -495,9 +500,9 @@ if (channelDashboard.value.dataTypes.length > 0) {
                         <span class="text-sm text-text-color-secondary">
                             {{ t('layout.shell.coolingPage.chain.profile') }}
                         </span>
-                        <UiSelect
+                        <UiGroupedSelect
                             v-model="selectedProfileUID"
-                            :options="profileOptions"
+                            :groups="profileGroups"
                             :placeholder="t('layout.shell.coolingPage.selectProfile')"
                         />
                     </div>

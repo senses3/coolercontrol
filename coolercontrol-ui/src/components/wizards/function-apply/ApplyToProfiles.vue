@@ -14,6 +14,7 @@ import { mdiContentSaveOutline } from '@mdi/js'
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
+import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
 import { UID } from '@/models/Device.ts'
 import { ProfileType } from '@/models/Profile.ts'
 import { useToast } from '@/shell/toast'
@@ -67,15 +68,18 @@ const setAlreadyAppliedProfiles = (): void => {
 }
 setAlreadyAppliedProfiles()
 
-const profileGroups = computed<UiOptionGroup[]>(() => [
-    {
-        label: '',
-        options: profileOptions.value.map((profile) => ({
-            label: profile.profileName,
-            value: profile.profileUID,
+const profileGroups = computed<UiOptionGroup[]>(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        profileOptions.value.map((profile) => ({
+            uid: profile.profileUID,
+            name: profile.profileName,
         })),
-    },
-])
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
+)
 const chosenProfileUids = computed<string[]>({
     get: () => chosenProfiles.value.map((profile) => profile.profileUID),
     set: (uids) => {

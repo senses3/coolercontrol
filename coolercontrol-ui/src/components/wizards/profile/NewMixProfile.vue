@@ -21,6 +21,7 @@ import { computed, ref, Ref } from 'vue'
 import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
+import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
 import { $enum } from 'ts-enum-util'
 import UiButton from '@/shell/ui/UiButton.vue'
 import { UID } from '@/models/Device.ts'
@@ -69,12 +70,15 @@ const chosenMemberProfileUids = computed<string[]>({
             .filter((p): p is Profile => p != null)
     },
 })
-const memberProfileGroups = computed<UiOptionGroup[]>(() => [
-    {
-        label: '',
-        options: memberProfileOptions.value.map((p) => ({ label: p.name, value: p.uid })),
-    },
-])
+const memberProfileGroups = computed<UiOptionGroup[]>(() =>
+    libraryOptionGroups(
+        settingsStore.menuOrder,
+        'profiles',
+        memberProfileOptions.value.map((p) => ({ uid: p.uid, name: p.name })),
+        settingsStore.libraryFolderNames,
+        t('layout.shell.coolingPanel.newFolder'),
+    ),
+)
 const chosenProfileMixFunctionModel = computed<string | undefined>({
     get: () => chosenProfileMixFunction.value,
     set: (v) => {
