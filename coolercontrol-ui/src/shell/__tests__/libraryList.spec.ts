@@ -265,6 +265,21 @@ describe('LibraryList drag handlers', () => {
         expect(itemsEl(wrapper, 'pf:1').style.display).toBe('none')
     })
 
+    // The drag layer leaves nodes Vue does not own, which drew the dragged
+    // profile in both the folder and the root list. The rows are rebuilt from
+    // the model after every drop, so whatever the drag left behind goes with
+    // the old subtree.
+    it('rebuilds the rows from the model after a drop', async () => {
+        const { wrapper, root } = await mountWithFolders()
+        const before = root.element
+        ;(root.props('onEnd') as Function)({ to: document.createElement('div') })
+        await nextTick()
+
+        expect(wrapper.findAllComponents(VueDraggable)[0].element).not.toBe(before)
+        expect(wrapper.text()).toContain('Silent')
+        expect(wrapper.text()).toContain('Loud')
+    })
+
     // A folder the user opened themselves is not the drag's to close: only
     // what the drag itself opened is taken back.
     it('leaves a folder the user opened alone', async () => {

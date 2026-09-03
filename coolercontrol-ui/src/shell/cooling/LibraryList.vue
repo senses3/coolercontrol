@@ -163,6 +163,14 @@ const openHoveredFolder = (event: { related?: HTMLElement }): boolean => {
     return true
 }
 
+// Bumped after every drop to rebuild the rows from the model. The drag layer
+// moves nodes itself and hands the moved one back for Vue to re-create, and
+// across a nested drop the two disagree often enough to leave the dragged
+// profile drawn in both the folder and the root list. The model is right either
+// way (a reload always showed it correctly), so the cheap, certain fix is to
+// throw the subtree away and render it again from the model.
+const renderKey = ref(0)
+
 // Only the folder the item landed in stays open. Without this, dragging past
 // three collapsed folders would leave all three open, which is the clutter the
 // user collapsed them to be rid of.
@@ -174,6 +182,7 @@ const onDragEnd = (event: { to?: HTMLElement }): void => {
     }
     autoOpened.clear()
     persist()
+    renderKey.value += 1
 }
 
 const cancelRename = (): void => {
@@ -210,6 +219,7 @@ const cancelRename = (): void => {
             </div>
         </div>
         <VueDraggable
+            :key="renderKey"
             v-model="lists.rootIds"
             handle=".root-drag-handle"
             :animation="150"
