@@ -144,15 +144,21 @@ const acceptsEntities = (_to: unknown, _from: unknown, dragged: HTMLElement): bo
     dragged.dataset.folder === undefined
 
 // A collapsed folder shows no items, so there is nothing to drop between.
-// Hovering it during a drag opens it, the way a file manager does. v-show keeps
-// the list mounted, so this only unhides it: no element the drag layer is
-// holding is created or destroyed mid-drag.
-const autoOpened = new Set<string>()
+// Hovering it during a drag opens it, the way a file manager does.
+//
+// This runs from inside the drag, so it unhides the list by hand rather than
+// through the store: a store write re-renders the list sortable is dragging in,
+// and its moved nodes and Vue's idea of them then disagree, which showed up as
+// the dragged profile appearing in both the folder and the root list. The state
+// catches up on drop, where a re-render is safe.
+const autoOpened = new Map<string, HTMLElement>()
 const openHoveredFolder = (event: { related?: HTMLElement }): boolean => {
     const id = event.related?.dataset?.folder
-    if (id != null && !isExpanded(id)) {
-        autoOpened.add(id)
-        setExpanded(id, true)
+    if (id == null || autoOpened.has(id) || isExpanded(id)) return true
+    const items = event.related?.querySelector<HTMLElement>('[data-folder-items]')
+    if (items != null) {
+        autoOpened.set(id, items)
+        items.style.display = ''
     }
     return true
 }
@@ -162,8 +168,9 @@ const openHoveredFolder = (event: { related?: HTMLElement }): boolean => {
 // user collapsed them to be rid of.
 const onDragEnd = (event: { to?: HTMLElement }): void => {
     const landedIn = event.to?.dataset?.folderItems
-    for (const id of autoOpened) {
-        if (id !== landedIn) setExpanded(id, false)
+    for (const [id, items] of autoOpened) {
+        if (id === landedIn) setExpanded(id, true)
+        else items.style.display = 'none'
     }
     autoOpened.clear()
     persist()

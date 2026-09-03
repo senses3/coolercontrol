@@ -189,72 +189,91 @@ describe('LibraryList', () => {
 
 // The drag cannot be performed in jsdom, but the handlers sortable would call
 // are ordinary functions, so they are called here with the events sortable
-// passes. That tests the logic without pretending an item moved.
+// passes, against the real rendered elements. That tests the logic without
+// pretending an item moved.
 describe('LibraryList drag handlers', () => {
-    const draggables = async () => {
+    const mountWithFolders = async () => {
+        menuOrder.value = [
+            { id: 'profiles', children: ['pf:1', 'pf:2', 'a', 'b'] },
+            { id: 'pf:1', children: [] },
+            { id: 'pf:2', children: [] },
+        ]
+        libraryFolderNames.value = []
         const wrapper = await mountList()
-        const lists = wrapper.findAllComponents(VueDraggable)
-        return { wrapper, root: lists[0], folder: lists[1] }
+        return { wrapper, root: wrapper.findAllComponents(VueDraggable)[0] }
     }
-    const element = (folderId?: string): HTMLElement => {
-        const el = document.createElement('div')
-        if (folderId != null) el.dataset.folder = folderId
-        return el
-    }
+    type Wrapper = Awaited<ReturnType<typeof mountList>>
+    const folderEl = (wrapper: Wrapper, id: string): HTMLElement =>
+        wrapper.get(`[data-folder="${id}"]`).element as HTMLElement
+    const itemsEl = (wrapper: Wrapper, id: string): HTMLElement =>
+        wrapper.get(`[data-folder-items="${id}"]`).element as HTMLElement
+
+    beforeEach(() => {
+        expandedMenuIds.value = []
+    })
 
     it('keeps profiles and functions in separate drag groups', async () => {
-        const { root, folder } = await draggables()
-        expect((root.props('group') as { name: string }).name).toBe('profiles')
-        expect((folder.props('group') as { name: string }).name).toBe('profiles')
+        const { wrapper } = await mountWithFolders()
+        const groups = wrapper
+            .findAllComponents(VueDraggable)
+            .map((list) => (list.props('group') as { name: string }).name)
+        expect(groups.every((name) => name === 'profiles')).toBe(true)
     })
 
     // Flat: the put predicate is the only thing standing between a folder and
     // being dropped inside another one.
     it('refuses a folder dropped into a folder', async () => {
-        const { folder } = await draggables()
-        const put = (folder.props('group') as { put: Function }).put
-        expect(put(null, null, element('pf:2'))).toBe(false)
-        expect(put(null, null, element())).toBe(true)
+        const { wrapper } = await mountWithFolders()
+        const put = (wrapper.findAllComponents(VueDraggable)[1].props('group') as { put: Function })
+            .put
+        const folder = document.createElement('div')
+        folder.dataset.folder = 'pf:2'
+        expect(put(null, null, folder)).toBe(false)
+        expect(put(null, null, document.createElement('div'))).toBe(true)
     })
 
-    it('opens a collapsed folder the drag passes over', async () => {
-        expandedMenuIds.value = []
-        const { root } = await draggables()
-        const onMove = root.props('onMove') as Function
+    // The store is left alone until the drop: writing it here re-renders the
+    // list sortable is dragging in, which is what duplicated the dragged row.
+    it('opens a collapsed folder the drag passes over without touching the store', async () => {
+        const { wrapper, root } = await mountWithFolders()
+        expect(itemsEl(wrapper, 'pf:1').style.display).toBe('none')
 
-        expect(onMove({ related: element('pf:1') })).toBe(true)
-        expect(expandedMenuIds.value).toEqual(['pf:1'])
+        expect((root.props('onMove') as Function)({ related: folderEl(wrapper, 'pf:1') })).toBe(
+            true,
+        )
+        expect(itemsEl(wrapper, 'pf:1').style.display).toBe('')
+        expect(expandedMenuIds.value).toEqual([])
     })
 
-    it('closes what the drag opened, except where the item landed', async () => {
-        expandedMenuIds.value = []
-        const { root } = await draggables()
+    it('commits only the folder the item landed in', async () => {
+        const { wrapper, root } = await mountWithFolders()
         const onMove = root.props('onMove') as Function
-        const onEnd = root.props('onEnd') as Function
-        onMove({ related: element('pf:1') })
-        onMove({ related: element('pf:2') })
-        expect(expandedMenuIds.value).toEqual(['pf:1', 'pf:2'])
+        onMove({ related: folderEl(wrapper, 'pf:1') })
+        onMove({ related: folderEl(wrapper, 'pf:2') })
 
-        const landed = document.createElement('div')
-        landed.dataset.folderItems = 'pf:2'
-        onEnd({ to: landed })
+        ;(root.props('onEnd') as Function)({ to: itemsEl(wrapper, 'pf:2') })
         expect(expandedMenuIds.value).toEqual(['pf:2'])
+        expect(itemsEl(wrapper, 'pf:1').style.display).toBe('none')
     })
 
     it('closes every folder the drag opened when the item lands outside one', async () => {
-        expandedMenuIds.value = []
-        const { root } = await draggables()
-        ;(root.props('onMove') as Function)({ related: element('pf:1') })
+        const { wrapper, root } = await mountWithFolders()
+        ;(root.props('onMove') as Function)({ related: folderEl(wrapper, 'pf:1') })
         ;(root.props('onEnd') as Function)({ to: document.createElement('div') })
+
         expect(expandedMenuIds.value).toEqual([])
+        expect(itemsEl(wrapper, 'pf:1').style.display).toBe('none')
     })
 
     // A folder the user opened themselves is not the drag's to close: only
     // what the drag itself opened is taken back.
     it('leaves a folder the user opened alone', async () => {
-        const { root } = await draggables()
-        ;(root.props('onMove') as Function)({ related: element('pf:1') })
+        expandedMenuIds.value = ['pf:1']
+        const { wrapper, root } = await mountWithFolders()
+        ;(root.props('onMove') as Function)({ related: folderEl(wrapper, 'pf:1') })
         ;(root.props('onEnd') as Function)({ to: document.createElement('div') })
+
         expect(expandedMenuIds.value).toEqual(['pf:1'])
+        expect(itemsEl(wrapper, 'pf:1').style.display).toBe('')
     })
 })
