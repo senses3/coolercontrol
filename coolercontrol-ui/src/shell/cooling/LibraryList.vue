@@ -178,154 +178,160 @@ const cancelRename = (): void => {
 </script>
 
 <template>
-    <div class="flex items-center justify-between px-3 pb-1 pt-1">
-        <span class="text-xs uppercase text-text-color-secondary opacity-70">{{ label }}</span>
-        <div class="flex items-center gap-0.5">
-            <button
-                type="button"
-                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                v-tooltip.top="t('layout.shell.coolingPanel.addFolder')"
-                @click="createFolder"
-            >
-                <svg-icon type="mdi" :path="mdiFolderPlusOutline" :size="16" />
-            </button>
-            <button
-                type="button"
-                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                v-tooltip.top="addTooltip"
-                @click="emit('add')"
-            >
-                <svg-icon type="mdi" :path="mdiPlus" :size="16" />
-            </button>
-        </div>
-    </div>
-    <VueDraggable
-        v-model="lists.rootIds"
-        handle=".root-drag-handle"
-        :animation="150"
-        :group="{ name: kind, pull: true, put: true }"
-        :on-move="openHoveredFolder"
-        class="flex flex-col gap-0.5"
-        @end="onDragEnd"
-    >
-        <template v-for="id in lists.rootIds" :key="id">
-            <div v-if="isFolderId(id)" :data-folder="id">
-                <div
-                    class="group/folder flex items-center gap-2 rounded-lg px-3 py-1 text-text-color hover:bg-surface-hover"
+    <!-- One root, not a fragment: the panel spaces the two sections apart with
+         a class on the component, which only lands on a single root. -->
+    <div class="flex flex-col gap-0.5">
+        <div class="flex items-center justify-between px-3 pb-1 pt-1">
+            <span class="text-xs uppercase text-text-color-secondary opacity-70">{{ label }}</span>
+            <div class="flex items-center gap-0.5">
+                <button
+                    type="button"
+                    class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    v-tooltip.top="t('layout.shell.coolingPanel.addFolder')"
+                    @click="createFolder"
                 >
-                    <input
-                        v-if="editingId === id"
-                        ref="nameInput"
-                        v-model="editingName"
-                        type="text"
-                        :maxlength="DEFAULT_NAME_STRING_LENGTH"
-                        :placeholder="t('layout.shell.coolingPanel.newFolder')"
-                        class="min-w-0 flex-1 rounded border border-border-one bg-control px-1 text-text-color outline-none focus:ring-2 focus:ring-accent"
-                        @keydown.enter.prevent="saveName"
-                        @keydown.esc.prevent="cancelRename"
-                        @blur="saveName"
-                    />
-                    <template v-else>
-                        <button
-                            type="button"
-                            class="flex min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                            :aria-expanded="isExpanded(id)"
-                            @click="setExpanded(id, !isExpanded(id))"
+                    <svg-icon type="mdi" :path="mdiFolderPlusOutline" :size="16" />
+                </button>
+                <button
+                    type="button"
+                    class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
+                    v-tooltip.top="addTooltip"
+                    @click="emit('add')"
+                >
+                    <svg-icon type="mdi" :path="mdiPlus" :size="16" />
+                </button>
+            </div>
+        </div>
+        <VueDraggable
+            v-model="lists.rootIds"
+            handle=".root-drag-handle"
+            :animation="150"
+            :group="{ name: kind, pull: true, put: true }"
+            :on-move="openHoveredFolder"
+            class="flex flex-col gap-0.5"
+            @end="onDragEnd"
+        >
+            <template v-for="id in lists.rootIds" :key="id">
+                <div v-if="isFolderId(id)" :data-folder="id">
+                    <div
+                        class="group/folder flex items-center gap-2 rounded-lg px-3 py-1 text-text-color hover:bg-surface-hover"
+                    >
+                        <input
+                            v-if="editingId === id"
+                            ref="nameInput"
+                            v-model="editingName"
+                            type="text"
+                            :maxlength="DEFAULT_NAME_STRING_LENGTH"
+                            :placeholder="t('layout.shell.coolingPanel.newFolder')"
+                            class="min-w-0 flex-1 rounded border border-border-one bg-control px-1 text-text-color outline-none focus:ring-2 focus:ring-accent"
+                            @keydown.enter.prevent="saveName"
+                            @keydown.esc.prevent="cancelRename"
+                            @blur="saveName"
+                        />
+                        <template v-else>
+                            <button
+                                type="button"
+                                class="flex min-w-0 flex-1 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                :aria-expanded="isExpanded(id)"
+                                @click="setExpanded(id, !isExpanded(id))"
+                            >
+                                <svg-icon
+                                    type="mdi"
+                                    :path="isExpanded(id) ? mdiChevronDown : mdiChevronRight"
+                                    :size="16"
+                                    class="shrink-0 text-text-color-secondary"
+                                />
+                                <svg-icon
+                                    type="mdi"
+                                    :path="isExpanded(id) ? mdiFolderOpenOutline : mdiFolderOutline"
+                                    :size="18"
+                                    class="shrink-0 text-text-color-secondary"
+                                />
+                                <span class="truncate">{{ folderLabel(id) }}</span>
+                            </button>
+                            <div
+                                class="hidden shrink-0 items-center gap-0.5 group-hover/folder:flex"
+                            >
+                                <button
+                                    type="button"
+                                    class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color"
+                                    v-tooltip.top="t('layout.menu.tooltips.rename')"
+                                    @click="startRename(id)"
+                                >
+                                    <svg-icon type="mdi" :path="mdiPencilOutline" :size="14" />
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded p-0.5 text-text-color-secondary outline-none hover:text-error"
+                                    v-tooltip.top="t('layout.shell.coolingPanel.deleteFolder')"
+                                    @click="discardFolder(id)"
+                                >
+                                    <svg-icon type="mdi" :path="mdiTrashCanOutline" :size="14" />
+                                </button>
+                                <span
+                                    class="root-drag-handle cursor-grab p-0.5 text-text-color-secondary"
+                                >
+                                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+                    <!-- v-show, not v-if: the drag layer keeps its instance, so a
+                         collapsed folder is still a place a drop can land. -->
+                    <VueDraggable
+                        v-show="isExpanded(id)"
+                        :data-folder-items="id"
+                        v-model="lists.folderChildren[id]"
+                        handle=".child-drag-handle"
+                        :animation="150"
+                        :group="{ name: kind, pull: true, put: acceptsEntities }"
+                        class="ml-5 flex min-h-6 flex-col gap-0.5 border-l border-border-one pl-1"
+                        @end="onDragEnd"
+                    >
+                        <RouterLink
+                            v-for="uid in lists.folderChildren[id]"
+                            :key="uid"
+                            :to="entityTarget(uid)"
+                            class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                            exact-active-class="bg-surface-hover !text-accent"
                         >
                             <svg-icon
                                 type="mdi"
-                                :path="isExpanded(id) ? mdiChevronDown : mdiChevronRight"
-                                :size="16"
-                                class="shrink-0 text-text-color-secondary"
-                            />
-                            <svg-icon
-                                type="mdi"
-                                :path="isExpanded(id) ? mdiFolderOpenOutline : mdiFolderOutline"
+                                :path="icon"
                                 :size="18"
                                 class="shrink-0 text-text-color-secondary"
                             />
-                            <span class="truncate">{{ folderLabel(id) }}</span>
-                        </button>
-                        <div class="hidden shrink-0 items-center gap-0.5 group-hover/folder:flex">
-                            <button
-                                type="button"
-                                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color"
-                                v-tooltip.top="t('layout.menu.tooltips.rename')"
-                                @click="startRename(id)"
-                            >
-                                <svg-icon type="mdi" :path="mdiPencilOutline" :size="14" />
-                            </button>
-                            <button
-                                type="button"
-                                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-error"
-                                v-tooltip.top="t('layout.shell.coolingPanel.deleteFolder')"
-                                @click="discardFolder(id)"
-                            >
-                                <svg-icon type="mdi" :path="mdiTrashCanOutline" :size="14" />
-                            </button>
+                            <span class="truncate">{{ entityName.get(uid) }}</span>
+                            <slot name="badge" :uid="uid" />
                             <span
-                                class="root-drag-handle cursor-grab p-0.5 text-text-color-secondary"
+                                class="child-drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                             >
                                 <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
                             </span>
-                        </div>
-                    </template>
+                        </RouterLink>
+                    </VueDraggable>
                 </div>
-                <!-- v-show, not v-if: the drag layer keeps its instance, so a
-                     collapsed folder is still a place a drop can land. -->
-                <VueDraggable
-                    v-show="isExpanded(id)"
-                    :data-folder-items="id"
-                    v-model="lists.folderChildren[id]"
-                    handle=".child-drag-handle"
-                    :animation="150"
-                    :group="{ name: kind, pull: true, put: acceptsEntities }"
-                    class="ml-5 flex min-h-6 flex-col gap-0.5 border-l border-border-one pl-1"
-                    @end="onDragEnd"
+                <RouterLink
+                    v-else
+                    :to="entityTarget(id)"
+                    class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
+                    exact-active-class="bg-surface-hover !text-accent"
                 >
-                    <RouterLink
-                        v-for="uid in lists.folderChildren[id]"
-                        :key="uid"
-                        :to="entityTarget(uid)"
-                        class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                        exact-active-class="bg-surface-hover !text-accent"
+                    <svg-icon
+                        type="mdi"
+                        :path="icon"
+                        :size="18"
+                        class="shrink-0 text-text-color-secondary"
+                    />
+                    <span class="truncate">{{ entityName.get(id) }}</span>
+                    <slot name="badge" :uid="id" />
+                    <span
+                        class="root-drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
                     >
-                        <svg-icon
-                            type="mdi"
-                            :path="icon"
-                            :size="18"
-                            class="shrink-0 text-text-color-secondary"
-                        />
-                        <span class="truncate">{{ entityName.get(uid) }}</span>
-                        <slot name="badge" :uid="uid" />
-                        <span
-                            class="child-drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
-                        >
-                            <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                        </span>
-                    </RouterLink>
-                </VueDraggable>
-            </div>
-            <RouterLink
-                v-else
-                :to="entityTarget(id)"
-                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                exact-active-class="bg-surface-hover !text-accent"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="icon"
-                    :size="18"
-                    class="shrink-0 text-text-color-secondary"
-                />
-                <span class="truncate">{{ entityName.get(id) }}</span>
-                <slot name="badge" :uid="id" />
-                <span
-                    class="root-drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
-                >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                </span>
-            </RouterLink>
-        </template>
-    </VueDraggable>
+                        <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
+                    </span>
+                </RouterLink>
+            </template>
+        </VueDraggable>
+    </div>
 </template>
