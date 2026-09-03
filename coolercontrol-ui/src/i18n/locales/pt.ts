@@ -106,6 +106,9 @@ export default {
                 library: 'Perfis e Funções',
                 profiles: 'Perfis',
                 functions: 'Funções',
+                addFolder: 'Adicionar pasta',
+                newFolder: 'Nova pasta',
+                deleteFolder: 'Excluir pasta',
             },
             monitoringPanel: {
                 newDashboard: 'Novo Painel',

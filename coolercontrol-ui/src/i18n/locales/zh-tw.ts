@@ -104,6 +104,9 @@ export default {
                 library: '設定檔與功能',
                 profiles: '設定檔',
                 functions: '功能',
+                addFolder: '新增資料夾',
+                newFolder: '未命名資料夾',
+                deleteFolder: '刪除資料夾',
             },
             monitoringPanel: {
                 newDashboard: '新增儀表板',

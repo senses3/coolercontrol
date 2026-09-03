@@ -5,25 +5,16 @@ import { describe, expect, it } from 'vitest'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
 import {
     addFolder,
-    buildLibraryTree,
+    buildLibraryLists,
     flatLibraryOrder,
     isFolderId,
     isFolderIdOfKind,
     newFolderId,
-    persistLibraryTree,
+    persistLibraryLists,
     removeFolder,
     setFolderName,
     sortEntitiesByTree,
-    type LibraryNode,
 } from '../libraryFolders.ts'
-
-const noNames = new Map<string, string>()
-
-const entity = (uid: string): LibraryNode => ({ type: 'entity', uid })
-const folder = (id: string, name: string, children: string[]): LibraryNode => ({
-    type: 'folder',
-    folder: { id, name, children },
-})
 
 describe('folder ids', () => {
     it('prefixes per kind', () => {
@@ -41,12 +32,12 @@ describe('folder ids', () => {
     })
 })
 
-describe('buildLibraryTree', () => {
+describe('buildLibraryLists', () => {
     it('puts everything at root without an entry', () => {
-        expect(buildLibraryTree([], 'profiles', ['a', 'b'], noNames)).toEqual([
-            entity('a'),
-            entity('b'),
-        ])
+        expect(buildLibraryLists([], 'profiles', ['a', 'b'])).toEqual({
+            rootIds: ['a', 'b'],
+            folderChildren: {},
+        })
     })
 
     it('interleaves folders and loose entities in the saved order', () => {
@@ -54,14 +45,10 @@ describe('buildLibraryTree', () => {
             { id: 'profiles', children: ['a', 'pf:1', 'b'] },
             { id: 'pf:1', children: ['c', 'd'] },
         ]
-        expect(
-            buildLibraryTree(
-                menuOrder,
-                'profiles',
-                ['a', 'b', 'c', 'd'],
-                new Map([['pf:1', 'Quiet']]),
-            ),
-        ).toEqual([entity('a'), folder('pf:1', 'Quiet', ['c', 'd']), entity('b')])
+        expect(buildLibraryLists(menuOrder, 'profiles', ['a', 'b', 'c', 'd'])).toEqual({
+            rootIds: ['a', 'pf:1', 'b'],
+            folderChildren: { 'pf:1': ['c', 'd'] },
+        })
     })
 
     it('appends entities the order has never seen at root, at the end', () => {
@@ -69,11 +56,10 @@ describe('buildLibraryTree', () => {
             { id: 'profiles', children: ['pf:1', 'b'] },
             { id: 'pf:1', children: ['a'] },
         ]
-        expect(buildLibraryTree(menuOrder, 'profiles', ['a', 'b', 'new'], noNames)).toEqual([
-            folder('pf:1', '', ['a']),
-            entity('b'),
-            entity('new'),
-        ])
+        expect(buildLibraryLists(menuOrder, 'profiles', ['a', 'b', 'new'])).toEqual({
+            rootIds: ['pf:1', 'b', 'new'],
+            folderChildren: { 'pf:1': ['a'] },
+        })
     })
 
     it('keeps a doubly-filed entity at its first mention only', () => {
@@ -82,10 +68,10 @@ describe('buildLibraryTree', () => {
             { id: 'pf:1', children: ['a'] },
             { id: 'pf:2', children: ['a'] },
         ]
-        expect(buildLibraryTree(menuOrder, 'profiles', ['a'], noNames)).toEqual([
-            folder('pf:1', '', ['a']),
-            folder('pf:2', '', []),
-        ])
+        expect(buildLibraryLists(menuOrder, 'profiles', ['a'])).toEqual({
+            rootIds: ['pf:1', 'pf:2'],
+            folderChildren: { 'pf:1': ['a'], 'pf:2': [] },
+        })
     })
 
     it('prunes ids whose entity is gone', () => {
@@ -93,9 +79,10 @@ describe('buildLibraryTree', () => {
             { id: 'profiles', children: ['deleted', 'pf:1'] },
             { id: 'pf:1', children: ['a', 'alsoDeleted'] },
         ]
-        expect(buildLibraryTree(menuOrder, 'profiles', ['a'], noNames)).toEqual([
-            folder('pf:1', '', ['a']),
-        ])
+        expect(buildLibraryLists(menuOrder, 'profiles', ['a'])).toEqual({
+            rootIds: ['pf:1'],
+            folderChildren: { 'pf:1': ['a'] },
+        })
     })
 
     it('keeps an empty folder', () => {
@@ -103,9 +90,10 @@ describe('buildLibraryTree', () => {
             { id: 'profiles', children: ['pf:1'] },
             { id: 'pf:1', children: [] },
         ]
-        expect(buildLibraryTree(menuOrder, 'profiles', [], noNames)).toEqual([
-            folder('pf:1', '', []),
-        ])
+        expect(buildLibraryLists(menuOrder, 'profiles', [])).toEqual({
+            rootIds: ['pf:1'],
+            folderChildren: { 'pf:1': [] },
+        })
     })
 
     it('renders a folder id listed twice once', () => {
@@ -113,9 +101,10 @@ describe('buildLibraryTree', () => {
             { id: 'profiles', children: ['pf:1', 'pf:1'] },
             { id: 'pf:1', children: ['a'] },
         ]
-        expect(buildLibraryTree(menuOrder, 'profiles', ['a'], noNames)).toEqual([
-            folder('pf:1', '', ['a']),
-        ])
+        expect(buildLibraryLists(menuOrder, 'profiles', ['a'])).toEqual({
+            rootIds: ['pf:1'],
+            folderChildren: { 'pf:1': ['a'] },
+        })
     })
 
     it('reads only its own group', () => {
@@ -125,16 +114,17 @@ describe('buildLibraryTree', () => {
             { id: 'pf:1', children: ['a'] },
             { id: 'fn:1', children: ['f'] },
         ]
-        expect(buildLibraryTree(menuOrder, 'functions', ['f'], noNames)).toEqual([
-            folder('fn:1', '', ['f']),
-        ])
+        expect(buildLibraryLists(menuOrder, 'functions', ['f'])).toEqual({
+            rootIds: ['fn:1'],
+            folderChildren: { 'fn:1': ['f'] },
+        })
     })
 })
 
-describe('persistLibraryTree', () => {
+describe('persistLibraryLists', () => {
     it('writes the root list and one entry per folder', () => {
-        const nodes = [entity('a'), folder('pf:1', 'Quiet', ['c'])]
-        expect(persistLibraryTree([], 'profiles', nodes)).toEqual([
+        const lists = { rootIds: ['a', 'pf:1'], folderChildren: { 'pf:1': ['c'] } }
+        expect(persistLibraryLists([], 'profiles', lists)).toEqual([
             { id: 'profiles', children: ['a', 'pf:1'] },
             { id: 'pf:1', children: ['c'] },
         ])
@@ -146,12 +136,11 @@ describe('persistLibraryTree', () => {
             { id: 'pf:1', children: ['a'] },
             { id: 'pf:2', children: ['b'] },
         ]
-        expect(persistLibraryTree(menuOrder, 'profiles', [folder('pf:1', '', ['a', 'b'])])).toEqual(
-            [
-                { id: 'profiles', children: ['pf:1'] },
-                { id: 'pf:1', children: ['a', 'b'] },
-            ],
-        )
+        const lists = { rootIds: ['pf:1'], folderChildren: { 'pf:1': ['a', 'b'] } }
+        expect(persistLibraryLists(menuOrder, 'profiles', lists)).toEqual([
+            { id: 'profiles', children: ['pf:1'] },
+            { id: 'pf:1', children: ['a', 'b'] },
+        ])
     })
 
     it('leaves device entries and the other group alone', () => {
@@ -160,7 +149,8 @@ describe('persistLibraryTree', () => {
             { id: 'functions', children: ['fn:1'] },
             { id: 'fn:1', children: ['f'] },
         ]
-        expect(persistLibraryTree(menuOrder, 'profiles', [entity('a')])).toEqual([
+        const lists = { rootIds: ['a'], folderChildren: {} }
+        expect(persistLibraryLists(menuOrder, 'profiles', lists)).toEqual([
             { id: 'dev1', children: ['dev1_fan1'] },
             { id: 'functions', children: ['fn:1'] },
             { id: 'fn:1', children: ['f'] },
@@ -168,22 +158,18 @@ describe('persistLibraryTree', () => {
         ])
     })
 
-    it('round-trips a tree', () => {
-        const nodes = [entity('a'), folder('pf:1', 'Quiet', ['c', 'd']), entity('b')]
-        const menuOrder = persistLibraryTree([], 'profiles', nodes)
-        expect(
-            buildLibraryTree(
-                menuOrder,
-                'profiles',
-                ['a', 'b', 'c', 'd'],
-                new Map([['pf:1', 'Quiet']]),
-            ),
-        ).toEqual(nodes)
+    it('round-trips the lists', () => {
+        const lists = {
+            rootIds: ['a', 'pf:1', 'b'],
+            folderChildren: { 'pf:1': ['c', 'd'] },
+        }
+        const menuOrder = persistLibraryLists([], 'profiles', lists)
+        expect(buildLibraryLists(menuOrder, 'profiles', ['a', 'b', 'c', 'd'])).toEqual(lists)
     })
 })
 
 describe('flatLibraryOrder', () => {
-    it('reads the tree top to bottom with folders expanded in place', () => {
+    it('reads the lists top to bottom with folders expanded in place', () => {
         const menuOrder: MenuOrderIds[] = [
             { id: 'profiles', children: ['a', 'pf:1', 'b'] },
             { id: 'pf:1', children: ['c', 'd'] },
@@ -205,7 +191,7 @@ describe('flatLibraryOrder', () => {
 })
 
 describe('sortEntitiesByTree', () => {
-    it('sorts by the flattened tree, unknown ids last', () => {
+    it('sorts by the flattened lists, unknown ids last', () => {
         const menuOrder: MenuOrderIds[] = [
             { id: 'profiles', children: ['b', 'pf:1'] },
             { id: 'pf:1', children: ['a'] },
@@ -223,30 +209,44 @@ describe('sortEntitiesByTree', () => {
 })
 
 describe('addFolder and removeFolder', () => {
-    it('adds at the top', () => {
-        expect(addFolder([entity('a')], 'pf:1', 'Quiet')).toEqual([
-            folder('pf:1', 'Quiet', []),
-            entity('a'),
-        ])
+    it('adds an empty folder at the top', () => {
+        const lists = { rootIds: ['a'], folderChildren: {} }
+        expect(addFolder(lists, 'pf:1')).toEqual({
+            rootIds: ['pf:1', 'a'],
+            folderChildren: { 'pf:1': [] },
+        })
     })
 
     it('returns the children to the folder slot, keeping the entities', () => {
-        const nodes = [entity('a'), folder('pf:1', 'Quiet', ['c', 'd']), entity('b')]
-        expect(removeFolder(nodes, 'pf:1')).toEqual([
-            entity('a'),
-            entity('c'),
-            entity('d'),
-            entity('b'),
-        ])
+        const lists = {
+            rootIds: ['a', 'pf:1', 'b'],
+            folderChildren: { 'pf:1': ['c', 'd'] },
+        }
+        expect(removeFolder(lists, 'pf:1')).toEqual({
+            rootIds: ['a', 'c', 'd', 'b'],
+            folderChildren: {},
+        })
     })
 
     it('removes an empty folder without a trace', () => {
-        expect(removeFolder([folder('pf:1', '', []), entity('a')], 'pf:1')).toEqual([entity('a')])
+        const lists = { rootIds: ['pf:1', 'a'], folderChildren: { 'pf:1': [] } }
+        expect(removeFolder(lists, 'pf:1')).toEqual({ rootIds: ['a'], folderChildren: {} })
+    })
+
+    it('leaves the other folders alone', () => {
+        const lists = {
+            rootIds: ['pf:1', 'pf:2'],
+            folderChildren: { 'pf:1': ['a'], 'pf:2': ['b'] },
+        }
+        expect(removeFolder(lists, 'pf:1')).toEqual({
+            rootIds: ['a', 'pf:2'],
+            folderChildren: { 'pf:2': ['b'] },
+        })
     })
 
     it('ignores an unknown id', () => {
-        const nodes = [entity('a')]
-        expect(removeFolder(nodes, 'pf:9')).toEqual(nodes)
+        const lists = { rootIds: ['a'], folderChildren: {} }
+        expect(removeFolder(lists, 'pf:9')).toEqual(lists)
     })
 })
 

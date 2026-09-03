@@ -104,6 +104,9 @@ export default {
                 library: 'الملفات الشخصية والوظائف',
                 profiles: 'الملفات الشخصية',
                 functions: 'الوظائف',
+                addFolder: 'إضافة مجلد',
+                newFolder: 'مجلد جديد',
+                deleteFolder: 'حذف المجلد',
             },
             monitoringPanel: {
                 newDashboard: 'لوحة معلومات جديدة',

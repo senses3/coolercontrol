@@ -104,6 +104,9 @@ export default {
                 library: '配置文件与功能',
                 profiles: '配置文件',
                 functions: '功能',
+                addFolder: '添加文件夹',
+                newFolder: '新建文件夹',
+                deleteFolder: '删除文件夹',
             },
             monitoringPanel: {
                 newDashboard: '新建仪表盘',

@@ -104,6 +104,9 @@ export default {
                 library: '프로파일 및 기능',
                 profiles: '프로파일',
                 functions: '기능',
+                addFolder: '폴더 추가',
+                newFolder: '새 폴더',
+                deleteFolder: '폴더 삭제',
             },
             monitoringPanel: {
                 newDashboard: '새 대시보드',

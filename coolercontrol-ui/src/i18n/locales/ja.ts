@@ -104,6 +104,9 @@ export default {
                 library: 'プロファイルと機能',
                 profiles: 'プロファイル',
                 functions: '機能',
+                addFolder: 'フォルダーを追加',
+                newFolder: '新しいフォルダー',
+                deleteFolder: 'フォルダーを削除',
             },
             monitoringPanel: {
                 newDashboard: '新しいダッシュボード',

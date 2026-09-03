@@ -106,6 +106,9 @@ export default {
                 library: 'Профили и функции',
                 profiles: 'Профили',
                 functions: 'Функции',
+                addFolder: 'Добавить папку',
+                newFolder: 'Новая папка',
+                deleteFolder: 'Удалить папку',
             },
             monitoringPanel: {
                 newDashboard: 'Новая панель',

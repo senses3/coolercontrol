@@ -9,8 +9,12 @@
 //   { id: 'profiles', children: ['uidA', 'pf:7c2e', 'uidB'] }
 //   { id: 'pf:7c2e',  children: ['uidC', 'uidD'] }
 //
-// Names live in `libraryFolderNames`, the one new UI setting. A config written
-// before folders existed loads as every entity at root.
+// The panel works in the same shape, a root id list plus one uid list per
+// folder, because the drag layer moves the bound item itself between the arrays
+// it is given: a tree of row objects would splice a row into a list of uids on
+// the first drop into a folder. Names live in `libraryFolderNames`, the one new
+// UI setting. A config written before folders existed loads as every entity at
+// root.
 
 import { v4 as uuidV4 } from 'uuid'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
@@ -18,21 +22,19 @@ import { setGroupOrder } from '@/shell/panelOrder.ts'
 
 export type LibraryKind = 'profiles' | 'functions'
 
+export interface LibraryLists {
+    // Entity uids and folder ids, in the order the panel shows them.
+    rootIds: string[]
+    // Folder id -> the entity uids it holds. Keyed for every folder in rootIds.
+    folderChildren: Record<string, string[]>
+}
+
 // Prefixed per kind so a profile folder can never take a function, whatever the
 // drag layer allows, and so one group's cleanup leaves the other's entries be.
 const FOLDER_PREFIX: Record<LibraryKind, string> = {
     profiles: 'pf:',
     functions: 'fn:',
 }
-
-export interface LibraryFolder {
-    id: string
-    name: string
-    children: string[]
-}
-
-export type LibraryNode =
-    { type: 'entity'; uid: string } | { type: 'folder'; folder: LibraryFolder }
 
 export function isFolderId(id: string): boolean {
     return Object.values(FOLDER_PREFIX).some((prefix) => id.startsWith(prefix))
@@ -52,58 +54,50 @@ export function newFolderId(kind: LibraryKind): string {
 // root, at the end, exactly where the flat list used to put them. An entity
 // listed twice is kept at its first mention and dropped from the rest, and one
 // whose entity is gone is dropped entirely, so neither can survive a reload.
-export function buildLibraryTree(
+export function buildLibraryLists(
     menuOrder: MenuOrderIds[],
     kind: LibraryKind,
     uids: string[],
-    names: Map<string, string>,
-): LibraryNode[] {
+): LibraryLists {
     const unclaimed = new Set(uids)
     const claim = (uid: string): boolean => unclaimed.delete(uid)
-    const seenFolders = new Set<string>()
-    const nodes: LibraryNode[] = []
+    const rootIds: string[] = []
+    const folderChildren: Record<string, string[]> = {}
     for (const id of menuOrder.find((entry) => entry.id === kind)?.children ?? []) {
         if (isFolderId(id)) {
-            if (seenFolders.has(id)) continue
-            seenFolders.add(id)
+            if (id in folderChildren) continue
             const children = menuOrder.find((entry) => entry.id === id)?.children ?? []
-            nodes.push({
-                type: 'folder',
-                folder: { id, name: names.get(id) ?? '', children: children.filter(claim) },
-            })
+            folderChildren[id] = children.filter(claim)
+            rootIds.push(id)
         } else if (claim(id)) {
-            nodes.push({ type: 'entity', uid: id })
+            rootIds.push(id)
         }
     }
     for (const uid of uids) {
-        if (unclaimed.has(uid)) nodes.push({ type: 'entity', uid })
+        if (unclaimed.has(uid)) rootIds.push(uid)
     }
-    return nodes
+    return { rootIds, folderChildren }
 }
 
 // Callers must assign the result back to the store ref: the UI-settings save
 // watcher only fires on whole-array replacement, not on in-place mutation.
-export function persistLibraryTree(
+export function persistLibraryLists(
     menuOrder: MenuOrderIds[],
     kind: LibraryKind,
-    nodes: LibraryNode[],
+    lists: LibraryLists,
 ): MenuOrderIds[] {
-    const live = new Set(nodes.flatMap((node) => (node.type === 'folder' ? [node.folder.id] : [])))
+    const live = new Set(lists.rootIds.filter(isFolderId))
     // Entries for folders this group no longer has are dropped; device entries
     // and the other group's folders keep their slots.
     let next = menuOrder.filter((entry) => !isFolderIdOfKind(entry.id, kind) || live.has(entry.id))
-    next = setGroupOrder(
-        next,
-        kind,
-        nodes.map((node) => (node.type === 'folder' ? node.folder.id : node.uid)),
-    )
-    for (const node of nodes) {
-        if (node.type === 'folder') next = setGroupOrder(next, node.folder.id, node.folder.children)
+    next = setGroupOrder(next, kind, lists.rootIds)
+    for (const id of live) {
+        next = setGroupOrder(next, id, lists.folderChildren[id] ?? [])
     }
     return next
 }
 
-// The order the rest of the app sees: the tree read top to bottom, folders
+// The order the rest of the app sees: the lists read top to bottom, folders
 // expanded in place. Every profile dropdown reads the entity array this sorts,
 // so filing a profile moves it there too.
 export function flatLibraryOrder(menuOrder: MenuOrderIds[], kind: LibraryKind): string[] {
@@ -142,19 +136,22 @@ export function sortEntitiesByTree<T>(
 
 // New folders go to the top, next to the button that made them, so a long list
 // does not hide the one waiting to be named.
-export function addFolder(nodes: LibraryNode[], id: string, name: string): LibraryNode[] {
-    return [{ type: 'folder', folder: { id, name, children: [] } }, ...nodes]
+export function addFolder(lists: LibraryLists, id: string): LibraryLists {
+    return {
+        rootIds: [id, ...lists.rootIds],
+        folderChildren: { ...lists.folderChildren, [id]: [] },
+    }
 }
 
 // The folder's items take its slot rather than the end of the list, so nothing
 // jumps somewhere else when a user unfiles it. The entities themselves are
 // never touched.
-export function removeFolder(nodes: LibraryNode[], folderId: string): LibraryNode[] {
-    return nodes.flatMap<LibraryNode>((node) =>
-        node.type === 'folder' && node.folder.id === folderId
-            ? node.folder.children.map((uid) => ({ type: 'entity', uid }))
-            : [node],
-    )
+export function removeFolder(lists: LibraryLists, folderId: string): LibraryLists {
+    const { [folderId]: children, ...folderChildren } = lists.folderChildren
+    return {
+        rootIds: lists.rootIds.flatMap((id) => (id === folderId ? (children ?? []) : [id])),
+        folderChildren,
+    }
 }
 
 // An empty name drops the entry, which is also how a deleted folder's name is

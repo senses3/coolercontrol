@@ -107,6 +107,9 @@ export default {
                 library: 'Profils et Fonctions',
                 profiles: 'Profils',
                 functions: 'Fonctions',
+                addFolder: 'Ajouter un dossier',
+                newFolder: 'Nouveau dossier',
+                deleteFolder: 'Supprimer le dossier',
             },
             monitoringPanel: {
                 newDashboard: 'Nouveau tableau de bord',

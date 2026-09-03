@@ -15,13 +15,12 @@ import {
     mdiFunction,
     mdiPinOff,
     mdiPinOutline,
-    mdiPlus,
 } from '@mdi/js'
 import PanelHeader from '@/shell/PanelHeader.vue'
 import UiTooltip from '@/shell/ui/UiTooltip.vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { storeToRefs } from 'pinia'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ChannelValues } from '@/stores/DeviceStore.ts'
 import type { Color, UID } from '@/models/Device.ts'
@@ -37,13 +36,9 @@ import {
     type CoolingChannel,
     type CoolingDeviceGroup,
 } from '@/shell/cooling/channels.ts'
-import {
-    reorderSubset,
-    reorderTopLevel,
-    setDeviceChildrenSubset,
-    setGroupOrder,
-    sortEntitiesByGroup,
-} from '@/shell/panelOrder.ts'
+import { reorderSubset, reorderTopLevel, setDeviceChildrenSubset } from '@/shell/panelOrder.ts'
+import { sortEntitiesByTree } from '@/shell/libraryFolders.ts'
+import LibraryList from '@/shell/cooling/LibraryList.vue'
 import UiSeparator from '@/shell/ui/UiSeparator.vue'
 import { channelSpins } from '@/shell/channelIcon.ts'
 import { useFailAlert } from '@/composables/useFailAlert.ts'
@@ -199,30 +194,13 @@ const onTagOpen = (rowKey: string, open: boolean): void => {
     openTagRow.value = open ? rowKey : null
 }
 
-const profileLinks = ref<typeof settingsStore.profiles>([])
-watchEffect(() => {
-    profileLinks.value = settingsStore.profiles.filter((profile) => profile.uid !== '0')
-})
-const persistProfileOrder = (): void => {
-    settingsStore.menuOrder = setGroupOrder(
-        settingsStore.menuOrder,
-        'profiles',
-        profileLinks.value.map((profile) => profile.uid),
-    )
-    sortEntitiesByGroup(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
-}
-const functionLinks = ref<typeof settingsStore.functions>([])
-watchEffect(() => {
-    functionLinks.value = settingsStore.functions.filter((fun) => fun.uid !== '0')
-})
-const persistFunctionOrder = (): void => {
-    settingsStore.menuOrder = setGroupOrder(
-        settingsStore.menuOrder,
-        'functions',
-        functionLinks.value.map((fun) => fun.uid),
-    )
-    sortEntitiesByGroup(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
-}
+// The default profile and function are not the user's to file or reorder.
+const profileLinks = computed(() => settingsStore.profiles.filter((profile) => profile.uid !== '0'))
+const functionLinks = computed(() => settingsStore.functions.filter((fun) => fun.uid !== '0'))
+const sortProfiles = (): void =>
+    sortEntitiesByTree(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
+const sortFunctions = (): void =>
+    sortEntitiesByTree(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
 const { openProfileWizard, openFunctionWizard } = useLibraryWizards()
 
 // A profile is unhealthy when the daemon reports a missing or stale temp source for it.
@@ -605,93 +583,34 @@ const isRouteActive = useRouteActive()
 
         <UiSeparator class="my-1" />
         <PanelHeader :label="t('layout.shell.coolingPanel.library')" />
-        <div class="flex items-center justify-between px-3 pb-1 pt-1">
-            <span class="text-xs uppercase text-text-color-secondary opacity-70">
-                {{ t('layout.shell.coolingPanel.profiles') }}
-            </span>
-            <button
-                type="button"
-                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                v-tooltip.top="t('layout.menu.tooltips.addProfile')"
-                @click="openProfileWizard"
-            >
-                <svg-icon type="mdi" :path="mdiPlus" :size="16" />
-            </button>
-        </div>
-        <VueDraggable
-            v-model="profileLinks"
-            handle=".drag-handle"
-            :animation="150"
-            class="flex flex-col gap-0.5"
-            @end="persistProfileOrder"
+        <LibraryList
+            kind="profiles"
+            :label="t('layout.shell.coolingPanel.profiles')"
+            :add-tooltip="t('layout.menu.tooltips.addProfile')"
+            :icon="mdiChartMultiple"
+            route-name="profiles"
+            param-name="profileUID"
+            :entities="profileLinks"
+            @add="openProfileWizard"
+            @reorder="sortProfiles"
         >
-            <RouterLink
-                v-for="profile in profileLinks"
-                :key="profile.uid"
-                :to="{ name: 'profiles', params: { profileUID: profile.uid } }"
-                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                exact-active-class="bg-surface-hover !text-accent"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiChartMultiple"
-                    :size="18"
-                    class="shrink-0 text-text-color-secondary"
-                />
-                <span class="truncate">{{ profile.name }}</span>
-                <UiTooltip
-                    v-if="isProfileUnhealthy(profile.uid)"
-                    :text="profileTooltip(profile.uid)"
-                >
+            <template #badge="{ uid }">
+                <UiTooltip v-if="isProfileUnhealthy(uid)" :text="profileTooltip(uid)">
                     <svg-icon type="mdi" :path="mdiAlert" :size="14" class="shrink-0 text-error" />
                 </UiTooltip>
-                <span
-                    class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
-                >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                </span>
-            </RouterLink>
-        </VueDraggable>
-        <div class="flex items-center justify-between px-3 pb-1 pt-2">
-            <span class="text-xs uppercase text-text-color-secondary opacity-70">
-                {{ t('layout.shell.coolingPanel.functions') }}
-            </span>
-            <button
-                type="button"
-                class="rounded p-0.5 text-text-color-secondary outline-none hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
-                v-tooltip.top="t('layout.menu.tooltips.addFunction')"
-                @click="openFunctionWizard"
-            >
-                <svg-icon type="mdi" :path="mdiPlus" :size="16" />
-            </button>
-        </div>
-        <VueDraggable
-            v-model="functionLinks"
-            handle=".drag-handle"
-            :animation="150"
-            class="flex flex-col gap-0.5"
-            @end="persistFunctionOrder"
-        >
-            <RouterLink
-                v-for="fun in functionLinks"
-                :key="fun.uid"
-                :to="{ name: 'functions', params: { functionUID: fun.uid } }"
-                class="group flex items-center gap-2 rounded-lg px-3 py-1 text-text-color outline-none hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-accent"
-                exact-active-class="bg-surface-hover !text-accent"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiFunction"
-                    :size="18"
-                    class="shrink-0 text-text-color-secondary"
-                />
-                <span class="truncate">{{ fun.name }}</span>
-                <span
-                    class="drag-handle ml-auto hidden cursor-grab p-0.5 text-text-color-secondary group-hover:inline-flex"
-                >
-                    <svg-icon type="mdi" :path="mdiDragVertical" :size="16" />
-                </span>
-            </RouterLink>
-        </VueDraggable>
+            </template>
+        </LibraryList>
+        <LibraryList
+            kind="functions"
+            :label="t('layout.shell.coolingPanel.functions')"
+            :add-tooltip="t('layout.menu.tooltips.addFunction')"
+            :icon="mdiFunction"
+            route-name="functions"
+            param-name="functionUID"
+            :entities="functionLinks"
+            class="pt-1"
+            @add="openFunctionWizard"
+            @reorder="sortFunctions"
+        />
     </div>
 </template>

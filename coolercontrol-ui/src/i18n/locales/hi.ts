@@ -105,6 +105,9 @@ export default {
                 library: 'प्रोफ़ाइल और फ़ंक्शन',
                 profiles: 'प्रोफ़ाइल',
                 functions: 'फ़ंक्शन',
+                addFolder: 'फ़ोल्डर जोड़ें',
+                newFolder: 'नया फ़ोल्डर',
+                deleteFolder: 'फ़ोल्डर हटाएँ',
             },
             monitoringPanel: {
                 newDashboard: 'नया डैशबोर्ड',

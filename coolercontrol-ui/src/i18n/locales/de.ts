@@ -107,6 +107,9 @@ export default {
                 library: 'Profile & Funktionen',
                 profiles: 'Profile',
                 functions: 'Funktionen',
+                addFolder: 'Ordner hinzufügen',
+                newFolder: 'Neuer Ordner',
+                deleteFolder: 'Ordner löschen',
             },
             monitoringPanel: {
                 newDashboard: 'Neues Dashboard',
