@@ -79,12 +79,17 @@ impl TokenHandle {
         write_access: bool,
     ) -> Result<(StoredToken, String)> {
         let raw_token = token::generate_token();
+        // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md. `digest` is
+        // what validation reads; the argon2 hash is written only so a 4.3.x daemon can
+        // still validate this token after a downgrade.
         let hash = token::hash_token(&raw_token)?;
+        let digest = token::digest_token(&raw_token);
         let id = Uuid::new_v4().to_string();
         let stored = StoredToken {
             id,
             label,
             hash,
+            digest: Some(digest),
             created_at: Local::now(),
             expires_at,
             last_used: None,
@@ -128,20 +133,41 @@ impl TokenHandle {
 
     pub async fn validate(&self, raw_token: String) -> Result<TokenValidation> {
         let tokens = self.tokens.read().await;
-        match token::validate_token(&raw_token, &tokens) {
-            Some((id, write_access)) => {
-                drop(tokens);
-                self.last_used_cache
-                    .lock()
-                    .expect("last_used_cache poisoned")
-                    .insert(id, Local::now());
-                if write_access {
-                    Ok(TokenValidation::ValidReadWrite)
-                } else {
-                    Ok(TokenValidation::ValidReadOnly)
-                }
-            }
-            None => Ok(TokenValidation::Invalid),
+        let Some(matched) = token::validate_token(&raw_token, &tokens) else {
+            return Ok(TokenValidation::Invalid);
+        };
+        drop(tokens);
+        self.last_used_cache
+            .lock()
+            .expect("last_used_cache poisoned")
+            .insert(matched.id.clone(), Local::now());
+        if let Some(digest) = matched.upgrade_digest {
+            self.persist_digest(&matched.id, digest).await;
+        }
+        if matched.write_access {
+            Ok(TokenValidation::ValidReadWrite)
+        } else {
+            Ok(TokenValidation::ValidReadOnly)
+        }
+    }
+
+    /// Records the digest of a token that just matched on the legacy argon2 path, so
+    /// it never pays the KDF again.
+    ///
+    /// Failures are logged rather than propagated: the caller has already
+    /// authenticated, and a failed upgrade costs nothing worse than one more argon2
+    /// verify on the next request.
+    async fn persist_digest(&self, id: &str, digest: String) {
+        let mut tokens = self.tokens.write().await;
+        let Some(token) = tokens.iter_mut().find(|token| token.id == id) else {
+            return; // deleted between validation and upgrade
+        };
+        if token.digest.is_some() {
+            return; // a concurrent validation upgraded it first
+        }
+        token.digest = Some(digest);
+        if let Err(err) = token::save_tokens(&tokens).await {
+            warn!("Failed to persist upgraded token digest for {id}: {err}");
         }
     }
 
@@ -180,12 +206,22 @@ mod tests {
             id: Uuid::new_v4().to_string(),
             label: "Test Token".to_string(),
             hash,
+            digest: Some(token::digest_token(raw)),
             created_at: Local::now(),
             expires_at: None,
             last_used: None,
             write_access,
         };
         (stored, raw.to_string())
+    }
+
+    /// A token as stored before 5.0.0: argon2 hash, no digest.
+    fn make_legacy_token(raw: &str) -> StoredToken {
+        let (stored, _) = make_stored_token(raw);
+        StoredToken {
+            digest: None,
+            ..stored
+        }
     }
 
     fn make_handle_with_tokens(tokens: Vec<StoredToken>) -> TokenHandle {
@@ -224,6 +260,79 @@ mod tests {
         let wrong = token::generate_token();
         let result = handle.validate(wrong).await.unwrap();
         assert_eq!(result, TokenValidation::Invalid);
+    }
+
+    /// Goal: a token minted before 5.0.0 still authenticates through the argon2
+    /// fallback, so upgrading the daemon does not invalidate anyone's tokens.
+    #[tokio::test]
+    async fn test_validate_legacy_token_still_authenticates() {
+        let raw = token::generate_token();
+        let handle = make_handle_with_tokens(vec![make_legacy_token(&raw)]);
+
+        let result = handle.validate(raw).await.unwrap();
+        assert_eq!(result, TokenValidation::ValidReadWrite);
+    }
+
+    /// Goal: validating a legacy token records its digest, so the KDF is paid at most
+    /// once more per token.
+    #[tokio::test]
+    async fn test_validate_legacy_token_records_digest() {
+        let raw = token::generate_token();
+        let handle = make_handle_with_tokens(vec![make_legacy_token(&raw)]);
+        assert_eq!(handle.tokens.read().await[0].digest, None);
+
+        handle.validate(raw.clone()).await.unwrap();
+
+        let tokens = handle.tokens.read().await;
+        assert_eq!(tokens[0].digest, Some(token::digest_token(&raw)));
+    }
+
+    /// Goal: prove the upgraded token authenticates off the digest alone.
+    ///
+    /// Method: validate once to trigger the upgrade, then corrupt the argon2 hash and
+    /// validate again. Success is only possible if the digest path handled it.
+    #[tokio::test]
+    async fn test_upgraded_token_validates_without_argon2() {
+        let raw = token::generate_token();
+        let handle = make_handle_with_tokens(vec![make_legacy_token(&raw)]);
+        handle.validate(raw.clone()).await.unwrap();
+
+        {
+            let mut tokens = handle.tokens.write().await;
+            tokens[0].hash = "$argon2id$v=19$m=19456,t=2,p=1$corrupt$corrupt".to_string();
+        }
+
+        let result = handle.validate(raw).await.unwrap();
+        assert_eq!(result, TokenValidation::ValidReadWrite);
+    }
+
+    /// Goal: an already-upgraded token is left alone, so concurrent validations cannot
+    /// each rewrite the store.
+    #[tokio::test]
+    async fn test_persist_digest_is_noop_when_already_set() {
+        let raw = token::generate_token();
+        let (stored, _) = make_stored_token(&raw);
+        let id = stored.id.clone();
+        let original = stored.digest.clone();
+        let handle = make_handle_with_tokens(vec![stored]);
+
+        handle
+            .persist_digest(&id, "not-the-real-digest".to_string())
+            .await;
+
+        assert_eq!(handle.tokens.read().await[0].digest, original);
+    }
+
+    /// Goal: a token deleted between validation and upgrade does not resurrect or panic.
+    #[tokio::test]
+    async fn test_persist_digest_ignores_missing_token() {
+        let handle = make_handle_with_tokens(Vec::new());
+
+        handle
+            .persist_digest("gone", token::digest_token("x"))
+            .await;
+
+        assert!(handle.tokens.read().await.is_empty());
     }
 
     #[tokio::test]
