@@ -47,22 +47,31 @@ impl BasicAuth {
     }
 
     /// Parse a raw header value into `BasicAuth` credentials.
+    ///
+    /// Every rejection here is an operating error, not a programmer error: `/login`
+    /// carries no auth layer, so this runs on wholly unauthenticated input and must
+    /// never assert against it.
     fn parse_header_value(value: &str) -> Result<Self, CCError> {
         let encoded = value
             .strip_prefix("Basic ")
             .ok_or_else(|| CCError::InvalidCredentials {
                 msg: "Authorization header must use Basic scheme.".to_string(),
             })?;
-        assert!(!encoded.is_empty(), "Base64 payload must not be empty.");
+        if encoded.is_empty() {
+            return Err(CCError::InvalidCredentials {
+                msg: "Authorization header has an empty base64 payload.".to_string(),
+            });
+        }
         let decoded_bytes = BASE64
             .decode(encoded)
             .map_err(|_| CCError::InvalidCredentials {
                 msg: "Invalid base64 in Authorization header.".to_string(),
             })?;
-        assert!(
-            decoded_bytes.len() <= MAX_BASIC_AUTH_DECODED_BYTES,
-            "Decoded Basic auth exceeds maximum length."
-        );
+        if decoded_bytes.len() > MAX_BASIC_AUTH_DECODED_BYTES {
+            return Err(CCError::InvalidCredentials {
+                msg: "Authorization header credentials are too long.".to_string(),
+            });
+        }
         let decoded =
             String::from_utf8(decoded_bytes).map_err(|_| CCError::InvalidCredentials {
                 msg: "Authorization header contains invalid UTF-8.".to_string(),
@@ -73,10 +82,11 @@ impl BasicAuth {
                 .ok_or_else(|| CCError::InvalidCredentials {
                     msg: "Authorization header missing ':' separator.".to_string(),
                 })?;
-        assert!(
-            !username.is_empty(),
-            "Username in Basic auth must not be empty."
-        );
+        if username.is_empty() {
+            return Err(CCError::InvalidCredentials {
+                msg: "Authorization header has an empty username.".to_string(),
+            });
+        }
         Ok(Self {
             username: username.to_string(),
             password: password.to_string(),
@@ -359,10 +369,53 @@ mod tests {
 
     #[test]
     fn reject_empty_username() {
-        // Goal: verify that an empty username triggers an assertion panic.
+        // Goal: an empty username is rejected as bad credentials, not by panicking.
+        // `/login` is unauthenticated, so anyone who can reach the port reaches this.
         let header = encode_basic("", "password");
-        let result = std::panic::catch_unwind(|| BasicAuth::parse_header_value(&header));
-        assert!(result.is_err(), "Expected panic for empty username.");
+        let err = BasicAuth::parse_header_value(&header).unwrap_err();
+        assert!(matches!(err, CCError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn reject_empty_base64_payload() {
+        // Goal: "Basic " with nothing after it is rejected rather than panicking.
+        let err = BasicAuth::parse_header_value("Basic ").unwrap_err();
+        assert!(matches!(err, CCError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn reject_oversized_credentials() {
+        // Goal: an over-long Basic payload is rejected rather than panicking. The
+        // boundary is exercised from both sides so the comparison cannot drift.
+        let at_limit = "a".repeat(MAX_BASIC_AUTH_DECODED_BYTES - "user:".len());
+        let header = encode_basic("user", &at_limit);
+        assert!(BasicAuth::parse_header_value(&header).is_ok());
+
+        let over_limit = "a".repeat(MAX_BASIC_AUTH_DECODED_BYTES);
+        let header = encode_basic("user", &over_limit);
+        let err = BasicAuth::parse_header_value(&header).unwrap_err();
+        assert!(matches!(err, CCError::InvalidCredentials { .. }));
+    }
+
+    #[test]
+    fn parse_header_value_never_panics_on_arbitrary_input() {
+        // Goal: no input reaching this unauthenticated boundary may unwind. Covers the
+        // shapes that used to assert, plus adjacent malformed ones.
+        let inputs = [
+            "",
+            "Basic",
+            "Basic ",
+            "Basic ====",
+            "Basic  ",
+            &format!("Basic {}", BASE64.encode(":")),
+            &format!("Basic {}", BASE64.encode(":pass")),
+            &format!("Basic {}", BASE64.encode([0xff, 0xfe])),
+            &format!("Basic {}", BASE64.encode("a".repeat(4096))),
+        ];
+        for input in inputs {
+            let result = std::panic::catch_unwind(|| drop(BasicAuth::parse_header_value(input)));
+            assert!(result.is_ok(), "panicked on input: {input:?}");
+        }
     }
 
     #[test]
