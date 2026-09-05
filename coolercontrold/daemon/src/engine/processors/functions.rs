@@ -322,6 +322,10 @@ impl FunctionStandardPreProcessor {
     /// latch as the only thing that advances a rate-limited ramp.
     /// Compares against `last_applied_temp` rather than the live temp so that
     /// the target is fixed for the length of the ramp and the deadband holds.
+    /// Each continuation cycle sets a duty, which resets the safety latch
+    /// counter, so threshold hopping cannot hop mid-ramp. The target stays
+    /// pinned until the temp leaves the deviance band, which is the deadband
+    /// working as intended.
     fn should_continue_stepping(
         metadata: &ChannelSettingMetadata,
         data: &SpeedProfileData,
@@ -329,7 +333,7 @@ impl FunctionStandardPreProcessor {
         let Some(last_applied_duty) = metadata.last_applied_duty else {
             return false; // No duty history yet, nothing to continue.
         };
-        debug_assert!(last_applied_duty <= 100, "duty must be in valid range");
+        debug_assert!(last_applied_duty <= MAX_DUTY, "duty must be in valid range");
         if data.profile.speed_profile.is_empty() {
             return false;
         }
@@ -338,16 +342,31 @@ impl FunctionStandardPreProcessor {
         // A duty diff can never exceed 100, so a max step of 100 never clamps
         // and there is never a remainder to continue. This is the default
         // function, so keep it off the interpolation below entirely.
-        if step_increase_max >= MAX_DUTY && step_decrease_max >= MAX_DUTY {
-            return false;
+        if step_increase_max >= MAX_DUTY {
+            if step_decrease_max >= MAX_DUTY {
+                return false;
+            }
         }
         let target_duty =
             utils::interpolate_profile(&data.profile.speed_profile, metadata.last_applied_temp);
+        debug_assert!(
+            target_duty <= MAX_DUTY,
+            "interpolated duty must be in valid range"
+        );
+        // The post-processor applies a sub-min step at the extremes when
+        // bypass_min_at_extremes is set, so the continuation has to keep
+        // feeding it or that last remainder falls back to the safety latch.
+        let extreme_bypass_active = data.profile.function.bypass_min_at_extremes
+            && (target_duty == 0 || target_duty == MAX_DUTY);
         // An equal target needs no step. Anything short of the min step is the
         // limiter's own deadband and belongs to the safety latch, not here.
         match target_duty.cmp(&last_applied_duty) {
-            Ordering::Less => last_applied_duty - target_duty >= step_decrease_min,
-            Ordering::Greater => target_duty - last_applied_duty >= step_increase_min,
+            Ordering::Less => {
+                extreme_bypass_active || last_applied_duty - target_duty >= step_decrease_min
+            }
+            Ordering::Greater => {
+                extreme_bypass_active || target_duty - last_applied_duty >= step_increase_min
+            }
             Ordering::Equal => false,
         }
     }
@@ -1995,6 +2014,56 @@ mod tests {
         assert!(
             FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data),
             "a clamped decrease must continue even when the increase is free"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_fires_below_the_min_step_at_an_extreme_target() {
+        // Goal: bypass_min_at_extremes lets the post-processor apply a sub-min
+        // step at 0% and 100%, so the continuation must keep feeding it there.
+        // Otherwise the last remainder stalls on the 30 second safety latch,
+        // which is the exact symptom this fix exists to remove.
+        // 80C targets 100%, the fan sits at 95%, min increasing step is 10.
+        let mut data = create_continuation_test_data(10, 20, 0, 0);
+        std::rc::Rc::get_mut(&mut data.profile)
+            .unwrap()
+            .function
+            .bypass_min_at_extremes = true;
+        let metadata = continuation_metadata(80.0, Some(95));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data),
+            "a sub-min remainder at an extreme target must continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_stops_below_the_min_step_without_extreme_bypass() {
+        // Goal: the same setup with the option off must keep the min deadband.
+        let data = create_continuation_test_data(10, 20, 0, 0);
+        let metadata = continuation_metadata(80.0, Some(95));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "the extreme bypass must not apply when the option is disabled"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_ignores_extreme_bypass_off_the_extremes() {
+        // Goal: the bypass is scoped to 0% and 100% only. 50C targets 60%,
+        // the fan sits at 65%, min decreasing step is 10, so the 5% remainder
+        // stays the limiter's deadband even with the option on.
+        let mut data = create_continuation_test_data(2, 100, 10, 20);
+        std::rc::Rc::get_mut(&mut data.profile)
+            .unwrap()
+            .function
+            .bypass_min_at_extremes = true;
+        let metadata = continuation_metadata(50.0, Some(65));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "a mid-curve target must not use the extreme bypass"
         );
     }
 
