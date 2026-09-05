@@ -16,6 +16,11 @@
 //! Blocked peers are rejected immediately rather than delayed. On a single-threaded
 //! reactor a sleeping request would stall every other client, handing an attacker the
 //! outage the throttle exists to prevent.
+//!
+//! The outcome is never inferred from the response status. `/handshake` answers 200 with
+//! or without an `Authorization` header, so a status-based reading would let an attacker
+//! clear their own streak between guesses. Only a layer that actually adjudicated the
+//! presented credentials marks the response, and only a marked response is counted.
 
 use crate::api::CCError;
 use axum::extract::{ConnectInfo, Request};
@@ -44,7 +49,13 @@ const _: () = assert!(MAX_TRACKED_PEERS > 0);
 
 /// Process-wide throttle. The daemon presents one authentication surface no matter how
 /// many listeners serve it, so per-router state would let a peer double its budget by
-/// alternating between the IPv4 and IPv6 servers.
+/// alternating between the IPv4 and IPv6 servers, which build their routers separately.
+///
+/// Deliberately a static rather than an actor handle, unlike `AuthActor` next door. This
+/// runs in a `from_fn` middleware that carries no state, upstream of every channel, and
+/// on the reject path it must answer without awaiting anything. The counters are two
+/// integers and a timestamp behind an uncontended lock; a channel round trip to own them
+/// would put a queue in front of the very path the throttle exists to keep cheap.
 static AUTH_THROTTLE: LazyLock<AuthThrottle> = LazyLock::new(AuthThrottle::new);
 
 #[derive(Debug)]
@@ -175,23 +186,54 @@ fn presents_credentials(request: &Request) -> bool {
     request.headers().contains_key(header::AUTHORIZATION)
 }
 
-/// What a downstream response says about the credentials that produced it.
+/// A verdict on credentials a request actually presented, attached to the response by
+/// the layer that checked them. An unmarked response is not a guessing signal: it was
+/// produced without the credentials ever being adjudicated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Outcome {
-    Rejected,
+pub enum CredentialOutcome {
+    /// The credentials authenticated. Scope is a separate question: a valid token
+    /// refused for insufficient scope still authenticated.
     Accepted,
-    /// Anything else, including the 429 this middleware itself returns and the 403 for a
-    /// valid token with insufficient scope. Neither is a credential-guessing signal.
-    Inconclusive,
+    Rejected,
 }
 
-fn outcome_for(status: StatusCode) -> Outcome {
-    if status == StatusCode::UNAUTHORIZED {
-        Outcome::Rejected
+/// Records a verdict on the response, for the throttle to read once it unwinds.
+pub fn mark(mut response: Response, outcome: CredentialOutcome) -> Response {
+    response.extensions_mut().insert(outcome);
+    response
+}
+
+/// Verdict for a route whose handler consumes credentials directly rather than behind an
+/// auth layer, such as `/login`.
+///
+/// A 429 here is `AuthActor`'s global password lockout, never this middleware's own
+/// rejection: that one short-circuits above and never reaches a handler. Counting it
+/// keeps the per-peer backoff growing behind the global lockout instead of freezing.
+fn outcome_for(status: StatusCode) -> Option<CredentialOutcome> {
+    if status == StatusCode::UNAUTHORIZED || status == StatusCode::TOO_MANY_REQUESTS {
+        Some(CredentialOutcome::Rejected)
     } else if status.is_success() {
-        Outcome::Accepted
+        Some(CredentialOutcome::Accepted)
     } else {
-        Outcome::Inconclusive
+        None
+    }
+}
+
+/// Marks responses from a route that adjudicates credentials in its handler.
+pub async fn credential_route_middleware(request: Request, next: Next) -> Response {
+    let response = next.run(request).await;
+    match outcome_for(response.status()) {
+        Some(outcome) => mark(response, outcome),
+        None => response,
+    }
+}
+
+/// Applies a response's verdict, if it carries one, to the peer that produced it.
+fn record(throttle: &AuthThrottle, peer: IpAddr, response: &Response, now: Instant) {
+    match response.extensions().get::<CredentialOutcome>() {
+        Some(CredentialOutcome::Rejected) => throttle.record_failure(peer, now),
+        Some(CredentialOutcome::Accepted) => throttle.record_success(peer),
+        None => {}
     }
 }
 
@@ -214,11 +256,7 @@ pub async fn throttle_middleware(request: Request, next: Next) -> Response {
         .into_response();
     }
     let response = next.run(request).await;
-    match outcome_for(response.status()) {
-        Outcome::Rejected => AUTH_THROTTLE.record_failure(peer, Instant::now()),
-        Outcome::Accepted => AUTH_THROTTLE.record_success(peer),
-        Outcome::Inconclusive => {}
-    }
+    record(&AUTH_THROTTLE, peer, &response, Instant::now());
     response
 }
 
@@ -278,21 +316,65 @@ mod tests {
         assert_eq!(peer_ip(&request), Some(IpAddr::from([10, 0, 0, 1])));
     }
 
-    /// Goal: only 401 counts against a peer. A 403 means the credential was valid but
-    /// under-scoped, and the 429 this middleware emits must not compound itself.
+    /// Goal: on a credential-consuming route, a rejection and an acceptance are both
+    /// recognised, and a server fault counts as neither.
     #[test]
-    fn only_unauthorized_counts_as_a_failure() {
-        assert_eq!(outcome_for(StatusCode::UNAUTHORIZED), Outcome::Rejected);
-        assert_eq!(outcome_for(StatusCode::OK), Outcome::Accepted);
-        assert_eq!(outcome_for(StatusCode::NO_CONTENT), Outcome::Accepted);
-        assert_eq!(outcome_for(StatusCode::FORBIDDEN), Outcome::Inconclusive);
+    fn credential_route_outcomes_follow_the_status() {
         assert_eq!(
-            outcome_for(StatusCode::TOO_MANY_REQUESTS),
-            Outcome::Inconclusive
+            outcome_for(StatusCode::UNAUTHORIZED),
+            Some(CredentialOutcome::Rejected)
         );
         assert_eq!(
-            outcome_for(StatusCode::INTERNAL_SERVER_ERROR),
-            Outcome::Inconclusive
+            outcome_for(StatusCode::OK),
+            Some(CredentialOutcome::Accepted)
+        );
+        assert_eq!(
+            outcome_for(StatusCode::NO_CONTENT),
+            Some(CredentialOutcome::Accepted)
+        );
+        assert_eq!(outcome_for(StatusCode::INTERNAL_SERVER_ERROR), None);
+    }
+
+    /// Goal: the global password lockout keeps the per-peer backoff growing. Its 429 is
+    /// the only 429 a handler can produce, since the throttle's own never reaches one.
+    #[test]
+    fn global_lockout_still_counts_against_the_peer() {
+        assert_eq!(
+            outcome_for(StatusCode::TOO_MANY_REQUESTS),
+            Some(CredentialOutcome::Rejected)
+        );
+    }
+
+    /// Goal: an unmarked response never moves the counter. `/handshake` answers 200
+    /// whatever the `Authorization` header holds, so reading its status as an acceptance
+    /// would let an attacker clear their streak between guesses.
+    #[test]
+    fn unmarked_responses_are_not_counted() {
+        let ok = StatusCode::OK.into_response();
+        assert_eq!(ok.extensions().get::<CredentialOutcome>(), None);
+
+        let marked = mark(StatusCode::OK.into_response(), CredentialOutcome::Accepted);
+        assert_eq!(
+            marked.extensions().get::<CredentialOutcome>(),
+            Some(&CredentialOutcome::Accepted)
+        );
+    }
+
+    /// Goal: a 403 for an under-scoped but valid token clears the streak rather than
+    /// counting, since the credential itself authenticated.
+    #[test]
+    fn insufficient_scope_is_an_acceptance() {
+        let response = mark(
+            CCError::InsufficientScope {
+                msg: "no write access".to_string(),
+            }
+            .into_response(),
+            CredentialOutcome::Accepted,
+        );
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            response.extensions().get::<CredentialOutcome>(),
+            Some(&CredentialOutcome::Accepted)
         );
     }
 
@@ -412,6 +494,57 @@ mod tests {
                 .to_be_bytes(),
         );
         assert!(throttle.lock().contains_key(&last));
+    }
+
+    /// Goal: an open route cannot be used to clear a streak. `/handshake` answers 200
+    /// whatever the `Authorization` header holds, so a peer mid-backoff must stay blocked
+    /// across any number of them.
+    #[test]
+    fn unadjudicated_success_does_not_clear_the_streak() {
+        let throttle = AuthThrottle::new();
+        let now = Instant::now();
+        for _ in 0..=FAILURE_THRESHOLD {
+            throttle.record_failure(peer(1), now);
+        }
+        let blocked = throttle.blocked_for(peer(1), now);
+        assert!(blocked.is_some());
+
+        for _ in 0..10 {
+            record(&throttle, peer(1), &StatusCode::OK.into_response(), now);
+        }
+        assert_eq!(throttle.blocked_for(peer(1), now), blocked);
+    }
+
+    /// Goal: an adjudicated success still clears the streak, so the guard above does not
+    /// leave an honest client throttled after it authenticates.
+    #[test]
+    fn adjudicated_success_clears_the_streak() {
+        let throttle = AuthThrottle::new();
+        let now = Instant::now();
+        for _ in 0..=FAILURE_THRESHOLD {
+            throttle.record_failure(peer(1), now);
+        }
+        assert!(throttle.blocked_for(peer(1), now).is_some());
+
+        let response = mark(StatusCode::OK.into_response(), CredentialOutcome::Accepted);
+        record(&throttle, peer(1), &response, now);
+        assert_eq!(throttle.blocked_for(peer(1), now), None);
+    }
+
+    /// Goal: a rejection recorded through the same seam still counts, so the backoff is
+    /// driven by the marker rather than by the status the throttle used to read.
+    #[test]
+    fn adjudicated_rejection_counts() {
+        let throttle = AuthThrottle::new();
+        let now = Instant::now();
+        let response = mark(
+            StatusCode::UNAUTHORIZED.into_response(),
+            CredentialOutcome::Rejected,
+        );
+        for _ in 0..=FAILURE_THRESHOLD {
+            record(&throttle, peer(1), &response, now);
+        }
+        assert_eq!(throttle.blocked_for(peer(1), now), Some(BASE_BACKOFF));
     }
 
     /// Goal: a poisoned mutex degrades to "throttle still works" rather than taking

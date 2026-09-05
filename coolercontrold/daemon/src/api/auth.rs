@@ -3,6 +3,7 @@
 
 use crate::admin;
 use crate::api::actor::{TokenHandle, TokenValidation};
+use crate::api::auth_throttle::{mark, CredentialOutcome};
 use crate::api::{AppState, CCError};
 use aide::axum::IntoApiResponse;
 use aide::NoApi;
@@ -11,6 +12,7 @@ use axum::extract::{FromRequestParts, Request, State};
 use axum::http::header;
 use axum::http::request::Parts;
 use axum::middleware::Next;
+use axum::response::IntoResponse as _;
 use axum::{Extension, Json};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
@@ -114,59 +116,82 @@ impl<S: Send + Sync> FromRequestParts<S> for BasicAuth {
     }
 }
 
+/// The bearer token a request presents, if it presents one at all.
+fn bearer_token(request: &Request) -> Option<String> {
+    let value = request
+        .headers()
+        .get(header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
+    value.strip_prefix("Bearer ").map(str::to_string)
+}
+
 /// Read-access middleware. Validates Bearer tokens (any valid token) or
 /// session cookies. Used for read-only routes.
+///
+/// Every bearer outcome is marked for `auth_throttle`, which counts only responses whose
+/// credentials were actually adjudicated here. A dispatch failure is left unmarked: it
+/// says nothing about the token.
 pub async fn auth_middleware(
     Extension(token_handle): Extension<TokenHandle>,
     session: Session,
     request: Request,
     next: Next,
 ) -> impl IntoApiResponse {
-    if let Some(auth_value) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(value) = auth_value.to_str() {
-            if let Some(raw_token) = value.strip_prefix("Bearer ") {
-                return match token_handle.validate(raw_token.to_string()).await {
-                    Ok(TokenValidation::ValidReadWrite | TokenValidation::ValidReadOnly) => {
-                        Ok(next.run(request).await)
-                    }
-                    Ok(TokenValidation::Invalid) => Err(CCError::InvalidCredentials {
-                        msg: "Invalid or expired access token.".to_string(),
-                    }),
-                    Err(_) => Err(CCError::InternalError {
-                        msg: "Token validation error.".to_string(),
-                    }),
-                };
+    if let Some(raw_token) = bearer_token(&request) {
+        return match token_handle.validate(raw_token).await {
+            Ok(TokenValidation::ValidReadWrite | TokenValidation::ValidReadOnly) => {
+                Ok(mark(next.run(request).await, CredentialOutcome::Accepted))
             }
-        }
+            Ok(TokenValidation::Invalid) => Ok(mark(
+                CCError::InvalidCredentials {
+                    msg: "Invalid or expired access token.".to_string(),
+                }
+                .into_response(),
+                CredentialOutcome::Rejected,
+            )),
+            Err(_) => Err(CCError::InternalError {
+                msg: "Token validation error.".to_string(),
+            }),
+        };
     }
     check_session_permission(session, request, next).await
 }
 
 /// Write-access middleware. Validates Bearer tokens (requires write access)
 /// or session cookies. Used for write/mutating routes.
+/// An under-scoped token is marked `Accepted`: it authenticated, and only the
+/// authorization check refused it. Counting it would throttle a client holding a
+/// perfectly valid credential.
 pub async fn auth_write_middleware(
     Extension(token_handle): Extension<TokenHandle>,
     session: Session,
     request: Request,
     next: Next,
 ) -> impl IntoApiResponse {
-    if let Some(auth_value) = request.headers().get(header::AUTHORIZATION) {
-        if let Ok(value) = auth_value.to_str() {
-            if let Some(raw_token) = value.strip_prefix("Bearer ") {
-                return match token_handle.validate(raw_token.to_string()).await {
-                    Ok(TokenValidation::ValidReadWrite) => Ok(next.run(request).await),
-                    Ok(TokenValidation::ValidReadOnly) => Err(CCError::InsufficientScope {
-                        msg: "This token does not have write access.".to_string(),
-                    }),
-                    Ok(TokenValidation::Invalid) => Err(CCError::InvalidCredentials {
-                        msg: "Invalid or expired access token.".to_string(),
-                    }),
-                    Err(_) => Err(CCError::InternalError {
-                        msg: "Token validation error.".to_string(),
-                    }),
-                };
+    if let Some(raw_token) = bearer_token(&request) {
+        return match token_handle.validate(raw_token).await {
+            Ok(TokenValidation::ValidReadWrite) => {
+                Ok(mark(next.run(request).await, CredentialOutcome::Accepted))
             }
-        }
+            Ok(TokenValidation::ValidReadOnly) => Ok(mark(
+                CCError::InsufficientScope {
+                    msg: "This token does not have write access.".to_string(),
+                }
+                .into_response(),
+                CredentialOutcome::Accepted,
+            )),
+            Ok(TokenValidation::Invalid) => Ok(mark(
+                CCError::InvalidCredentials {
+                    msg: "Invalid or expired access token.".to_string(),
+                }
+                .into_response(),
+                CredentialOutcome::Rejected,
+            )),
+            Err(_) => Err(CCError::InternalError {
+                msg: "Token validation error.".to_string(),
+            }),
+        };
     }
     check_session_permission(session, request, next).await
 }

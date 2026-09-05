@@ -128,7 +128,13 @@ fn auth_routes() -> ApiRouter<AppState> {
                     .description("The endpoint used to create a login session.")
                     .tag("auth")
                     .security_requirement("BasicAuth")
-            }),
+            })
+            // The only unauthenticated route that adjudicates credentials in its handler,
+            // so it reports its own verdict to the throttle rather than being read off a
+            // status code the throttle cannot attribute.
+            .layer(axum::middleware::from_fn(
+                auth_throttle::credential_route_middleware,
+            )),
         )
         .api_route(
             "/verify-session",
