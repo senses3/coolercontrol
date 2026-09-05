@@ -4,7 +4,7 @@
 import { mdiFolderOutline } from '@mdi/js'
 import { describe, expect, it } from 'vitest'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
-import { libraryOptionGroups } from '../cooling/libraryOptions.ts'
+import { libraryOptionGroups } from '../libraryOptions.ts'
 
 const entities = [
     { uid: 'a', name: 'Silent' },
