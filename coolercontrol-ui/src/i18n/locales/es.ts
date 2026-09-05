@@ -807,7 +807,7 @@ export default {
             general: 'General',
             thresholdHopping: 'Salto de Umbral',
             thresholdHoppingTooltip:
-                'Cuando la velocidad del ventilador permanece sin cambios durante 30+ segundos, los límites de tamaño de paso e histéresis se omiten temporalmente.\nEsto asegura que los ventiladores eventualmente alcancen su velocidad objetivo, incluso con configuraciones de umbral conservadoras.',
+                'Cuando la velocidad del ventilador permanece sin cambios durante 30+ segundos, los límites de tamaño de paso mínimo e histéresis se omiten temporalmente.\nEsto asegura que los ventiladores eventualmente alcancen su velocidad objetivo, incluso con configuraciones de umbral conservadoras. El tamaño de paso máximo siempre se respeta.',
             stepOverrides: 'Anulaciones de paso',
             bypassMinAtExtremes: 'Aplicar siempre 0% / 100%',
             bypassMinAtExtremesTooltip:

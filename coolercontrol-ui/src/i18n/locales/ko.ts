@@ -788,7 +788,7 @@ export default {
             general: '일반',
             thresholdHopping: '임계값 도약',
             thresholdHoppingTooltip:
-                '팬 속도가 30초 이상 변하지 않으면 단계 크기 및 이력 현상 제한이 일시적으로 무시됩니다.\n이렇게 하면 보수적인 임계값 설정에서도 팬이 결국 목표 속도에 도달합니다.',
+                '팬 속도가 30초 이상 변하지 않으면 최소 단계 크기 및 이력 현상 제한이 일시적으로 무시됩니다.\n이렇게 하면 보수적인 임계값 설정에서도 팬이 결국 목표 속도에 도달합니다. 최대 단계 크기는 항상 유지됩니다.',
             stepOverrides: '단계 재정의',
             bypassMinAtExtremes: '항상 0% / 100% 적용',
             bypassMinAtExtremesTooltip:

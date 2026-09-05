@@ -809,7 +809,7 @@ export default {
             general: 'Allgemein',
             thresholdHopping: 'Schwellenwert-Überspringen',
             thresholdHoppingTooltip:
-                'Wenn die Lüftergeschwindigkeit 30+ Sekunden unverändert bleibt, werden Schrittgröße und Hysterese-Limits vorübergehend umgangen.\nDies stellt sicher, dass Lüfter schließlich ihre Zielgeschwindigkeit erreichen, auch bei konservativen Schwellenwerteinstellungen.',
+                'Wenn die Lüftergeschwindigkeit 30+ Sekunden unverändert bleibt, werden die minimale Schrittgröße und Hysterese-Limits vorübergehend umgangen.\nDies stellt sicher, dass Lüfter schließlich ihre Zielgeschwindigkeit erreichen, auch bei konservativen Schwellenwerteinstellungen. Die maximale Schrittgröße wird immer eingehalten.',
             stepOverrides: 'Schritt-Überschreibungen',
             bypassMinAtExtremes: 'Immer 0% / 100% anwenden',
             bypassMinAtExtremesTooltip:
