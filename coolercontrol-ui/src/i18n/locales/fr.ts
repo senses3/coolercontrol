@@ -873,7 +873,7 @@ export default {
             stepOverrides: 'Dérogations de pas',
             thresholdHopping: 'Saut de Seuil',
             thresholdHoppingTooltip:
-                "Lorsque la vitesse du ventilateur reste inchangée pendant 30+ secondes, les limites de taille de pas et d'hystérésis sont temporairement contournées.\nCela garantit que les ventilateurs atteignent finalement leur vitesse cible, même avec des paramètres de seuil conservateurs.",
+                "Lorsque la vitesse du ventilateur reste inchangée pendant 30+ secondes, les limites de taille de pas minimale et d'hystérésis sont temporairement contournées.\nCela garantit que les ventilateurs atteignent finalement leur vitesse cible, même avec des paramètres de seuil conservateurs. La taille de pas maximale est toujours respectée.",
             bypassMinAtExtremes: 'Toujours appliquer 0% / 100%',
             bypassMinAtExtremesTooltip:
                 "Lorsque activé, les cycles cibles de 0% ou 100% sont appliqués même lorsque le changement est inférieur à la taille de pas minimale.\nUtile pour s'assurer que les ventilateurs s'arrêtent complètement ou atteignent leur RPM maximum. Désactivé par défaut.",
