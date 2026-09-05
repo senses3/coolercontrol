@@ -4,6 +4,7 @@
 pub mod actor;
 mod alerts;
 mod auth;
+mod auth_throttle;
 mod base;
 mod calibration;
 mod custom_sensors;
@@ -478,9 +479,16 @@ async fn create_api_server(
         // Plain HTTP server (no redirect needed)
         info!("Serving HTTP API on: {addr}");
         let normalized_router = NormalizePathLayer::trim_trailing_slash().layer(base_router);
+        // Connect info matches the TLS path above: the auth throttle keys on the peer
+        // address, and without this it would have nothing to key on in the default
+        // (TLS-disabled) configuration.
         axum_server::from_tcp(listener.into_std()?)?
             .handle(handle)
-            .serve(ServiceExt::<Request>::into_make_service(normalized_router))
+            .serve(
+                ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
+                    normalized_router,
+                ),
+            )
             .await?;
     }
     Ok(())
