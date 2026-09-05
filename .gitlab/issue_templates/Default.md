@@ -7,6 +7,7 @@
 
 - CoolerControl version:
 - Linux Distribution name and version:
+- Installed from (which repository or package source):
 - Affected device(s):
 - (any additional relevant information)
 
