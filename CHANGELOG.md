@@ -74,6 +74,11 @@ Release notes are automatically generated from this file and git tags.
 - Tags on channel rows as interactive chips, with a tag filter bar and a tag manager
 - Modes management with apply wizards, where-used listings, and a previous-mode indicator
 - "Used by" links and type icons across profiles, functions, channels and sensors
+- Folders in the Cooling panel's Profiles & Functions library: add, rename and delete folders, and
+  drag profiles and functions in and out of them. The same grouping is carried into every profile
+  and function picker, so a picker reads like the panel
+- Rows in the Modes table link to the page of the channel they set, picking the cooling, lighting or
+  LCD editor by what the channel controls
 - Backup CLI: archive, restore, list, rotated backup and config-check subcommands
 - Bulk device and sensor enable/disable editor
 - Target versus actual duty in the Mix profile editor
