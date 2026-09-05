@@ -6,7 +6,7 @@ use anyhow::Result;
 use chrono::{DateTime, Local};
 use log::{error, trace, warn};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -27,6 +27,15 @@ pub struct TokenHandle {
 }
 
 impl TokenHandle {
+    /// A poisoned cache must not take authentication down with it. The map holds only
+    /// last-used timestamps, so continuing with whatever state survived is strictly
+    /// better than failing every subsequent token validation.
+    fn cache(&self) -> MutexGuard<'_, HashMap<String, DateTime<Local>>> {
+        self.last_used_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
     pub async fn new(cancel_token: CancellationToken) -> Self {
         // Token IO uses `sidecar_fs` (always Tokio), so load on the sidecar Tokio runtime.
         let tokens = match crate::sidecar::handle().run(token::load_tokens).await {
@@ -103,10 +112,7 @@ impl TokenHandle {
 
     pub async fn list(&self) -> Result<Vec<StoredToken>> {
         let tokens = self.tokens.read().await;
-        let cache = self
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned");
+        let cache = self.cache();
         Ok(tokens
             .iter()
             .map(|t| {
@@ -120,12 +126,7 @@ impl TokenHandle {
     }
 
     pub async fn delete(&self, id: String) -> Result<()> {
-        {
-            self.last_used_cache
-                .lock()
-                .expect("last_used_cache poisoned")
-                .remove(&id);
-        }
+        self.cache().remove(&id);
         let mut tokens = self.tokens.write().await;
         tokens.retain(|t| t.id != id);
         token::save_tokens(&tokens).await
@@ -137,10 +138,7 @@ impl TokenHandle {
             return Ok(TokenValidation::Invalid);
         };
         drop(tokens);
-        self.last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned")
-            .insert(matched.id.clone(), Local::now());
+        self.cache().insert(matched.id.clone(), Local::now());
         if let Some(digest) = matched.upgrade_digest {
             self.persist_digest(&matched.id, digest).await;
         }
@@ -173,10 +171,7 @@ impl TokenHandle {
 
     async fn flush_last_used(&self) -> Result<()> {
         let updates: HashMap<String, DateTime<Local>> = {
-            let mut cache = self
-                .last_used_cache
-                .lock()
-                .expect("last_used_cache poisoned");
+            let mut cache = self.cache();
             if cache.is_empty() {
                 return Ok(());
             }
@@ -195,6 +190,7 @@ impl TokenHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ops::Not;
 
     fn make_stored_token(raw: &str) -> (StoredToken, String) {
         make_stored_token_with_write(raw, true)
@@ -344,11 +340,7 @@ mod tests {
 
         handle.validate(raw).await.unwrap();
 
-        let cache = handle
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned");
-        assert!(cache.contains_key(&token_id));
+        assert!(handle.cache().contains_key(&token_id));
     }
 
     #[tokio::test]
@@ -379,13 +371,7 @@ mod tests {
 
         // Note: delete calls save_tokens which writes to disk — skip for unit test
         // Instead, verify the in-memory state changes
-        {
-            handle
-                .last_used_cache
-                .lock()
-                .expect("last_used_cache poisoned")
-                .remove(&token_id);
-        }
+        handle.cache().remove(&token_id);
         {
             let mut tokens = handle.tokens.write().await;
             tokens.retain(|t| t.id != token_id);
@@ -393,11 +379,7 @@ mod tests {
 
         let listed = handle.list().await.unwrap();
         assert!(listed.is_empty());
-        assert!(!handle
-            .last_used_cache
-            .lock()
-            .unwrap()
-            .contains_key(&token_id));
+        assert!(handle.cache().contains_key(&token_id).not());
     }
 
     #[tokio::test]
@@ -427,20 +409,13 @@ mod tests {
 
         // Validate to populate cache
         handle.validate(raw).await.unwrap();
-        assert!(!handle
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned")
-            .is_empty());
+        assert!(handle.cache().is_empty().not());
 
         // Flush merges cache into tokens (save_tokens will fail without filesystem,
         // but we can verify the merge logic by checking token state)
         {
             let updates: HashMap<String, DateTime<Local>> = {
-                let mut cache = handle
-                    .last_used_cache
-                    .lock()
-                    .expect("last_used_cache poisoned");
+                let mut cache = handle.cache();
                 std::mem::take(&mut *cache)
             };
             let mut tokens = handle.tokens.write().await;
@@ -452,11 +427,7 @@ mod tests {
         }
 
         // Cache should be empty after flush
-        assert!(handle
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned")
-            .is_empty());
+        assert!(handle.cache().is_empty());
         // Token should have last_used set
         let tokens = handle.tokens.read().await;
         let t = tokens.iter().find(|t| t.id == token_id).unwrap();
