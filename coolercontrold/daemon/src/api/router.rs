@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::{
-    alerts, auth, base, calibration, custom_sensors, detect, device_health, functions,
-    hardware_report, metrics, modes, plugins, power_profiles, profile_generation, profiles,
-    settings, sse, stats, status, stress_test, tokens,
+    alerts, auth, auth_throttle, base, calibration, custom_sensors, detect, device_health,
+    functions, hardware_report, metrics, modes, plugins, power_profiles, profile_generation,
+    profiles, settings, sse, stats, status, stress_test, tokens,
 };
 use crate::api::{devices, AppState};
 #[cfg(debug_assertions)]
@@ -27,6 +27,10 @@ pub fn init(app_state: AppState) -> ApiRouter {
         .with_state(app_state)
         // need an extension here for middleware::from_fn to work and not pass app_state everywhere.
         .layer(Extension(token_handle))
+        // Outermost, so a throttled peer is turned away before any credential work runs.
+        .layer(axum::middleware::from_fn(
+            auth_throttle::throttle_middleware,
+        ))
 }
 
 /// Every route carrying `OpenAPI` metadata, before state, the fallback and the doc route are
