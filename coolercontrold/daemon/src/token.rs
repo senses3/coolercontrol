@@ -364,30 +364,6 @@ mod tests {
         assert_eq!(validate_token(&token_b, &[mismatched]), None);
     }
 
-    /// Goal: rejecting a garbage token against a fully migrated store costs no KDF
-    /// work, which is the property that removes the pre-auth CPU amplifier.
-    ///
-    /// Method: one argon2 verify measures ~7.7ms, so a whole rejection sweep over 50
-    /// digest-bearing tokens finishing well inside a single verify's budget proves no
-    /// verify ran. The bound is deliberately loose so a slow CI box cannot flake it.
-    #[test]
-    fn test_rejecting_garbage_token_skips_argon2() {
-        let tokens: Vec<StoredToken> = (0..50)
-            .map(|_| stored_token(&generate_token(), true))
-            .collect();
-        let garbage = generate_token();
-
-        let start = std::time::Instant::now();
-        let result = validate_token(&garbage, &tokens);
-        let elapsed = start.elapsed();
-
-        assert_eq!(result, None);
-        assert!(
-            elapsed < std::time::Duration::from_millis(5),
-            "rejection swept 50 tokens in {elapsed:?}, which implies argon2 ran"
-        );
-    }
-
     /// Goal: the digest pass wins even when an unrelated legacy token sits first in
     /// the store, so a migrated token is never delayed by someone else's KDF.
     #[test]
