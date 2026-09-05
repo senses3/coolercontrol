@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::token::{self, StoredToken};
+use crate::token::{self, StoredToken, TokenDigest};
 use anyhow::Result;
 use chrono::{DateTime, Local};
 use log::{error, trace, warn};
@@ -157,7 +157,7 @@ impl TokenHandle {
     /// Failures are logged rather than propagated: the caller has already
     /// authenticated, and a failed upgrade costs nothing worse than one more argon2
     /// verify on the next request.
-    async fn persist_digest(&self, id: &str, digest: String) {
+    async fn persist_digest(&self, id: &str, digest: TokenDigest) {
         let mut tokens = self.tokens.write().await;
         let Some(token) = tokens.iter_mut().find(|token| token.id == id) else {
             return; // deleted between validation and upgrade
@@ -317,7 +317,7 @@ mod tests {
         let handle = make_handle_with_tokens(vec![stored]);
 
         handle
-            .persist_digest(&id, "not-the-real-digest".to_string())
+            .persist_digest(&id, token::digest_token("a-different-token"))
             .await;
 
         assert_eq!(handle.tokens.read().await[0].digest, original);

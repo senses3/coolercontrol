@@ -34,10 +34,10 @@ pub struct StoredToken {
     /// `digest`, and only read on the legacy fallback path, but still written so a
     /// downgraded daemon can keep validating tokens minted here.
     pub hash: String,
-    /// Hex-encoded SHA-256 of the raw token, absent on tokens minted before 5.0.0.
-    /// `validate_token` upgrades those in place the first time they are presented.
+    /// SHA-256 of the raw token, absent on tokens minted before 5.0.0. `validate_token`
+    /// upgrades those in place the first time they are presented.
     #[serde(default)]
-    pub digest: Option<String>,
+    pub digest: Option<TokenDigest>,
     pub created_at: DateTime<Local>,
     pub expires_at: Option<DateTime<Local>>,
     pub last_used: Option<DateTime<Local>>,
@@ -71,25 +71,38 @@ pub fn verify_token(raw: &str, hash: &str) -> bool {
 
 /// Hex-encoded SHA-256 of a raw token.
 ///
+/// A distinct type from the raw token and from the argon2 `hash`, all three of which are
+/// otherwise interchangeable strings. Only `digest_token` can produce one, so a digest
+/// can never be compared against a raw secret by accident.
+///
+/// Serialized transparently, so the stored JSON stays a plain string.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct TokenDigest(String);
+
+impl TokenDigest {
+    /// Compare two digests without leaking where they diverge. Length is not secret, so
+    /// checking it first is safe; the byte comparison itself must not short-circuit.
+    fn matches(&self, other: &Self) -> bool {
+        if self.0.len() != other.0.len() {
+            return false;
+        }
+        self.0.as_bytes().ct_eq(other.0.as_bytes()).into()
+    }
+}
+
+/// SHA-256 of a raw token.
+///
 /// Tokens are `cc_` plus 122 bits of `Uuid::new_v4` randomness, so a password KDF's
 /// cost factor buys nothing here: brute force is infeasible at any hash speed, and
 /// there is no precomputable space for a salt to defend. A fast digest with a
 /// constant-time compare is the correct primitive for a high-entropy secret, and it
 /// keeps the pre-auth path from becoming a CPU amplifier.
-pub fn digest_token(raw: &str) -> String {
+pub fn digest_token(raw: &str) -> TokenDigest {
     let digest = Sha256::digest(raw.as_bytes());
     let hex = hashutil::to_lower_hex(&digest);
     debug_assert_eq!(hex.len(), DIGEST_HEX_LEN);
-    hex
-}
-
-/// Compare two hex digests without leaking where they diverge. Length is not secret,
-/// so checking it first is safe; the byte comparison itself must not short-circuit.
-fn digests_match(presented: &str, stored: &str) -> bool {
-    if presented.len() != stored.len() {
-        return false;
-    }
-    presented.as_bytes().ct_eq(stored.as_bytes()).into()
+    TokenDigest(hex)
 }
 
 fn is_expired(token: &StoredToken, now: DateTime<Local>) -> bool {
@@ -129,7 +142,7 @@ pub struct TokenMatch {
     pub write_access: bool,
     /// `Some` when the match came from the legacy argon2 path. The caller must persist
     /// it so this token never pays the KDF cost again.
-    pub upgrade_digest: Option<String>,
+    pub upgrade_digest: Option<TokenDigest>,
 }
 
 /// Two passes, cheapest first. The digest pass is a handful of 64-byte compares; the
@@ -142,10 +155,10 @@ pub fn validate_token(raw_token: &str, tokens: &[StoredToken]) -> Option<TokenMa
         if is_expired(token, now) {
             continue;
         }
-        let Some(stored) = token.digest.as_deref() else {
+        let Some(stored) = token.digest.as_ref() else {
             continue;
         };
-        if digests_match(&presented, stored) {
+        if presented.matches(stored) {
             return Some(TokenMatch {
                 id: token.id.clone(),
                 write_access: token.write_access,
@@ -237,9 +250,9 @@ mod tests {
     fn test_digest_token_shape_and_stability() {
         let raw = generate_token();
         let first = digest_token(&raw);
-        assert_eq!(first.len(), DIGEST_HEX_LEN);
-        assert!(first.chars().all(|c| c.is_ascii_hexdigit()));
-        assert!(first.chars().any(char::is_uppercase).not());
+        assert_eq!(first.0.len(), DIGEST_HEX_LEN);
+        assert!(first.0.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(first.0.chars().any(char::is_uppercase).not());
         assert_eq!(first, digest_token(&raw));
         assert_ne!(first, digest_token(&generate_token()));
     }
@@ -248,7 +261,7 @@ mod tests {
     #[test]
     fn test_digest_token_known_vector() {
         assert_eq!(
-            digest_token("abc"),
+            digest_token("abc").0,
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
     }
@@ -257,10 +270,11 @@ mod tests {
     #[test]
     fn test_digests_match() {
         let digest = digest_token("a");
-        assert!(digests_match(&digest, &digest));
-        assert!(digests_match(&digest, &digest_token("b")).not());
-        assert!(digests_match(&digest, "short").not());
-        assert!(digests_match("short", &digest).not());
+        let short = TokenDigest("short".to_string());
+        assert!(digest.matches(&digest));
+        assert!(digest.matches(&digest_token("b")).not());
+        assert!(digest.matches(&short).not());
+        assert!(short.matches(&digest).not());
     }
 
     #[test]
@@ -463,5 +477,11 @@ mod tests {
         let hash = value[0]["hash"].as_str().unwrap();
         assert!(hash.starts_with("$argon2id$"));
         assert!(verify_token(&raw, hash));
+        // `TokenDigest` is a newtype only in Rust: on disk it stays a plain string, so a
+        // daemon that predates the type still parses the file.
+        assert_eq!(
+            value[0]["digest"].as_str(),
+            Some(digest_token(&raw).0.as_str())
+        );
     }
 }
