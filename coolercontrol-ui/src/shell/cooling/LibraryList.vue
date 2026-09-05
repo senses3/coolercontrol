@@ -141,19 +141,13 @@ const saveName = (): void => {
     settingsStore.libraryFolderNames = setFolderName(settingsStore.libraryFolderNames, id, name)
 }
 
-// One level: a folder dragged over another folder's list is refused rather
-// than nested, whatever the pointer says.
+// One level: a folder dragged over another folder's list is refused.
 const acceptsEntities = (_to: unknown, _from: unknown, dragged: HTMLElement): boolean =>
     dragged.dataset.folder === undefined
 
-// A collapsed folder shows no items, so there is nothing to drop between.
-// Hovering it during a drag opens it, the way a file manager does.
-//
-// This runs from inside the drag, so it unhides the list by hand rather than
-// through the store: a store write re-renders the list sortable is dragging in,
-// and its moved nodes and Vue's idea of them then disagree, which showed up as
-// the dragged profile appearing in both the folder and the root list. The state
-// catches up on drop, where a re-render is safe.
+// Hovering a collapsed folder mid-drag opens it, so there is somewhere to drop.
+// Unhidden by hand, not through the store: a store write re-renders the list
+// sortable is dragging in, and its moved nodes then disagree with Vue's.
 const autoOpened = new Map<string, HTMLElement>()
 const openHoveredFolder = (event: { related?: HTMLElement }): boolean => {
     const id = event.related?.dataset?.folder
@@ -166,17 +160,11 @@ const openHoveredFolder = (event: { related?: HTMLElement }): boolean => {
     return true
 }
 
-// Bumped after every drop to rebuild the rows from the model. The drag layer
-// moves nodes itself and hands the moved one back for Vue to re-create, and
-// across a nested drop the two disagree often enough to leave the dragged
-// profile drawn in both the folder and the root list. The model is right either
-// way (a reload always showed it correctly), so the cheap, certain fix is to
-// throw the subtree away and render it again from the model.
+// Bumped after every drop to rebuild the rows from the model, which is right
+// even when the drag layer's moved nodes and Vue's disagree.
 const renderKey = ref(0)
 
-// Only the folder the item landed in stays open. Without this, dragging past
-// three collapsed folders would leave all three open, which is the clutter the
-// user collapsed them to be rid of.
+// Only the folder the item landed in stays open; auto-opened ones re-collapse.
 const onDragEnd = (event: { to?: HTMLElement }): void => {
     const landedIn = event.to?.dataset?.folderItems
     for (const [id, items] of autoOpened) {
@@ -197,8 +185,7 @@ const cancelRename = (): void => {
 </script>
 
 <template>
-    <!-- One root, not a fragment: the panel spaces the two sections apart with
-         a class on the component, which only lands on a single root. -->
+    <!-- One root, not a fragment: the panel's spacing class needs a single root. -->
     <div class="flex flex-col gap-0.5">
         <div class="flex items-center justify-between px-3 pb-1 pt-1">
             <span class="text-xs uppercase text-text-color-secondary opacity-70">{{ label }}</span>
@@ -297,8 +284,7 @@ const cancelRename = (): void => {
                             </div>
                         </template>
                     </div>
-                    <!-- v-show, not v-if: the drag layer keeps its instance, so a
-                         collapsed folder is still a place a drop can land. -->
+                    <!-- v-show, not v-if: a collapsed folder must stay a drop target. -->
                     <VueDraggable
                         v-show="isExpanded(id)"
                         :data-folder-items="id"

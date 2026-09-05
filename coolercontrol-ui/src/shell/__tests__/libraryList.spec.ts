@@ -1,12 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// What the panel makes of the lists the folder module builds. The drag itself
-// is not here and cannot be: jsdom has no layout, so sortable never moves
-// anything, and a test that faked the move would only assert the fake. What is
-// worth pinning is the rest: that a folder renders with its items under it,
-// that collapsing hides them, and that creating and abandoning a folder leaves
-// the settings exactly as they were.
+// Rendering only. jsdom has no layout, so sortable never moves anything and a
+// faked move would assert the fake.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'

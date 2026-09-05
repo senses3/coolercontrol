@@ -1,20 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// One flat level of user-named folders over the Profiles and Functions lists in
-// the Cooling panel. Folders reuse `menuOrder` rather than adding a structure
-// beside it: the group's children list interleaves entity uids with folder ids,
-// and each folder id gets its own entry holding that folder's uids.
+// One flat level of user-named folders over the Cooling panel's Profiles and
+// Functions lists, stored in `menuOrder`: a group's children interleave entity
+// uids with folder ids, and each folder id gets its own entry.
 //
 //   { id: 'profiles', children: ['uidA', 'pf:7c2e', 'uidB'] }
 //   { id: 'pf:7c2e',  children: ['uidC', 'uidD'] }
 //
-// The panel works in the same shape, a root id list plus one uid list per
-// folder, because the drag layer moves the bound item itself between the arrays
-// it is given: a tree of row objects would splice a row into a list of uids on
-// the first drop into a folder. Names live in `libraryFolderNames`, the one new
-// UI setting. A config written before folders existed loads as every entity at
-// root.
+// Root ids plus one uid list per folder, not a row tree: the drag layer moves
+// the bound item itself, so rows would splice into a list of uids.
 
 import { v4 as uuidV4 } from 'uuid'
 import type { MenuOrderIds } from '@/models/UISettings.ts'
@@ -29,8 +24,7 @@ export interface LibraryLists {
     folderChildren: Record<string, string[]>
 }
 
-// Prefixed per kind so a profile folder can never take a function, whatever the
-// drag layer allows, and so one group's cleanup leaves the other's entries be.
+// Prefixed per kind so a profile folder can never take a function.
 const FOLDER_PREFIX: Record<LibraryKind, string> = {
     profiles: 'pf:',
     functions: 'fn:',
@@ -44,16 +38,14 @@ export function isFolderIdOfKind(id: string, kind: LibraryKind): boolean {
     return id.startsWith(FOLDER_PREFIX[kind])
 }
 
-// uuid rather than crypto.randomUUID(), which is undefined outside a secure
-// context: the web UI is reached over plain http from another machine.
+// crypto.randomUUID() is undefined outside a secure context, and the web UI is
+// reached over plain http.
 export function newFolderId(kind: LibraryKind): string {
     return `${FOLDER_PREFIX[kind]}${uuidV4()}`
 }
 
-// Builds the rows the panel renders. Entities the order has never seen land at
-// root, at the end, exactly where the flat list used to put them. An entity
-// listed twice is kept at its first mention and dropped from the rest, and one
-// whose entity is gone is dropped entirely, so neither can survive a reload.
+// Unknown entities land at root, at the end. Duplicates keep their first
+// mention, and ids without an entity are dropped.
 export function buildLibraryLists(
     menuOrder: MenuOrderIds[],
     kind: LibraryKind,
@@ -79,13 +71,9 @@ export function buildLibraryLists(
     return { rootIds, folderChildren }
 }
 
-// Callers must assign the result back to the store ref: the UI-settings save
-// watcher only fires on whole-array replacement, not on in-place mutation.
-//
-// A folder this write does not know about is kept, not dropped. UI settings are
-// saved as one blob, so a second client, or one whose copy predates the folder,
-// would otherwise take every folder with it on its next drag. Deleting is
-// `removeFolderEntry`, and nothing else.
+// Assign the result back to the store ref: the save watcher fires on whole-array
+// replacement only. Folders this write does not know about are kept, since UI
+// settings save as one blob and another client's copy may predate them.
 export function persistLibraryLists(
     menuOrder: MenuOrderIds[],
     kind: LibraryKind,
@@ -102,15 +90,12 @@ export function persistLibraryLists(
     return next
 }
 
-// The one way a folder leaves the order. Callers drop the entry before
-// persisting, so the write above does not read it back as one to keep.
+// Call before persisting, so the write above does not read the entry back.
 export function removeFolderEntry(menuOrder: MenuOrderIds[], folderId: string): MenuOrderIds[] {
     return menuOrder.filter((entry) => entry.id !== folderId)
 }
 
-// The order the rest of the app sees: the lists read top to bottom, folders
-// expanded in place. Every profile dropdown reads the entity array this sorts,
-// so filing a profile moves it there too.
+// Top to bottom, folders expanded in place.
 export function flatLibraryOrder(menuOrder: MenuOrderIds[], kind: LibraryKind): string[] {
     const order: string[] = []
     const seen = new Set<string>()
@@ -145,8 +130,7 @@ export function sortEntitiesByTree<T>(
     entities.sort((a, b) => indexOf(a) - indexOf(b))
 }
 
-// New folders go to the top, next to the button that made them, so a long list
-// does not hide the one waiting to be named.
+// Top of the list, next to the button, so a long list cannot hide it.
 export function addFolder(lists: LibraryLists, id: string): LibraryLists {
     return {
         rootIds: [id, ...lists.rootIds],
@@ -154,9 +138,7 @@ export function addFolder(lists: LibraryLists, id: string): LibraryLists {
     }
 }
 
-// The folder's items take its slot rather than the end of the list, so nothing
-// jumps somewhere else when a user unfiles it. The entities themselves are
-// never touched.
+// The folder's items take its slot, so nothing jumps elsewhere when unfiled.
 export function removeFolder(lists: LibraryLists, folderId: string): LibraryLists {
     const { [folderId]: children, ...folderChildren } = lists.folderChildren
     return {
@@ -165,8 +147,7 @@ export function removeFolder(lists: LibraryLists, folderId: string): LibraryList
     }
 }
 
-// An empty name drops the entry, which is also how a deleted folder's name is
-// cleared. Such a folder falls back to the panel's default label.
+// An empty name drops the entry and falls back to the panel's default label.
 export function setFolderName(
     names: Array<[string, string]>,
     id: string,
