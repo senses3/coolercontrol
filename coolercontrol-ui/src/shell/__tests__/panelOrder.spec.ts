@@ -11,7 +11,6 @@ import {
     setDeviceChildrenSubset,
     setGroupOrder,
     setTopLevelOrder,
-    sortEntitiesByGroup,
 } from '../panelOrder.ts'
 
 describe('orderedByGroup', () => {
@@ -83,15 +82,6 @@ describe('setDeviceChildrenSubset', () => {
     it('appends ids never ordered before', () => {
         const result = setDeviceChildrenSubset([], 'd1', ['d1_b', 'd1_a'], ['d1_a', 'd1_b'])
         expect(result[0].children).toEqual(['d1_b', 'd1_a'])
-    })
-})
-
-describe('sortEntitiesByGroup', () => {
-    it('sorts the array in place by the persisted order', () => {
-        const menuOrder: MenuOrderIds[] = [{ id: 'profiles', children: ['p2', 'p1'] }]
-        const entities = [{ uid: 'p1' }, { uid: 'p2' }, { uid: 'p3' }]
-        sortEntitiesByGroup(menuOrder, 'profiles', entities, (e) => e.uid)
-        expect(entities.map((e) => e.uid)).toEqual(['p2', 'p1', 'p3'])
     })
 })
 

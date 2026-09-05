@@ -84,23 +84,6 @@ export function setDeviceChildrenSubset(
     return setGroupOrder(menuOrder, deviceUID, reorderSubset(base, subsetIds))
 }
 
-// Sorts a store entity array in place by a group's persisted order (legacy
-// behavior: the profiles/functions arrays themselves carry the user order).
-export function sortEntitiesByGroup<T>(
-    menuOrder: MenuOrderIds[],
-    groupId: string,
-    entities: T[],
-    idOf: (item: T) => string,
-): void {
-    const entry = menuOrder.find((item) => item.id === groupId)
-    if (!entry?.children?.length) return
-    const getIndex = (item: T): number => {
-        const index = entry.children.indexOf(idOf(item))
-        return index >= 0 ? index : Number.MAX_SAFE_INTEGER
-    }
-    entities.sort((a, b) => getIndex(a) - getIndex(b))
-}
-
 // Pinned rows in the order their ids were pinned, whatever kind each row is.
 // A panel showing more than one kind must not group them: `pinnedIds` is one
 // order, so grouping would put a newly pinned item above older ones and make a
