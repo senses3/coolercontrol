@@ -12,7 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import UiSelect from '@/shell/ui/UiSelect.vue'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
-import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
@@ -74,14 +74,9 @@ const chosenOverlayMemberProfileUid = computed<string | undefined>({
         )
     },
 })
-const overlayBaseGroups = computed(() =>
-    libraryOptionGroups(
-        settingsStore.menuOrder,
-        'profiles',
-        offsetMemberProfileOptions.value.map((p) => ({ uid: p.uid, name: p.name })),
-        settingsStore.libraryFolderNames,
-        t('layout.shell.coolingPanel.newFolder'),
-    ),
+const { profileGroups } = useLibraryGroups()
+const overlayBaseGroups = profileGroups(() =>
+    offsetMemberProfileOptions.value.map((p) => ({ uid: p.uid, name: p.name })),
 )
 const nextStep = () => {
     if (chosenOverlayMemberProfile.value == null) {

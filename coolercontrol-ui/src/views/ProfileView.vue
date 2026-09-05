@@ -86,7 +86,7 @@ import UiKnob from '@/shell/ui/UiKnob.vue'
 import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiSelect from '@/shell/ui/UiSelect.vue'
-import { libraryOptionGroups, withLeadingOption } from '@/shell/cooling/libraryOptions.ts'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
 import HelpIcon from '@/components/info/HelpIcon.vue'
 
@@ -351,17 +351,12 @@ const chosenOverlayOffsetTypeModel = computed<string | undefined>({
         if (value != null) chosenOverlayOffsetType.value = value
     },
 })
-const memberProfileGroups = computed<UiOptionGroup[]>(() =>
-    libraryOptionGroups(
-        settingsStore.menuOrder,
-        'profiles',
-        memberProfileOptions.value.map((profile) => ({
-            uid: profile.uid,
-            name: profile.name,
-        })),
-        settingsStore.libraryFolderNames,
-        t('layout.shell.coolingPanel.newFolder'),
-    ),
+const { profileGroups, functionGroups: toFunctionGroups } = useLibraryGroups()
+const memberProfileGroups = profileGroups(() =>
+    memberProfileOptions.value.map((profile) => ({
+        uid: profile.uid,
+        name: profile.name,
+    })),
 )
 const chosenMemberProfileUids = computed<string[]>({
     get: () => chosenMemberProfiles.value.map((profile) => profile.uid),
@@ -371,17 +366,11 @@ const chosenMemberProfileUids = computed<string[]>({
             .filter((profile): profile is Profile => profile != null)
     },
 })
-const overlayBaseGroups = computed(() =>
-    libraryOptionGroups(
-        settingsStore.menuOrder,
-        'profiles',
-        offsetMemberProfileOptions.value.map((profile) => ({
-            uid: profile.uid,
-            name: profile.name,
-        })),
-        settingsStore.libraryFolderNames,
-        t('layout.shell.coolingPanel.newFolder'),
-    ),
+const overlayBaseGroups = profileGroups(() =>
+    offsetMemberProfileOptions.value.map((profile) => ({
+        uid: profile.uid,
+        name: profile.name,
+    })),
 )
 const chosenOverlayMemberProfileUid = computed<string | undefined>({
     get: () => chosenOverlayMemberProfile.value?.uid,
@@ -391,23 +380,8 @@ const chosenOverlayMemberProfileUid = computed<string | undefined>({
         )
     },
 })
-const defaultFunctionOption = computed(() => {
-    const found = settingsStore.functions.find((fn) => fn.uid === '0')
-    return found == null ? undefined : { label: found.name, value: found.uid }
-})
-const functionGroups = computed(() =>
-    withLeadingOption(
-        libraryOptionGroups(
-            settingsStore.menuOrder,
-            'functions',
-            settingsStore.functions
-                .filter((fn) => fn.uid !== '0')
-                .map((fn) => ({ uid: fn.uid, name: fn.name })),
-            settingsStore.libraryFolderNames,
-            t('layout.shell.coolingPanel.newFolder'),
-        ),
-        defaultFunctionOption.value,
-    ),
+const functionGroups = toFunctionGroups(() =>
+    settingsStore.functions.map((fn) => ({ uid: fn.uid, name: fn.name })),
 )
 const chosenFunctionUid = computed<string | undefined>({
     get: () => chosenFunction.value.uid,

@@ -8,7 +8,7 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
-import { libraryOptionGroups, withLeadingOption } from '@/shell/cooling/libraryOptions.ts'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { UID } from '@/models/Device.ts'
 import { Function } from '@/models/Profile.ts'
 import { computed, ref, Ref } from 'vue'
@@ -37,23 +37,9 @@ const selectedFunction: Ref<Function> = ref(
 
 const getFunctionOptions = (): any[] => settingsStore.functions
 
-const defaultFunction = computed(() => {
-    const found = getFunctionOptions().find((f) => f.uid === '0')
-    return found == null ? undefined : { label: found.name, value: found.uid }
-})
-const functionSelectGroups = computed(() =>
-    withLeadingOption(
-        libraryOptionGroups(
-            settingsStore.menuOrder,
-            'functions',
-            getFunctionOptions()
-                .filter((f) => f.uid !== '0')
-                .map((f) => ({ uid: f.uid, name: f.name })),
-            settingsStore.libraryFolderNames,
-            t('layout.shell.coolingPanel.newFolder'),
-        ),
-        defaultFunction.value,
-    ),
+const { functionGroups } = useLibraryGroups()
+const functionSelectGroups = functionGroups(() =>
+    getFunctionOptions().map((f) => ({ uid: f.uid, name: f.name })),
 )
 const selectedFunctionUidModel = computed<string | undefined>({
     get: () => selectedFunction.value?.uid,

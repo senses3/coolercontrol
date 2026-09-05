@@ -8,7 +8,7 @@
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
-import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { UID } from '@/models/Device.ts'
 import { Profile, getProfileDisplayName } from '@/models/Profile.ts'
 import { computed, ref, Ref } from 'vue'
@@ -48,14 +48,9 @@ const selectedProfile: Ref<Profile> = ref(
     ) ?? getProfileOptions()[0],
 )
 
-const profileSelectGroups = computed(() =>
-    libraryOptionGroups(
-        settingsStore.menuOrder,
-        'profiles',
-        getProfileOptions().map((p) => ({ uid: p.uid, name: getProfileDisplayName(p) })),
-        settingsStore.libraryFolderNames,
-        t('layout.shell.coolingPanel.newFolder'),
-    ),
+const { profileGroups } = useLibraryGroups()
+const profileSelectGroups = profileGroups(() =>
+    getProfileOptions().map((p) => ({ uid: p.uid, name: getProfileDisplayName(p) })),
 )
 const selectedProfileUid = computed<string | undefined>({
     get: () => selectedProfile.value?.uid,

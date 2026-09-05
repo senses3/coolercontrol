@@ -48,7 +48,7 @@ import {
 import UiButton from '@/shell/ui/UiButton.vue'
 import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
-import { libraryOptionGroups } from '@/shell/cooling/libraryOptions.ts'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import UiSlider from '@/shell/ui/UiSlider.vue'
 import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
 
@@ -95,14 +95,9 @@ const controlModeOptions = computed(() => [
     { label: t('layout.shell.coolingPage.modeUnmanaged'), value: 'unmanaged' },
 ])
 
-const profileGroups = computed(() =>
-    libraryOptionGroups(
-        settingsStore.menuOrder,
-        'profiles',
-        settingsStore.profiles.filter((profile) => profile.uid !== '0'),
-        settingsStore.libraryFolderNames,
-        t('layout.shell.coolingPanel.newFolder'),
-    ),
+const { profileGroups: toProfileGroups } = useLibraryGroups()
+const profileGroups = toProfileGroups(() =>
+    settingsStore.profiles.filter((profile) => profile.uid !== '0'),
 )
 
 // ----- chain strip -----
