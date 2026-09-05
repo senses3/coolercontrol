@@ -38,6 +38,7 @@ const DEFAULT_MAX_NO_DUTY_SET_SECONDS: f64 = 30.;
 const MIN_NO_DUTY_SET_SECONDS: f64 = 30.;
 const MAX_NO_DUTY_SET_SECONDS: f64 = 60.;
 const EMERGENCY_MISSING_TEMP: Temp = 100.;
+const MAX_DUTY: Duty = 100;
 
 /// Triple Exponential Moving Average (EMA of EMA of EMA).
 ///
@@ -332,10 +333,16 @@ impl FunctionStandardPreProcessor {
         if data.profile.speed_profile.is_empty() {
             return false;
         }
+        let (step_increase_min, step_increase_max, step_decrease_min, step_decrease_max) =
+            FunctionDutyThresholdPostProcessor::determine_step_sizes(&data.profile.function);
+        // A duty diff can never exceed 100, so a max step of 100 never clamps
+        // and there is never a remainder to continue. This is the default
+        // function, so keep it off the interpolation below entirely.
+        if step_increase_max >= MAX_DUTY && step_decrease_max >= MAX_DUTY {
+            return false;
+        }
         let target_duty =
             utils::interpolate_profile(&data.profile.speed_profile, metadata.last_applied_temp);
-        let (step_increase_min, _, step_decrease_min, _) =
-            FunctionDutyThresholdPostProcessor::determine_step_sizes(&data.profile.function);
         // An equal target needs no step. Anything short of the min step is the
         // limiter's own deadband and belongs to the safety latch, not here.
         match target_duty.cmp(&last_applied_duty) {
@@ -1960,6 +1967,34 @@ mod tests {
         assert!(
             FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
             "the symmetric min step must apply to the decrease side"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_skips_interpolation_without_a_max_clamp() {
+        // Goal: the default function (step_size_max=100) can never be clamped,
+        // so the fast path must reject before interpolating. Verified through
+        // behaviour: a remainder that would otherwise continue must not.
+        let data = create_continuation_test_data(2, 100, 0, 0);
+        let metadata = continuation_metadata(50.0, Some(80));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "a max step of 100 never clamps, so there is nothing to continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_fires_when_only_one_direction_is_clamped() {
+        // Goal: the fast path needs BOTH directions unclamped. An asymmetric
+        // function with a free increase but a clamped decrease must still
+        // continue a downward ramp.
+        let data = create_continuation_test_data(2, 100, 1, 1);
+        let metadata = continuation_metadata(50.0, Some(80));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data),
+            "a clamped decrease must continue even when the increase is free"
         );
     }
 
