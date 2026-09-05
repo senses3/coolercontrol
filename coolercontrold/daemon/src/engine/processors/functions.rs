@@ -17,6 +17,7 @@
  */
 
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::{HashMap, VecDeque};
 use std::ops::Not;
 use std::rc::Rc;
@@ -258,7 +259,13 @@ impl FunctionStandardPreProcessor {
                 data
             }
         } else if oldest_temp_within_tolerance {
-            data // Nothing to apply.
+            if Self::should_continue_stepping(metadata, data) {
+                // Replay the accepted temp so the step limiter can take its
+                // next step. The stack and last_applied_temp stay untouched,
+                // so the hysteresis deadband is unaffected.
+                data.temp = Some(metadata.last_applied_temp);
+            }
+            data
         } else {
             // Should use temp from hysteresis stack.
             data.temp = Some(oldest_temp_celsius);
@@ -306,6 +313,36 @@ impl FunctionStandardPreProcessor {
             return true;
         }
         false
+    }
+
+    /// True when the duty step limiter clamped the last write short of the
+    /// target duty for the already-accepted temp. Without this the chain stops
+    /// running as soon as the temp goes flat, which leaves the 30 second safety
+    /// latch as the only thing that advances a rate-limited ramp.
+    /// Compares against `last_applied_temp` rather than the live temp so that
+    /// the target is fixed for the length of the ramp and the deadband holds.
+    fn should_continue_stepping(
+        metadata: &ChannelSettingMetadata,
+        data: &SpeedProfileData,
+    ) -> bool {
+        let Some(last_applied_duty) = metadata.last_applied_duty else {
+            return false; // No duty history yet, nothing to continue.
+        };
+        debug_assert!(last_applied_duty <= 100, "duty must be in valid range");
+        if data.profile.speed_profile.is_empty() {
+            return false;
+        }
+        let target_duty =
+            utils::interpolate_profile(&data.profile.speed_profile, metadata.last_applied_temp);
+        let (step_increase_min, _, step_decrease_min, _) =
+            FunctionDutyThresholdPostProcessor::determine_step_sizes(&data.profile.function);
+        // An equal target needs no step. Anything short of the min step is the
+        // limiter's own deadband and belongs to the safety latch, not here.
+        match target_duty.cmp(&last_applied_duty) {
+            Ordering::Less => last_applied_duty - target_duty >= step_decrease_min,
+            Ordering::Greater => target_duty - last_applied_duty >= step_increase_min,
+            Ordering::Equal => false,
+        }
     }
 
     fn temp_within_tolerance(temp_to_verify: f64, last_applied_temp: f64, deviance: f64) -> bool {
@@ -830,6 +867,7 @@ mod tests {
     };
     use crate::engine::{NormalizedGraphProfile, SpeedProfileData, TempSource};
     use crate::setting::{Function, FunctionKind};
+    use std::ops::Not;
 
     #[test]
     #[allow(clippy::float_cmp)]
@@ -1814,6 +1852,143 @@ mod tests {
         assert!(
             !FunctionStandardPreProcessor::should_bypass_for_upward_temp(&mut metadata, &mut data),
             "should not bypass when there is no temp history"
+        );
+    }
+
+    // ==================== should_continue_stepping tests ====================
+
+    /// Builds the data for a continuation check. The curve is linear from
+    /// 20C/20% to 80C/100%, so 50C interpolates to 60%.
+    fn create_continuation_test_data(
+        step_size_min: u8,
+        step_size_max: u8,
+        step_size_min_decreasing: u8,
+        step_size_max_decreasing: u8,
+    ) -> SpeedProfileData {
+        let mut data = create_bypass_test_data(vec![(20.0, 20), (80.0, 100)], step_size_min);
+        let profile = std::rc::Rc::get_mut(&mut data.profile).unwrap();
+        profile.function.step_size_max = step_size_max;
+        profile.function.step_size_min_decreasing = step_size_min_decreasing;
+        profile.function.step_size_max_decreasing = step_size_max_decreasing;
+        data
+    }
+
+    fn continuation_metadata(
+        last_applied_temp: f64,
+        last_applied_duty: Option<u8>,
+    ) -> super::ChannelSettingMetadata {
+        let mut metadata = super::ChannelSettingMetadata::new();
+        metadata.last_applied_temp = last_applied_temp;
+        metadata.last_applied_duty = last_applied_duty;
+        metadata
+    }
+
+    #[test]
+    fn continue_stepping_fires_on_a_clamped_decrease() {
+        // Goal: the max decreasing step left the fan short of the target, so
+        // the ramp must continue. 50C targets 60%, the fan sits at 80%.
+        let data = create_continuation_test_data(1, 100, 1, 1);
+        let metadata = continuation_metadata(50.0, Some(80));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data),
+            "a 20% remainder above the 1% min step must continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_fires_on_a_clamped_increase() {
+        // Goal: the same in the increasing direction. 50C targets 60%, the
+        // fan sits at 40%.
+        let data = create_continuation_test_data(1, 1, 1, 1);
+        let metadata = continuation_metadata(50.0, Some(40));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data),
+            "a 20% remainder above the 1% min step must continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_stops_on_target() {
+        // Goal: the ramp must terminate once the fan is on the curve target.
+        // Without this the chain would run and re-write the same duty forever.
+        let data = create_continuation_test_data(1, 100, 1, 1);
+        let metadata = continuation_metadata(50.0, Some(60));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "an exact target match must not continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_stops_below_the_min_decreasing_step() {
+        // Goal: a remainder under the min step is the limiter's own deadband.
+        // Clearing it is the safety latch's job, not the continuation's.
+        // 50C targets 60%, the fan sits at 65%, min decreasing step is 10.
+        let data = create_continuation_test_data(2, 100, 10, 20);
+        let metadata = continuation_metadata(50.0, Some(65));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "a 5% remainder under the 10% min decreasing step must not continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_stops_below_the_min_increasing_step() {
+        // Goal: the same guard on the increasing side. 50C targets 60%, the
+        // fan sits at 55%, min increasing step is 10.
+        let data = create_continuation_test_data(10, 20, 0, 0);
+        let metadata = continuation_metadata(50.0, Some(55));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "a 5% remainder under the 10% min increasing step must not continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_uses_the_symmetric_min_step() {
+        // Goal: with step_size_min_decreasing=0 the decrease side must mirror
+        // step_size_min, matching determine_step_sizes. Min step 10, so a 5%
+        // remainder must not continue.
+        let data = create_continuation_test_data(10, 100, 0, 0);
+        let metadata = continuation_metadata(50.0, Some(65));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "the symmetric min step must apply to the decrease side"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_stops_without_duty_history() {
+        // Goal: before the first application there is nothing to continue.
+        let data = create_continuation_test_data(1, 100, 1, 1);
+        let metadata = continuation_metadata(50.0, None);
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "no duty history must not continue"
+        );
+    }
+
+    #[test]
+    fn continue_stepping_stops_on_an_empty_speed_profile() {
+        // Goal: an empty curve cannot be interpolated, so refuse rather than
+        // ramp toward the 0% that interpolate_profile returns for one.
+        let mut data = create_continuation_test_data(1, 100, 1, 1);
+        std::rc::Rc::get_mut(&mut data.profile)
+            .unwrap()
+            .speed_profile
+            .clear();
+        let metadata = continuation_metadata(50.0, Some(80));
+
+        assert!(
+            FunctionStandardPreProcessor::should_continue_stepping(&metadata, &data).not(),
+            "an empty speed profile must not continue"
         );
     }
 

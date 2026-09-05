@@ -351,6 +351,35 @@ mod engine_tests {
         function_uid
     }
 
+    fn create_standard_function_with_asymmetric_steps(
+        config: &Config,
+        response_delay: u8,
+        deviance: f64,
+        only_downward: bool,
+        step_size_min: Duty,
+        step_size_max: Duty,
+        step_size_min_decreasing: Duty,
+        step_size_max_decreasing: Duty,
+    ) -> FunctionUID {
+        let function_uid = Uuid::new_v4().to_string();
+        let function = Function {
+            uid: function_uid.clone(),
+            name: "StandardFunction".to_string(),
+            step_size_min,
+            step_size_max,
+            step_size_min_decreasing,
+            step_size_max_decreasing,
+            kind: FunctionKind::Standard {
+                deviance: Some(deviance),
+                only_downward: Some(only_downward),
+                response_delay: Some(response_delay),
+            },
+            ..Default::default()
+        };
+        config.set_function(function).unwrap();
+        function_uid
+    }
+
     fn create_identity_function_with_bypass(
         config: &Config,
         step_size_min: Duty,
@@ -1358,6 +1387,254 @@ mod engine_tests {
                 *speeds.last().unwrap(),
                 100,
                 "bypass should let the fan reach exactly 100% despite step_size_min=20"
+            );
+        });
+    }
+
+    /// Runs `cycle_count` processing cycles with the temp source held at
+    /// `temp_celsius`. Each cycle gets its own scope so spawned speed tasks
+    /// complete before the next one starts.
+    async fn process_cycles(
+        engine: &Engine,
+        device: &DeviceLock,
+        temp_name: &TempName,
+        temp_celsius: Temp,
+        cycle_count: usize,
+    ) {
+        for _ in 0..cycle_count {
+            set_temp_status(device, temp_name, temp_celsius);
+            let cycle_result: Result<()> = moro_local::async_scope!(|scope| {
+                engine.process_scheduled_speeds(scope);
+                Ok(())
+            })
+            .await;
+            cycle_result.unwrap();
+        }
+    }
+
+    /// The curve shared by the ramp continuation tests. 45C interpolates to
+    /// 34% and 75C to 65%, giving a 31% span for a 1% step to work through.
+    fn ramp_test_curve() -> Vec<(Temp, Duty)> {
+        vec![(40.0, 30), (60.0, 45), (75.0, 65), (85.0, 100)]
+    }
+
+    #[test]
+    #[serial]
+    fn test_standard_function_continues_stepping_down_with_small_steps() {
+        cc_fs::test_runtime(async {
+            // Goal: reproduce issue #602. With a max decreasing step of 1 the
+            // limiter needs many cycles to reach the target, but the hysteresis
+            // gate stops feeding the chain once the temp goes flat, so only the
+            // 30 cycle safety latch advances the fan. Verify the limiter steps
+            // once per cycle instead.
+            // Method: settle at 75C, drop to 45C, hold it flat for 20 cycles
+            // (well under the latch) and inspect only the duties applied after
+            // the settle.
+            let (device, engine, config, set_speeds, _should_fail) = setup_single_device();
+            let fan_channel_name = create_controllable_fan(&device, "fan1");
+            let temp_channel_name = create_temp(&device, "temp1");
+            let device_uid = device.borrow().uid.clone();
+
+            // The reporter's function: 1% max step down, 3s delay, 2C deviance.
+            let function_uid = create_standard_function_with_asymmetric_steps(
+                &config, 3, 2.0, false, 1, 100, 1, 1,
+            );
+            let profile_uid = create_graph_profile_with_temp_source_and_function(
+                &config,
+                ramp_test_curve(),
+                TempSource {
+                    device_uid: device_uid.clone(),
+                    temp_name: temp_channel_name.clone(),
+                },
+                &function_uid,
+            );
+
+            engine
+                .set_profile(&device_uid, &fan_channel_name, &profile_uid)
+                .await
+                .unwrap();
+
+            process_cycles(&engine, &device, &temp_channel_name, 75., 6).await;
+            let settled_count = set_speeds.borrow().len();
+            assert_eq!(
+                set_speeds.borrow().last(),
+                Some(&65),
+                "should settle on the 75C target before the drop"
+            );
+
+            process_cycles(&engine, &device, &temp_channel_name, 45., 20).await;
+
+            let speeds = set_speeds.borrow().clone();
+            let ramp = &speeds[settled_count..];
+            assert!(
+                ramp.len() >= 15,
+                "limiter should step once per cycle, got {} steps: {ramp:?}",
+                ramp.len()
+            );
+            assert_eq!(ramp[0], 64, "first step down from 65%: {ramp:?}");
+            assert!(
+                ramp.windows(2).all(|w| w[0] - w[1] == 1),
+                "every step must be exactly the 1% max decreasing step: {ramp:?}"
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_standard_function_continues_stepping_up_with_small_steps() {
+        cc_fs::test_runtime(async {
+            // Goal: the same continuation must work while ramping up. With
+            // only_downward=false the existing upward bypass never runs, so
+            // without the fix an upward ramp stalls on the latch too.
+            // Method: settle at 45C, raise to 75C, hold flat for 20 cycles.
+            let (device, engine, config, set_speeds, _should_fail) = setup_single_device();
+            let fan_channel_name = create_controllable_fan(&device, "fan1");
+            let temp_channel_name = create_temp(&device, "temp1");
+            let device_uid = device.borrow().uid.clone();
+
+            let function_uid =
+                create_standard_function_with_asymmetric_steps(&config, 3, 2.0, false, 1, 1, 1, 1);
+            let profile_uid = create_graph_profile_with_temp_source_and_function(
+                &config,
+                ramp_test_curve(),
+                TempSource {
+                    device_uid: device_uid.clone(),
+                    temp_name: temp_channel_name.clone(),
+                },
+                &function_uid,
+            );
+
+            engine
+                .set_profile(&device_uid, &fan_channel_name, &profile_uid)
+                .await
+                .unwrap();
+
+            // 10 cycles: the seeded 20C applies 30%, then the ramp to the 45C
+            // target of 34% takes 4 more single-percent steps.
+            process_cycles(&engine, &device, &temp_channel_name, 45., 10).await;
+            let settled_count = set_speeds.borrow().len();
+            assert_eq!(
+                set_speeds.borrow().last(),
+                Some(&34),
+                "should settle on the 45C target before the climb"
+            );
+
+            process_cycles(&engine, &device, &temp_channel_name, 75., 20).await;
+
+            let speeds = set_speeds.borrow().clone();
+            let ramp = &speeds[settled_count..];
+            assert!(
+                ramp.len() >= 15,
+                "limiter should step once per cycle, got {} steps: {ramp:?}",
+                ramp.len()
+            );
+            assert_eq!(ramp[0], 35, "first step up from 34%: {ramp:?}");
+            assert!(
+                ramp.windows(2).all(|w| w[1] - w[0] == 1),
+                "every step must be exactly the 1% max increasing step: {ramp:?}"
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_standard_function_stops_stepping_at_target() {
+        cc_fs::test_runtime(async {
+            // Goal: the continuation must terminate. Once the ramp reaches the
+            // curve target it must not overshoot, oscillate, or keep writing.
+            // Method: give the 31 step ramp 80 cycles, far more than it needs.
+            let (device, engine, config, set_speeds, _should_fail) = setup_single_device();
+            let fan_channel_name = create_controllable_fan(&device, "fan1");
+            let temp_channel_name = create_temp(&device, "temp1");
+            let device_uid = device.borrow().uid.clone();
+
+            let function_uid = create_standard_function_with_asymmetric_steps(
+                &config, 3, 2.0, false, 1, 100, 1, 1,
+            );
+            let profile_uid = create_graph_profile_with_temp_source_and_function(
+                &config,
+                ramp_test_curve(),
+                TempSource {
+                    device_uid: device_uid.clone(),
+                    temp_name: temp_channel_name.clone(),
+                },
+                &function_uid,
+            );
+
+            engine
+                .set_profile(&device_uid, &fan_channel_name, &profile_uid)
+                .await
+                .unwrap();
+
+            process_cycles(&engine, &device, &temp_channel_name, 75., 6).await;
+            let settled_count = set_speeds.borrow().len();
+
+            process_cycles(&engine, &device, &temp_channel_name, 45., 80).await;
+
+            let speeds = set_speeds.borrow().clone();
+            let ramp = &speeds[settled_count..];
+            assert_eq!(
+                ramp.last(),
+                Some(&34),
+                "ramp must settle exactly on the 45C target: {ramp:?}"
+            );
+            assert!(
+                ramp.iter().all(|&duty| (34..65).contains(&duty)),
+                "ramp must stay between the start and target duty: {ramp:?}"
+            );
+            assert!(
+                ramp.windows(2).all(|w| w[1] <= w[0]),
+                "a downward ramp must never step back up: {ramp:?}"
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_standard_function_holds_within_deadband_when_not_clamped() {
+        cc_fs::test_runtime(async {
+            // Goal: regression guard. The continuation must not turn the
+            // hysteresis gate into a no-op. Without a max clamp the limiter
+            // reaches the target in a single write, so a later temp drift
+            // inside the deviance band must apply nothing at all.
+            // Method: settle at 60C, drift 1C (inside the 2C band), hold for
+            // 20 cycles, which stays under the safety latch.
+            let (device, engine, config, set_speeds, _should_fail) = setup_single_device();
+            let fan_channel_name = create_controllable_fan(&device, "fan1");
+            let temp_channel_name = create_temp(&device, "temp1");
+            let device_uid = device.borrow().uid.clone();
+
+            let function_uid = create_standard_function_with_steps(&config, 3, 2.0, false, 1, 100);
+            let profile_uid = create_graph_profile_with_temp_source_and_function(
+                &config,
+                ramp_test_curve(),
+                TempSource {
+                    device_uid: device_uid.clone(),
+                    temp_name: temp_channel_name.clone(),
+                },
+                &function_uid,
+            );
+
+            engine
+                .set_profile(&device_uid, &fan_channel_name, &profile_uid)
+                .await
+                .unwrap();
+
+            process_cycles(&engine, &device, &temp_channel_name, 60., 6).await;
+            let settled_count = set_speeds.borrow().len();
+            assert_eq!(
+                set_speeds.borrow().last(),
+                Some(&45),
+                "should settle on the 60C target before the drift"
+            );
+
+            process_cycles(&engine, &device, &temp_channel_name, 61., 20).await;
+
+            let speeds = set_speeds.borrow().clone();
+            assert!(
+                speeds[settled_count..].is_empty(),
+                "drift inside the deviance band must not apply anything: {:?}",
+                &speeds[settled_count..]
             );
         });
     }
