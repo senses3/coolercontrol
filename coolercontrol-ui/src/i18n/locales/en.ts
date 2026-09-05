@@ -798,7 +798,7 @@ export default {
             stepOverrides: 'Step Overrides',
             thresholdHopping: 'Threshold Hopping',
             thresholdHoppingTooltip:
-                'When fan speed remains unchanged for 30+ seconds, step size and hysteresis limits are temporarily bypassed.\nThis ensures that fans eventually reach their target speed, even with conservative threshold settings.',
+                'When fan speed remains unchanged for 30+ seconds, the minimum step size and hysteresis limits are temporarily bypassed.\nThis ensures that fans eventually reach their target speed, even with conservative threshold settings. The maximum step size is always respected.',
             bypassMinAtExtremes: 'Always apply 0% / 100%',
             bypassMinAtExtremesTooltip:
                 'When enabled, target duties of 0% or 100% are applied even when the change is smaller than the minimum step size.\nUseful for ensuring fans fully stop or reach max RPM. Disabled by default.',

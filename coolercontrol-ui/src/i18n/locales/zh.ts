@@ -772,7 +772,7 @@ export default {
             general: '常规',
             thresholdHopping: '阈值跳跃',
             thresholdHoppingTooltip:
-                '当风扇速度保持30秒以上不变时，步长和滞后限制将被临时绕过。\n这确保风扇最终达到目标速度，即使使用保守的阈值设置。',
+                '当风扇速度保持30秒以上不变时，最小步长和滞后限制将被临时绕过。\n这确保风扇最终达到目标速度，即使使用保守的阈值设置。最大步长始终生效。',
             stepOverrides: '步长覆盖',
             bypassMinAtExtremes: '始终应用 0% / 100%',
             bypassMinAtExtremesTooltip:
