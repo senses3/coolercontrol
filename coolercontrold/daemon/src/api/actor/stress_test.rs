@@ -8,7 +8,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use log::{debug, info, warn};
+use log::{debug, info, log, warn, Level};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -120,6 +120,25 @@ impl std::fmt::Display for StressBackend {
 struct StressNgCaps {
     /// Path to the stress-ng binary, if found.
     path: Option<PathBuf>,
+}
+
+/// Why the GPU list is being enumerated, which decides how a failure is reported.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum GpuQuery {
+    /// Listing what exists. A machine with no GPU is a normal machine and the
+    /// user has nothing to fix, so a failure only informs.
+    List,
+    /// A stress test the user asked to start, which is not going to run.
+    Start,
+}
+
+impl GpuQuery {
+    const fn failure_level(self) -> Level {
+        match self {
+            Self::List => Level::Info,
+            Self::Start => Level::Warn,
+        }
+    }
 }
 
 struct StressTestActor {
@@ -532,14 +551,17 @@ impl StressTestActor {
     /// The GPU picker list, enumerated on first use and cached thereafter.
     /// Returns an empty list when enumeration fails, which leaves the UI with
     /// "all GPUs" as its only choice rather than a broken picker.
-    async fn gpu_targets(&mut self) -> Vec<GpuTarget> {
+    async fn gpu_targets(&mut self, asked_by: GpuQuery) -> Vec<GpuTarget> {
         if let Some(targets) = self.gpu_targets.as_ref() {
             return targets.clone();
         }
         let targets = match Self::enumerate_gpu_targets().await {
             Ok(targets) => targets,
             Err(e) => {
-                warn!("Could not enumerate GPUs for stress testing: {e}");
+                log!(
+                    asked_by.failure_level(),
+                    "Could not enumerate GPUs for stress testing: {e}"
+                );
                 return Vec::new();
             }
         };
@@ -593,7 +615,7 @@ impl StressTestActor {
     /// unknown ID is an error: silently falling back to every GPU would load
     /// hardware the user did not ask to load.
     async fn resolve_gpu_target(&mut self, gpu_id: &str) -> Result<GpuTarget> {
-        self.gpu_targets()
+        self.gpu_targets(GpuQuery::Start)
             .await
             .into_iter()
             .find(|target| target.id == gpu_id)
@@ -1017,7 +1039,7 @@ impl ApiActor<StressTestMessage> for StressTestActor {
                 let _ = respond_to.send(Ok(()));
             }
             StressTestMessage::ListGpus { respond_to } => {
-                let targets = self.gpu_targets().await;
+                let targets = self.gpu_targets(GpuQuery::List).await;
                 let _ = respond_to.send(targets);
             }
             StressTestMessage::StartRam {
@@ -1478,6 +1500,23 @@ impl StressTestHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Goal: a GPU-less machine must not be warned on every listing, since there is nothing
+    /// for the user to fix, while a stress test that cannot start still warrants a warning.
+    /// Methodology: read the level each query kind reports a failed enumeration at.
+    #[test]
+    fn only_a_requested_stress_test_warns_about_missing_gpus() {
+        assert_eq!(
+            GpuQuery::List.failure_level(),
+            Level::Info,
+            "Listing GPUs on a machine that has none is expected"
+        );
+        assert_eq!(
+            GpuQuery::Start.failure_level(),
+            Level::Warn,
+            "A stress test the user started is not going to run"
+        );
+    }
 
     #[test]
     fn stress_test_status_defaults() {
