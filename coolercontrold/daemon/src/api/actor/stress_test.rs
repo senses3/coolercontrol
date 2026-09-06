@@ -139,6 +139,17 @@ impl GpuQuery {
             Self::Start => Level::Warn,
         }
     }
+
+    /// Whether this query still has something to say once `reported` has been logged for the
+    /// current outage. A GPU-less machine is listed on every UI load, so a repeat is dropped;
+    /// a Start still warns after a List has only informed.
+    const fn worth_reporting_after(self, reported: Option<Self>) -> bool {
+        match reported {
+            None => true,
+            Some(Self::List) => matches!(self, Self::Start),
+            Some(Self::Start) => false,
+        }
+    }
 }
 
 struct StressTestActor {
@@ -153,6 +164,10 @@ struct StressTestActor {
     /// init. `None` until the first successful enumeration, so a transient
     /// failure does not stick.
     gpu_targets: Option<Vec<GpuTarget>>,
+    /// How the current enumeration outage was already reported, so the retry
+    /// that every listing performs does not repeat the line. Cleared once
+    /// enumeration works.
+    gpu_failure_reported: Option<GpuQuery>,
     cpu_child: Option<Child>,
     cpu_duration_secs: Option<u16>,
     cpu_backend: Option<StressBackend>,
@@ -252,6 +267,7 @@ impl StressTestActor {
             sender,
             stress_ng,
             gpu_targets: None,
+            gpu_failure_reported: None,
             cpu_child: None,
             cpu_duration_secs: None,
             cpu_backend: None,
@@ -558,13 +574,17 @@ impl StressTestActor {
         let targets = match Self::enumerate_gpu_targets().await {
             Ok(targets) => targets,
             Err(e) => {
-                log!(
-                    asked_by.failure_level(),
-                    "Could not enumerate GPUs for stress testing: {e}"
-                );
+                if asked_by.worth_reporting_after(self.gpu_failure_reported) {
+                    log!(
+                        asked_by.failure_level(),
+                        "Could not enumerate GPUs for stress testing: {e}"
+                    );
+                    self.gpu_failure_reported = Some(asked_by);
+                }
                 return Vec::new();
             }
         };
+        self.gpu_failure_reported = None;
         self.gpu_targets = Some(targets.clone());
         targets
     }
@@ -1515,6 +1535,45 @@ mod tests {
             GpuQuery::Start.failure_level(),
             Level::Warn,
             "A stress test the user started is not going to run"
+        );
+    }
+
+    /// Goal: enumeration is retried on every listing, so a GPU-less machine must log the failure
+    /// once, while a Start must still warn after a List has only informed.
+    /// Methodology: ask each query kind what it adds to each already reported state.
+    #[test]
+    fn an_enumeration_failure_is_reported_once_per_outage() {
+        assert!(
+            GpuQuery::List.worth_reporting_after(None),
+            "The first failure is always reported"
+        );
+        assert!(
+            GpuQuery::Start.worth_reporting_after(None),
+            "The first failure is always reported"
+        );
+
+        assert!(
+            GpuQuery::List
+                .worth_reporting_after(Some(GpuQuery::List))
+                .not(),
+            "Every listing retries, so the info line must not repeat"
+        );
+        assert!(
+            GpuQuery::Start.worth_reporting_after(Some(GpuQuery::List)),
+            "A stress test that cannot start warrants a warning the info line did not give"
+        );
+
+        assert!(
+            GpuQuery::List
+                .worth_reporting_after(Some(GpuQuery::Start))
+                .not(),
+            "A listing adds nothing after a warning"
+        );
+        assert!(
+            GpuQuery::Start
+                .worth_reporting_after(Some(GpuQuery::Start))
+                .not(),
+            "The warning stands until enumeration works again"
         );
     }
 
