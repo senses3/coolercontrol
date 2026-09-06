@@ -19,7 +19,7 @@ automatically. They are included here for reference:
       1. with new Release version and date
       2. plus any changes to screenshots and/or description
 
-3. Update Packaging Settings (replaced with script)
+3. Update Packaging Settings (replaced with `make bump` target)
    1. Update `packaging/fedora/coolercontrol.spec`,`packaging/fedora/coolercontrold.spec`
       1. Version near the top
       2. Changelog at the bottom
@@ -46,8 +46,7 @@ automatically. They are included here for reference:
       8. check that the release notes look correct (gitlab -> Deployment -> Releases)
       9. close the current Milestone
       10. create the next release milestone (can easily change the milestone name/version later)
-   5. Cloudsmith: Verify amd and arm package uploads are all present. Both are built by CI now, so a
-      missing one means a failed job rather than a step to do by hand.
+   5. Apt Repo: Verify amd and arm package uploads were successful.
    6. DockerHub: Adjust Image links on main page
    7. Copr: Adjust git tag version for each package and trigger new builds.
    8. Merge any website changes to be made.
