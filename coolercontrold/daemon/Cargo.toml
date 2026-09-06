@@ -202,7 +202,6 @@ tonic = { version = "0.14.6", default-features = false, features = [
 prost = "0.14.4"
 tonic-prost = "0.14.6"
 tonic-health = "0.14.6"
-tonic-reflection = "0.14.6"
 # Pure Rust (libc only, no libsystemd C dependency). 0.5 for
 # `watchdog_enabled() -> Option<Duration>`; 0.4 used an out-parameter.
 sd-notify = "0.5.0"

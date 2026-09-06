@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use protox::prost::Message;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,7 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
     // Compile the protos with the pure-Rust protox compiler, then hand tonic the resulting descriptor
     // set for code generation. This removes protoc as a system build dependency. protox supports
     // proto3 optional natively, so no experimental protoc arg is needed.
@@ -47,12 +45,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "resources/proto/coolercontrol/device_service/v1/device_service.proto",
         ],
         ["resources/proto"],
-    )?;
-    // compile_fds does not persist the descriptor set, so write it ourselves for the reflection
-    // service (grpc_api loads it via include_file_descriptor_set!).
-    std::fs::write(
-        out_dir.join("device_service_descriptor.bin"),
-        file_descriptor_set.encode_to_vec(),
     )?;
     tonic_prost_build::configure()
         .build_server(true)
