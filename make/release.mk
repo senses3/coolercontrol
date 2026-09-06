@@ -36,7 +36,7 @@ assets-qt: build-qt
 	@mkdir -p assets-built
 	@cp $(qt_dir)/build/coolercontrol ./assets-built/
 
-# cargo vendored crates (consumed by the deb/OBS source builds)
+# cargo vendored crates (consumed by the deb source builds)
 vendor:
 	@$(MAKE) -C $(daemon_dir) vendor
 	@cd $(daemon_dir) && tar -czf ../coolercontrold-vendor.tar.gz vendor .cargo
