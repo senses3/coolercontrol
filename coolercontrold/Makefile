@@ -73,12 +73,12 @@ dev-run: sync-app
 	@$(CARGO) build
 	@sudo ./target/debug/coolercontrold
 
-# requires minor dependency patch to pass rh checks
-# See: https://bugzilla.redhat.com/show_bug.cgi?id=1541318#c13
+# Some crates ship .rs files with the exec bit set, which fails Fedora's brp-mangle-shebangs
+# on the leading `#![allow(...)]`. See: https://bugzilla.redhat.com/show_bug.cgi?id=1541318#c13
 vendor:
 	@mkdir -p .cargo
 	@$(CARGO) vendor --locked > .cargo/config.toml
-	@-chmod -x vendor/brotli-decompressor/src/*.rs
+	@find vendor -type f -name '*.rs' -exec chmod a-x {} +
 
 clean: clean-app
 	@-$(RM) -rf target
