@@ -77,7 +77,7 @@ popd
 %systemd_postun_with_restart %{name}.service
 
 %changelog
-* Sat Aug 08 2026 Guy Boldon <gb@guyboldon.com> - 5.0.0-1
+* Sun Sep 06 2026 Guy Boldon <gb@guyboldon.com> - 5.0.0-1
 - 5.0.0 Release
 
 * Sat May 23 2026 Guy Boldon <gb@guyboldon.com> - 4.3.1-1

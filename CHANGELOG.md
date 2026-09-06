@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Release notes are automatically generated from this file and git tags.
 -->
 
-## [5.0.0] - 2026-08-31
+## [5.0.0] - 2026-09-06
 
 ### Added
 
