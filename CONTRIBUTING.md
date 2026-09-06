@@ -36,7 +36,7 @@ not only to keep the project maintainable, but also to provide consistent value 
 Contributions are made to this repo via Issues and Merge Requests (MRs). A few general guidelines
 that cover both:
 
-- Search for existing [Issues](https://gitlab.com/coolercontrol/coolercontrol/-/issues) and
+- Search for existing [Issues](https://gitlab.com/coolercontrol/coolercontrol/-/work_items) and
   [MRs](https://gitlab.com/coolercontrol/coolercontrol/-/merge_requests) before creating your own.
 - We work hard to make sure issues are handled in a timely manner but, depending on the impact, it
   could take a while to investigate the root cause. A friendly ping in the comment thread to the

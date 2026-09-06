@@ -101,14 +101,14 @@ motherboard fans, USB AIOs, GPU fan control, laptops, and HDDs.
 
 ## Problems and Questions
 
-- Open an [issue on GitLab](https://gitlab.com/coolercontrol/coolercontrol/-/issues) using one of
-  the provided templates. Daemon logs are invaluable for bug reports.
+- Open an [issue on GitLab](https://gitlab.com/coolercontrol/coolercontrol/-/work_items) using one
+  of the provided templates. Daemon logs are invaluable for bug reports.
 - Join the [Discord](https://discord.gg/MbcgUFAfhV) for general questions and community support.
 
 ## Contributing
 
 Contributions are welcome. Please open an
-[issue](https://gitlab.com/coolercontrol/coolercontrol/-/issues/) or discuss on
+[issue](https://gitlab.com/coolercontrol/coolercontrol/-/work_items) or discuss on
 [Discord](https://discord.gg/MbcgUFAfhV) before submitting changes. See the
 [contributing guidelines](https://gitlab.com/coolercontrol/coolercontrol/-/blob/main/CONTRIBUTING.md)
 for details.
