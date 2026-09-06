@@ -171,6 +171,9 @@ Release notes are automatically generated from this file and git tags.
 - Plugin services are restarted rather than replaced on a configuration change, and a service is
   installed when its plugin is enabled
 - Plugins running under OpenRC require OpenRC 0.45 or newer
+- Access tokens are validated against a SHA-256 digest instead of argon2, so an authenticated
+  request no longer pays a password hash on every call; the argon2 hash is still written for
+  backward compatibility.
 
 ### Fixed
 
@@ -221,6 +224,13 @@ Release notes are automatically generated from this file and git tags.
 - The Qt tray alert icon keeps its `-symbolic` suffix and falls back to the pre-rename name
 - The application SVG opens within gdk-pixbuf's 256-byte sniff window, so more icon loaders render
   it
+- A Standard Function with a maximum step size advanced only one step every 30 seconds once the
+  temperature went flat, because the step limiter stopped running and the safety latch was left to
+  move the fan. The limiter now carries the ramp through to its target, including the last step to
+  0% or 100% when "Always apply 0% / 100%" is enabled, and the Threshold Hopping tooltip says that
+  the maximum step size is always respected (#602)
+- Malformed HTTP Basic credentials are rejected instead of panicking the request
+- Repeated daemon warnings are reported once per outage rather than every tick.
 
 ### Removed
 
@@ -230,6 +240,7 @@ Release notes are automatically generated from this file and git tags.
 - The legacy shell and Control views, and the per-device Settings tab
 - PrimeVue, element-plus, vue-flow and radix-vue dependencies
 - The `notify` subcommand, and the unused `colors` field from the LCD settings enum
+- The gRPC server reflection service, and its build dependency
 
 ### Security
 
@@ -243,6 +254,7 @@ Release notes are automatically generated from this file and git tags.
   the manifest; restored credentials are written owner-only
 - Dependencies updated to clear audit advisories
 - Plugin services run with new privileges denied, and plugin folder ownership is hardened
+- Failed authentication attempts are throttled per client address
 
 ## [4.3.1] - 2026-05-23
 
