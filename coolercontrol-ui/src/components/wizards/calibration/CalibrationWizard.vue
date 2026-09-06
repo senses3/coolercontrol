@@ -1,20 +1,7 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
@@ -25,20 +12,29 @@ import {
     mdiCircleOutline,
     mdiInformationSlabCircleOutline,
     mdiLoading,
+    mdiMinus,
     mdiMinusCircleOutline,
     mdiTuneVerticalVariant,
 } from '@mdi/js'
-import Button from 'primevue/button'
-import Checkbox from 'primevue/checkbox'
-import InputNumber from 'primevue/inputnumber'
+import PanelHeader from '@/shell/PanelHeader.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiCheckbox from '@/shell/ui/UiCheckbox.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiProgressBar from '@/shell/ui/UiProgressBar.vue'
+import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
 import { computed, inject, onMounted, ref, type Ref } from 'vue'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useCalibrationStore } from '@/stores/CalibrationStore.ts'
+import { useAlertCalibrationGuard } from '@/composables/useAlertCalibrationGuard.ts'
+import { useCalibrationStatusText } from '@/composables/useCalibrationStatusText.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
+import { isFirmwareCurveEnabled } from '@/models/CCSettings.ts'
+import { firmwareCurveApplicable } from '@/shell/cooling/firmwareCurve.ts'
+import type { Profile } from '@/models/Profile.ts'
 import type { CalibrationBatchEntry, CalibrationStage } from '@/models/Calibration.ts'
 
 const dialogRef: Ref<DynamicDialogInstance> = inject('dialogRef')!
@@ -48,12 +44,16 @@ const toast = useToast()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
+const { blockingAlertName, watchingAlertCount } = useAlertCalibrationGuard()
+const { warningText } = useCalibrationStatusText()
 
 // The daemon owns the batch, so on open we resume an in-progress run
 // rather than always starting at the picker.
 const batchActive = (): boolean => calibrationStore.batchStatus?.active === true
 const step: Ref<number> = ref(batchActive() ? 2 : 1)
 onMounted(async () => {
+    // Refresh alert states so the active-alert blocking hints are current.
+    settingsStore.loadAlertsAndLogs().catch(() => {})
     await calibrationStore.ensureBatchPolling()
     if (batchActive()) step.value = 2
 })
@@ -66,18 +66,25 @@ interface FanRow {
     color: string
     selected: boolean
     alreadyCalibrated: boolean
+    firmwareControlled: boolean
 }
 const fanRows: Ref<Array<FanRow>> = ref([])
 // When launched from Auto-Create, the dialog passes the fans being assigned so they are pre-selected
 // instead of the default (all uncalibrated).
 const preselectKeys = ((): Set<string> | null => {
     const preselect = dialogRef.value.data?.preselect as
-        | Array<{ deviceUID: string; channelName: string }>
-        | undefined
+        Array<{ deviceUID: string; channelName: string }> | undefined
     return preselect == null
         ? null
         : new Set(preselect.map((fan) => `${fan.deviceUID}||${fan.channelName}`))
 })()
+const assignedProfile = (deviceUID: string, channelName: string): Profile | undefined => {
+    const profileUID = settingsStore.allDaemonDeviceSettings
+        .get(deviceUID)
+        ?.settings.get(channelName)?.profile_uid
+    if (profileUID == null || profileUID === '0') return undefined
+    return settingsStore.profiles.find((profile) => profile.uid === profileUID)
+}
 const fillFans = (): void => {
     fanRows.value.length = 0
     for (const device of deviceStore.allDevices()) {
@@ -89,6 +96,24 @@ const fillFans = (): void => {
             const sc = deviceSettings.sensorsAndChannels.get(channelName)
             const calibrated =
                 calibrationStore.statusFor(device.uid, channelName)?.phase === 'completed'
+            // Under firmware control the daemon bakes the calibration into the
+            // curve it hands the firmware, but the cold-start kick cannot be
+            // expressed there, so a sweep buys less. Still selectable.
+            // Opting in is not enough: unless the assigned profile is one the
+            // device can run itself, the daemon keeps computing the curve and
+            // calibration applies in full, so gate on the same condition.
+            const firmwareControlled =
+                isFirmwareCurveEnabled(
+                    channelInfo.speed_options?.extension,
+                    settingsStore.ccDeviceSettings
+                        .get(device.uid)
+                        ?.channel_settings.get(channelName)?.extension,
+                ) &&
+                firmwareCurveApplicable(
+                    assignedProfile(device.uid, channelName),
+                    device.uid,
+                    channelInfo.speed_options?.extension,
+                )
             fanRows.value.push({
                 deviceUID: device.uid,
                 channelName,
@@ -96,22 +121,70 @@ const fillFans = (): void => {
                 color: sc?.color ?? '#888888',
                 selected: preselectKeys
                     ? preselectKeys.has(`${device.uid}||${channelName}`)
-                    : !calibrated,
+                    : !calibrated && !firmwareControlled,
                 alreadyCalibrated: calibrated,
+                firmwareControlled,
             })
         }
     }
 }
 fillFans()
 
-const selectedRows = computed(() => fanRows.value.filter((row) => row.selected))
-const allSelected = computed(
-    () => fanRows.value.length > 0 && fanRows.value.every((row) => row.selected),
+// Channel names repeat across devices (Fan1, Fan2...), so the picker shows them
+// under their device. Rows are already collected device by device.
+interface FanGroup {
+    deviceUID: string
+    deviceName: string
+    rows: Array<FanRow>
+}
+const deviceLabel = (deviceUID: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
+const fanGroups = computed<Array<FanGroup>>(() => {
+    const groups: Array<FanGroup> = []
+    for (const row of fanRows.value) {
+        const current = groups[groups.length - 1]
+        if (current != null && current.deviceUID === row.deviceUID) current.rows.push(row)
+        else
+            groups.push({
+                deviceUID: row.deviceUID,
+                deviceName: deviceLabel(row.deviceUID),
+                rows: [row],
+            })
+    }
+    return groups
+})
+
+// A fan with a currently Active alert cannot be calibrated; the daemon
+// rejects it, so the picker keeps it out of the selection.
+const rowBlockedBy = (row: FanRow): string | undefined =>
+    blockingAlertName(row.deviceUID, row.channelName)
+// An already-calibrated fan may carry warnings (e.g. no RPM detected); surface
+// them on the picker so the user sees them before re-running, like the popover.
+const rowWarnings = (row: FanRow): string => {
+    const status = calibrationStore.statusFor(row.deviceUID, row.channelName)
+    if (status?.phase !== 'completed') return ''
+    return (status.calibration.warnings ?? []).map(warningText).join('; ')
+}
+const selectedRows = computed(() =>
+    fanRows.value.filter((row) => row.selected && rowBlockedBy(row) == null),
 )
+const allSelected = computed(() => {
+    const selectable = fanRows.value.filter((row) => rowBlockedBy(row) == null)
+    return selectable.length > 0 && selectable.every((row) => row.selected)
+})
 const toggleAll = (): void => {
     const target = !allSelected.value
-    for (const row of fanRows.value) row.selected = target
+    for (const row of fanRows.value) {
+        if (rowBlockedBy(row) != null) {
+            row.selected = false
+            continue
+        }
+        row.selected = target
+    }
 }
+// Alerts watching the selected fans are paused only while each fan's own
+// sweep runs; this is the informational note under the picker.
+const pausedAlertCount = computed(() => watchingAlertCount(selectedRows.value))
 // Master "select all" checkbox: indeterminate when only some are selected,
 // and clicking it (any state) toggles the whole list.
 const partiallySelected = computed(() => selectedRows.value.length > 0 && !allSelected.value)
@@ -166,6 +239,17 @@ const currentNumber = computed(() => {
     const index = entries.value.findIndex((entry) => entry.phase === 'running')
     return index >= 0 ? index + 1 : finishedCount.value
 })
+// One bar for the whole batch: settled fans count in full, running ones by
+// their own percent, so it advances smoothly at any concurrency.
+const batchPercent = computed(() => {
+    if (totalCount.value === 0) return 0
+    const sum = entries.value.reduce((total, entry) => {
+        if (entry.phase === 'queued') return total
+        if (entry.phase === 'running') return total + (entry.percent ?? 0)
+        return total + 100
+    }, 0)
+    return sum / totalCount.value
+})
 const doneCount = computed(() => entries.value.filter((entry) => entry.phase === 'done').length)
 const failedCount = computed(() => entries.value.filter((entry) => entry.phase === 'failed').length)
 const skippedCount = computed(
@@ -192,6 +276,16 @@ const runningText = (entry: CalibrationBatchEntry): string => {
     if (entry.stage == null || entry.percent == null)
         return t('components.wizards.calibration.queued')
     return `${stageLabel(entry.stage)} ${entry.percent}%`
+}
+
+// A completed fan's persisted calibration may carry warnings (e.g. no RPM
+// detected). Read them from the per-channel status the store refreshes on
+// batch completion, formatted like the channel popover shows them.
+const entryWarnings = (entry: CalibrationBatchEntry): string => {
+    if (entry.phase !== 'done') return ''
+    const status = calibrationStore.statusFor(entry.device_uid, entry.channel_name)
+    if (status?.phase !== 'completed') return ''
+    return (status.calibration.warnings ?? []).map(warningText).join('; ')
 }
 
 const phaseIcon = (phase: CalibrationBatchEntry['phase']): string => {
@@ -223,167 +317,250 @@ const phaseClass = (phase: CalibrationBatchEntry['phase']): string => {
 </script>
 
 <template>
-    <div class="flex flex-col justify-between min-w-96 w-[40vw] min-h-max h-[50vh]">
-        <!-- Step 1: pick fans -->
-        <div v-if="step === 1" class="flex flex-col gap-y-3 overflow-y-auto">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.calibration.pickIntro') }}
-            </small>
-            <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
-                {{ t('components.wizards.calibration.noFans') }}
-            </div>
-            <template v-else>
-                <div class="flex items-center gap-x-2 ml-1 pb-2 border-b border-border-one">
-                    <Checkbox v-model="selectAllModel" :indeterminate="partiallySelected" binary />
-                    <span class="text-sm font-medium cursor-pointer select-none" @click="toggleAll">
-                        {{ t('components.wizards.calibration.selectAll') }}
-                    </span>
-                </div>
-                <div
-                    v-for="(row, index) in fanRows"
-                    :key="row.deviceUID + row.channelName"
-                    class="flex items-center gap-x-2 ml-1"
-                >
-                    <Checkbox v-model="fanRows[index].selected" binary />
-                    <span class="pi pi-minus" :style="{ color: row.color }" />
-                    <span class="truncate">{{ row.label }}</span>
-                    <span v-if="row.alreadyCalibrated" class="text-xs text-accent">
-                        {{ t('components.wizards.calibration.calibratedBadge') }}
-                    </span>
-                </div>
-            </template>
-            <template v-if="fanRows.length > 1">
-                <div class="flex items-center justify-between gap-x-3 ml-1 mt-1">
-                    <span class="text-sm">
-                        {{ t('components.wizards.calibration.concurrencyLabel') }}
-                    </span>
-                    <InputNumber
-                        v-model="concurrency"
-                        mode="decimal"
-                        show-buttons
-                        button-layout="horizontal"
-                        :min="1"
-                        :max="fanRows.length"
-                        :step="1"
-                        :use-grouping="false"
-                        :input-style="{ width: '3rem' }"
-                    >
-                        <template #incrementicon>
-                            <span class="pi pi-plus" />
+    <div class="flex flex-col min-w-96 w-[40vw] h-[70vh]">
+        <div class="min-h-0 flex-1">
+            <UiScrollArea surface="two">
+                <!-- Step 1: pick fans -->
+                <div v-if="step === 1" class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.calibration.pickIntro') }}
+                    </small>
+                    <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
+                        {{ t('components.wizards.calibration.noFans') }}
+                    </div>
+                    <template v-else>
+                        <div class="flex items-center gap-x-2 ml-1 pb-2 border-b border-border-one">
+                            <UiCheckbox
+                                v-model="selectAllModel"
+                                :indeterminate="partiallySelected"
+                            />
+                            <span
+                                class="text-sm font-medium cursor-pointer select-none"
+                                @click="toggleAll"
+                            >
+                                {{ t('components.wizards.calibration.selectAll') }}
+                            </span>
+                        </div>
+                        <template v-for="group in fanGroups" :key="group.deviceUID">
+                            <PanelHeader :label="group.deviceName" />
+                            <div
+                                v-for="row in group.rows"
+                                :key="row.deviceUID + row.channelName"
+                                class="flex items-center gap-x-2 ml-1"
+                            >
+                                <UiCheckbox
+                                    v-model="row.selected"
+                                    :disabled="rowBlockedBy(row) != null"
+                                />
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiMinus"
+                                    :size="16"
+                                    :style="{ color: row.color }"
+                                />
+                                <span class="truncate">{{ row.label }}</span>
+                                <span v-if="rowBlockedBy(row) != null" class="text-xs text-warning">
+                                    {{
+                                        t('components.wizards.calibration.blockedByAlert', {
+                                            name: rowBlockedBy(row),
+                                        })
+                                    }}
+                                </span>
+                                <span
+                                    v-else-if="row.alreadyCalibrated && rowWarnings(row)"
+                                    v-tooltip.top="rowWarnings(row)"
+                                    class="flex min-w-0 items-center gap-x-1 text-xs text-warning"
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiAlertCircleOutline"
+                                        :size="14"
+                                        class="shrink-0"
+                                    />
+                                    <span class="truncate">{{ rowWarnings(row) }}</span>
+                                </span>
+                                <span v-else-if="row.alreadyCalibrated" class="text-xs text-accent">
+                                    {{ t('components.wizards.calibration.calibratedBadge') }}
+                                </span>
+                                <!-- Independent of the badges above: a channel can be
+                                     both calibrated and firmware-controlled. -->
+                                <span
+                                    v-if="row.firmwareControlled"
+                                    v-tooltip.top="
+                                        t('components.wizards.calibration.firmwareControlledDesc')
+                                    "
+                                    class="shrink-0 text-xs text-text-color-secondary"
+                                >
+                                    {{
+                                        t('components.wizards.calibration.firmwareControlledBadge')
+                                    }}
+                                </span>
+                            </div>
                         </template>
-                        <template #decrementicon>
-                            <span class="pi pi-minus" />
-                        </template>
-                    </InputNumber>
-                </div>
-                <span class="text-xs text-text-color-secondary ml-1">
-                    {{ t('components.wizards.calibration.concurrencyNote') }}
-                </span>
-            </template>
-            <div class="flex items-start gap-x-2 ml-1 mt-1">
-                <svg-icon
-                    type="mdi"
-                    class="shrink-0 mt-0.5"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.2)"
-                />
-                <span class="text-sm">{{ t('components.wizards.calibration.idleNote') }}</span>
-            </div>
-        </div>
-
-        <!-- Step 2: observe the daemon-driven batch -->
-        <div v-else class="flex flex-col gap-y-2 overflow-y-auto">
-            <small class="ml-1 font-light text-sm">
-                {{
-                    isActive
-                        ? t('components.wizards.calibration.running', {
-                              current: currentNumber,
-                              total: totalCount,
-                          })
-                        : t('components.wizards.calibration.summary', {
-                              done: doneCount,
-                              failed: failedCount,
-                              skipped: skippedCount,
-                          })
-                }}
-            </small>
-            <div
-                v-for="entry in entries"
-                :key="entry.device_uid + entry.channel_name"
-                class="flex items-center justify-between gap-x-3 ml-1"
-            >
-                <div class="flex items-center gap-x-2 min-w-0">
-                    <!-- overflow-hidden clips the running spinner's rotation to its own box so it
-                         does not expand the scroll container and flicker a scrollbar. -->
-                    <span class="shrink-0 inline-flex overflow-hidden">
+                    </template>
+                    <template v-if="fanRows.length > 1">
+                        <div class="flex items-center justify-between gap-x-3 ml-1 mt-1">
+                            <span class="text-sm">
+                                {{ t('components.wizards.calibration.concurrencyLabel') }}
+                            </span>
+                            <UiNumberInput
+                                v-model="concurrency"
+                                :min="1"
+                                :max="fanRows.length"
+                                :step="1"
+                            />
+                        </div>
+                        <span class="text-xs text-text-color-secondary ml-1">
+                            {{ t('components.wizards.calibration.concurrencyNote') }}
+                        </span>
+                    </template>
+                    <div v-if="pausedAlertCount > 0" class="flex items-start gap-x-2 ml-1 mt-1">
                         <svg-icon
                             type="mdi"
-                            :class="phaseClass(entry.phase)"
-                            :path="phaseIcon(entry.phase)"
+                            class="shrink-0 mt-0.5 text-warning"
+                            :path="mdiInformationSlabCircleOutline"
                             :size="deviceStore.getREMSize(1.2)"
                         />
-                    </span>
-                    <span class="truncate">{{
-                        entryLabel(entry.device_uid, entry.channel_name)
-                    }}</span>
+                        <span class="text-sm">
+                            {{
+                                t('components.wizards.calibration.alertsPausedNote', {
+                                    count: pausedAlertCount,
+                                })
+                            }}
+                        </span>
+                    </div>
+                    <div class="flex items-start gap-x-2 ml-1 mt-1">
+                        <svg-icon
+                            type="mdi"
+                            class="shrink-0 mt-0.5 text-warning"
+                            :path="mdiInformationSlabCircleOutline"
+                            :size="deviceStore.getREMSize(1.2)"
+                        />
+                        <span class="text-sm">{{
+                            t('components.wizards.calibration.idleNote')
+                        }}</span>
+                    </div>
                 </div>
-                <div class="text-right text-sm shrink-0">
-                    <span v-if="entry.phase === 'running'" class="text-accent">{{
-                        runningText(entry)
-                    }}</span>
-                    <span v-else-if="entry.phase === 'queued'" class="text-text-color-secondary">{{
-                        t('components.wizards.calibration.queued')
-                    }}</span>
-                    <span v-else-if="entry.phase === 'done'" class="text-accent">{{
-                        t('components.wizards.calibration.done')
-                    }}</span>
-                    <span
-                        v-else-if="entry.phase === 'cancelled'"
-                        class="text-text-color-secondary"
-                        >{{ t('components.wizards.calibration.skipped') }}</span
+
+                <!-- Step 2: observe the daemon-driven batch -->
+                <div v-else class="flex flex-col gap-y-2">
+                    <small class="ml-1 font-light text-sm">
+                        {{
+                            isActive
+                                ? t('components.wizards.calibration.running', {
+                                      current: currentNumber,
+                                      total: totalCount,
+                                  })
+                                : t('components.wizards.calibration.summary', {
+                                      done: doneCount,
+                                      failed: failedCount,
+                                      skipped: skippedCount,
+                                  })
+                        }}
+                    </small>
+                    <UiProgressBar
+                        v-if="isActive && totalCount > 1"
+                        :value="batchPercent"
+                        class="mx-1 mb-1"
+                    />
+                    <div
+                        v-for="entry in entries"
+                        :key="entry.device_uid + entry.channel_name"
+                        class="flex items-start justify-between gap-x-3 ml-1"
                     >
-                    <span v-else class="text-warning">{{
-                        entry.message ?? t('components.wizards.calibration.failed')
-                    }}</span>
+                        <div class="flex items-center gap-x-2 min-w-0 w-2/5 shrink-0">
+                            <!-- overflow-hidden clips the running spinner's rotation to its own box so it
+                         does not expand the scroll container and flicker a scrollbar. -->
+                            <span class="shrink-0 inline-flex overflow-hidden">
+                                <svg-icon
+                                    type="mdi"
+                                    :class="
+                                        entryWarnings(entry)
+                                            ? 'text-warning'
+                                            : phaseClass(entry.phase)
+                                    "
+                                    :path="
+                                        entryWarnings(entry)
+                                            ? mdiAlertCircleOutline
+                                            : phaseIcon(entry.phase)
+                                    "
+                                    :size="deviceStore.getREMSize(1.2)"
+                                />
+                            </span>
+                            <span class="truncate">{{
+                                entryLabel(entry.device_uid, entry.channel_name)
+                            }}</span>
+                        </div>
+                        <div class="text-right text-sm flex-1 min-w-0 break-words">
+                            <UiProgressBar
+                                v-if="entry.phase === 'running'"
+                                :value="entry.percent ?? 0"
+                                :label="runningText(entry)"
+                                class="mt-0.5"
+                            />
+                            <span
+                                v-else-if="entry.phase === 'queued'"
+                                class="text-text-color-secondary"
+                                >{{ t('components.wizards.calibration.queued') }}</span
+                            >
+                            <span
+                                v-else-if="entry.phase === 'done'"
+                                :class="entryWarnings(entry) ? 'text-warning' : 'text-accent'"
+                                >{{
+                                    entryWarnings(entry) || t('components.wizards.calibration.done')
+                                }}</span
+                            >
+                            <span
+                                v-else-if="entry.phase === 'cancelled'"
+                                class="text-text-color-secondary"
+                                >{{ t('components.wizards.calibration.skipped') }}</span
+                            >
+                            <span v-else class="text-warning">{{
+                                entry.message ?? t('components.wizards.calibration.failed')
+                            }}</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </UiScrollArea>
         </div>
 
         <!-- Footer -->
-        <div class="flex flex-row justify-between mt-4">
-            <Button
+        <div class="flex flex-row justify-between mt-4 shrink-0">
+            <UiButton
                 v-if="step === 1"
-                class="w-24 bg-bg-one"
-                :label="t('common.cancel')"
+                variant="ghost"
+                class="w-24 !bg-bg-one"
                 @click="closeDialog"
-            />
+            >
+                {{ t('common.cancel') }}
+            </UiButton>
             <div v-else />
-            <Button
+            <UiButton
                 v-if="step === 1"
-                class="bg-accent/80 hover:!bg-accent w-40"
-                :label="t('components.wizards.calibration.start')"
+                variant="solid"
+                class="w-40"
                 :disabled="selectedRows.length === 0 || starting"
                 @click="startBatch"
             >
+                {{ t('components.wizards.calibration.start') }}
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiTuneVerticalVariant"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-else-if="isActive"
-                class="w-28 bg-bg-one"
-                :label="t('common.cancel')"
+                variant="ghost"
+                class="w-28 !bg-bg-one"
                 @click="cancelBatch"
-            />
-            <Button
-                v-else
-                class="bg-accent/80 hover:!bg-accent w-28"
-                :label="t('components.wizards.calibration.close')"
-                @click="closeDialog"
-            />
+            >
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton v-else variant="solid" class="w-28" @click="closeDialog">
+                {{ t('components.wizards.calibration.close') }}
+            </UiButton>
         </div>
     </div>
 </template>

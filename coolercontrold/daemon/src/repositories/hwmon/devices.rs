@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::pci_ids;
 use crate::cc_fs;
@@ -50,6 +35,9 @@ const PATTERN_HWMON_PATH_NUMBER: &str = r"/(?P<hwmon>hwmon)(?P<number>\d+)";
 pub const HWMON_DEVICE_NAME_BLACKLIST: [&str; 1] = [
     "amdgpu", // GPU Repo handles this
 ];
+// The hardware report names the GPU repository as this list's reason, which is
+// only true while the GPU repository is the only thing in it.
+const _: () = assert!(HWMON_DEVICE_NAME_BLACKLIST.len() == 1);
 const LAPTOP_DEVICE_NAMES: [&str; 3] = ["thinkpad", "asus-nb-wmi", "asus_fan"];
 pub const DEVICE_NAME_THINK_PAD: &str = "thinkpad";
 pub const DEVICE_NAME_MAC_SMC: &str = "macsmc-hwmon";
@@ -146,7 +134,7 @@ pub async fn get_device_name(base_path: &Path) -> String {
         info!(
             "Hwmon driver at location: {} has no name set, using default: {}",
             base_path.display(),
-            &hwmon_name
+            hwmon_name
         );
         hwmon_name
     }

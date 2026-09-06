@@ -1,23 +1,8 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::cc_fs;
-use crate::device::{ChannelName, ChannelStatus, Duty, RPM};
+use crate::device::{ChannelStatus, Duty, RPM};
 use crate::repositories::hwmon::devices::DEVICE_NAME_MAC_SMC;
 use crate::repositories::hwmon::fans;
 use crate::repositories::hwmon::hwmon_repo::{
@@ -96,19 +81,15 @@ impl AppleMacSMC {
         Self::default()
     }
 
-    pub async fn init_fans(
-        base_path: &Path,
-        channels: &mut Vec<HwmonChannelInfo>,
-        disabled_channels: &[ChannelName],
-    ) {
-        match Self::init_apple_fans(base_path).await {
-            Ok(fans) => channels.extend(
-                fans.into_iter()
-                    .filter(|fan| disabled_channels.contains(&fan.name).not())
-                    .collect::<Vec<HwmonChannelInfo>>(),
-            ),
-            Err(err) => error!("Error initializing Apple Mac SMC Fans: {err}"),
-        }
+    /// Returns every detected fan, including ones the user has disabled. The
+    /// caller drops those, so both hwmon branches record the same exclusions.
+    pub async fn init_fans(base_path: &Path) -> Vec<HwmonChannelInfo> {
+        Self::init_apple_fans(base_path)
+            .await
+            .unwrap_or_else(|err| {
+                error!("Error initializing Apple Mac SMC Fans: {err}");
+                Vec::new()
+            })
     }
 
     async fn init_apple_fans(base_path: &Path) -> Result<Vec<HwmonChannelInfo>> {
@@ -168,9 +149,16 @@ impl AppleMacSMC {
         } else if Self::fan_target_is_writable(base_path, channel_number).not() {
             return Ok(()); // skip if fan_target file isn't writable
         }
-        if fans::get_fan_rpm(base_path, &channel_number, None, true)
-            .await
-            .is_none()
+        // Detection reads each attribute once, so this cache closes with the probe.
+        if fans::get_fan_rpm(
+            &cc_fs::SysfsFdCache::default(),
+            base_path,
+            &channel_number,
+            None,
+            true,
+        )
+        .await
+        .is_none()
         {
             return Ok(()); // skip if fan_input file isn't readable (no indicator of speed)
         }
@@ -357,13 +345,14 @@ impl AppleMacSMC {
     ) -> Option<ChannelStatus> {
         debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
         let fan_duty = if channel.caps.is_apple_smc() {
-            self.get_fan_duty(channel.number, channel.rpm_path.as_ref())
+            self.get_fan_duty(&driver.fds, channel.number, channel.rpm_path.as_ref())
                 .await
         } else {
             None
         };
         let fan_rpm = if channel.caps.has_rpm() {
             fans::get_fan_rpm(
+                &driver.fds,
                 &driver.path,
                 &channel.number,
                 channel.rpm_path.as_ref(),
@@ -402,6 +391,7 @@ impl AppleMacSMC {
             return Some(None);
         }
         let fan_rpm = fans::get_fan_rpm(
+            &driver.fds,
             &driver.path,
             &channel.number,
             channel.rpm_path.as_ref(),
@@ -474,7 +464,7 @@ impl AppleMacSMC {
 
     async fn get_fan_min(base_path: &Path, channel_number: u8, log_error: bool) -> Option<RPM> {
         let fan_min_path = base_path.join(format_fan_min!(channel_number));
-        cc_fs::read_sysfs(&fan_min_path)
+        cc_fs::read_sysfs_value(&fan_min_path)
             .await
             .and_then(fans::check_parsing_32)
             // Edge case where on spin-up the output is max value until it begins moving
@@ -492,7 +482,7 @@ impl AppleMacSMC {
 
     async fn get_fan_max(base_path: &Path, channel_number: u8, log_error: bool) -> Option<RPM> {
         let fan_max_path = base_path.join(format_fan_max!(channel_number));
-        cc_fs::read_sysfs(&fan_max_path)
+        cc_fs::read_sysfs_value(&fan_max_path)
             .await
             .and_then(fans::check_parsing_32)
             // Edge case where on spin-up the output is max value until it begins moving
@@ -510,10 +500,12 @@ impl AppleMacSMC {
 
     pub async fn get_fan_duty(
         &self,
+        fds: &cc_fs::SysfsFdCache,
         channel_number: u8,
         rpm_path: Option<&PathBuf>,
     ) -> Option<f64> {
         fans::get_fan_rpm(
+            fds,
             &self.path,
             &channel_number,
             rpm_path,
@@ -988,9 +980,11 @@ mod tests {
         });
     }
 
+    /// Disabled channels are dropped by the caller, not here, so that the same
+    /// place also records the exclusion for the hardware report.
     #[test]
     #[serial]
-    fn test_init_fans_with_disabled_channels() {
+    fn test_init_fans_returns_disabled_channels() {
         cc_fs::test_runtime(async {
             let ctx = setup().await;
             // given:
@@ -1010,15 +1004,13 @@ mod tests {
             cc_fs::write(test_base_path.join("fan1_max"), b"6500".to_vec())
                 .await
                 .unwrap();
-            let mut channels = vec![];
-            let disabled_channels = vec!["fan1".to_string()];
-
             // when:
-            AppleMacSMC::init_fans(test_base_path, &mut channels, &disabled_channels).await;
+            let channels = AppleMacSMC::init_fans(test_base_path).await;
 
             // then:
             teardown(&ctx).await;
-            assert!(channels.is_empty());
+            assert_eq!(channels.len(), 1);
+            assert_eq!(channels[0].name, "fan1");
         });
     }
 
@@ -1262,7 +1254,9 @@ mod tests {
             };
 
             // when:
-            let result = apple_smc.get_fan_duty(1, None).await;
+            let result = apple_smc
+                .get_fan_duty(&cc_fs::SysfsFdCache::default(), 1, None)
+                .await;
 
             // then:
             teardown(&ctx).await;
@@ -1342,6 +1336,7 @@ mod tests {
                 channels: channels.clone(),
                 drivetemp: drivetemp::DrivetempState::default(),
                 apple_smc: AppleMacSMC::not_applicable(),
+                fds: cc_fs::SysfsFdCache::default(),
             });
 
             // when:
@@ -1921,6 +1916,7 @@ mod tests {
                 channels: channels.clone(),
                 drivetemp: drivetemp::DrivetempState::default(),
                 apple_smc: AppleMacSMC::not_applicable(),
+                fds: cc_fs::SysfsFdCache::default(),
             });
 
             // when:
@@ -1970,6 +1966,7 @@ mod tests {
                 channels: channels.clone(),
                 drivetemp: drivetemp::DrivetempState::default(),
                 apple_smc: AppleMacSMC::not_applicable(),
+                fds: cc_fs::SysfsFdCache::default(),
             });
 
             // when:
@@ -2059,6 +2056,7 @@ mod tests {
                 channels,
                 drivetemp: drivetemp::DrivetempState::default(),
                 apple_smc: AppleMacSMC::not_applicable(),
+                fds: cc_fs::SysfsFdCache::default(),
             });
 
             // when:
@@ -2144,6 +2142,7 @@ mod tests {
                 channels,
                 drivetemp: drivetemp::DrivetempState::default(),
                 apple_smc: AppleMacSMC::not_applicable(),
+                fds: cc_fs::SysfsFdCache::default(),
             });
 
             // when:
@@ -2181,6 +2180,7 @@ mod tests {
                 channels: vec![],
                 drivetemp: drivetemp::DrivetempState::default(),
                 apple_smc: AppleMacSMC::not_applicable(),
+                fds: cc_fs::SysfsFdCache::default(),
             });
 
             let mut invocations: u32 = 0;

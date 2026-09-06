@@ -1,31 +1,16 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::device::{DeviceType, UID};
+use crate::device::{DeviceType, Duty, UID};
 use crate::device_health::FailsafeRef;
 use crate::setting::{LcdSettings, LightingSettings, TempSource};
 use crate::Device;
 use anyhow::Result;
 use async_trait::async_trait;
-use derive_more::{Display, Error};
+use thiserror::Error;
 
 pub type DeviceLock = Rc<RefCell<Device>>;
 pub type DeviceList = Vec<DeviceLock>;
@@ -120,6 +105,16 @@ pub trait Repository {
     fn failsafing(&self) -> Vec<FailsafeRef> {
         Vec::new()
     }
+
+    /// Lowest non-zero duty an `apply_setting_speed_fixed` write can
+    /// actually reach on this channel. Anything in `1..floor` is clamped
+    /// up by the driver, so a calibration sweep of that band measures
+    /// one operating point repeatedly. `0` means no clamping beyond what
+    /// `SpeedOptions::min_duty` already reports; only repositories that
+    /// clamp behind the daemon's back override this.
+    fn duty_floor(&self, _device_uid: &UID, _channel_name: &str) -> Duty {
+        0
+    }
 }
 
 #[derive(Default)]
@@ -179,14 +174,14 @@ impl Repositories {
 
 /// Repository Initialization Errors
 /// Particularly useful for handling different initialization situations.
-#[derive(Debug, Clone, Display, Error, PartialEq)]
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum InitError {
-    #[display("Liquidctl Integration is Disabled")]
+    #[error("Liquidctl Integration is Disabled")]
     LiqctldDisabled,
 
-    #[display("Python Environment Error: {msg}")]
+    #[error("Python Environment Error: {msg}")]
     PythonEnv { msg: String },
 
-    #[display("Connection Error: {msg}")]
+    #[error("Connection Error: {msg}")]
     Connection { msg: String },
 }

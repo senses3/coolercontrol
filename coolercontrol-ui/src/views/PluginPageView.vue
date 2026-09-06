@@ -1,27 +1,16 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
+    mdiContentCopy,
     mdiInformationOutline,
     mdiLinkVariant,
+    mdiLoading,
     mdiPlay,
     mdiPowerPlugOutline,
     mdiRestart,
@@ -30,8 +19,8 @@ import {
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { usePluginIframe } from '@/composables/usePluginIframe.ts'
-import { useDialog } from 'primevue/usedialog'
-import { useToast } from 'primevue/usetoast'
+import { useDialog } from '@/shell/dialog'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import {
     getPluginStatusDisplayName,
@@ -40,9 +29,9 @@ import {
     ServiceType,
 } from '@/models/Plugins.ts'
 import pluginMetadataModal from '@/layout/PluginUi.vue'
-import Button from 'primevue/button'
-import Tag from 'primevue/tag'
-import ToggleSwitch from 'primevue/toggleswitch'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
+import UiTag from '@/shell/ui/UiTag.vue'
 
 const STATUS_POLL_INTERVAL_MS = 30_000
 
@@ -253,33 +242,38 @@ onUnmounted(() => {
 
 <template>
     <div v-if="loading" class="flex items-center justify-center w-full h-full">
-        <i class="pi pi-spin pi-spinner text-4xl text-text-color-secondary" />
+        <svg-icon
+            type="mdi"
+            :path="mdiLoading"
+            :size="36"
+            class="animate-spin text-text-color-secondary"
+        />
     </div>
     <div v-else-if="plugin == null" class="flex items-center justify-center w-full h-full">
         <span class="text-text-color-secondary text-lg">{{ t('layout.plugins.notFound') }}</span>
     </div>
     <div v-else class="flex flex-col w-full h-full">
         <!-- Header toolbar -->
-        <div class="flex h-[3.5rem] border-b-4 border-border-one items-center justify-between">
-            <div class="pl-4 py-2 flex items-center gap-3">
+        <div class="flex items-center justify-between p-4">
+            <div class="flex items-center gap-3">
                 <svg-icon
                     type="mdi"
                     :path="mdiPowerPlugOutline"
                     :size="deviceStore.getREMSize(1.75)"
                 />
-                <span class="text-2xl font-bold">{{ plugin.id }}</span>
+                <h1 class="text-xl font-semibold text-text-color">{{ plugin.id }}</h1>
                 <span v-if="plugin.version" class="text-text-color-secondary text-sm">
                     v{{ plugin.version }}
                 </span>
-                <Tag :value="statusDisplayName" :severity="statusSeverity" class="ml-2" />
+                <UiTag :value="statusDisplayName" :severity="statusSeverity" class="ml-2" />
                 <span v-if="pluginStatusReason" class="text-text-color-secondary text-sm italic">
                     {{ pluginStatusReason }}
                 </span>
             </div>
 
-            <div class="pr-4 flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 <!-- Enable/disable toggle -->
-                <ToggleSwitch
+                <UiSwitch
                     v-tooltip.top="
                         isDisabled ? t('layout.plugins.enable') : t('layout.plugins.disable')
                     "
@@ -289,30 +283,30 @@ onUnmounted(() => {
 
                 <!-- Lifecycle controls (managed integration plugins only, when enabled) -->
                 <template v-if="isManaged && isIntegration">
-                    <Button
+                    <UiButton
                         v-tooltip.top="t('layout.plugins.start')"
-                        class="!p-1.5"
+                        variant="ghost"
+                        size="icon"
+                        class="text-success"
                         :disabled="pluginStatus === PluginStatus.Running"
-                        severity="success"
-                        text
                         @click="startPlugin"
                     >
                         <svg-icon type="mdi" :path="mdiPlay" :size="deviceStore.getREMSize(1.5)" />
-                    </Button>
-                    <Button
+                    </UiButton>
+                    <UiButton
                         v-tooltip.top="t('layout.plugins.stop')"
-                        class="!p-1.5"
+                        variant="ghost"
+                        size="icon"
+                        class="text-error"
                         :disabled="pluginStatus === PluginStatus.Stopped"
-                        severity="danger"
-                        text
                         @click="stopPlugin"
                     >
                         <svg-icon type="mdi" :path="mdiStop" :size="deviceStore.getREMSize(1.5)" />
-                    </Button>
-                    <Button
+                    </UiButton>
+                    <UiButton
                         v-tooltip.top="t('layout.plugins.restart')"
-                        class="!p-1.5"
-                        text
+                        variant="ghost"
+                        size="icon"
                         @click="restartPlugin"
                     >
                         <svg-icon
@@ -320,15 +314,16 @@ onUnmounted(() => {
                             :path="mdiRestart"
                             :size="deviceStore.getREMSize(1.5)"
                         />
-                    </Button>
+                    </UiButton>
                 </template>
 
                 <!-- Plugin info button (visible for plugins with UI) -->
-                <Button
+                <UiButton
                     v-if="hasUi"
                     v-tooltip.top="t('layout.plugins.info')"
-                    class="!bg-accent/80 hover:!bg-accent h-[2.375rem] !border !border-border-one"
-                    text
+                    variant="outline"
+                    size="icon"
+                    class="!bg-accent/80 hover:!bg-accent"
                     @click="openMetadataModal"
                 >
                     <svg-icon
@@ -336,7 +331,7 @@ onUnmounted(() => {
                         :path="mdiInformationOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
         </div>
 
@@ -418,8 +413,11 @@ onUnmounted(() => {
                                     <code class="ml-1 select-all"
                                         >journalctl -f -u cc-plugin-{{ plugin.id }}</code
                                     >
-                                    <i
-                                        class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiContentCopy"
+                                        :size="14"
+                                        class="cursor-pointer opacity-60 hover:opacity-100"
                                         @click="
                                             copyCommand(`journalctl -f -u cc-plugin-${plugin.id}`)
                                         "
@@ -430,8 +428,11 @@ onUnmounted(() => {
                                     <code class="ml-1 select-all"
                                         >grep cc-plugin-{{ plugin.id }} /var/log/messages</code
                                     >
-                                    <i
-                                        class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiContentCopy"
+                                        :size="14"
+                                        class="cursor-pointer opacity-60 hover:opacity-100"
                                         @click="
                                             copyCommand(
                                                 `grep cc-plugin-${plugin.id} /var/log/messages`,

@@ -21,8 +21,20 @@ qt_add_executable(
   main_window.h
   address_wizard.cpp
   address_wizard.h
+  connections.cpp
+  connections.h
   ipc.cpp
-  ipc.h)
+  ipc.h
+  sse_parser.cpp
+  sse_parser.h
+  translations.cpp
+  translations.h
+  tls_trust.cpp
+  tls_trust.h
+  origin_filter.cpp
+  origin_filter.h
+  system_palette.cpp
+  system_palette.h)
 
 target_link_libraries(
   coolercontrol PRIVATE Qt::Core Qt::Widgets Qt::WebEngineWidgets
@@ -32,7 +44,7 @@ target_link_libraries(
 set(cc_resource_files
     "icons/org.coolercontrol.CoolerControl.svg"
     "icons/org.coolercontrol.CoolerControl-symbolic.svg"
-    "icons/org.coolercontrol.CoolerControl-symbolic-alert.svg")
+    "icons/org.coolercontrol.CoolerControl-alert-symbolic.svg")
 
 qt_add_resources(
   coolercontrol "coolercontrol" PREFIX "/"

@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Per-channel diagnosis sweep that produces a `Calibration`.
 //! Owns the temporal workflow: pre-flight, snapshot, sweep, classify,
@@ -115,6 +100,12 @@ pub enum DiagnosisFailure {
         others_over_limit: usize,
     },
     Cancelled,
+    /// Preflight: an enabled alert is already Active on this channel. The
+    /// alert was not triggered by the sweep, so the fan itself is suspect;
+    /// calibration refuses to run on it.
+    BlockedByAlert {
+        alert_name: String,
+    },
     /// Hardware write failed; preserves the repo error verbatim.
     WriteFailed(String),
     /// Restore failed after the sweep. The calibration is kept if
@@ -232,6 +223,15 @@ pub trait DiagnosisHost {
     /// Writes raw duty, bypassing dispatch (channel is `under_diagnosis`).
     async fn write_raw_duty(&self, device_uid: &UID, channel_name: &str, duty: Duty) -> Result<()>;
 
+    /// Lowest non-zero duty the channel can actually be driven at.
+    /// Duties in `1..floor` are clamped up by the driver or firmware, so
+    /// the sweep skips that band instead of sampling one operating point
+    /// a dozen times. Default `0` means "no floor", which reproduces the
+    /// pre-floor duty sequences exactly.
+    fn duty_floor(&self, _device_uid: &UID, _channel_name: &str) -> Duty {
+        0
+    }
+
     /// Hottest temp across all devices with the offending sensor's
     /// identity, plus how many sensors are at or above `limit_celsius`.
     /// Drives the pre-flight gate and mid-sweep abort.
@@ -287,22 +287,33 @@ pub async fn run_diagnosis<H: DiagnosisHost + ?Sized>(
     let _ = host.write_raw_duty(&device_uid, &channel_name, 0).await;
     host.sleep_millis(settings.kick_duration_default_ms).await;
 
-    let sweep_data =
-        match perform_sweep(host, settings, &device_uid, &channel_name, &cancellation).await {
-            Ok(curves) => curves,
-            Err(failure) => {
-                emit_phase(
-                    host,
-                    &device_uid,
-                    &channel_name,
-                    DiagnosisPhase::Finalizing,
-                    100,
-                );
-                state.set_under_diagnosis(key, false);
-                let _ = host.restore_setting(&snapshot).await;
-                return Err(failure);
-            }
-        };
+    // Resolved once: the floor is a property of the driver, not of the
+    // sweep's position in the range.
+    let duty_floor = host.duty_floor(&device_uid, &channel_name).min(100);
+    let sweep_data = match perform_sweep(
+        host,
+        settings,
+        &device_uid,
+        &channel_name,
+        &cancellation,
+        duty_floor,
+    )
+    .await
+    {
+        Ok(curves) => curves,
+        Err(failure) => {
+            emit_phase(
+                host,
+                &device_uid,
+                &channel_name,
+                DiagnosisPhase::Finalizing,
+                100,
+            );
+            state.set_under_diagnosis(key, false);
+            let _ = host.restore_setting(&snapshot).await;
+            return Err(failure);
+        }
+    };
     let scalars = derive_scalars(&sweep_data.0, &sweep_data.1);
     let kick_duration_ms = if let Some(s) = scalars {
         measure_settled_kick_duration(
@@ -604,22 +615,60 @@ async fn perform_sweep<H>(
     device_uid: &UID,
     channel_name: &str,
     cancellation: &CancellationToken,
+    duty_floor: Duty,
 ) -> Result<(Vec<DutySample>, Vec<DutySample>, Vec<bool>), DiagnosisFailure>
 where
     H: DiagnosisHost + ?Sized,
 {
-    let up_curve = perform_up_sweep(host, settings, device_uid, channel_name, cancellation).await?;
+    let up_curve = perform_up_sweep(
+        host,
+        settings,
+        device_uid,
+        channel_name,
+        cancellation,
+        duty_floor,
+    )
+    .await?;
     let kick_in_duty = up_curve
         .iter()
         .find(|s| s.rpm >= settings.start_rpm_min)
         .map(|s| s.duty);
     let (down_curve, down_stable) = match kick_in_duty {
         Some(duty) => {
-            perform_down_sweep(host, settings, device_uid, channel_name, cancellation, duty).await?
+            perform_down_sweep(
+                host,
+                settings,
+                device_uid,
+                channel_name,
+                cancellation,
+                duty,
+                duty_floor,
+            )
+            .await?
         }
         None => (Vec::new(), Vec::new()),
     };
     Ok((up_curve, down_curve, down_stable))
+}
+
+/// Next duty on the up-sweep, `None` once 100 has been sampled. From 0
+/// the sweep jumps straight to `duty_floor`: the band below it is
+/// clamped up by the driver, so sampling it would re-measure the floor's
+/// operating point a dozen times. A floor of 0 reduces to the plain
+/// dense step, which is the pre-floor behavior.
+fn next_up_duty(duty: Duty, duty_floor: Duty) -> Option<Duty> {
+    if duty >= 100 {
+        return None;
+    }
+    if duty == 0 {
+        return Some(duty_floor.clamp(DUTY_STEP_DENSE, 100));
+    }
+    let step = if duty < UP_SWEEP_DENSE_RANGE_END_DUTY {
+        DUTY_STEP_DENSE
+    } else {
+        DUTY_STEP_SPARSE
+    };
+    Some(duty.saturating_add(step).min(100))
 }
 
 /// Up-sweep: dense (2%) steps below `UP_SWEEP_DENSE_RANGE_END_DUTY`,
@@ -635,12 +684,14 @@ async fn perform_up_sweep<H>(
     device_uid: &UID,
     channel_name: &str,
     cancellation: &CancellationToken,
+    duty_floor: Duty,
 ) -> Result<Vec<DutySample>, DiagnosisFailure>
 where
     H: DiagnosisHost + ?Sized,
 {
     let mut samples = Vec::with_capacity(64);
     let mut duty: Duty = 0;
+    let first_non_zero_duty = next_up_duty(0, duty_floor);
     let mut kicked_in = false;
     loop {
         assert!(
@@ -652,7 +703,7 @@ where
         // when duty leaves 0%, spiking RPM well above the steady-state.
         // Sleep post-write inside sweep_step so the kick has time to
         // decay before settle_and_sample's stability window starts.
-        let extra_post_write_settle_ms = if duty == DUTY_STEP_DENSE {
+        let extra_post_write_settle_ms = if first_non_zero_duty == Some(duty) {
             settings.kick_decay_settle_ms
         } else {
             0
@@ -670,23 +721,38 @@ where
         )
         .await?;
         samples.push(DutySample { duty, rpm });
-        if duty == 100 {
-            break;
-        }
         if kicked_in.not() && rpm >= settings.start_rpm_min {
             kicked_in = true;
         }
         if kicked_in.not() && duty >= UNRESPONSIVE_ABORT_DUTY {
             return Ok(samples);
         }
-        let step = if in_dense {
-            DUTY_STEP_DENSE
-        } else {
-            DUTY_STEP_SPARSE
+        let Some(next) = next_up_duty(duty, duty_floor) else {
+            break;
         };
-        duty = duty.saturating_add(step).min(100);
+        duty = next;
     }
     Ok(samples)
+}
+
+/// Next duty on the down-sweep, `None` once 0 has been sampled. The
+/// walk lands exactly on `duty_floor` before dropping to 0, since the
+/// floor is the sample that becomes the sustain floor and the band below
+/// it is unreachable. A floor of 0 reduces to the plain decrement, which
+/// is the pre-floor behavior.
+fn next_down_duty(duty: Duty, zone_top: Duty, duty_floor: Duty) -> Option<Duty> {
+    if duty == 0 {
+        return None;
+    }
+    if duty <= duty_floor {
+        return Some(0);
+    }
+    let step = if duty <= zone_top {
+        DUTY_STEP_DENSE
+    } else {
+        DUTY_STEP_SPARSE
+    };
+    Some(duty.saturating_sub(step).max(duty_floor))
 }
 
 /// Down-sweep: sparse 5% steps from 100 to `kick_in_duty +
@@ -701,6 +767,7 @@ async fn perform_down_sweep<H>(
     channel_name: &str,
     cancellation: &CancellationToken,
     kick_in_duty: Duty,
+    duty_floor: Duty,
 ) -> Result<(Vec<DutySample>, Vec<bool>), DiagnosisFailure>
 where
     H: DiagnosisHost + ?Sized,
@@ -729,15 +796,10 @@ where
         )
         .await?;
         sample_pairs.push((DutySample { duty, rpm }, was_stable));
-        if duty == 0 {
+        let Some(next) = next_down_duty(duty, zone_top, duty_floor) else {
             break;
-        }
-        let step = if duty <= zone_top {
-            DUTY_STEP_DENSE
-        } else {
-            DUTY_STEP_SPARSE
         };
-        duty = duty.saturating_sub(step);
+        duty = next;
     }
     sample_pairs.sort_by_key(|(s, _)| s.duty);
     Ok(sample_pairs.into_iter().unzip())
@@ -1040,6 +1102,8 @@ mod tests {
         manual_control_calls: RefCell<Vec<(String, String)>>,
         step_at_manual_control: Cell<Option<usize>>,
         fail_manual_control: Cell<bool>,
+        // Lowest non-zero duty the sweep is told it can reach.
+        duty_floor: Cell<Duty>,
     }
 
     impl MockHost {
@@ -1066,6 +1130,7 @@ mod tests {
                 manual_control_calls: RefCell::new(Vec::new()),
                 step_at_manual_control: Cell::new(None),
                 fail_manual_control: Cell::new(false),
+                duty_floor: Cell::new(0),
             }
         }
 
@@ -1103,6 +1168,21 @@ mod tests {
                     2000
                 };
                 self.rpm_for_duty.borrow_mut().insert(duty, rpm);
+            }
+            self
+        }
+
+        /// Configure a fan behind a hardware duty clamp, RDNA3-style:
+        /// duty 0 is truly off (Zero RPM), and every non-zero duty below
+        /// `floor` is driven at `floor` instead. Reports `floor` to the
+        /// sweep so it can skip the clamped band.
+        fn with_clamped_fan(self, floor: Duty) -> Self {
+            self.duty_floor.set(floor);
+            for duty in 0u8..=100 {
+                let effective = if duty == 0 { 0 } else { duty.max(floor) };
+                self.rpm_for_duty
+                    .borrow_mut()
+                    .insert(duty, 20 * u32::from(effective));
             }
             self
         }
@@ -1168,6 +1248,10 @@ mod tests {
             self.duty_writes.borrow_mut().push(duty);
             self.last_written_duty.set(duty);
             Ok(())
+        }
+
+        fn duty_floor(&self, _device_uid: &UID, _channel_name: &str) -> Duty {
+            self.duty_floor.get()
         }
 
         async fn hottest_temp(&self, limit_celsius: f64) -> HottestTemp {
@@ -1974,6 +2058,106 @@ mod tests {
         window.push_back(125);
         window.push_back(115);
         assert!(is_stable(&window, 15, 3).not());
+    }
+
+    /// Full up-sweep duty sequence for a floor, walked by the same
+    /// stepping function `perform_up_sweep` uses.
+    fn up_sweep_duties(duty_floor: Duty) -> Vec<Duty> {
+        let mut duties = vec![0];
+        let mut duty = 0;
+        while let Some(next) = next_up_duty(duty, duty_floor) {
+            duties.push(next);
+            duty = next;
+        }
+        duties
+    }
+
+    /// Same for the down-sweep, from 100 to 0.
+    fn down_sweep_duties(zone_top: Duty, duty_floor: Duty) -> Vec<Duty> {
+        let mut duties = vec![100];
+        let mut duty = 100;
+        while let Some(next) = next_down_duty(duty, zone_top, duty_floor) {
+            duties.push(next);
+            duty = next;
+        }
+        duties
+    }
+
+    #[test]
+    fn duty_floor_zero_reproduces_the_original_sweep_sequences() {
+        // Goal: regression lock. A floor of 0 (every device except an
+        // RDNA3/4 card with Zero RPM, and any driver with an enforced
+        // minimum) must walk exactly the duties the sweep walked before
+        // the floor existed: dense 2% steps to 30, sparse 5% to 100 on
+        // the way up, and the mirror image coming down.
+        let expected_up: Vec<Duty> = (0u8..=30)
+            .step_by(2)
+            .chain((35u8..=100).step_by(5))
+            .collect();
+        assert_eq!(up_sweep_duties(0), expected_up);
+        // zone_top 16: a fan kicking in at 6% plus the 10% buffer.
+        let expected_down: Vec<Duty> = (20u8..=100)
+            .rev()
+            .step_by(5)
+            .chain([15, 13, 11, 9, 7, 5, 3, 1, 0])
+            .collect();
+        assert_eq!(down_sweep_duties(16, 0), expected_down);
+    }
+
+    #[test]
+    fn duty_floor_skips_the_clamped_band() {
+        // Goal: with a floor of 15 (a typical RDNA3 FAN_CURVE_SPEED
+        // minimum), the up-sweep samples 0 for the off-state and then
+        // jumps straight to the floor, and the down-sweep lands on the
+        // floor before dropping to 0. Sampling 1..15 would re-measure
+        // the floor's operating point over and over.
+        let up = up_sweep_duties(15);
+        assert_eq!(&up[..4], &[0, 15, 17, 19]);
+        assert!(up.iter().any(|&d| (1..15).contains(&d)).not(), "{up:?}");
+        assert_eq!(up.last().copied(), Some(100));
+        // zone_top 25: kicking in at the floor plus the 10% buffer.
+        let down = down_sweep_duties(25, 15);
+        assert_eq!(&down[down.len() - 4..], &[19, 17, 15, 0]);
+        assert!(down.iter().any(|&d| (1..15).contains(&d)).not(), "{down:?}");
+    }
+
+    #[test]
+    fn clamped_fan_derives_scalars_at_the_floor() {
+        crate::rt::test_runtime(async {
+            // Goal: on a fan whose driver clamps every non-zero duty
+            // below 15% up to 15%, the sweep must never write into the
+            // clamped band and the derived scalars must land on the
+            // floor itself. Without the floor, 7 of the dense up-samples
+            // measured the same operating point and the scalars came out
+            // at the first dense step (2%) instead of 15%.
+            let state = FanStateMap::new();
+            let store = CalibrationStore::empty();
+            let host = MockHost::new().with_clamped_fan(15);
+            let settings = DiagnosisSettings::default();
+
+            let result = run_diagnosis(
+                &state,
+                &store,
+                &host,
+                &settings,
+                "dev-a".to_string(),
+                "fan1".to_string(),
+                CancellationToken::new(),
+            )
+            .await
+            .expect("clamped fan diagnoses");
+
+            let writes = host.duty_writes.borrow().clone();
+            assert!(
+                writes.iter().any(|&d| (1..15).contains(&d)).not(),
+                "clamped band was written: {writes:?}"
+            );
+            let duties: Vec<Duty> = result.up_curve.iter().map(|s| s.duty).collect();
+            assert_eq!(&duties[..2], &[0, 15]);
+            assert_eq!(result.min_start_duty, 15);
+            assert_eq!(result.min_sustain_duty, 15);
+            assert_eq!(result.curve_kind, CurveKind::Smooth);
+        });
     }
 
     #[test]

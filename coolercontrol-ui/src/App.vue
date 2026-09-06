@@ -1,53 +1,52 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router'
+import { startupRouteName } from '@/shell/sections.ts'
+import { sortEntitiesByTree } from '@/shell/libraryFolders.ts'
+import { TOUR_STEPS } from '@/shell/tour.ts'
+import { buildQtStrings } from '@/shell/qtStrings.ts'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import { Ref, onMounted, ref, inject, nextTick } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { useCalibrationStore } from '@/stores/CalibrationStore'
-import Button from 'primevue/button'
-import Toast from 'primevue/toast'
-import ConfirmDialog from 'primevue/confirmdialog'
-import Dialog from 'primevue/dialog'
-import DynamicDialog from 'primevue/dynamicdialog'
-import InputNumber from 'primevue/inputnumber'
-import InputText from 'primevue/inputtext'
-import { ElLoading, ElSwitch } from 'element-plus'
-import 'element-plus/es/components/loading/style/css'
-import { StartupPage, ThemeMode } from '@/models/UISettings.ts'
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiClose, mdiOpenInNew, mdiRefresh } from '@mdi/js'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiToast from '@/shell/ui/UiToast.vue'
+import ConnectionLostOverlay from '@/shell/ConnectionLostOverlay.vue'
+import SupportWizardOverlay from '@/shell/SupportWizardOverlay.vue'
+import UiConfirmDialog from '@/shell/ui/UiConfirmDialog.vue'
+import UiModal from '@/shell/ui/UiModal.vue'
+import UiDynamicDialog from '@/shell/ui/UiDynamicDialog.vue'
+import { ThemeMode } from '@/models/UISettings.ts'
 import { useDaemonState } from '@/stores/DaemonState.ts'
 import { VOnboardingWrapper, VOnboardingStep, useVOnboarding } from 'v-onboarding'
 import { Emitter, EventType } from 'mitt'
-import { svgLoader, svgLoaderBackground, svgLoaderViewBox } from '@/models/Loader.ts'
-import FloatLabel from 'primevue/floatlabel'
+import { showLoadingOverlay } from '@/components/loadingOverlay.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { useI18n } from 'vue-i18n'
 
 const { t, locale } = useI18n({ useScope: 'global' })
 const loaded: Ref<boolean> = ref(false)
 const initSuccessful = ref(true)
 const deviceStore = useDeviceStore()
+const router = useRouter()
+const { openCalibrationWizard } = useToolWizards()
 const settingsStore = useSettingsStore()
 const calibrationStore = useCalibrationStore()
 const daemonState = useDaemonState()
-const router = useRouter()
 const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+// True only when the app opened at the root URL (captured in main.ts before the
+// router rewrote the hash); gates the configured-start-page redirect below.
+const startedAtRoot = inject<boolean>('startedAtRoot', false)
 
 const daemonPort: Ref<number> = ref(deviceStore.getDaemonPort())
 const daemonAddress: Ref<string> = ref(deviceStore.getDaemonAddress())
@@ -107,8 +106,6 @@ const applyCustomTheme = (): void => {
 const onboardingWrapper = ref(null)
 const { start, finish } = useVOnboarding(onboardingWrapper)
 
-type TourMode = 'basic' | 'thorough'
-const tourMode: Ref<TourMode | null> = ref(null)
 const steps: Ref<any[]> = ref([])
 const isTransitioningMode = ref(false)
 
@@ -116,13 +113,13 @@ const POPPER_RIGHT = { popper: { placement: 'right' } }
 const GETTING_STARTED_URL =
     'https://docs.coolercontrol.org/getting-started.html#%F0%9F%A7%99-configure'
 
-const makeStep = (selector: string, key: string): any => ({
+const makeStep = (selector: string, key: string, placement: string = 'right'): any => ({
     attachTo: { element: selector },
     content: {
         title: t(`components.onboarding.${key}`),
         description: t(`components.onboarding.${key}Desc`),
     },
-    options: POPPER_RIGHT,
+    options: { popper: { placement } },
 })
 
 const welcomeStep = (): any => ({
@@ -140,57 +137,23 @@ const finishStep = (): any => ({
 const filterPresent = (list: any[]): any[] =>
     list.filter((s) => document.querySelector(s.attachTo.element) !== null)
 
-//todo: reorder and add:
-
-const buildBasicSteps = (): any[] =>
+// filterPresent drops any absent anchor, such as #rail-plugins when no plugins
+// are installed.
+const buildTourSteps = (): any[] =>
     filterPresent([
-        makeStep('#logo', 'appInfo'),
-        makeStep('#add', 'quickAdd'),
-        makeStep('#dashboard-quick', 'dashboardQuick'),
-        makeStep('#controls', 'controls'),
-        makeStep('#alerts-quick', 'alertsQuick'),
-        makeStep('#settings', 'settings'),
-        makeStep('#restart', 'restartMenu'),
-        makeStep('#system-menu', 'systemMenu'),
-        makeStep('#profiles', 'profiles'),
-        makeStep('#functions', 'functions'),
-        finishStep(),
-    ])
-
-const buildThoroughSteps = (): any[] =>
-    filterPresent([
-        makeStep('#logo', 'appInfo'),
-        makeStep('#add', 'quickAdd'),
-        makeStep('#dashboard-quick', 'dashboardQuick'),
-        makeStep('#controls', 'controls'),
-        makeStep('#modes-quick', 'modesQuick'),
-        makeStep('#collapse-menu', 'collapseMenu'),
-        makeStep('#alerts-quick', 'alertsQuick'),
-        makeStep('#plugins-quick', 'pluginsQuick'),
-        makeStep('#settings', 'settings'),
-        makeStep('#access', 'access'),
-        makeStep('#restart', 'restartMenu'),
-        makeStep('#system-menu', 'systemMenu'),
-        makeStep('#dashboards', 'dashboards'),
-        makeStep('#profiles', 'profiles'),
-        makeStep('#functions', 'functions'),
-        makeStep('#modes', 'modes'),
-        makeStep('#alerts', 'alerts'),
-        makeStep('[data-tour-anchor="custom-sensors"]', 'customSensors'),
+        ...TOUR_STEPS.map((step) => makeStep(step.selector, step.key, step.placement)),
         finishStep(),
     ])
 
 const startTour = (): void => {
-    tourMode.value = null
     steps.value = [welcomeStep()]
     start()
 }
 
-const chooseTourMode = async (mode: TourMode): Promise<void> => {
-    tourMode.value = mode
+const startWalkthrough = async (): Promise<void> => {
     isTransitioningMode.value = true
     finish()
-    steps.value = mode === 'thorough' ? buildThoroughSteps() : buildBasicSteps()
+    steps.value = buildTourSteps()
     await nextTick()
     start()
     await nextTick()
@@ -208,7 +171,7 @@ const openGettingStartedDocs = (): void => {
 
 const onTourFinished = (): void => {
     if (isTransitioningMode.value) return
-    settingsStore.showOnboarding = false
+    settingsStore.completeOnboarding()
 }
 
 emitter.on('start-tour', startTour)
@@ -227,52 +190,9 @@ onMounted(async () => {
         }
     })
 
-    // Set default language
-    const savedLocale = localStorage.getItem('locale')
-
-    if (savedLocale) {
-        locale.value = savedLocale
-    } else {
-        // Use browser language if supported
-        const browserLang = navigator.language.toLowerCase()
-
-        // List of supported languages
-        const supportedLanguages: Record<string, string> = {
-            zh: 'zh', // Chinese (Simplified)
-            'zh-cn': 'zh', // Chinese (Mainland China)
-            'zh-tw': 'zh-tw', // Chinese (Traditional)
-            'zh-hk': 'zh-tw', // Chinese (Hong Kong)
-            ja: 'ja', // Japanese
-            ru: 'ru', // Russian
-            de: 'de', // German
-            fr: 'fr', // French
-            es: 'es', // Spanish
-            ar: 'ar', // Arabic
-            pt: 'pt', // Portuguese
-            'pt-br': 'pt', // Brazilian Portuguese
-            ko: 'ko', // Korean
-            hi: 'hi', // Hindi
-        }
-
-        // Check for exact match
-        if (supportedLanguages[browserLang]) {
-            locale.value = supportedLanguages[browserLang]
-        }
-        // Check for language prefix match (e.g. en-US matches en)
-        else {
-            const langPrefix = browserLang.split('-')[0]
-            if (supportedLanguages[langPrefix]) {
-                locale.value = supportedLanguages[langPrefix]
-            } else {
-                // Default to English
-                locale.value = 'en'
-            }
-        }
-
-        // Save to localStorage
-        localStorage.setItem('locale', locale.value)
-    }
-    document.querySelector('html')?.setAttribute('lang', locale.value)
+    // The language was resolved when the i18n instance was built, from the
+    // cached setting; loadUISettings replaces it with the daemon's copy.
+    document.documentElement.setAttribute('lang', locale.value)
 
     // Handshake and login must happen before anything else
     const handshakeSuccessful = await deviceStore.handshake()
@@ -284,13 +204,7 @@ onMounted(async () => {
     if (!loginSuccessful) {
         return
     }
-    const loading = ElLoading.service({
-        lock: true,
-        text: t('common.loading'),
-        background: svgLoaderBackground,
-        svg: svgLoader,
-        svgViewBox: svgLoaderViewBox,
-    })
+    const loading = showLoadingOverlay({ text: t('common.loading') })
 
     const deviceInitSuccessful = await deviceStore.initializeDevices()
     if (!deviceInitSuccessful) {
@@ -299,22 +213,27 @@ onMounted(async () => {
         return
     }
     await settingsStore.initializeSettings(deviceStore.allDevices())
-    // Prime the calibration cache before `loaded` flips below: the Controls
-    // Overview can be the configured startup page, and its FanChannelNode
-    // buttons read `statusFor` on first paint.
+    // Apply the persisted panel order (devices, channels, profiles, functions);
+    // the old tree menu did this on build, the shell applies it once at boot.
+    deviceStore.reSortDevicesByMenuOrder()
+    // Folders expand in place, so a filed profile keeps the position its folder
+    // has: what the panel shows top to bottom is what every dropdown lists.
+    sortEntitiesByTree(settingsStore.menuOrder, 'profiles', settingsStore.profiles, (p) => p.uid)
+    sortEntitiesByTree(settingsStore.menuOrder, 'functions', settingsStore.functions, (f) => f.uid)
+    // Prime the calibration cache before `loaded` flips below: the cooling
+    // channel page reads `statusFor` on first paint.
     await calibrationStore.refreshAllStatuses()
     // Re-attach to a calibration batch the daemon is still driving after a
     // reload (the daemon owns the queue, so it survived the suspend/reload).
     const calibrationBatchResumed = await calibrationStore.ensureBatchPolling()
-    // Honor the configured startup page, but only when the user landed on the
-    // default root route (no deep link). The empty path's component is
-    // AppInfoView, so AppInfo needs no redirect; Controls and HomeDashboard do.
-    if (router.currentRoute.value.name === 'startup-page') {
-        const startup = settingsStore.startupPage
-        if (startup === StartupPage.Controls) {
-            await router.replace({ name: 'system-controls' })
-        } else if (startup === StartupPage.HomeDashboard) {
-            await router.replace({ name: 'dashboards' })
+    // Honor the configured startup page, but only when the app opened at the
+    // root URL (startedAtRoot), not on a direct/deep link like /#/home. The
+    // `startup-page` route resolves this too, but it ran before settings had
+    // loaded, so it landed on the default; re-apply now that they are in.
+    if (startedAtRoot) {
+        const target = startupRouteName(settingsStore.startupPage)
+        if (target !== 'section-home') {
+            await router.replace({ name: target })
         }
     }
     applyCustomTheme()
@@ -323,13 +242,13 @@ onMounted(async () => {
     loaded.value = true
     loading.close()
     // Reopen the calibration wizard to show live progress once the layout
-    // (and its `calibrate-fans` listener) has mounted.
+    // has mounted.
     if (calibrationBatchResumed) {
         await nextTick()
-        emitter.emit('calibrate-fans')
+        openCalibrationWizard()
     }
     await deviceStore.loadLogs()
-    // Some other dialogs, like the password dialog, will wait until Onboarding has closed
+    // Some other dialogs, like the password dialog, will wait until Onboarding has closed.
     if (settingsStore.showOnboarding) startTour()
     let signalLoadFinished = async (): Promise<void> => {
         if (deviceStore.isQtApp()) {
@@ -337,51 +256,34 @@ onMounted(async () => {
             // @ts-ignore
             const ipc = window.ipc
             await ipc.loadFinished()
+            // Push the current alert state now the IPC bridge is confirmed ready.
+            settingsStore.pushTrayAlertState()
+            // Qt renders its own dialogs and has no translations. Hand it the strings
+            // it needs in the active locale; it caches them, since a discarded
+            // renderer cannot be asked later.
+            // Optional: a Qt app that has not been restarted since the update has no
+            // such method, and a bare call there rejects this whole function, which
+            // would strand pushTrayPinnedSensors below.
+            ipc.setTranslations?.(JSON.stringify(buildQtStrings(t)))
+            // Seed the tray's sensor list. The watch only fires on later changes.
+            settingsStore.pushTrayPinnedSensors()
         }
     }
     // Fire-and-forget: SW manages its own SSE connection independently.
     deviceStore.initNotificationWorker()
     // async functions that run for the lifetime of the application:
-    await Promise.all([
-        deviceStore.updateStatusFromSSE(),
-        deviceStore.updateLogsFromSSE(),
-        deviceStore.updateAlertsFromSSE(),
-        deviceStore.updateActiveModeFromSSE(),
-        signalLoadFinished(),
-    ])
+    await Promise.all([deviceStore.updateFromSSE(), signalLoadFinished()])
 })
 </script>
 
 <template>
     <RouterView v-if="loaded" />
-    <Toast position="top-center" />
-    <DynamicDialog />
-    <ConfirmDialog
-        :pt="{
-            mask: {
-                style: 'backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);',
-            },
-        }"
-    >
-        <template #message="slotProps">
-            <div class="flex flex-col items-center">
-                <i
-                    v-if="slotProps.message.icon"
-                    class="text-text-color-secondary text-4xl mb-2"
-                    :class="slotProps.message.icon"
-                />
-                <p class="w-96">{{ slotProps.message.message }}</p>
-            </div>
-        </template>
-    </ConfirmDialog>
-    <ConfirmDialog
-        group="AseTek690"
-        :pt="{
-            mask: {
-                style: 'backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);',
-            },
-        }"
-    >
+    <ConnectionLostOverlay />
+    <SupportWizardOverlay />
+    <UiToast />
+    <UiDynamicDialog />
+    <UiConfirmDialog />
+    <UiConfirmDialog group="AseTek690">
         <template #message="slotProps">
             <div class="flex flex-col w-[34rem] gap-3 text-wrap">
                 <p>
@@ -398,12 +300,15 @@ onMounted(async () => {
                 </p>
             </div>
         </template>
-    </ConfirmDialog>
-    <Dialog
-        class="leading-loose"
-        :visible="!initSuccessful"
-        :header="t('views.error.connectionError')"
-        :style="{ width: '50vw' }"
+    </UiConfirmDialog>
+    <UiModal
+        content-class="leading-loose"
+        :open="!initSuccessful"
+        :title="t('views.error.connectionError')"
+        :content-style="{ width: '50vw' }"
+        :closable="false"
+        :dismissable="false"
+        :close-on-escape="false"
     >
         <p>
             {{ t('views.error.connectionErrorMessage') }} <br />
@@ -437,94 +342,95 @@ onMounted(async () => {
         </h6>
         <h6 v-else class="text-xl mb-4">{{ t('views.error.daemonAddressWeb') }}</h6>
         <div>
-            <div class="mt-8 flex flex-row">
-                <FloatLabel variant="on">
-                    <InputText
+            <div class="mt-8 flex flex-row items-end">
+                <div>
+                    <label
+                        for="host-address"
+                        class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                        >{{ t('common.address') }}</label
+                    >
+                    <UiInput
                         id="host-address"
                         v-model="daemonAddress"
                         class="mb-2 w-60"
                         v-tooltip.top="t('views.error.addressTooltip')"
                         :invalid="daemonAddress.length === 0"
                     />
-                    <label for="host-address">{{ t('common.address') }}</label>
-                </FloatLabel>
-                <span class="mx-2">:</span>
-                <FloatLabel variant="on">
-                    <InputNumber
+                </div>
+                <span class="mx-2 mb-4">:</span>
+                <div>
+                    <label
+                        for="daemon-port"
+                        class="mb-1 ml-1 block text-sm text-text-color-secondary"
+                        >{{ t('common.port') }}</label
+                    >
+                    <UiNumberInput
                         id="daemon-port"
                         v-model="daemonPort"
-                        showButtons
                         :min="80"
                         :max="65535"
-                        :useGrouping="false"
                         class="mb-2"
-                        :input-style="{ width: '6rem' }"
                         v-tooltip.top="t('views.error.portTooltip')"
-                        button-layout="horizontal"
-                        :allow-empty="false"
-                    >
-                        <template #incrementicon>
-                            <span class="pi pi-plus" />
-                        </template>
-                        <template #decrementicon>
-                            <span class="pi pi-minus" />
-                        </template>
-                    </InputNumber>
-                    <label for="daemon-port">{{ t('common.port') }}</label>
-                </FloatLabel>
+                    />
+                </div>
             </div>
             <div class="flex flex-col mb-3 w-12 leading-none align-middle">
                 <small class="ml-3 font-light text-sm text-text-color-secondary">{{
                     t('common.protocol')
                 }}</small>
                 <div class="flex flex-row items-center" v-tooltip.top="t('views.error.sslTooltip')">
-                    <el-switch v-model="daemonSslEnabled" size="large" />
+                    <UiSwitch v-model="daemonSslEnabled" />
                     <span class="ml-2 m-1">{{ t('common.sslTls') }}</span>
                 </div>
             </div>
             <div>
-                <Button
-                    :label="t('common.saveAndRefresh')"
+                <UiButton
                     class="mb-2 w-44"
                     v-tooltip.top="t('views.error.saveTooltip')"
                     @click="saveDaemonSettings"
-                />
+                >
+                    {{ t('common.saveAndRefresh') }}
+                </UiButton>
             </div>
-            <Button
-                :label="t('common.reset')"
+            <UiButton
+                variant="outline"
                 v-tooltip.top="t('views.error.resetTooltip')"
                 @click="resetDaemonSettings"
-            />
+            >
+                {{ t('common.reset') }}
+            </UiButton>
         </div>
-        <template #footer>
-            <Button
-                :label="t('common.retry')"
-                icon="pi pi-refresh"
-                @click="deviceStore.reloadUI()"
-            />
-        </template>
-    </Dialog>
-    <Dialog
-        class="leading-loose"
-        :visible="deviceStore.accessDenied"
-        :header="t('views.error.accessDenied')"
-        :style="{ width: '30vw' }"
+        <div class="mt-4 flex justify-end">
+            <UiButton class="gap-1" @click="deviceStore.reloadUI()">
+                <svg-icon type="mdi" :path="mdiRefresh" :size="18" />
+                {{ t('common.retry') }}
+            </UiButton>
+        </div>
+    </UiModal>
+    <UiModal
+        content-class="leading-loose"
+        :open="deviceStore.accessDenied"
+        :title="t('views.error.accessDenied')"
+        :content-style="{ width: '30vw' }"
         :closable="false"
+        :dismissable="false"
+        :close-on-escape="false"
     >
         <p>
             {{ t('views.error.accessDeniedMessage') }}
         </p>
-        <template #footer>
-            <Button
-                class="outline-none"
-                :label="t('common.retry')"
-                icon="pi pi-refresh"
+        <div class="mt-4 flex justify-end">
+            <UiButton
+                class="gap-1"
                 @click="deviceStore.reloadUI()"
                 @keydown.enter="deviceStore.reloadUI()"
                 autofocus
-            />
-        </template>
-    </Dialog>
+            >
+                <svg-icon type="mdi" :path="mdiRefresh" :size="18" />
+                {{ t('common.retry') }}
+            </UiButton>
+        </div>
+    </UiModal>
     <VOnboardingWrapper
         ref="onboardingWrapper"
         :steps="steps"
@@ -540,13 +446,15 @@ onMounted(async () => {
                     class="bg-bg-two drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)] rounded-lg border-2 border-border-one"
                 >
                     <div class="px-4 py-5 sm:p-6">
-                        <!-- Welcome step: intro + 3-button mode choice -->
+                        <!-- Welcome step: intro + start-tour choice -->
                         <template v-if="step.content?.kind === 'welcome'">
                             <div class="relative max-w-2xl">
                                 <button
                                     @click="skipTour"
-                                    class="absolute right-0 top-0 text-text-color-secondary font-medium text-base pi pi-times outline-0"
-                                />
+                                    class="absolute right-0 top-0 text-text-color-secondary font-medium outline-0"
+                                >
+                                    <svg-icon type="mdi" :path="mdiClose" :size="16" />
+                                </button>
                                 <h3 class="text-2xl leading-6 text-text-color">
                                     {{ t('components.onboarding.welcome') }}
                                 </h3>
@@ -563,43 +471,40 @@ onMounted(async () => {
                                         class="mt-3 ml-2 pl-6 list-decimal text-sm text-text-color-secondary space-y-1"
                                     >
                                         <li>
-                                            {{
-                                                t('views.appInfo.gettingStartedStep1', {
-                                                    profile: t(
-                                                        'views.appInfo.gettingStartedGraphProfile',
-                                                    ),
-                                                })
-                                            }}
+                                            {{ t('views.appInfo.gettingStartedStep1') }}
                                         </li>
                                         <li>
-                                            {{
-                                                t('views.appInfo.gettingStartedStep2', {
-                                                    controls: t(
-                                                        'views.appInfo.gettingStartedControlsPage',
-                                                    ),
-                                                })
-                                            }}
+                                            {{ t('views.appInfo.gettingStartedStep2') }}
                                         </li>
                                         <li>
                                             {{ t('views.appInfo.gettingStartedStep3') }}
                                         </li>
                                     </ol>
+                                    <p class="mt-3 ml-2 text-sm text-text-color-secondary">
+                                        {{
+                                            t('views.appInfo.gettingStartedAutoCreate', {
+                                                wizard: t(
+                                                    'views.appInfo.gettingStartedAutoCreateLink',
+                                                ),
+                                            })
+                                        }}
+                                    </p>
                                 </div>
                                 <div class="mt-4 flex flex-col gap-2 text-sm">
                                     <a
                                         target="_blank"
                                         :href="GETTING_STARTED_URL"
-                                        class="text-accent outline-0"
+                                        class="flex w-fit items-center gap-2 text-accent outline-0"
                                     >
-                                        <span class="pi pi-external-link mr-2" />
+                                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="16" />
                                         {{ t('views.appInfo.gettingStarted') }}
                                     </a>
                                     <a
                                         target="_blank"
                                         href="https://docs.coolercontrol.org/hardware-support.html"
-                                        class="text-accent outline-0"
+                                        class="flex w-fit items-center gap-2 text-accent outline-0"
                                     >
-                                        <span class="pi pi-external-link mr-2" />
+                                        <svg-icon type="mdi" :path="mdiOpenInNew" :size="16" />
                                         {{ t('views.appInfo.hardwareSupport') }}
                                     </a>
                                 </div>
@@ -608,18 +513,11 @@ onMounted(async () => {
                                 </p>
                                 <div class="mt-6 flex flex-col sm:flex-row gap-3">
                                     <button
-                                        @click="chooseTourMode('basic')"
+                                        @click="startWalkthrough"
                                         type="button"
-                                        class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent/80 hover:!bg-accent px-4 py-2 font-medium text-text-color shadow-sm focus:outline-none"
+                                        class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent px-4 py-2 font-medium text-accent-fg shadow-sm outline-none hover:bg-accent/90"
                                     >
-                                        {{ t('components.onboarding.quickTour') }}
-                                    </button>
-                                    <button
-                                        @click="chooseTourMode('thorough')"
-                                        type="button"
-                                        class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent/80 hover:!bg-accent px-4 py-2 font-medium text-text-color shadow-sm focus:outline-none"
-                                    >
-                                        {{ t('components.onboarding.thoroughTour') }}
+                                        {{ t('components.onboarding.startTour') }}
                                     </button>
                                     <button
                                         @click="skipTour"
@@ -636,8 +534,10 @@ onMounted(async () => {
                             <div class="relative max-w-xl">
                                 <button
                                     @click="skipTour"
-                                    class="absolute right-0 top-0 text-text-color-secondary font-medium text-base pi pi-times outline-0"
-                                />
+                                    class="absolute right-0 top-0 text-text-color-secondary font-medium outline-0"
+                                >
+                                    <svg-icon type="mdi" :path="mdiClose" :size="16" />
+                                </button>
                                 <h3 class="text-2xl leading-6 text-text-color">
                                     {{ t('components.onboarding.thatsIt') }}
                                 </h3>
@@ -650,7 +550,12 @@ onMounted(async () => {
                                         type="button"
                                         class="inline-flex items-center justify-center rounded-lg border border-transparent bg-accent/80 hover:!bg-accent px-4 py-2 font-medium text-text-color shadow-sm focus:outline-none"
                                     >
-                                        <span class="pi pi-external-link mr-2" />
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiOpenInNew"
+                                            :size="16"
+                                            class="mr-2"
+                                        />
                                         {{ t('components.onboarding.openGettingStarted') }}
                                     </button>
                                     <button
@@ -685,8 +590,10 @@ onMounted(async () => {
                                 >
                                     <button
                                         @click="skipTour"
-                                        class="absolute right-0 bottom-full mb-[-1.0rem] text-text-color-secondary font-medium text-base pi pi-times outline-0"
-                                    />
+                                        class="absolute right-0 bottom-full mb-[-1.0rem] text-text-color-secondary font-medium outline-0"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiClose" :size="16" />
+                                    </button>
                                     <template v-if="!isFirst">
                                         <button
                                             @click="previous"
@@ -720,7 +627,6 @@ onMounted(async () => {
 <style>
 :root {
     background-color: rgb(var(--colors-bg-one));
-    --el-color-primary: rgb(var(--colors-accent));
     --v-onboarding-overlay-z: 60;
     --v-onboarding-step-z: 70;
     --v-onboarding-overlay-opacity: 0.125;
@@ -740,23 +646,46 @@ onMounted(async () => {
     height: 1rem;
     position: absolute;
     z-index: -1;
-    border-left: 2px solid rgb(var(--colors-border-one));
-    border-bottom: 2px solid rgb(var(--colors-border-one));
 }
 
+/*
+ * The arrow is a rotated square; its two bordered sides form the tip pointing
+ * toward the anchor. The border pair therefore differs per placement (the base
+ * ::before draws no border, each placement sets its own).
+ */
 [data-v-onboarding-wrapper] [data-popper-placement^='top'] > [data-popper-arrow] {
     bottom: 7px;
+}
+[data-v-onboarding-wrapper] [data-popper-placement^='top'] > [data-popper-arrow]::before {
+    border-right: 2px solid rgb(var(--colors-border-one));
+    border-bottom: 2px solid rgb(var(--colors-border-one));
 }
 
 [data-v-onboarding-wrapper] [data-popper-placement^='right'] > [data-popper-arrow] {
     left: -6px;
 }
+[data-v-onboarding-wrapper] [data-popper-placement^='right'] > [data-popper-arrow]::before {
+    border-left: 2px solid rgb(var(--colors-border-one));
+    border-bottom: 2px solid rgb(var(--colors-border-one));
+}
 
 [data-v-onboarding-wrapper] [data-popper-placement^='bottom'] > [data-popper-arrow] {
     top: -6px;
 }
+[data-v-onboarding-wrapper] [data-popper-placement^='bottom'] > [data-popper-arrow]::before {
+    border-top: 2px solid rgb(var(--colors-border-one));
+    border-left: 2px solid rgb(var(--colors-border-one));
+}
 
 [data-v-onboarding-wrapper] [data-popper-placement^='left'] > [data-popper-arrow] {
     right: -6px;
+}
+[data-v-onboarding-wrapper] [data-popper-placement^='left'] > [data-popper-arrow]::before {
+    /* anchor to the arrow element's right edge so the diamond straddles the
+       popover's right edge (element is positioned by its right side here) */
+    left: auto;
+    right: 0;
+    border-top: 2px solid rgb(var(--colors-border-one));
+    border-right: 2px solid rgb(var(--colors-border-one));
 }
 </style>

@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Per-channel RPM calibration.
 //!
@@ -46,9 +31,23 @@ pub use diagnoser::{
 pub use dispatch::{dispatch, DutyWriter, RepoWriter};
 pub use registry::DiagnosisRegistry;
 pub use state::FanStateMap;
+// Parameter and return types of `FanStateMap`'s public entry/replace
+// pair; only the engine tests name them today.
+#[cfg_attr(not(test), allow(unused_imports))]
+pub use state::{ChannelEntry, FanState};
 pub use store::{validate, CalibrationEntry, CalibrationStore};
 
 use crate::device::{ChannelName, DeviceUID};
 
 /// Identifies a calibratable channel uniquely within the daemon.
 pub type ChannelKey = (DeviceUID, ChannelName);
+
+/// Preflight gate: an alert already Active on a channel blocks calibrating it.
+/// Suppression only exists for alerts a sweep would cause; one that fired
+/// beforehand means the fan itself is suspect. Implemented by the alert
+/// controller; tests install a stub.
+pub trait CalibrationAlertGate {
+    /// The name of an enabled, unsilenced alert currently Active on the
+    /// channel via a non-Temp source, if any.
+    fn active_alert_for_channel(&self, device_uid: &str, channel_name: &str) -> Option<String>;
+}

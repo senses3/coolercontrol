@@ -1,20 +1,7 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 import { useDeviceStore } from '@/stores/DeviceStore'
@@ -304,10 +291,23 @@ let isZoomed: boolean = false
 let rafId: number | null = null
 let rafPaused: boolean = false // rAF stopped due to user interaction
 let userZoomed: boolean = false // user has made a zoom selection
+// New data arrives roughly once a second, so a full-canvas redraw on every display
+// frame is wasted work. Throttle the scroll redraw to a fixed, lower cadence.
+const rafFrameIntervalMs = 1000 / 30
+let lastRafDrawMs = 0
+// Skip animating while the chart is scrolled out of view (dashboards can stack
+// several charts, only some of them visible at a time).
+let chartOnScreen = true
+let visibilityObserver: IntersectionObserver | null = null
+let resizeObserver: ResizeObserver | null = null
 const startRaf = () => {
-    if (rafId !== null || chart === null) return
+    if (rafId !== null || chart === null || !chartOnScreen) return
     const animate = () => {
-        const now = Date.now() / 1000
+        rafId = requestAnimationFrame(animate)
+        const nowMs = Date.now()
+        if (nowMs - lastRafDrawMs < rafFrameIntervalMs) return
+        lastRafDrawMs = nowMs
+        const now = nowMs / 1000
         chart!.setData(uSeriesData, false)
         // Snap the right edge to a whole device-pixel boundary so the x-axis only
         // advances in integer-pixel steps. This stabilizes the dash/dot phase between
@@ -315,7 +315,6 @@ const startRaf = () => {
         const pxPerSec = chart!.bbox.width / timeRangeSeconds
         const snappedNow = pxPerSec > 0 ? Math.round(now * pxPerSec) / pxPerSec : now
         chart!.setScale('x', { min: snappedNow - timeRangeSeconds, max: snappedNow })
-        rafId = requestAnimationFrame(animate)
     }
     rafId = requestAnimationFrame(animate)
 }
@@ -327,8 +326,20 @@ const stopRaf = () => {
     }
 }
 
+// chartKey remounts this component on any dashboard/device settings change, so anything
+// held past unmount is stranded for the life of the page. The observers are the retainers:
+// they keep the chart element reachable, which keeps its listener closures, the uPlot
+// instance and the series arrays alive.
 onUnmounted(() => {
     stopRaf()
+    visibilityObserver?.disconnect()
+    visibilityObserver = null
+    resizeObserver?.disconnect()
+    resizeObserver = null
+    // Releases uPlot's canvases and its own listeners, and removes the DOM subtree the
+    // plugin listeners are bound to.
+    chart?.destroy()
+    chart = null
 })
 
 // @ts-ignore
@@ -417,6 +428,10 @@ for (const lineName of uLineNames) {
 }
 
 const hourFormat = settingsStore.time24 ? 'HH' : 'h'
+// Escalating tick increments so axes still render values at small chart
+// heights: uPlot picks the first increment whose ticks fit, so full-height
+// rendering is unchanged while smaller charts fall back to coarser steps.
+const incrSteps = (base: number): number[] => [base, base * 2, base * 2.5, base * 5, base * 10]
 const uOptions: uPlot.Options = {
     width: 200,
     height: 200,
@@ -472,7 +487,7 @@ const uOptions: uPlot.Options = {
                 width: 1,
                 size: 5,
             },
-            incrs: [10],
+            incrs: incrSteps(10),
             // values: (_, ticks) => ticks.map((rawValue) => rawValue + '°/%'),
             border: {
                 show: true,
@@ -493,13 +508,10 @@ const uOptions: uPlot.Options = {
                 settingsStore.frequencyPrecision === 1
                     ? t('components.axisOptions.rpmMhz')
                     : t('components.axisOptions.krpmGhz'),
-            labelGap: settingsStore.frequencyPrecision === 1 ? deviceStore.getREMSize(1.0) : 0,
-            labelSize:
-                settingsStore.frequencyPrecision === 1
-                    ? deviceStore.getREMSize(2.9)
-                    : hasWattsAxis
-                      ? deviceStore.getREMSize(2.25)
-                      : deviceStore.getREMSize(1.4),
+            labelGap: deviceStore.getREMSize(1.0),
+            // The band has to hold the gap plus the rotated title, or the title
+            // spills into whatever axis comes next (the watts axis, when shown).
+            labelSize: deviceStore.getREMSize(2.9),
             // labelFont, unlike font, seems to take rem values properly, and by is 1rem by default:
             labelFont: `sans-serif`,
             stroke: colors.themeColors.text_color,
@@ -520,23 +532,23 @@ const uOptions: uPlot.Options = {
             incrs: (_self: uPlot, _axisIdx: number, _scaleMin: number, scaleMax: number) => {
                 if (settingsStore.frequencyPrecision === 1) {
                     if (scaleMax > 7000) {
-                        return [1000]
+                        return incrSteps(1000)
                     } else if (scaleMax > 3000) {
-                        return [500]
+                        return incrSteps(500)
                     } else if (scaleMax > 1300) {
-                        return [200]
+                        return incrSteps(200)
                     } else if (scaleMax > 700) {
-                        return [100]
+                        return incrSteps(100)
                     } else {
-                        return [50]
+                        return incrSteps(50)
                     }
                 } else {
                     if (scaleMax > 2) {
-                        return [1]
+                        return incrSteps(1)
                     } else if (scaleMax > 1) {
-                        return [0.5]
+                        return incrSteps(0.5)
                     } else {
-                        return [0.2]
+                        return incrSteps(0.2)
                     }
                 }
             },
@@ -572,29 +584,29 @@ const uOptions: uPlot.Options = {
 
             incrs: (_self: uPlot, _axisIdx: number, _scaleMin: number, scaleMax: number) => {
                 if (scaleMax > 7000) {
-                    return [1000]
+                    return incrSteps(1000)
                 } else if (scaleMax > 3000) {
-                    return [500]
+                    return incrSteps(500)
                 } else if (scaleMax > 1200) {
-                    return [200]
+                    return incrSteps(200)
                 } else if (scaleMax > 500) {
-                    return [100]
+                    return incrSteps(100)
                 } else if (scaleMax > 180) {
-                    return [50]
+                    return incrSteps(50)
                 } else if (scaleMax > 120) {
-                    return [20]
+                    return incrSteps(20)
                 } else if (scaleMax > 50) {
-                    return [10]
+                    return incrSteps(10)
                 } else if (scaleMax > 23) {
-                    return [5]
+                    return incrSteps(5)
                 } else if (scaleMax > 13) {
-                    return [2]
+                    return incrSteps(2)
                 } else if (scaleMax > 7) {
-                    return [1]
+                    return incrSteps(1)
                 } else if (scaleMax > 1) {
-                    return [0.5]
+                    return incrSteps(0.5)
                 }
-                return [0.1]
+                return incrSteps(0.1)
             },
             // values: (_, ticks) => ticks.map((rawValue) => rawValue + ' W'),
             border: {
@@ -732,10 +744,27 @@ onMounted(async () => {
         return { width: cwh.width, height: cwh.height }
     }
     chart.setSize(getChartSize())
-    const resizeObserver = new ResizeObserver((_) => {
-        chart!.setSize(getChartSize())
+    resizeObserver = new ResizeObserver((_) => {
+        chart?.setSize(getChartSize())
     })
     resizeObserver.observe(uChartElement)
+
+    // Pause the scroll animation whenever the chart leaves the viewport, and
+    // re-sync the (skipped) data before resuming when it returns.
+    visibilityObserver = new IntersectionObserver(
+        (entries) => {
+            chartOnScreen = entries[0]?.isIntersecting ?? true
+            if (!chartOnScreen) {
+                stopRaf()
+            } else if (settingsStore.eyeCandy && !rafPaused && rafId === null) {
+                initUSeriesData()
+                chart!.setData(uSeriesData, false)
+                startRaf()
+            }
+        },
+        { threshold: 0 },
+    )
+    visibilityObserver.observe(uChartElement)
 
     uChartElement.addEventListener('mousedown', (event: MouseEvent) => {
         if (
@@ -751,7 +780,8 @@ onMounted(async () => {
     // plugin's listener on the child u.over element (bubbling phase).
     uChartElement.addEventListener(
         'wheel',
-        () => {
+        (event: WheelEvent) => {
+            if (!event.ctrlKey) return
             if (settingsStore.eyeCandy && rafId !== null) {
                 if (
                     chart!.scales.x.min != chart!.data[0][0] ||
@@ -835,7 +865,7 @@ onMounted(async () => {
 <style scoped lang="scss">
 #u-plot-chart {
     width: 100%;
-    height: calc(100vh - 5.75rem);
+    height: var(--time-chart-height, calc(100vh - 5.75rem));
 }
 
 // zoom selection style

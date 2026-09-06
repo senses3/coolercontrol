@@ -1,45 +1,49 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiBellPlusOutline } from '@mdi/js'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
-import DataTable, { DataTableRowSelectEvent } from 'primevue/datatable'
-import Column from 'primevue/column'
+import {
+    mdiBellPlusOutline,
+    mdiBellSleepOutline,
+    mdiMinusThick,
+    mdiMonitor,
+    mdiPower,
+    mdiVolumeHigh,
+} from '@mdi/js'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { AlertState, getAlertStateDisplayName, getAlertStateIcon } from '@/models/Alert.ts'
+import {
+    Alert,
+    alertIsSilenced,
+    alertSources,
+    AlertState,
+    getAlertStateDisplayName,
+    getAlertStateIcon,
+} from '@/models/Alert.ts'
+import {
+    ChannelMetric,
+    ChannelSource,
+    getChannelMetricDisplayName,
+} from '@/models/ChannelSource.ts'
+import UiTag from '@/shell/ui/UiTag.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
+import AlertSilenceMenu from '@/components/AlertSilenceMenu.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { computed, inject, ref } from 'vue'
-import { Emitter, EventType } from 'mitt'
-import { FilterMatchMode } from '@primevue/core/api'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
+import { computed } from 'vue'
+import AlertLogTable from '@/components/AlertLogTable.vue'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const { getREMSize } = useDeviceStore()
 const router = useRouter()
 const { t } = useI18n()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 const alertsList = computed(() => {
     const alerts = []
@@ -56,147 +60,296 @@ const alertsList = computed(() => {
     }
     return alerts
 })
-const logFilters = ref({
-    global: { value: null, matchMode: FilterMatchMode.CONTAINS },
-})
-const onRowSelect = (event: DataTableRowSelectEvent) => {
-    router.push({ name: 'alerts', params: { alertUID: event.data.uid } })
+const onRowSelect = (alertUID: string) => {
+    router.push({ name: 'monitoring-alert', params: { alertUID } })
 }
+
+// Card grid: alerts needing attention first, disabled last, then the
+// panel's menu order.
+const sortedAlerts = computed(() => {
+    const rank = (alert: Alert): number => {
+        if (!alert.enabled) return 3
+        return alert.state === AlertState.Active ? 0 : alert.state === AlertState.Error ? 1 : 2
+    }
+    return [...alertsList.value].sort((a, b) => rank(a) - rank(b))
+})
+const tagSeverity = (state?: AlertState): 'danger' | 'warn' | 'success' =>
+    state === AlertState.Active ? 'danger' : state === AlertState.Error ? 'warn' : 'success'
+const sourceChannel = (source: ChannelSource) =>
+    settingsStore.allUIDeviceSettings
+        .get(source.device_uid)
+        ?.sensorsAndChannels.get(source.channel_name)
+const sourceLabel = (source: ChannelSource): string =>
+    sourceChannel(source)?.name ?? source.channel_name
+const sourceColor = (source: ChannelSource): string =>
+    sourceChannel(source)?.color ?? 'rgb(var(--colors-text-color-secondary))'
+// Per-source state text color, parallel to channel_sources by index.
+const sourceStateClass = (alert: Alert, index: number): string => {
+    const state = alert.source_states[index]?.state
+    if (state === AlertState.Active) return 'text-error'
+    if (state === AlertState.Error) return 'text-warning'
+    return ''
+}
+const valueSuffix = (metric: ChannelMetric): string => {
+    switch (metric) {
+        case ChannelMetric.Duty:
+        case ChannelMetric.Load:
+            return ` ${t('common.percentUnit')}`
+        case ChannelMetric.RPM:
+            return ` ${t('common.rpmAbbr')}`
+        case ChannelMetric.Freq:
+            return ` ${t('common.mhzAbbr')}`
+        default:
+            return ` ${t('common.tempUnit')}`
+    }
+}
+const liveValue = (source: ChannelSource): string => {
+    const values = deviceStore.currentDeviceStatus.get(source.device_uid)?.get(source.channel_name)
+    if (values == null) return ''
+    switch (source.channel_metric) {
+        case ChannelMetric.Duty:
+        case ChannelMetric.Load:
+            return values.duty ?? ''
+        case ChannelMetric.RPM:
+            return values.rpm ?? ''
+        case ChannelMetric.Freq:
+            return values.freq ?? ''
+        default:
+            return values.temp ?? ''
+    }
+}
+// Phrase the thresholds as the firing condition (the inverse of the OK
+// range); min is validated >= 0, so a 0 floor cannot fire and is omitted.
+const triggerText = (alert: Alert): string => {
+    const unit = valueSuffix(alertSources(alert)[0].channel_metric)
+    if (alert.min > 0) {
+        return t('views.alerts.triggersOutside', { min: alert.min, max: alert.max, unit })
+    }
+    return t('views.alerts.triggersAbove', { max: alert.max, unit })
+}
+const silencedUntilText = (alert: Alert): string =>
+    new Date(alert.silenced_until!).toLocaleString([], {
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    })
+// Latest log entry per alert: the moment it entered its current state.
+const lastLogTimes = computed(() => {
+    const latest = new Map<string, string>()
+    for (const log of settingsStore.alertLogs) {
+        const existing = latest.get(log.uid)
+        if (existing == null || new Date(log.timestamp) > new Date(existing)) {
+            latest.set(log.uid, log.timestamp)
+        }
+    }
+    return latest
+})
 </script>
 
 <template>
-    <div class="flex h-[3.5rem] border-b-4 border-border-one items-center justify-between">
-        <div class="pl-4 py-2 text-2xl font-bold">{{ t('views.alerts.alertsOverview') }}</div>
-    </div>
-    <ScrollAreaRoot style="--scrollbar-size: 10px">
-        <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <div class="mt-8 flex flex-col">
-                <div class="w-max">
-                    <div class="flex items-center justify-between">
-                        <span class="pb-1 ml-1 font-semibold text-xl text-text-color">{{
-                            t('layout.topbar.alerts')
-                        }}</span>
-                        <Button
-                            class="h-8 my-2"
-                            v-tooltip.top="{ value: t('layout.menu.tooltips.addAlert') }"
-                            @click="emitter.emit('alert-add')"
-                        >
-                            <svg-icon
-                                class="outline-0"
-                                type="mdi"
-                                :path="mdiBellPlusOutline"
-                                :size="deviceStore.getREMSize(1.25)"
-                            />
-                        </Button>
-                    </div>
-                    <DataTable
-                        :value="alertsList"
-                        selection-mode="single"
-                        data-key="uid"
-                        :meta-key-selection="false"
-                        @row-select="onRowSelect"
+    <div class="flex h-full flex-col">
+        <div class="flex shrink-0 flex-wrap items-center gap-3 px-4 pt-4">
+            <h1 class="text-xl font-semibold text-text-color">
+                {{ t('views.alerts.alertsOverview') }}
+            </h1>
+        </div>
+        <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
+            <ScrollAreaViewport class="p-4 h-full w-full">
+                <div class="mt-8 flex flex-col">
+                    <span class="pb-3 ml-1 font-semibold text-xl text-text-color">{{
+                        t('layout.topbar.alerts')
+                    }}</span>
+                    <div
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
                     >
-                        <Column header="">
-                            <template #body="slotProps">
+                        <div
+                            v-for="alert in sortedAlerts"
+                            :key="alert.uid"
+                            class="flex cursor-pointer flex-col gap-2 rounded-lg border bg-bg-two p-4 hover:bg-surface-hover"
+                            :class="[
+                                alert.enabled &&
+                                (alert.state === AlertState.Active ||
+                                    alert.state === AlertState.Error)
+                                    ? 'border-error'
+                                    : 'border-border-one',
+                                { 'opacity-60': !alert.enabled },
+                            ]"
+                            @click="onRowSelect(alert.uid)"
+                        >
+                            <div class="flex items-center gap-2">
+                                <!-- Shape encodes silenced, color keeps the live state:
+                                     a red sleep bell means firing-but-muted. -->
                                 <svg-icon
                                     type="mdi"
+                                    class="shrink-0"
                                     :class="{
-                                        'text-error': slotProps.data.state === AlertState.Active,
+                                        'text-error':
+                                            alert.enabled && alert.state === AlertState.Active,
                                     }"
-                                    :path="getAlertStateIcon(slotProps.data.state)"
+                                    :path="
+                                        alert.enabled && alertIsSilenced(alert)
+                                            ? mdiBellSleepOutline
+                                            : getAlertStateIcon(alert.state!)
+                                    "
                                     :size="getREMSize(1.5)"
                                 />
-                            </template>
-                        </Column>
-                        <Column field="state" :header="t('common.state')">
-                            <template #body="slotProps">
-                                <span
-                                    class="underline"
-                                    :class="{
-                                        'text-error': slotProps.data.state === AlertState.Active,
-                                        'text-success':
-                                            slotProps.data.state === AlertState.Inactive,
-                                    }"
-                                >
-                                    {{ getAlertStateDisplayName(slotProps.data.state) }}
+                                <span class="truncate text-base font-semibold text-text-color">
+                                    {{ alert.name }}
                                 </span>
-                            </template>
-                        </Column>
-                        <Column
-                            field="name"
-                            :header="t('common.name')"
-                            body-class="w-full text-ellipsis underline"
-                        />
-                    </DataTable>
-                </div>
-            </div>
-            <div class="mt-8 flex flex-col">
-                <span class="pb-3 ml-1 font-semibold text-xl text-text-color">{{
-                    t('views.alerts.alertLogs')
-                }}</span>
-                <DataTable
-                    class="w-full"
-                    :value="settingsStore.alertLogs"
-                    v-model:filters="logFilters"
-                    :global-filter-fields="['name', 'message']"
-                    sort-field="timestamp"
-                    :sort-order="-1"
-                    selection-mode="single"
-                    :meta-key-selection="false"
-                    paginator
-                    paginator-position="top"
-                    :rows="20"
-                    :rows-per-page-options="[20, 50, 100]"
-                    @row-select="onRowSelect"
-                >
-                    <template #paginatorstart>
-                        <InputText
-                            v-model="logFilters.global.value"
-                            :placeholder="t('common.search')"
-                            size="small"
-                        />
-                    </template>
-                    <Column field="timestamp" :header="t('common.timestamp')" :sortable="true">
-                        <template #body="slotProps">
-                            {{ new Date(slotProps.data.timestamp).toLocaleString() }}
-                        </template>
-                    </Column>
-                    <Column field="state" :header="t('common.state')">
-                        <template #body="slotProps">
-                            <span
-                                class="underline"
-                                :class="{
-                                    'text-error': slotProps.data.state === AlertState.Active,
-                                    'text-success': slotProps.data.state === AlertState.Inactive,
-                                }"
+                                <span class="ml-auto flex shrink-0 items-center gap-1.5">
+                                    <UiTag
+                                        v-if="alert.enabled && alertIsSilenced(alert)"
+                                        :value="
+                                            t('views.alerts.silencedUntil', {
+                                                time: silencedUntilText(alert),
+                                            })
+                                        "
+                                        severity="warn"
+                                    />
+                                    <UiTag
+                                        v-if="!alert.enabled"
+                                        :value="t('views.alerts.disabledLabel')"
+                                    />
+                                    <UiTag
+                                        v-else
+                                        :value="getAlertStateDisplayName(alert.state!)"
+                                        :severity="tagSeverity(alert.state)"
+                                    />
+                                </span>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <div
+                                    v-for="(source, index) in alertSources(alert)"
+                                    :key="`${source.channel_name}/${source.channel_metric}`"
+                                    class="flex items-center gap-2 text-base text-text-color"
+                                >
+                                    <svg-icon
+                                        type="mdi"
+                                        :path="mdiMinusThick"
+                                        :size="14"
+                                        class="shrink-0"
+                                        :style="{ color: sourceColor(source) }"
+                                    />
+                                    <span class="truncate" :class="sourceStateClass(alert, index)">
+                                        {{ sourceLabel(source) }}
+                                    </span>
+                                    <span
+                                        v-if="liveValue(source) !== ''"
+                                        class="ml-auto shrink-0 text-text-color-secondary"
+                                    >
+                                        {{ liveValue(source)
+                                        }}{{ valueSuffix(source.channel_metric) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="text-sm text-text-color-secondary">
+                                {{
+                                    getChannelMetricDisplayName(
+                                        alertSources(alert)[0].channel_metric,
+                                    )
+                                }}: {{ triggerText(alert) }}
+                            </div>
+                            <div
+                                class="mt-auto flex items-center gap-2 text-sm text-text-color-secondary"
                             >
-                                {{ getAlertStateDisplayName(slotProps.data.state) }}
-                            </span>
-                        </template>
-                    </Column>
-                    <Column field="name" :header="t('common.name')" body-class="underline" />
-                    <Column
-                        field="message"
-                        :header="t('common.message')"
-                        body-class="w-full text-ellipsis"
-                    />
-                </DataTable>
-            </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
-            orientation="vertical"
-        >
-            <ScrollAreaThumb
-                class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
+                                <!-- The latest state transition: when the alert entered its
+                                     current state. Meaningless while disabled (not evaluated). -->
+                                <span
+                                    v-if="alert.enabled && lastLogTimes.get(alert.uid) != null"
+                                    class="truncate"
+                                >
+                                    {{
+                                        t('views.alerts.stateSince', {
+                                            state: getAlertStateDisplayName(alert.state!),
+                                            time: new Date(
+                                                lastLogTimes.get(alert.uid)!,
+                                            ).toLocaleString(),
+                                        })
+                                    }}
+                                </span>
+                                <span
+                                    class="ml-auto flex shrink-0 items-center gap-1.5"
+                                    @click.stop
+                                >
+                                    <svg-icon
+                                        v-if="alert.desktop_notify"
+                                        type="mdi"
+                                        :path="mdiMonitor"
+                                        :size="14"
+                                        v-tooltip.top="t('views.alerts.desktopNotify')"
+                                    />
+                                    <svg-icon
+                                        v-if="alert.desktop_notify_audio"
+                                        type="mdi"
+                                        :path="mdiVolumeHigh"
+                                        :size="14"
+                                        v-tooltip.top="t('views.alerts.desktopNotifyAudio')"
+                                    />
+                                    <svg-icon
+                                        v-if="alert.shutdown_on_activation"
+                                        type="mdi"
+                                        class="text-error"
+                                        :path="mdiPower"
+                                        :size="14"
+                                        v-tooltip.top="t('views.alerts.shutdownOnActivation')"
+                                    />
+                                    <AlertSilenceMenu v-if="alert.enabled" :alert="alert">
+                                        <template #trigger>
+                                            <UiButton
+                                                variant="ghost"
+                                                size="icon"
+                                                class="h-6 w-6"
+                                                v-tooltip.top="t('views.alerts.silenceTooltip')"
+                                            >
+                                                <svg-icon
+                                                    type="mdi"
+                                                    :path="mdiBellSleepOutline"
+                                                    :size="16"
+                                                />
+                                            </UiButton>
+                                        </template>
+                                    </AlertSilenceMenu>
+                                    <!-- Wrapper span: UiSwitch roots at a component, so the
+                                         tooltip directive needs a plain element to attach to. -->
+                                    <span v-tooltip.top="t('views.alerts.enabledTooltip')">
+                                        <UiSwitch
+                                            :model-value="alert.enabled"
+                                            @update:model-value="
+                                                (value: boolean) =>
+                                                    settingsStore.setAlertEnabled(alert.uid, value)
+                                            "
+                                        />
+                                    </span>
+                                </span>
+                            </div>
+                        </div>
+                        <div
+                            class="flex min-h-[8rem] cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border-one p-4 text-text-color-secondary hover:bg-surface-hover hover:text-text-color"
+                            @click="router.push({ name: 'monitoring-alert-new' })"
+                        >
+                            <svg-icon type="mdi" :path="mdiBellPlusOutline" :size="20" />
+                            {{ t('views.alerts.newAlert') }}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-8 flex flex-col">
+                    <span class="pb-3 ml-1 font-semibold text-xl text-text-color">{{
+                        t('views.alerts.alertLogs')
+                    }}</span>
+                    <AlertLogTable />
+                </div>
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar
+                class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
+                orientation="vertical"
+            >
+                <ScrollAreaThumb
+                    class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
+                />
+            </ScrollAreaScrollbar>
+        </ScrollAreaRoot>
+    </div>
 </template>
 
-<style scoped lang="scss">
-.table-data {
-    padding: 0.5rem;
-    border: 1px solid rgb(var(--colors-border-one));
-}
-</style>
+<style scoped lang="scss"></style>

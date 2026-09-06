@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 const colors = require('tailwindcss/colors')
 
@@ -22,14 +7,19 @@ module.exports = {
     content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
     darkMode: 'selector',
     plugins: [
-        require('tailwindcss-primeui'),
         require('tailwindcss-themer')({
             defaultTheme: {
                 extend: {
                     // the default theme that appears for a split second on load:
                     colors: {
                         // dark-theme copy
-                        accent: '#568af2',
+                        accent: '#4d8cff',
+                        'accent-gradient-to': '#ff21ff',
+                        // Contrast foreground for filled accent/error surfaces. These
+                        // placeholders cover the pre-JS flash; ThemeColorsStore recomputes
+                        // --colors-accent-fg / --colors-error-fg per theme at runtime.
+                        'accent-fg': '#1b1e23',
+                        'error-fg': '#f5f6f9',
                         'bg-one': '#1b1e23',
                         'bg-two': '#2c313c',
                         'border-one': '#8a95aa40',
@@ -61,6 +51,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: 'AccentColor',
+                            // No gradient: the OS palette offers no second brand color.
+                            'accent-gradient-to': 'AccentColor',
                             // accent: 'Highlight',
                             'bg-one': 'Canvas',
                             'bg-two': 'ButtonFace',
@@ -103,6 +95,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#00ff00',
+                            // Flat: a gradient would undercut the contrast guarantee.
+                            'accent-gradient-to': '#00ff00',
                             'bg-one': '#000000',
                             'bg-two': '#000000',
                             'border-one': '#ffffff',
@@ -129,6 +123,8 @@ module.exports = {
                     extend: {
                         colors: {
                             accent: '#0000ff',
+                            // Flat: a gradient would undercut the contrast guarantee.
+                            'accent-gradient-to': '#0000ff',
                             'bg-one': '#ffffff',
                             'bg-two': '#ffffff',
                             'border-one': '#000000',
@@ -138,11 +134,13 @@ module.exports = {
                             white: '#ffffff',
                             pink: '#ff00ff',
                             green: '#00ff00',
-                            success: '#00ff00',
+                            // Pure green and yellow are unreadable on white;
+                            // these hold AAA against the theme's background.
+                            success: '#14532d',
                             red: '#ff0000',
                             error: '#ff0000',
                             yellow: '#ffff00',
-                            warning: '#ffff00',
+                            warning: '#713f12',
                             blue: '#0000ff',
                             info: '#0000ff',
                         },
@@ -154,7 +152,10 @@ module.exports = {
                     // mediaQuery: '@media (prefers-color-scheme: light)',
                     extend: {
                         colors: {
-                            accent: '#568af2',
+                            accent: '#4d8cff',
+                            // The brand magenta washes out on a light ground, so it
+                            // deepens within its own hue, as success/warning do below.
+                            'accent-gradient-to': '#cc00cc',
                             'bg-one': '#f5f6f9',
                             'bg-two': '#dfe0e0',
                             'border-one': '#3c454d',
@@ -164,11 +165,16 @@ module.exports = {
                             white: '#f5f6f9',
                             pink: '#ff007f',
                             green: '#00ff7f',
-                            success: '#00ff7f',
+                            // The dark themes' bright spring green and pale
+                            // yellow wash out on light surfaces, so the two
+                            // status colors darken to keep WCAG AA against both
+                            // bg-one and bg-two. The green/yellow palette hues
+                            // stay as they are: they only tint tag backgrounds.
+                            success: '#166534',
                             red: '#ff5555',
                             error: '#ff5555',
                             yellow: '#f1fa8c',
-                            warning: '#f1fa8c',
+                            warning: '#854d0e',
                             blue: '#568af2',
                             info: '#568af2',
                         },
@@ -181,7 +187,8 @@ module.exports = {
                     // mediaQuery: '@media (prefers-color-scheme: dark)',
                     extend: {
                         colors: {
-                            accent: '#568af2',
+                            accent: '#4d8cff',
+                            'accent-gradient-to': '#ff21ff',
                             'bg-one': '#1b1e23',
                             'bg-two': '#2c313c',
                             // 'border-one': '#343b48',
@@ -221,9 +228,29 @@ module.exports = {
             purple: colors.purple,
         },
         extend: {
+            fontFamily: {
+                // Live values (duty, rpm, temps) carry the numeric face; the
+                // interface-font setting swaps both roles at the variable.
+                numeric: 'var(--font-numeric)',
+            },
+            keyframes: {
+                'hue-rotate': {
+                    from: { filter: 'hue-rotate(0deg)' },
+                    to: { filter: 'hue-rotate(360deg)' },
+                },
+            },
             animation: {
                 'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                 'spin-slow': 'spin 2s linear infinite',
+                'hue-rotate': 'hue-rotate 2.0s linear infinite',
+            },
+            boxShadow: {
+                // Elevation for floating overlays; shadow-md is invisible on dark surfaces.
+                overlay: '0 4px 8px -1px rgb(0 0 0 / 0.5), 0 10px 24px -6px rgb(0 0 0 / 0.4)',
+                // Larger floating panels (menus, popovers, pickers) need a bigger
+                // shadow than tooltips to read as equally elevated.
+                'overlay-lg':
+                    '0 8px 20px -2px rgb(0 0 0 / 0.55), 0 24px 56px -10px rgb(0 0 0 / 0.45)',
             },
             // This seems to confict with our setup. Don't use:
             //colors: {},

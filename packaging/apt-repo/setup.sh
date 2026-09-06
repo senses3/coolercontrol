@@ -1,7 +1,15 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Configure apt to install CoolerControl from apt.coolercontrol.org.
 #
 #   curl -fsSL https://apt.coolercontrol.org/setup.sh | sudo sh
+#
+# Set TREE=debian or TREE=ubuntu to override the detected package tree, for derivatives that
+# report an ID this script does not know. Note the -E, without it sudo drops the variable:
+#
+#   curl -fsSL https://apt.coolercontrol.org/setup.sh | sudo -E TREE=debian sh
 #
 # Safe to re-run: it rewrites its own source file and leaves everything else alone.
 set -eu
@@ -85,7 +93,11 @@ disable_cloudsmith_sources() {
     [ "${found}" -eq 0 ] || log "the old repository can be removed with: rm ${SOURCES%/*}/*.disabled"
 }
 
-tree=$(pick_tree)
+case ${TREE-} in
+"") tree=$(pick_tree) ;;
+debian | ubuntu) tree=${TREE} ;;
+*) die "TREE must be debian or ubuntu, got '${TREE}'" ;;
+esac
 log "using the ${tree} package tree at ${REPO_URL}/${tree}"
 
 log "installing signing key to ${KEYRING}"
@@ -97,12 +109,13 @@ mv "${KEYRING}.new" "${KEYRING}"
 
 log "writing ${SOURCES}"
 mkdir -p "$(dirname "${SOURCES}")"
+# No Architectures field: apt takes the supported set from our signed Release file and skips
+# the rest, so listing them here only makes every machine fetch the other one's index.
 cat >"${SOURCES}" <<EOF
 Types: deb
 URIs: ${REPO_URL}/${tree}
 Suites: stable
 Components: main
-Architectures: amd64 arm64
 Signed-By: ${KEYRING}
 EOF
 

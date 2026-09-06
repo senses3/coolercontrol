@@ -1,26 +1,131 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 // @ts-ignore
-import AppLayout from '@/layout/AppLayout.vue'
-import { useSettingsStore } from '@/stores/SettingsStore'
-import { StartupPage } from '@/models/UISettings'
+import ShellLayout from '@/shell/ShellLayout.vue'
+
+// Shell section routes. Placeholder pages until each section's phase lands;
+// the settings section reuses the existing settings route.
+const sectionRoutes: RouteRecordRaw[] = [
+    {
+        path: 'home',
+        name: 'section-home',
+        component: () => import('@/shell/home/HomePage.vue'),
+        meta: { section: 'home' },
+    },
+    {
+        path: 'home/logs',
+        name: 'home-logs',
+        component: () => import('@/shell/home/LogsPage.vue'),
+        meta: { section: 'home' },
+    },
+    {
+        path: 'cooling',
+        name: 'section-cooling',
+        component: () => import('@/shell/cooling/CoolingLanding.vue'),
+        meta: { section: 'cooling' },
+    },
+    {
+        path: 'cooling/modes',
+        name: 'cooling-modes',
+        component: () => import('@/shell/cooling/ModesPage.vue'),
+        meta: { section: 'cooling' },
+    },
+    {
+        path: 'cooling/:deviceUID/:channelName',
+        name: 'cooling-channel',
+        component: () => import('@/shell/cooling/ChannelPage.vue'),
+        props: true,
+        meta: { section: 'cooling' },
+    },
+    {
+        // Section landing is the home dashboard (DashboardView's no-param fallback).
+        path: 'monitoring',
+        name: 'section-monitoring',
+        component: () => import('@/views/DashboardView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/dashboards/:dashboardUID',
+        name: 'monitoring-dashboard',
+        component: () => import('@/views/DashboardView.vue'),
+        props: true,
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/sensors/:deviceUID/:channelName',
+        name: 'monitoring-sensor',
+        component: () => import('@/views/DashboardView.vue'),
+        props: true,
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/alerts',
+        name: 'monitoring-alerts',
+        component: () => import('@/views/AlertsOverView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/alerts/new',
+        name: 'monitoring-alert-new',
+        component: () => import('@/views/AlertView.vue'),
+        meta: { section: 'monitoring' },
+    },
+    {
+        path: 'monitoring/alerts/:alertUID',
+        name: 'monitoring-alert',
+        component: () => import('@/views/AlertView.vue'),
+        props: true,
+        meta: { section: 'monitoring' },
+    },
+    {
+        // Custom sensors are managed from the Devices section (the backend
+        // models them as a device); Monitoring only observes them.
+        path: 'devices/custom-sensors/new',
+        name: 'device-custom-sensor-new',
+        component: () => import('@/views/CustomSensorView.vue'),
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'devices/custom-sensors/:customSensorID',
+        name: 'device-custom-sensor',
+        component: () => import('@/views/CustomSensorView.vue'),
+        props: true,
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'monitoring/custom-sensors/new',
+        redirect: { name: 'device-custom-sensor-new' },
+    },
+    {
+        path: 'monitoring/custom-sensors/:customSensorID',
+        name: 'monitoring-custom-sensor',
+        redirect: (to) => ({
+            name: 'device-custom-sensor',
+            params: { customSensorID: to.params.customSensorID },
+        }),
+    },
+    {
+        path: 'devices',
+        name: 'section-devices',
+        component: () => import('@/shell/devices/DevicesLanding.vue'),
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'devices/manage-sensors',
+        name: 'devices-manage-sensors',
+        component: () => import('@/shell/devices/ManageSensorsView.vue'),
+        meta: { section: 'devices' },
+    },
+    {
+        path: 'devices/:deviceUID',
+        name: 'devices-device',
+        component: () => import('@/shell/devices/DevicePage.vue'),
+        props: true,
+        meta: { section: 'devices' },
+    },
+]
 
 const router = createRouter({
     // For our use case, using the hash history allows users to bookmark links
@@ -31,114 +136,153 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            component: AppLayout,
+            component: ShellLayout,
             children: [
+                ...sectionRoutes,
                 {
                     path: '',
                     name: 'startup-page',
-                    component: () => import('@/views/AppInfoView.vue'),
-                    props: false,
+                    // Static on purpose. Resolving the configured startup page
+                    // here would mean reading the settings store, which cannot
+                    // be created outside a component setup (see sections.spec).
+                    // Callers that want the configured page resolve it
+                    // themselves; App.vue applies it at boot.
+                    redirect: { name: 'section-home' },
                 },
+                // Legacy route names kept as redirects: wizards, bookmarks,
+                // and the Qt app navigate by these.
                 {
                     path: 'controls',
                     name: 'system-controls',
-                    component: () => import('@/views/ControlsView.vue'),
-                    props: true,
+                    redirect: { name: 'section-cooling' },
                 },
                 {
                     path: 'controls/:deviceUID/:channelName',
                     name: 'channel-control-flow',
-                    component: () => import('@/views/ChannelControlFlowView.vue'),
-                    props: true,
+                    redirect: (to) => ({
+                        name: 'cooling-channel',
+                        params: {
+                            deviceUID: to.params.deviceUID,
+                            channelName: to.params.channelName,
+                        },
+                    }),
                 },
                 {
                     path: 'app-info',
                     name: 'app-info',
-                    component: () => import('@/views/AppInfoView.vue'),
-                    props: false,
+                    redirect: { name: 'section-home' },
                 },
                 {
                     path: '/settings/:tabNumber?',
                     name: 'settings',
                     component: () => import('@/layout/AppSettings.vue'),
                     props: true,
+                    meta: { section: 'settings' },
                 },
                 {
                     path: '/dashboards/:dashboardUID?',
                     name: 'dashboards',
-                    component: () => import('@/views/DashboardView.vue'),
-                    props: true,
+                    redirect: (to) =>
+                        to.params.dashboardUID
+                            ? {
+                                  name: 'monitoring-dashboard',
+                                  params: { dashboardUID: to.params.dashboardUID },
+                              }
+                            : { name: 'section-monitoring' },
                 },
                 {
                     path: '/modes/:modeUID',
                     name: 'modes',
                     component: () => import('@/views/ModeView.vue'),
                     props: true,
+                    meta: { section: 'cooling' },
                 },
                 {
                     path: '/profiles/:profileUID',
                     name: 'profiles',
                     component: () => import('@/views/ProfileView.vue'),
                     props: true,
+                    meta: { section: 'cooling' },
                 },
                 {
                     path: '/functions/:functionUID',
                     name: 'functions',
                     component: () => import('@/views/FunctionView.vue'),
                     props: true,
+                    meta: { section: 'cooling' },
                 },
                 {
                     path: '/alerts/:alertUID?',
                     name: 'alerts',
-                    component: () => import('@/views/AlertView.vue'),
-                    props: true,
+                    redirect: (to) =>
+                        to.params.alertUID
+                            ? { name: 'monitoring-alert', params: { alertUID: to.params.alertUID } }
+                            : { name: 'monitoring-alert-new' },
                 },
                 {
                     path: '/alerts-overview',
                     name: 'alerts-overview',
-                    component: () => import('@/views/AlertsOverView.vue'),
-                    props: true,
+                    redirect: { name: 'monitoring-alerts' },
                 },
                 {
                     path: '/custom-sensors/:customSensorID?',
                     name: 'custom-sensors',
-                    component: () => import('@/views/CustomSensorView.vue'),
-                    props: true,
+                    redirect: (to) =>
+                        to.params.customSensorID
+                            ? {
+                                  name: 'device-custom-sensor',
+                                  params: { customSensorID: to.params.customSensorID },
+                              }
+                            : { name: 'device-custom-sensor-new' },
                 },
                 {
                     path: '/dashboards/:deviceUID/:channelName',
                     name: 'single-dashboard',
-                    component: () => import('@/views/SingleDashboardView.vue'),
-                    props: true,
+                    redirect: (to) => ({
+                        name: 'monitoring-sensor',
+                        params: {
+                            deviceUID: to.params.deviceUID,
+                            channelName: to.params.channelName,
+                        },
+                    }),
                 },
                 {
                     path: '/devices/:deviceUID/speed/:channelName',
                     name: 'device-speed',
-                    component: () => import('@/views/SpeedView.vue'),
-                    props: true,
+                    redirect: (to) => ({
+                        name: 'cooling-channel',
+                        params: {
+                            deviceUID: to.params.deviceUID,
+                            channelName: to.params.channelName,
+                        },
+                    }),
                 },
                 {
-                    path: '/devices/:deviceId/lighting/:channelName',
+                    path: '/devices/:deviceUID/lighting/:channelName',
                     name: 'device-lighting',
                     component: () => import('@/views/LightingView.vue'),
                     props: true,
+                    meta: { section: 'devices' },
                 },
                 {
-                    path: '/devices/:deviceId/lcd/:channelName',
+                    path: '/devices/:deviceUID/lcd/:channelName',
                     name: 'device-lcd',
                     component: () => import('@/views/LcdView.vue'),
                     props: true,
+                    meta: { section: 'devices' },
                 },
                 {
                     path: '/plugins-overview',
                     name: 'plugins-overview',
                     component: () => import('@/views/PluginsOverView.vue'),
+                    meta: { section: 'plugins' },
                 },
                 {
                     path: '/plugins/:pluginId',
                     name: 'plugin-page',
                     component: () => import('@/views/PluginPageView.vue'),
                     props: true,
+                    meta: { section: 'plugins' },
                 },
                 {
                     path: '/:pathMatch(.*)', // match any other route
@@ -148,23 +292,6 @@ const router = createRouter({
             ],
         },
     ],
-})
-
-// Redirect the default root route to the user's configured startup page.
-// Skipped on initial load (settings not yet loaded); App.vue handles that case
-// after settings init. Subsequent navigations to "/" honor the setting.
-// AppInfo is the default fallback; the empty path's component is AppInfoView,
-// so when startupPage === AppInfo we just stay put without a redirect.
-router.beforeEach((to) => {
-    if (to.name !== 'startup-page') return true
-    const settingsStore = useSettingsStore()
-    if (settingsStore.startupPage === StartupPage.Controls) {
-        return { name: 'system-controls' }
-    }
-    if (settingsStore.startupPage === StartupPage.HomeDashboard) {
-        return { name: 'dashboards' }
-    }
-    return true
 })
 
 export default router

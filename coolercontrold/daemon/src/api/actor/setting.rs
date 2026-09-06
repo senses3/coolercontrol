@@ -1,26 +1,11 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::actor::{run_api_actor, ApiActor};
 use crate::api::settings::{CoolerControlDeviceSettingsDto, CoolerControlSettingsDto};
 use crate::api::CCError;
 use crate::config::Config;
-use crate::device::{ChannelName, DeviceInfo, DeviceName, DeviceType, DeviceUID};
+use crate::device::{ChannelName, DeviceInfo, DeviceName, DeviceType, DeviceUID, UID};
 use crate::overrides::{OverridesController, OverridesDocument};
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, CoolerControlSettings, CustomSensor, DeviceExtensions,
@@ -50,6 +35,10 @@ enum SettingMessage {
     },
     UpdateCC {
         update: CoolerControlSettingsDto,
+        respond_to: oneshot::Sender<Result<()>>,
+    },
+    SetPowerProfileModes {
+        modes: HashMap<String, UID>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     GetAllCCDevices {
@@ -170,7 +159,7 @@ impl SettingActor {
     ) -> Option<String> {
         if let Some(device_lock) = self.all_devices.get(device_uid) {
             let lock = device_lock.borrow();
-            if let Some(label) = detected_channel_label(&lock.info, channel_name) {
+            if let Some(label) = lock.info.detected_channel_label(channel_name) {
                 return Some(label);
             }
         }
@@ -236,6 +225,14 @@ impl ApiActor<SettingMessage> for SettingActor {
                 .await;
                 let _ = respond_to.send(result);
             }
+            SettingMessage::SetPowerProfileModes { modes, respond_to } => {
+                let result = async {
+                    self.config.set_power_profile_modes(&modes);
+                    self.config.save_config_file().await
+                }
+                .await;
+                let _ = respond_to.send(result);
+            }
             SettingMessage::GetAllCCDevices { respond_to } => {
                 let result = async {
                     let mut devices_settings = HashMap::new();
@@ -269,7 +266,7 @@ impl ApiActor<SettingMessage> for SettingActor {
                                     name: device_name,
                                     disable: false,
                                     extensions: DeviceExtensions::default(),
-                                    channel_settings: HashMap::with_capacity(0),
+                                    channel_settings: HashMap::new(),
                                 },
                             );
                         }
@@ -332,7 +329,7 @@ impl ApiActor<SettingMessage> for SettingActor {
                             name: current_device_name,
                             disable: false,
                             extensions: DeviceExtensions::default(),
-                            channel_settings: HashMap::with_capacity(0),
+                            channel_settings: HashMap::new(),
                         }
                     };
                     self.resolve_cc_device_dto(&mut dto);
@@ -479,6 +476,18 @@ impl SettingHandle {
         rx.await?
     }
 
+    /// Persists the power profile to Mode mapping. Goes through the actor so the config write is
+    /// serialized with every other settings write.
+    pub async fn set_power_profile_modes(&self, modes: HashMap<String, UID>) -> Result<()> {
+        let (tx, rx) = oneshot::channel();
+        let msg = SettingMessage::SetPowerProfileModes {
+            modes,
+            respond_to: tx,
+        };
+        let _ = self.sender.send(msg).await;
+        rx.await?
+    }
+
     pub async fn get_all_cc_devices(&self) -> Result<Vec<CoolerControlDeviceSettingsDto>> {
         let (tx, rx) = oneshot::channel();
         let msg = SettingMessage::GetAllCCDevices { respond_to: tx };
@@ -571,16 +580,6 @@ impl SettingHandle {
     }
 }
 
-/// The detected label for a channel from live device info, when present.
-fn detected_channel_label(info: &DeviceInfo, channel_name: &str) -> Option<String> {
-    if let Some(temp_info) = info.temps.get(channel_name) {
-        return Some(temp_info.label.clone());
-    }
-    info.channels
-        .get(channel_name)
-        .and_then(|channel| channel.label.clone())
-}
-
 /// Resolves a CC device settings name: override > saved memo > live detected.
 fn resolve_cc_device_name(
     overrides: &OverridesController,
@@ -607,7 +606,7 @@ fn resolve_channel_setting_labels(
     assert!(device_uid.is_empty().not());
     for (channel_name, settings) in channel_settings.iter_mut() {
         let memo = settings.label.take().filter(|label| label.is_empty().not());
-        let live = live_info.and_then(|info| detected_channel_label(info, channel_name));
+        let live = live_info.and_then(|info| info.detected_channel_label(channel_name));
         settings.label = overrides
             .channel_label_override(device_uid, channel_name)
             .or(memo)
@@ -635,7 +634,7 @@ fn stamp_detection_memos(
         update.name.clone_from(&current.name);
     }
     for (channel_name, settings) in &mut update.channel_settings {
-        let live_label = live.and_then(|(_, info)| detected_channel_label(info, channel_name));
+        let live_label = live.and_then(|(_, info)| info.detected_channel_label(channel_name));
         let memo = current
             .channel_settings
             .get(channel_name)

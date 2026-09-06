@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::config::Config;
 use crate::device::{
@@ -23,6 +8,7 @@ use crate::device::{
 };
 use crate::device_health::FailsafeRef;
 use crate::grpc_api::device_service::v1::health_response;
+use crate::hardware_support::HardwareSupportController;
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
@@ -55,7 +41,7 @@ use toml_edit::DocumentMut;
 pub type ServiceDeviceID = String;
 
 use crate::paths;
-const SERVICE_MANIFEST_FILE_NAME: &str = "manifest.toml";
+pub const SERVICE_MANIFEST_FILE_NAME: &str = "manifest.toml";
 pub const CC_PLUGIN_USER: &str = "cc-plugin-user";
 const TIMEOUT_SERVICE_START_SECONDS: usize = 5;
 const TIMEOUT_SERVICE_CONNECTION_SECONDS: usize = 10;
@@ -76,6 +62,8 @@ pub struct ServicePluginRepo {
     reset_plugin_user: bool,
     services: HashMap<ServiceId, (Option<Rc<DeviceServiceConnection>>, ServiceManifest)>,
     devices: HashMap<DeviceUID, (DeviceLock, Rc<DeviceServiceConnection>)>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     preloaded_statuses: RefCell<HashMap<DeviceUID, PreloadData>>,
     failsafe_statuses: RefCell<HashMap<DeviceUID, FailsafeStatusData>>,
     disabled_channels: HashMap<DeviceUID, HashSet<String>>,
@@ -187,11 +175,41 @@ impl ServicePluginRepo {
             reset_plugin_user,
             services: HashMap::new(),
             devices: HashMap::new(),
+            hardware_support: None,
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: HashMap::new(),
             device_delays: HashMap::new(),
         })
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, (device_lock, _)) in &self.devices {
+            let device = device_lock.borrow();
+            hardware_support.record_device_channels(device_uid, &device.info);
+            // Enabled by construction: a disabled device never reaches this map.
+            hardware_support.record_device_summary(
+                device_uid,
+                crate::hardware_report::DeviceSummary::from_device(&device, true),
+            );
+        }
     }
 
     fn load_device_delays(&mut self) {
@@ -282,6 +300,33 @@ impl ServicePluginRepo {
         services
     }
 
+    /// The service definition for a plugin, or `None` when its manifest names no
+    /// executable and there is therefore nothing to manage.
+    ///
+    /// Shared so that a plugin enabled while the daemon runs is installed exactly as one
+    /// installed at startup. Building this in two places is how the two drift apart.
+    pub fn service_definition(
+        service_id: &ServiceId,
+        service_manifest: &ServiceManifest,
+    ) -> Option<ServiceDefinition> {
+        let executable = service_manifest.executable.clone()?;
+        let username = service_manifest
+            .privileged
+            .not()
+            .then_some(CC_PLUGIN_USER.to_string());
+        let mut envs = Self::env_log_level();
+        envs.append(&mut service_manifest.envs.clone());
+        Some(ServiceDefinition {
+            service_id: service_id.clone(),
+            executable,
+            args: service_manifest.args.clone(),
+            username,
+            wrk_dir: None,
+            envs: Some(envs),
+            disable_restart_on_failure: false,
+        })
+    }
+
     fn env_log_level() -> Vec<(String, String)> {
         match log::max_level() {
             LevelFilter::Off => {
@@ -335,27 +380,13 @@ impl ServicePluginRepo {
         poll_rate: f64,
         api_up_token: CancellationToken,
     ) {
-        let username = service_manifest
-            .privileged
-            .not()
-            .then_some(CC_PLUGIN_USER.to_string());
-        let mut envs = Self::env_log_level();
-        envs.append(&mut service_manifest.envs.clone());
-        // This will also reload this daemon unit if already installed:
-        let _ = service_manager.remove(&service_id).await;
-        if let Some(exe) = &service_manifest.executable {
-            if let Err(e) = service_manager
-                .add(ServiceDefinition {
-                    service_id: service_id.clone(),
-                    executable: exe.clone(),
-                    args: service_manifest.args.clone(),
-                    username,
-                    wrk_dir: None,
-                    envs: Some(envs),
-                    disable_restart_on_failure: false,
-                })
-                .await
-            {
+        // The definition is overwritten in place rather than removed and re-added. Removing
+        // it stops the service and unlinks its script, and under OpenRC a stop that has not
+        // finished leaves a supervised process the missing script can no longer address, so
+        // the start below would add a second one. `restart` further down applies the new
+        // definition to a service that is already up.
+        if let Some(definition) = Self::service_definition(&service_id, &service_manifest) {
+            if let Err(e) = service_manager.add(definition).await {
                 error!(
                     "Error adding plugin service. This service {service_id} will be skipped: {e}"
                 );
@@ -397,7 +428,7 @@ impl ServicePluginRepo {
             }
             ServiceType::Device => {
                 if service_manifest.is_managed() {
-                    if let Err(err) = service_manager.start(&service_id).await {
+                    if let Err(err) = service_manager.restart(&service_id).await {
                         error!(
                             "Error starting plugin service. This service {service_id} will be skipped: {err}"
                         );
@@ -569,7 +600,7 @@ impl ServicePluginRepo {
                 () = sleep(Duration::from_secs(TIMEOUT_API_UP_SECONDS)) => warn!("Timeout waiting for the daemon's API to come up. Will start integration services anyway."),
                 () = api_up_token.cancelled() => info!("API startup complete, starting integration service: {service_id}"),
             }
-            if let Err(err) = service_manager.start(&service_id).await {
+            if let Err(err) = service_manager.restart(&service_id).await {
                 error!("Error starting plugin service: {err}");
                 return;
             }
@@ -998,6 +1029,7 @@ impl Repository for ServicePluginRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("Service Plugin Repository initialized");
         Ok(())
     }

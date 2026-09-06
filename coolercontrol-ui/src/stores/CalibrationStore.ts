@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 /**
  * Calibration state + API client glue.
@@ -39,7 +24,8 @@
 
 import { defineStore } from 'pinia'
 import { reactive, ref } from 'vue'
-import { useConfirm } from 'primevue/useconfirm'
+import { mdiRefresh } from '@mdi/js'
+import { useConfirm } from '@/shell/confirm'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
@@ -70,10 +56,7 @@ function channelKey(deviceUid: UID, channelName: string): ChannelKey {
  * manual-duty slider bounds need to refresh from `device.info`.
  */
 type PendingPromptKind =
-    | 'rpm_only_completed'
-    | 'rpm_only_cleared'
-    | 'duty_range_completed'
-    | 'duty_range_cleared'
+    'rpm_only_completed' | 'rpm_only_cleared' | 'duty_range_completed' | 'duty_range_cleared'
 
 interface PendingPromptEntry {
     channelName: string
@@ -200,7 +183,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
         confirm.require({
             header: t('components.channelExtensionSettings.calibration.reloadHeader'),
             message: composePromptMessage(entries),
-            icon: 'pi pi-refresh',
+            icon: mdiRefresh,
             defaultFocus: 'reject',
             acceptLabel: t('components.channelExtensionSettings.calibration.reloadAccept'),
             rejectLabel: t('components.channelExtensionSettings.calibration.reloadReject'),
@@ -503,7 +486,7 @@ export const useCalibrationStore = defineStore('calibration', () => {
         confirm.require({
             header: t('components.channelExtensionSettings.calibration.reloadHeader'),
             message: t('components.wizards.calibration.reloadBatch', { count: calibrated }),
-            icon: 'pi pi-refresh',
+            icon: mdiRefresh,
             defaultFocus: 'reject',
             acceptLabel: t('components.channelExtensionSettings.calibration.reloadAccept'),
             rejectLabel: t('components.channelExtensionSettings.calibration.reloadReject'),

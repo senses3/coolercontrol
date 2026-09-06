@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -26,6 +11,60 @@ export const useThemeColorsStore = defineStore('theme-colors', () => {
     const cssRoot = document.querySelector(':root')
     const getStyle = (varName: string): string =>
         `rgb(${getComputedStyle(cssRoot!).getPropertyValue(varName)})`
+
+    // Contrast-aware foreground for filled surfaces (accent / error buttons):
+    // pick whichever theme text color reads best on the surface, falling back to
+    // pure white/black when neither clears WCAG AA. Recomputed on every theme
+    // change (incl. the system theme's unknown OS accent) and exposed as the
+    // --colors-accent-fg / --colors-error-fg CSS variables.
+    const rawVar = (name: string): string =>
+        getComputedStyle(cssRoot!).getPropertyValue(name).trim()
+    const parseRgb = (value: string): number[] =>
+        value.split(/[\s,]+/).map((n) => Number.parseInt(n, 10))
+    const relLuminance = ([r, g, b]: number[]): number => {
+        const channel = (c: number): number => {
+            const s = c / 255
+            return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+        }
+        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    }
+    const contrastRatio = (a: number[], b: number[]): number => {
+        const la = relLuminance(a)
+        const lb = relLuminance(b)
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+    }
+    const bestForeground = (bg: number[]): number[] => {
+        const text = parseRgb(rawVar('--colors-text-color'))
+        const base = parseRgb(rawVar('--colors-bg-one'))
+        if (Math.max(contrastRatio(bg, text), contrastRatio(bg, base)) >= 4.5) {
+            return contrastRatio(bg, text) >= contrastRatio(bg, base) ? text : base
+        }
+        return contrastRatio(bg, [255, 255, 255]) >= contrastRatio(bg, [0, 0, 0])
+            ? [255, 255, 255]
+            : [0, 0, 0]
+    }
+    const applyContrastVars = (): void => {
+        document.documentElement.style.setProperty(
+            '--colors-accent-fg',
+            bestForeground(parseRgb(rawVar('--colors-accent'))).join(' '),
+        )
+        document.documentElement.style.setProperty(
+            '--colors-error-fg',
+            bestForeground(parseRgb(rawVar('--colors-error'))).join(' '),
+        )
+        // Match native controls (date picker popup + icon, scrollbars) to the
+        // theme's brightness so they don't render light-on-dark.
+        document.documentElement.style.colorScheme =
+            relLuminance(parseRgb(rawVar('--colors-bg-one'))) > 0.4 ? 'light' : 'dark'
+        // Keep an installed app window's title bar on the same surface as the app
+        // header, which ShellLayout paints with bg-two. The manifest's static
+        // theme_color only covers the dark default, and themes are user-chosen.
+        // Absent in the unit-test DOM, which mounts components without index.html.
+        document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute('content', `rgb(${rawVar('--colors-bg-two')})`)
+    }
+
     const reLoadThemeColors = () => {
         themeColors.value.accent = getStyle('--colors-accent')
         themeColors.value.bg_one = getStyle('--colors-bg-one')
@@ -33,7 +72,16 @@ export const useThemeColorsStore = defineStore('theme-colors', () => {
         themeColors.value.border = getStyle('--colors-border-one')
         themeColors.value.text_color = getStyle('--colors-text-color')
         themeColors.value.text_color_secondary = getStyle('--colors-text-color-secondary')
+        applyContrastVars()
     }
+
+    // Theme-mode switches toggle a class on <html>; watch it so the contrast
+    // foregrounds recompute even when reLoadThemeColors isn't called explicitly.
+    applyContrastVars()
+    new MutationObserver(applyContrastVars).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class'],
+    })
 
     const themeColors = ref({
         accent: getStyle('--colors-accent'),
@@ -77,12 +125,12 @@ export const useThemeColorsStore = defineStore('theme-colors', () => {
         if (isHexColor(rgb)) {
             return rgb
         }
-        const matches = rgb.match(/\d+/g)!.map((x) => parseInt(x, 10))
+        const matches = rgb.match(/\d+/g)
         if (matches == null) {
-            console.error(`Invalid RGB color: ${rgb}`)
+            if (rgb.length > 0) console.error(`Invalid RGB color: ${rgb}`)
             return rgb
         }
-        const [r, g, b] = matches
+        const [r, g, b] = matches.map((x) => parseInt(x, 10))
         return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
     }
 

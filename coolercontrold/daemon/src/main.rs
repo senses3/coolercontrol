@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
 use std::env;
@@ -59,7 +44,10 @@ mod device_health;
 mod device_listener;
 mod device_uid;
 mod engine;
+mod env_vars;
 mod grpc_api;
+mod hardware_report;
+mod hardware_support;
 mod hashutil;
 mod logger;
 mod main_loop;
@@ -67,12 +55,16 @@ mod modes;
 mod notifier;
 mod overrides;
 mod paths;
+mod power_profile_listener;
 mod repositories;
 mod rt;
+mod sensors_conf;
 mod setting;
 mod sidecar;
 mod sleep_listener;
+mod system_event;
 mod token;
+mod watchdog;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -304,7 +296,7 @@ fn main() -> Result<()> {
         // Publish the sidecar handle process-wide so reactor-bound work (process spawning, the
         // auth/token/liqctld/service-plugin transports) can reach it without threading a handle.
         sidecar::install_global(sidecar.handle());
-        handle_non_root_commands(&cmd_args).await?;
+        handle_non_root_commands(&cmd_args)?;
         let log_buf_handle = logger::setup_logging(&cmd_args, run_token.clone()).await?;
         verify_is_root()?;
         handle_detect_command(&cmd_args);
@@ -313,23 +305,45 @@ fn main() -> Result<()> {
         let config = Rc::new(Config::load_config_file().await?);
         parse_cmd_args(&cmd_args).await?;
         config.verify_writeability()?;
-        config.log_deprecated_function_warnings();
+        config.log_converted_function_warnings();
+        let moved_lcd_images = config.migrate_lcd_images_to_per_channel().await;
+        if moved_lcd_images > 0 {
+            info!("Moved {moved_lcd_images} LCD image setting(s) onto per-channel files");
+            config.save_config_file().await?;
+        }
         paths::ensure_data_dir().await?;
         // admin uses `sidecar_fs` (always Tokio); on the compio main thread there is no Tokio
         // reactor, so run it on the sidecar. Harmless on the Tokio backend too.
         sidecar::handle().run(admin::load_passwd).await??;
 
+        // The startup pause below is covered by TimeoutStartSec: systemd does
+        // not start the watchdog until READY.
+        let watchdog = Rc::new(watchdog::Watchdog::init());
         pause_before_startup(&config).await?;
-        run_sensors_detection(&config);
+        let detection_results = run_sensors_detection(&config);
         rt::log_active_backend();
+        let hardware_support = Rc::new(
+            hardware_support::HardwareSupportController::init(
+                detection_results,
+                cc_detect::DETECTION_SUPPORTED,
+            )
+            .await,
+        );
+        hardware_support.log_findings();
 
-        let overrides_controller = Rc::new(overrides::OverridesController::init().await);
+        let sensors_conf = Rc::new(load_sensors_conf(&config).await);
+        let overrides_controller = Rc::new(
+            overrides::OverridesController::init()
+                .await
+                .with_sensors_conf(sensors_conf),
+        );
         let (repos, custom_sensors_repo, plugin_controller, api_up_token, lc_repo) =
             initialize_device_repos(
                 &config,
                 &cmd_args,
                 run_token.clone(),
                 Rc::clone(&overrides_controller),
+                Rc::clone(&hardware_support),
             )
             .await?;
         let all_devices = create_devices_map(&repos).await;
@@ -344,11 +358,14 @@ fn main() -> Result<()> {
             fan_state_map,
             Rc::clone(&overrides_controller),
         ));
+        let power_profiles =
+            power_profile_listener::PowerProfiles::new(config.get_power_profile_modes());
         let mode_controller = Rc::new(
             ModeController::init(
                 Rc::clone(&config),
                 Rc::clone(&all_devices),
                 Rc::clone(&engine),
+                power_profiles.clone(),
             )
             .await?,
         );
@@ -373,23 +390,29 @@ fn main() -> Result<()> {
                     AlertController::init(
                         Rc::clone(&all_devices),
                         Rc::clone(&overrides_controller),
+                        engine.diagnosis_registry(),
                     )
                     .await?,
                 );
-                let device_health_controller = Rc::new(device_health::DeviceHealthController::new(
-                    Rc::clone(&all_devices),
-                    Rc::clone(&config),
-                    Rc::clone(&repos),
-                    Rc::clone(&overrides_controller),
-                ));
+                let device_health_controller = Rc::new(
+                    device_health::DeviceHealthController::new(
+                        Rc::clone(&all_devices),
+                        Rc::clone(&config),
+                        Rc::clone(&repos),
+                        Rc::clone(&overrides_controller),
+                    )
+                    .with_hardware_support(Rc::clone(&hardware_support)),
+                );
                 AlertController::watch_for_shutdown(
                     &alert_controller,
                     run_token.clone(),
                     main_scope,
                 );
                 let notification_handle = notifier::NotificationHandle::new(run_token.clone());
+                let system_event_handle = system_event::SystemEventHandle::new(run_token.clone());
                 alert_controller.set_notification_handle(notification_handle.clone());
                 engine.set_notification_handle(notification_handle.clone());
+                engine.set_alert_gate(alert_controller.clone());
                 let device_listener_enabled = config
                     .get_settings()
                     .map_or(true, |s| s.device_listener_enabled);
@@ -416,11 +439,14 @@ fn main() -> Result<()> {
                     Rc::clone(&mode_controller),
                     Rc::clone(&alert_controller),
                     Rc::clone(&device_health_controller),
+                    Rc::clone(&hardware_support),
                     Rc::clone(&overrides_controller),
                     plugin_controller,
                     log_buf_handle,
                     status_handle.clone(),
                     notification_handle,
+                    system_event_handle.clone(),
+                    power_profiles.clone(),
                     run_token.clone(),
                     main_scope,
                 )
@@ -429,11 +455,24 @@ fn main() -> Result<()> {
                     Ok(()) => api_up_token.cancel(),
                     Err(err) => error!("Error initializing API Server: {err}"),
                 }
+                // Started after the API so the ModeHandle exists; the listener activates Modes
+                // through the actor rather than the !Send controller.
+                if let Some(mode_handle) = mode_controller.mode_handle() {
+                    power_profile_listener::start(
+                        system_event_handle,
+                        mode_handle,
+                        power_profiles,
+                        run_token.clone(),
+                    );
+                }
 
                 // give concurrent services a moment to finish initializing:
                 rt::sleep(Duration::from_millis(10)).await;
                 set_cpu_affinity()?;
                 info!("Initialization Complete");
+                // Only now is the daemon serving, so this is what releases
+                // systemd's start job.
+                watchdog::notify_ready();
                 main_loop::run(
                     Rc::clone(&config),
                     Rc::clone(&repos),
@@ -442,6 +481,7 @@ fn main() -> Result<()> {
                     alert_controller,
                     device_health_controller,
                     status_handle,
+                    Rc::clone(&watchdog),
                     run_token.clone(),
                 )
                 .await?;
@@ -456,6 +496,7 @@ fn main() -> Result<()> {
             error!("Main scope failed to start: {err}");
         });
         // all tasks from the main scope must have completed by this point.
+        watchdog::notify_stopping();
         let shutdown_result = shutdown(repos, config).await;
         // Repos have finished their shutdown (incl. any sidecar round-trips like the service-plugin
         // gRPC shutdown), so the sidecar can now be torn down and joined (bounded, force-exit).
@@ -530,6 +571,12 @@ enum SubCommands {
     List,
     /// Validate all configuration files
     Check,
+    /// Print the environment variables the daemon reads
+    Env,
+    /// Print the `OpenAPI` spec to stdout. Generated from the route table, so it needs
+    /// neither root nor a running daemon. See `make openapi`.
+    #[command(name = "openapi", hide = true)]
+    OpenApi,
     #[command(hide = true)]
     StressCpu {
         #[arg(long)]
@@ -541,7 +588,19 @@ enum SubCommands {
     StressGpu {
         #[arg(long)]
         timeout: u16,
+        /// Stress only the GPU at this position in `stress-gpu-list`.
+        /// All GPUs if omitted. Requires --gpu-id.
+        #[arg(long, requires = "gpu_id")]
+        gpu_index: Option<usize>,
+        /// PCI ID (`vendor:device` in hex) expected at --gpu-index, which
+        /// guards against the list shifting in between.
+        #[arg(long, requires = "gpu_index")]
+        gpu_id: Option<String>,
     },
+    /// Print the stress-testable GPUs as JSON. Runs out of process so the
+    /// daemon never loads a Vulkan driver into its own address space.
+    #[command(hide = true)]
+    StressGpuList,
     #[command(hide = true)]
     StressRam {
         #[arg(long)]
@@ -560,13 +619,46 @@ enum SubCommands {
     },
 }
 
-async fn handle_non_root_commands(args: &Args) -> Result<()> {
+/// The stress subcommands run synchronously on plain threads, so this needs
+/// no runtime of its own.
+fn handle_non_root_commands(args: &Args) -> Result<()> {
+    if let Some(SubCommands::OpenApi) = &args.command {
+        // Pretty-printed: the file is checked in, so a merge request diff has to be
+        // readable. Whitespace compresses away to a couple of KB on the wire.
+        println!("{}", serde_json::to_string_pretty(&api::openapi_spec())?);
+        exit_successfully();
+    }
+    if let Some(SubCommands::Env) = &args.command {
+        env_vars::print_table();
+        exit_successfully();
+    }
     if let Some(SubCommands::StressCpu { threads, timeout }) = &args.command {
         cc_stress::run_cpu_stress(*threads, *timeout)?;
         exit_successfully();
     }
-    if let Some(SubCommands::StressGpu { timeout }) = &args.command {
-        cc_stress::run_gpu_stress(*timeout).await?;
+    if let Some(SubCommands::StressGpu {
+        timeout,
+        gpu_index,
+        gpu_id,
+    }) = &args.command
+    {
+        // clap's `requires` pairs the two flags, so either both are present
+        // or neither is.
+        let selection = match (gpu_index, gpu_id) {
+            (Some(index), Some(id)) => Some(cc_stress::GpuSelection {
+                index: *index,
+                pci_id: id.parse()?,
+            }),
+            _ => None,
+        };
+        cc_stress::run_gpu_stress(*timeout, selection)?;
+        exit_successfully();
+    }
+    if let Some(SubCommands::StressGpuList) = &args.command {
+        println!(
+            "{}",
+            serde_json::to_string(&api::actor::enumerate_gpu_adapters()?)?
+        );
         exit_successfully();
     }
     if let Some(SubCommands::StressRam { bytes, timeout }) = &args.command {
@@ -692,11 +784,14 @@ fn exit_successfully() -> ! {
 }
 
 /// Run Super-I/O hardware detection and load kernel modules if enabled.
+/// Returns the results so they can be retained for the lifetime of the daemon.
+/// `None` means no probe was made, which is not the same as a probe that found
+/// nothing and must not produce findings.
 #[cfg(target_arch = "x86_64")]
-fn run_sensors_detection(config: &Rc<Config>) {
+fn run_sensors_detection(config: &Rc<Config>) -> Option<cc_detect::DetectionResults> {
     if is_env_disabled(ENV_SENSORS_DETECT) {
         info!("Super-I/O hardware detection disabled by environment variable");
-        return;
+        return None;
     }
     match config.get_settings() {
         Ok(settings) if settings.sensors_auto_detect => {
@@ -711,19 +806,23 @@ fn run_sensors_detection(config: &Rc<Config>) {
             if results.detected_chips.is_empty() && !results.environment.is_container {
                 info!("No Super-I/O chips detected");
             }
+            Some(results)
         }
         Ok(_) => {
             info!("Super-I/O hardware detection disabled by configuration");
+            None
         }
         Err(err) => {
             warn!("Could not read settings for sensors detection: {err}");
+            None
         }
     }
 }
 
 #[cfg(not(target_arch = "x86_64"))]
-fn run_sensors_detection(_config: &Rc<Config>) {
+fn run_sensors_detection(_config: &Rc<Config>) -> Option<cc_detect::DetectionResults> {
     // Super-I/O detection is x86_64-only
+    None
 }
 
 /// Some hardware needs additional time to come up and be ready to communicate.
@@ -744,6 +843,7 @@ async fn initialize_device_repos(
     cmd_args: &Args,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<(
     Repos,
     Rc<CustomSensorsRepo>,
@@ -756,7 +856,14 @@ async fn initialize_device_repos(
     let mut lc_locations = Vec::new();
     let mut lc_repo_typed: Option<Rc<LiquidctlRepo>> = None;
     // liquidctl should be first
-    match init_liquidctl_repo(config.clone(), run_token, Rc::clone(&overrides)).await {
+    match init_liquidctl_repo(
+        config.clone(),
+        run_token,
+        Rc::clone(&overrides),
+        Rc::clone(&hardware_support),
+    )
+    .await
+    {
         Ok((repo, mut lc_locs)) => {
             lc_locations.append(&mut lc_locs);
             lc_repo_typed = Some(Rc::clone(&repo));
@@ -773,19 +880,32 @@ async fn initialize_device_repos(
     // init these concurrently:
     moro_local::async_scope!(|init_scope| {
         init_scope.spawn(async {
-            match init_cpu_repo(config.clone()).await {
+            match init_cpu_repo(config.clone(), Rc::clone(&overrides)).await {
                 Ok(repo) => repos.cpu = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing CPU Repo: {err}"),
             }
         });
         init_scope.spawn(async {
-            match init_gpu_repo(config.clone(), cmd_args.nvidia_cli).await {
+            match init_gpu_repo(
+                config.clone(),
+                cmd_args.nvidia_cli,
+                Rc::clone(&hardware_support),
+            )
+            .await
+            {
                 Ok(repo) => repos.gpu = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing GPU Repo: {err}"),
             }
         });
         init_scope.spawn(async {
-            match init_hwmon_repo(config.clone(), lc_locations, Rc::clone(&overrides)).await {
+            match init_hwmon_repo(
+                config.clone(),
+                lc_locations,
+                Rc::clone(&overrides),
+                Rc::clone(&hardware_support),
+            )
+            .await
+            {
                 Ok(repo) => repos.hwmon = Some(Rc::new(repo)),
                 Err(err) => error!("Error initializing HWMON Repo: {err}"),
             }
@@ -796,6 +916,7 @@ async fn initialize_device_repos(
                 api_up_token.clone(),
                 cmd_args.reset_plugin_user,
                 Rc::clone(&overrides),
+                Rc::clone(&hardware_support),
             )
             .await
             {
@@ -834,8 +955,11 @@ async fn init_liquidctl_repo(
     config: Rc<Config>,
     run_token: CancellationToken,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<(Rc<LiquidctlRepo>, Vec<String>)> {
-    let mut lc_repo = LiquidctlRepo::new(config, run_token, overrides).await?;
+    let mut lc_repo = LiquidctlRepo::new(config, run_token, overrides)
+        .await?
+        .with_hardware_support(hardware_support);
     lc_repo.get_devices().await?;
     lc_repo.initialize_devices().await?;
     let lc_locations = lc_repo.get_all_driver_locations();
@@ -847,14 +971,34 @@ async fn init_liquidctl_repo(
     Ok((lc_repo, lc_locations))
 }
 
-async fn init_cpu_repo(config: Rc<Config>) -> Result<CpuRepo> {
-    let mut cpu_repo = CpuRepo::new(config)?;
+/// Reads the lm-sensors configuration, unless the user has turned that support off, in which case
+/// the files are never touched.
+async fn load_sensors_conf(config: &Rc<Config>) -> sensors_conf::SensorsConf {
+    let enabled = config
+        .get_settings()
+        .map_or(true, |settings| settings.sensors_conf_enabled);
+    if enabled.not() {
+        info!("lm-sensors configuration support is disabled");
+        return sensors_conf::SensorsConf::default();
+    }
+    sensors_conf::SensorsConf::load().await
+}
+
+async fn init_cpu_repo(
+    config: Rc<Config>,
+    overrides: Rc<overrides::OverridesController>,
+) -> Result<CpuRepo> {
+    let mut cpu_repo = CpuRepo::new(config, overrides)?;
     cpu_repo.initialize_devices().await?;
     Ok(cpu_repo)
 }
 
-async fn init_gpu_repo(config: Rc<Config>, nvidia_cli: bool) -> Result<GpuRepo> {
-    let mut gpu_repo = GpuRepo::new(config, nvidia_cli);
+async fn init_gpu_repo(
+    config: Rc<Config>,
+    nvidia_cli: bool,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
+) -> Result<GpuRepo> {
+    let mut gpu_repo = GpuRepo::new(config, nvidia_cli).with_hardware_support(hardware_support);
     gpu_repo.initialize_devices().await?;
     Ok(gpu_repo)
 }
@@ -863,8 +1007,10 @@ async fn init_hwmon_repo(
     config: Rc<Config>,
     lc_locations: Vec<String>,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<HwmonRepo> {
-    let mut hwmon_repo = HwmonRepo::new(config, lc_locations, overrides);
+    let mut hwmon_repo =
+        HwmonRepo::new(config, lc_locations, overrides).with_hardware_support(hardware_support);
     hwmon_repo.initialize_devices().await?;
     Ok(hwmon_repo)
 }
@@ -874,9 +1020,11 @@ async fn init_service_plugin_repo(
     api_up_token: CancellationToken,
     reset_plugin_user: bool,
     overrides: Rc<overrides::OverridesController>,
+    hardware_support: Rc<hardware_support::HardwareSupportController>,
 ) -> Result<ServicePluginRepo> {
     let mut external_repo =
-        ServicePluginRepo::new(config, api_up_token, reset_plugin_user, overrides)?;
+        ServicePluginRepo::new(config, api_up_token, reset_plugin_user, overrides)?
+            .with_hardware_support(hardware_support);
     external_repo.initialize_devices().await?;
     Ok(external_repo)
 }

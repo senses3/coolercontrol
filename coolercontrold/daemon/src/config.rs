@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -31,7 +16,7 @@ use toml_edit::{ArrayOfTables, DocumentMut, Formatted, Item, Table, TableLike, V
 use crate::api::CCError;
 use crate::cc_fs;
 use crate::device::{ChannelName, Duty, Temp, UID};
-use crate::engine::processors::functions::TMA_DEFAULT_WINDOW_SIZE;
+use crate::paths;
 use crate::repositories::repository::DeviceLock;
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, ChannelExtensions, CoolerControlSettings, CustomSensor,
@@ -39,10 +24,14 @@ use crate::setting::{
     DeviceExtensions, Function, FunctionKind, FunctionType, FunctionUID, LcdCarouselSettings,
     LcdModeKind, LcdModeName, LcdSettings, LightingSettings, Offset, Profile, ProfileKind,
     ProfileMixFunctionType, ProfileType, ProfileUID, Setting, SettingKind, TempSource,
-    DEFAULT_FUNCTION_UID, DEFAULT_PROFILE_UID,
+    DEFAULT_FUNCTION_UID, DEFAULT_PROFILE_UID, STARTUP_DELAY_SECONDS_MAX,
 };
 
 const DEFAULT_CONFIG_FILE_BYTES: &[u8] = include_bytes!("../resources/config-default.toml");
+/// The `f_type` written by pre-4.4.0 daemons for the removed EMA Function type.
+const REMOVED_EMA_FUNCTION_TYPE: &str = "ExponentialMovingAvg";
+/// Top-level table mapping a system power profile name to the Mode UID to activate.
+const POWER_PROFILE_MODES_KEY: &str = "power_profile_modes";
 
 /// Settings tables in config.toml whose keys are device UIDs. Kept together so the UID
 /// migration cannot miss one. `devices` is excluded: it is never pruned, so a migrated
@@ -218,13 +207,13 @@ impl Config {
         }
         cc_fs::write_string(&self.path, document_content)
             .await
-            .with_context(|| format!("Saving configuration file: {}", &self.path.display()))
+            .with_context(|| format!("Saving configuration file: {}", self.path.display()))
     }
 
     pub async fn save_ui_config_file(&self, ui_settings: String) -> Result<()> {
         cc_fs::write_string(&self.path_ui, ui_settings)
             .await
-            .with_context(|| format!("Saving UI configuration file: {}", &self.path_ui.display()))
+            .with_context(|| format!("Saving UI configuration file: {}", self.path_ui.display()))
     }
 
     pub async fn load_ui_config_file(&self) -> Result<String> {
@@ -271,6 +260,87 @@ impl Config {
             .and_then(|devices| devices.get(device_uid))
             .and_then(Item::as_str)
             .map(str::to_owned)
+    }
+
+    /// Moves LCD image settings off the single shared image file and onto per-channel paths.
+    ///
+    /// Earlier daemons wrote every channel's image to one `lcd_image.png` (or `.gif`), so a
+    /// second screen overwrote the first and both settings named the same file. Each channel
+    /// still pointing at a shared file gets its own copy of it, leaving what every screen
+    /// shows today unchanged while making the next upload per channel.
+    ///
+    /// Returns how many settings moved, so the caller stays silent when nothing did.
+    pub async fn migrate_lcd_images_to_per_channel(&self) -> usize {
+        let legacy: Vec<String> = paths::legacy_lcd_image_files()
+            .iter()
+            .filter_map(|path| path.to_str().map(ToString::to_string))
+            .collect();
+        let mut moved = 0;
+        for (device_uid, channel_name, source) in self.channels_on_legacy_lcd_images(&legacy) {
+            let extension = if Path::new(&source)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
+            {
+                "gif"
+            } else {
+                "png"
+            };
+            let destination =
+                paths::lcd_image_dir().join(format!("{device_uid}-{channel_name}.{extension}"));
+            if let Err(err) = Self::copy_legacy_lcd_image(&source, &destination).await {
+                warn!("Failed to migrate the LCD image for {device_uid}:{channel_name}: {err}");
+                continue;
+            }
+            let Some(destination) = destination.to_str() else {
+                continue;
+            };
+            self.document.borrow_mut()["device-settings"][&device_uid][&channel_name]["lcd"]
+                ["image_file_processed"] =
+                Item::Value(Value::String(Formatted::new(destination.to_string())));
+            moved += 1;
+        }
+        moved
+    }
+
+    /// Every `device-settings` channel whose LCD image is one of the shared legacy files.
+    fn channels_on_legacy_lcd_images(&self, legacy: &[String]) -> Vec<(String, String, String)> {
+        let document = self.document.borrow();
+        let Some(devices) = document.get("device-settings").and_then(Item::as_table) else {
+            return Vec::new();
+        };
+        let mut found = Vec::new();
+        for (device_uid, device_item) in devices {
+            let Some(channels) = device_item.as_table() else {
+                continue;
+            };
+            for (channel_name, channel_item) in channels {
+                let image = channel_item
+                    .get("lcd")
+                    .and_then(|lcd| lcd.get("image_file_processed"))
+                    .and_then(Item::as_str);
+                if let Some(image) = image {
+                    if legacy.iter().any(|path| path == image) {
+                        found.push((
+                            device_uid.to_string(),
+                            channel_name.to_string(),
+                            image.to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+        found
+    }
+
+    /// Copies the shared image to its per-channel home. A destination that already exists is
+    /// left alone, so a re-run cannot overwrite an image the user has since replaced.
+    async fn copy_legacy_lcd_image(source: &str, destination: &Path) -> Result<()> {
+        if cc_fs::exists(destination) {
+            return Ok(());
+        }
+        let image = cc_fs::read_image(Path::new(source)).await?;
+        cc_fs::create_dir_all(paths::lcd_image_dir()).await?;
+        cc_fs::write(destination, image).await
     }
 
     /// Returns how many sites moved, so the caller stays silent when nothing did. A table
@@ -565,7 +635,7 @@ impl Config {
         }
         // Always written even though unused: 4.3.x hard-requires lcd.colors on load, so
         // omitting it breaks a daemon downgrade.
-        // DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): see DEPRECATIONS.md.
+        // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
         channel_setting["lcd"]["colors"] = Item::Value(Value::Array(toml_edit::Array::new()));
         if let Some(temp_source) = lcd.temp_source() {
             channel_setting["lcd"]["temp_source"]["temp_name"] =
@@ -1112,7 +1182,7 @@ impl Config {
                     .unwrap_or(&Item::Value(Value::Integer(Formatted::new(2))))
                     .as_integer()
                     .with_context(|| "startup_delay should be an integer value")?
-                    .clamp(0, 30) as u64,
+                    .clamp(0, i64::from(STARTUP_DELAY_SECONDS_MAX)) as u64,
             );
             let thinkpad_full_speed = settings
                 .get("thinkpad_full_speed")
@@ -1251,6 +1321,11 @@ impl Config {
                 .unwrap_or(&Item::Value(Value::Boolean(Formatted::new(true))))
                 .as_bool()
                 .with_context(|| "device_listener_enabled should be a boolean value")?;
+            let sensors_conf_enabled = settings
+                .get("sensors_conf_enabled")
+                .unwrap_or(&Item::Value(Value::Boolean(Formatted::new(true))))
+                .as_bool()
+                .with_context(|| "sensors_conf_enabled should be a boolean value")?;
             Ok(CoolerControlSettings {
                 apply_on_boot,
                 no_init,
@@ -1272,10 +1347,73 @@ impl Config {
                 protocol_header,
                 sensors_auto_detect,
                 device_listener_enabled,
+                sensors_conf_enabled,
             })
         } else {
             Err(anyhow!("Setting table not found in configuration file"))
         }
+    }
+
+    /// Reads the power profile to Mode mapping.
+    ///
+    /// Absent, malformed, and empty all mean "no mapping", since an unmapped system must simply
+    /// never switch Modes rather than fail to start.
+    pub fn get_power_profile_modes(&self) -> HashMap<String, UID> {
+        let document = self.document.borrow();
+        let Some(table) = document
+            .get(POWER_PROFILE_MODES_KEY)
+            .and_then(Item::as_table)
+        else {
+            return HashMap::new();
+        };
+        let mut modes = HashMap::with_capacity(table.len());
+        for (profile, mode_uid) in table {
+            let Some(mode_uid) = mode_uid.as_str() else {
+                warn!("Ignoring non-string Mode UID for power profile '{profile}'");
+                continue;
+            };
+            if profile.trim().is_empty() || mode_uid.is_empty() {
+                continue;
+            }
+            modes.insert(profile.to_string(), mode_uid.to_string());
+        }
+        debug_assert!(
+            modes.len() <= table.len(),
+            "Reading the mapping must never invent entries"
+        );
+        modes
+    }
+
+    /// Replaces the power profile to Mode mapping. An empty map clears the table entirely so a
+    /// cleared mapping does not leave a stale section behind.
+    pub fn set_power_profile_modes(&self, modes: &HashMap<String, UID>) {
+        debug_assert!(
+            modes.keys().all(|profile| profile.trim().is_empty().not()),
+            "Blank profile names are rejected at the API boundary"
+        );
+        debug_assert!(
+            modes
+                .values()
+                .all(|mode_uid| mode_uid.trim().is_empty().not()),
+            "Blank Mode UIDs are rejected at the API boundary"
+        );
+        let mut document = self.document.borrow_mut();
+        if modes.is_empty() {
+            document.remove(POWER_PROFILE_MODES_KEY);
+            debug_assert!(document.get(POWER_PROFILE_MODES_KEY).is_none());
+            return;
+        }
+        let table = document[POWER_PROFILE_MODES_KEY].or_insert(Item::Table(Table::new()));
+        // Rebuild rather than merge, so a removed profile does not linger.
+        *table = Item::Table(Table::new());
+        for (profile, mode_uid) in modes {
+            table[profile.as_str()] = Item::Value(Value::String(Formatted::new(mode_uid.clone())));
+        }
+        debug_assert_eq!(
+            table.as_table().map_or(0, Table::len),
+            modes.len(),
+            "Every submitted mapping must reach the config document"
+        );
     }
 
     /// Sets `CoolerControl` settings
@@ -1335,6 +1473,9 @@ impl Config {
         )));
         base_settings["device_listener_enabled"] = Item::Value(Value::Boolean(Formatted::new(
             cc_settings.device_listener_enabled,
+        )));
+        base_settings["sensors_conf_enabled"] = Item::Value(Value::Boolean(Formatted::new(
+            cc_settings.sensors_conf_enabled,
         )));
     }
 
@@ -1955,22 +2096,37 @@ impl Config {
             .ok_or(anyhow!("Function not found"))
     }
 
-    /// Logs a one-time deprecation warning for each Function still using the deprecated EMA type.
-    /// Called once at startup so the per-channel config reads do not spam the log.
-    pub fn log_deprecated_function_warnings(&self) {
-        let Ok(functions) = self.get_current_functions() else {
+    /// Logs a one-time warning for each Function converted from the removed
+    /// `ExponentialMovingAvg` type. Called once at startup so the per-channel config reads do
+    /// not spam the log; the conversion itself happens silently at parse time and persists
+    /// whenever the config is next saved. Inspects the raw document because parsed Functions
+    /// are already converted to Identity.
+    pub fn log_converted_function_warnings(&self) {
+        let document = self.document.borrow();
+        let Some(functions_item) = document.get("functions") else {
             return;
         };
-        for function in &functions {
-            if function.f_type() == FunctionType::ExponentialMovingAvg {
-                warn!(
-                    "Function '{}' ({}) uses the deprecated ExponentialMovingAvg type, \
-                     please change this and use a EMA Custom Sensor for temperature smoothing, \
-                     which has improved controls and visibility.
-                     The EMA Function type will be removed in a future release.",
-                    function.name, function.uid
-                );
+        let Some(functions_array) = functions_item.as_array_of_tables() else {
+            return;
+        };
+        for function_table in functions_array {
+            let f_type = function_table.get("f_type").and_then(|item| item.as_str());
+            if f_type != Some(REMOVED_EMA_FUNCTION_TYPE) {
+                continue;
             }
+            let name = function_table
+                .get("name")
+                .and_then(|item| item.as_str())
+                .unwrap_or("unknown");
+            let uid = function_table
+                .get("uid")
+                .and_then(|item| item.as_str())
+                .unwrap_or("unknown");
+            warn!(
+                "Function '{name}' ({uid}) uses the removed ExponentialMovingAvg type and has \
+                 been converted to Identity. For temperature smoothing, use an EMA Custom \
+                 Sensor as the Profile's temperature source."
+            );
         }
     }
 
@@ -1999,8 +2155,16 @@ impl Config {
                     .with_context(|| "Function type should be present")?
                     .as_str()
                     .with_context(|| "Function type should be a string")?;
-                let f_type = FunctionType::from_str(f_type_str)
-                    .with_context(|| "Function type should be a valid member")?;
+                // Permanent upgrade migration: the ExponentialMovingAvg Function type was
+                // removed in 4.4.0 in favor of the EMA Custom Sensor. Upgrades may skip
+                // several releases, so unlike downgrade shims this conversion never expires.
+                // `log_converted_function_warnings` reports it once at startup.
+                let f_type = if f_type_str == REMOVED_EMA_FUNCTION_TYPE {
+                    FunctionType::Identity
+                } else {
+                    FunctionType::from_str(f_type_str)
+                        .with_context(|| "Function type should be a valid member")?
+                };
                 let duty_minimum: u8 = if let Some(duty_minimum_value) =
                     function_table.get("duty_minimum")
                 {
@@ -2097,23 +2261,6 @@ impl Config {
                     } else {
                         None
                     };
-                let sample_window =
-                    if let Some(sample_window_value) = function_table.get("sample_window") {
-                        let s_window: u8 = sample_window_value
-                            .as_integer()
-                            .with_context(|| "sample_window should be an integer")?
-                            .try_into()
-                            .ok()
-                            .with_context(|| "sample_window should be a value between 1-16")?;
-                        let validated_sample_window = if (1..=16).contains(&s_window) {
-                            s_window
-                        } else {
-                            TMA_DEFAULT_WINDOW_SIZE
-                        };
-                        Some(validated_sample_window)
-                    } else {
-                        None
-                    };
                 let threshold_hopping = if let Some(threshold_hopping_value) =
                     function_table.get("threshold_hopping")
                 {
@@ -2139,9 +2286,6 @@ impl Config {
                         only_downward,
                         response_delay,
                     },
-                    FunctionType::ExponentialMovingAvg => {
-                        FunctionKind::ExponentialMovingAvg { sample_window }
-                    }
                 };
                 let function = Function {
                     uid,
@@ -2278,7 +2422,6 @@ impl Config {
         let response_delay = function.response_delay();
         let deviance = function.deviance();
         let only_downward = function.only_downward();
-        let sample_window = function.sample_window();
         function_table["uid"] = Item::Value(Value::String(Formatted::new(function.uid)));
         function_table["name"] = Item::Value(Value::String(Formatted::new(function.name)));
         function_table["f_type"] = Item::Value(Value::String(Formatted::new(f_type.to_string())));
@@ -2311,17 +2454,9 @@ impl Config {
         } else {
             function_table["only_downward"] = Item::None;
         }
-        if let Some(sample_window) = sample_window {
-            let validated_window = if (1..=16).contains(&sample_window) {
-                sample_window
-            } else {
-                TMA_DEFAULT_WINDOW_SIZE
-            };
-            function_table["sample_window"] =
-                Item::Value(Value::Integer(Formatted::new(i64::from(validated_window))));
-        } else {
-            function_table["sample_window"] = Item::None;
-        }
+        // The removed EMA type leaves a stale sample_window key in tables converted to
+        // Identity; clearing it on every write completes the migration.
+        function_table["sample_window"] = Item::None;
         function_table["threshold_hopping"] =
             Item::Value(Value::Boolean(Formatted::new(function.threshold_hopping)));
         function_table["bypass_min_at_extremes"] = Item::Value(Value::Boolean(Formatted::new(
@@ -2726,9 +2861,11 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use crate::cc_fs;
-    use crate::config::Config;
+    use crate::config::{Config, POWER_PROFILE_MODES_KEY};
+    use crate::paths;
     use serial_test::serial;
     use std::cell::{Cell, RefCell};
+    use std::collections::HashMap;
     use std::ops::Not;
     use std::path::Path;
     use toml_edit::{DocumentMut, Item};
@@ -2775,6 +2912,88 @@ mod tests {
             document: RefCell::new(document.parse::<DocumentMut>().unwrap()),
             generation: Cell::new(0),
         }
+    }
+
+    /// The LCD image dir is shared by every test in this sandbox, so each LCD migration
+    /// test starts from an empty one instead of inheriting another test's copies.
+    async fn reset_lcd_image_dir() {
+        let _ = cc_fs::remove_dir_all(paths::lcd_image_dir()).await;
+    }
+
+    /// Goal: a hand-edited mapping table must load, and anything unusable in it must be skipped
+    /// rather than break startup, since an unmapped system simply never switches Modes.
+    /// Methodology: parse a table holding a good entry, a non-string, and an empty value.
+    #[test]
+    fn power_profile_modes_skip_unusable_entries() {
+        let config = config_from(
+            "[power_profile_modes]\n\
+             performance = \"mode-a\"\n\
+             balanced = \"\"\n\
+             power-saver = 7\n",
+        );
+
+        let modes = config.get_power_profile_modes();
+
+        assert_eq!(modes.get("performance").map(String::as_str), Some("mode-a"));
+        assert_eq!(modes.get("balanced"), None, "Empty UID must be skipped");
+        assert_eq!(modes.get("power-saver"), None, "Non-string must be skipped");
+        assert_eq!(modes.len(), 1);
+    }
+
+    /// Goal: an absent table is the default and must read as no mapping.
+    /// Methodology: read from a config that has never had the section.
+    #[test]
+    fn power_profile_modes_absent_table_is_empty() {
+        let config = config_from("[settings]\napply_on_boot = true\n");
+
+        assert!(config.get_power_profile_modes().is_empty());
+    }
+
+    /// Goal: a written mapping must read back identically, and clearing it must remove the
+    /// section rather than leave a stale one behind.
+    /// Methodology: write, read back, then write an empty map and confirm the key is gone.
+    #[test]
+    fn power_profile_modes_round_trip_and_clear() {
+        let config = config_from("[settings]\n");
+        let written = HashMap::from([
+            ("balanced".to_string(), "mode-b".to_string()),
+            ("performance".to_string(), "mode-p".to_string()),
+        ]);
+
+        config.set_power_profile_modes(&written);
+        assert_eq!(config.get_power_profile_modes(), written);
+
+        config.set_power_profile_modes(&HashMap::new());
+        assert!(config.get_power_profile_modes().is_empty());
+        assert!(
+            config
+                .document
+                .borrow()
+                .get(POWER_PROFILE_MODES_KEY)
+                .is_none(),
+            "Clearing must remove the table, not leave it empty"
+        );
+    }
+
+    /// Goal: removing one profile from the mapping must not leave the old entry behind, since
+    /// the table is rebuilt rather than merged.
+    /// Methodology: write two profiles, then write only one.
+    #[test]
+    fn power_profile_modes_drop_removed_profiles() {
+        let config = config_from("[settings]\n");
+        config.set_power_profile_modes(&HashMap::from([
+            ("balanced".to_string(), "mode-b".to_string()),
+            ("performance".to_string(), "mode-p".to_string()),
+        ]));
+
+        config.set_power_profile_modes(&HashMap::from([(
+            "balanced".to_string(),
+            "mode-b".to_string(),
+        )]));
+
+        let modes = config.get_power_profile_modes();
+        assert_eq!(modes.len(), 1);
+        assert_eq!(modes.get("performance"), None);
     }
 
     /// Mirrors the reporter's config: a per-device settings table, a Graph profile bound
@@ -2909,6 +3128,132 @@ mod tests {
         let rewrites = config.migrate_device_uid(LEGACY_UID, CURRENT_UID);
 
         assert_eq!(rewrites, 0);
+    }
+
+    /// Goal: the migration's whole point. Two channels sharing one legacy image file each
+    /// end up with their own copy, and the config names the new files.
+    #[test]
+    #[serial]
+    fn migrate_lcd_images_gives_each_channel_its_own_file() {
+        cc_fs::test_runtime(async {
+            reset_lcd_image_dir().await;
+            let legacy = paths::config_dir().join("lcd_image.png");
+            cc_fs::write(&legacy, b"shared-image".to_vec())
+                .await
+                .unwrap();
+            let legacy = legacy.to_str().unwrap().to_string();
+            let config = config_from(&format!(
+                "[device-settings.dev1.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{legacy}\" }}\n\
+                 [device-settings.dev2.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{legacy}\" }}\n"
+            ));
+
+            let moved = config.migrate_lcd_images_to_per_channel().await;
+
+            assert_eq!(moved, 2, "both channels must move off the shared file");
+            let document = config.document.borrow().to_string();
+            assert!(
+                document.contains(&legacy).not(),
+                "no setting may still name the shared file"
+            );
+            assert!(document.contains("lcd_images/dev1-lcd.png"));
+            assert!(document.contains("lcd_images/dev2-lcd.png"));
+            for name in ["dev1-lcd.png", "dev2-lcd.png"] {
+                let copied = paths::lcd_image_dir().join(name);
+                assert_eq!(
+                    cc_fs::read_image(&copied).await.unwrap(),
+                    b"shared-image",
+                    "each copy must carry the image the screen was showing"
+                );
+            }
+        });
+    }
+
+    /// Goal: the migration re-runs on every boot until the config is saved, and must not
+    /// overwrite an image the user has replaced since the first pass.
+    #[test]
+    #[serial]
+    fn migrate_lcd_images_is_idempotent_and_keeps_a_newer_image() {
+        cc_fs::test_runtime(async {
+            reset_lcd_image_dir().await;
+            let legacy = paths::config_dir().join("lcd_image.png");
+            cc_fs::write(&legacy, b"shared-image".to_vec())
+                .await
+                .unwrap();
+            let legacy_str = legacy.to_str().unwrap().to_string();
+            let config = config_from(&format!(
+                "[device-settings.dev1.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{legacy_str}\" }}\n"
+            ));
+
+            assert_eq!(config.migrate_lcd_images_to_per_channel().await, 1);
+            let migrated = paths::lcd_image_dir().join("dev1-lcd.png");
+            cc_fs::write(&migrated, b"user-replaced-it".to_vec())
+                .await
+                .unwrap();
+
+            assert_eq!(
+                config.migrate_lcd_images_to_per_channel().await,
+                0,
+                "a second pass has nothing left pointing at the shared file"
+            );
+            assert_eq!(
+                cc_fs::read_image(&migrated).await.unwrap(),
+                b"user-replaced-it",
+                "the newer image must survive"
+            );
+        });
+    }
+
+    /// Goal: negative space. Settings already on per-channel paths, and non-LCD settings,
+    /// must be left completely alone.
+    #[test]
+    #[serial]
+    fn migrate_lcd_images_leaves_current_settings_alone() {
+        cc_fs::test_runtime(async {
+            reset_lcd_image_dir().await;
+            let current = paths::lcd_image_dir().join("dev1-lcd.png");
+            let current = current.to_str().unwrap().to_string();
+            let config = config_from(&format!(
+                "[device-settings.dev1.lcd]\nlcd = {{ mode = \"image\", image_file_processed = \"{current}\" }}\n\
+                 [device-settings.dev1.fan1]\nspeed_fixed = 50\n"
+            ));
+            let before = config.document.borrow().to_string();
+
+            let moved = config.migrate_lcd_images_to_per_channel().await;
+
+            assert_eq!(moved, 0);
+            assert_eq!(config.document.borrow().to_string(), before);
+        });
+    }
+
+    // Goal: the startup delay accepts the full documented range and clamps
+    // anything past it, so a hand-edited config cannot stall the daemon forever.
+    #[test]
+    fn startup_delay_clamps_to_max() {
+        let max_written = i64::from(crate::setting::STARTUP_DELAY_SECONDS_MAX);
+        let max_seconds = u64::from(crate::setting::STARTUP_DELAY_SECONDS_MAX);
+        for (written, expected_seconds) in [
+            (-5, 0),
+            (0, 0),
+            (60, 60),
+            (max_written, max_seconds),
+            (max_written + 1, max_seconds),
+        ] {
+            let document = format!("[settings]\nstartup_delay = {written}\n")
+                .parse::<DocumentMut>()
+                .unwrap();
+            let config = Config {
+                path: Path::new("/tmp/config.toml").to_path_buf(),
+                path_ui: Path::new("/tmp/config-ui.json").to_path_buf(),
+                document: RefCell::new(document),
+                generation: Cell::new(0),
+            };
+            let settings = config.get_settings().unwrap();
+            assert_eq!(
+                settings.startup_delay.as_secs(),
+                expected_seconds,
+                "startup_delay = {written}"
+            );
+        }
     }
 
     #[test]
@@ -3179,7 +3524,7 @@ offset = 5
             config.set_lcd_shutdown_setting(device_uid, channel_name, &lcd);
 
             // 4.3.x hard-requires lcd.colors on load, so the no-op write must keep it present.
-            // DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): remove with the colors field.
+            // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): remove with the colors field.
             {
                 let doc = config.document.borrow();
                 let colors = doc["lcd-shutdown-settings"][device_uid][channel_name]["lcd"]
@@ -3444,17 +3789,9 @@ offset = 5
                 },
             ))
             .unwrap();
-        config
-            .set_function(make(
-                "ema",
-                FunctionKind::ExponentialMovingAvg {
-                    sample_window: Some(10),
-                },
-            ))
-            .unwrap();
 
         let functions = config.get_current_functions().unwrap();
-        assert_eq!(functions.len(), 3);
+        assert_eq!(functions.len(), 2);
         assert!(matches!(functions[0].kind, FunctionKind::Identity));
         assert_eq!(
             functions[1].kind,
@@ -3464,12 +3801,53 @@ offset = 5
                 response_delay: Some(4),
             }
         );
-        assert!(matches!(
-            functions[2].kind,
-            FunctionKind::ExponentialMovingAvg {
-                sample_window: Some(10)
-            }
-        ));
+    }
+
+    // A config written by a pre-4.4.0 daemon with the removed ExponentialMovingAvg Function type
+    // must load as Identity (permanent upgrade migration), and re-saving the function must scrub
+    // the stale sample_window key from the stored table.
+    #[test]
+    fn function_removed_ema_type_converts_to_identity() {
+        use crate::setting::FunctionKind;
+        use std::str::FromStr;
+
+        let legacy_toml = r#"
+[[functions]]
+uid = "ema-fn"
+name = "My EMA"
+f_type = "ExponentialMovingAvg"
+duty_minimum = 2
+duty_maximum = 100
+sample_window = 10
+"#;
+        let config = Config {
+            path: Path::new("/tmp/fn-ema-convert.toml").to_path_buf(),
+            path_ui: Path::new("/tmp/fn-ema-convert-ui.json").to_path_buf(),
+            document: RefCell::new(DocumentMut::from_str(legacy_toml).unwrap()),
+            generation: Cell::new(0),
+        };
+
+        let functions = config.get_current_functions().unwrap();
+        assert_eq!(functions.len(), 1);
+        assert!(matches!(functions[0].kind, FunctionKind::Identity));
+        assert_eq!(functions[0].name, "My EMA");
+        // Shared fields survive the conversion.
+        assert_eq!(functions[0].step_size_min, 2);
+
+        // Re-saving the converted function persists Identity and scrubs the stale key.
+        config.update_function(functions[0].clone()).unwrap();
+        let document = config.document.borrow();
+        let table = &document["functions"]
+            .as_array_of_tables()
+            .unwrap()
+            .iter()
+            .next()
+            .unwrap();
+        assert_eq!(
+            table.get("f_type").and_then(|i| i.as_str()),
+            Some("Identity")
+        );
+        assert!(table.get("sample_window").is_none());
     }
 
     // Updating a Standard function to Identity must scrub the Standard-only keys from the stored

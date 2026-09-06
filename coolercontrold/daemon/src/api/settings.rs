@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::devices::{DeviceChannelPath, DevicePath};
 use crate::api::{handle_error, AppState, CCError};
@@ -22,6 +7,7 @@ use crate::device::{ChannelName, UID};
 use crate::overrides::OverridesDocument;
 use crate::setting::{
     CCChannelSettings, CCDeviceSettings, CoolerControlSettings, DeviceExtensions,
+    STARTUP_DELAY_SECONDS_MAX,
 };
 use axum::extract::{Path, State};
 use axum::Json;
@@ -162,6 +148,8 @@ pub struct CoolerControlSettingsDto {
     sensors_auto_detect: Option<bool>,
     /// Whether to listen for device add/remove events at startup
     device_listener_enabled: Option<bool>,
+    /// Whether to apply labels and ignores from the lm-sensors configuration
+    sensors_conf_enabled: Option<bool>,
 }
 
 impl CoolerControlSettingsDto {
@@ -177,7 +165,7 @@ impl CoolerControlSettingsDto {
             current_settings.no_init
         };
         let startup_delay = if let Some(delay) = self.startup_delay {
-            Duration::from_secs(u64::from(delay.clamp(0, 30)))
+            Duration::from_secs(u64::from(delay.clamp(0, STARTUP_DELAY_SECONDS_MAX)))
         } else {
             current_settings.startup_delay
         };
@@ -231,16 +219,15 @@ impl CoolerControlSettingsDto {
         } else {
             current_settings.protocol_header
         };
-        let sensors_auto_detect = if let Some(detect) = self.sensors_auto_detect {
-            detect
-        } else {
-            current_settings.sensors_auto_detect
-        };
-        let device_listener_enabled = if let Some(listener) = self.device_listener_enabled {
-            listener
-        } else {
-            current_settings.device_listener_enabled
-        };
+        let sensors_auto_detect = self
+            .sensors_auto_detect
+            .unwrap_or(current_settings.sensors_auto_detect);
+        let device_listener_enabled = self
+            .device_listener_enabled
+            .unwrap_or(current_settings.device_listener_enabled);
+        let sensors_conf_enabled = self
+            .sensors_conf_enabled
+            .unwrap_or(current_settings.sensors_conf_enabled);
         CoolerControlSettings {
             apply_on_boot,
             no_init,
@@ -262,6 +249,7 @@ impl CoolerControlSettingsDto {
             protocol_header,
             sensors_auto_detect,
             device_listener_enabled,
+            sensors_conf_enabled,
         }
     }
 }
@@ -284,6 +272,7 @@ impl From<CoolerControlSettings> for CoolerControlSettingsDto {
             protocol_header: settings.protocol_header,
             sensors_auto_detect: Some(settings.sensors_auto_detect),
             device_listener_enabled: Some(settings.device_listener_enabled),
+            sensors_conf_enabled: Some(settings.sensors_conf_enabled),
         }
     }
 }
@@ -342,6 +331,7 @@ mod tests {
                 protocol_header: None,
                 sensors_auto_detect: None,
                 device_listener_enabled: None,
+                sensors_conf_enabled: None,
             }
         }
     }
@@ -376,6 +366,25 @@ mod tests {
         let merged = dto.merge(current);
         assert!(merged.sensors_auto_detect.not());
         assert!(merged.device_listener_enabled.not());
+    }
+
+    #[test]
+    fn merge_clamps_startup_delay_to_max() {
+        // The API boundary must accept the full documented range and clamp above it.
+        let mut dto = empty_dto();
+        dto.startup_delay = Some(STARTUP_DELAY_SECONDS_MAX);
+        let merged = dto.merge(CoolerControlSettings::default());
+        assert_eq!(
+            merged.startup_delay,
+            Duration::from_secs(u64::from(STARTUP_DELAY_SECONDS_MAX))
+        );
+
+        dto.startup_delay = Some(STARTUP_DELAY_SECONDS_MAX + 1);
+        let merged = dto.merge(CoolerControlSettings::default());
+        assert_eq!(
+            merged.startup_delay,
+            Duration::from_secs(u64::from(STARTUP_DELAY_SECONDS_MAX))
+        );
     }
 
     #[test]

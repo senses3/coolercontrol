@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::repositories::utils::DirectCommand;
 use anyhow::Result;
@@ -140,14 +125,20 @@ fn find_on_path(executable: &str) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    fn is_root() -> bool {
+        nix::unistd::geteuid().is_root()
+    }
+
     #[tokio::test]
     async fn test_plugin_user_exists_returns_true_for_root() {
         // root always exists on Linux
+        crate::sidecar::ensure_test_handle();
         assert!(plugin_user_exists("root").await);
     }
 
     #[tokio::test]
     async fn test_plugin_user_exists_returns_false_for_nonexistent() {
+        crate::sidecar::ensure_test_handle();
         assert!(!plugin_user_exists("nonexistent_user_xyz_12345").await);
     }
 
@@ -155,6 +146,12 @@ mod tests {
     async fn test_ensure_plugin_user_does_not_panic_for_nonexistent() {
         // Should not panic; will log a warning when user creation fails
         // (expected in test environment without root privileges).
+        crate::sidecar::ensure_test_handle();
+        if is_root() {
+            // Skip: as root `useradd` would succeed and leave a real account behind on the
+            // build host, and the second run would no longer exercise the failure path at all.
+            return;
+        }
         ensure_plugin_user("cc-plugin-test-nonexistent").await;
     }
 }

@@ -1,38 +1,37 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiBookmarkCheckOutline, mdiInformationSlabCircleOutline, mdiMemory } from '@mdi/js'
+import {
+    mdiAlertOutline,
+    mdiBookmarkCheckOutline,
+    mdiContentDuplicate,
+    mdiContentSaveOutline,
+    mdiDeleteOutline,
+    mdiMemory,
+    mdiMinusThick,
+} from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { computed, inject, onMounted, type Ref, ref, watch } from 'vue'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { Mode } from '@/models/Mode.ts'
 import { UID } from '@/models/Device.ts'
 import { DeviceSettingReadDTO } from '@/models/DaemonSettings.ts'
 import { getProfileDisplayName } from '@/models/Profile.ts'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiTable from '@/shell/ui/UiTable.vue'
 import { useI18n } from 'vue-i18n'
+import { type RouteLocationRaw, useRouter } from 'vue-router'
+import { controlChannelRoute } from '@/shell/channelRoute.ts'
+import { useConfirm } from '@/shell/confirm'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import { Emitter, EventType } from 'mitt'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 interface Props {
     modeUID: UID
@@ -45,8 +44,8 @@ const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
-const currentMode: Ref<Mode> = computed(
-    () => settingsStore.modes.find((mode) => mode.uid === props.modeUID)!,
+const currentMode: Ref<Mode> = computed(() =>
+    settingsStore.modes.find((mode) => mode.uid === props.modeUID)!,
 )
 const deviceTableData: Ref<Array<DeviceData>> = ref([])
 
@@ -59,6 +58,26 @@ interface DeviceData {
     channelLabel: string
     settingType: string
     settingInfo: string
+    channelTarget: RouteLocationRaw
+    // Set only for a row whose setting names a real profile, so Manual, LCD,
+    // Lighting and Unmanaged rows stay plain text.
+    profileUID?: UID
+}
+
+// Subtle in a dense table: the row reads as data until the pointer is on it.
+const linkClass =
+    'rounded outline-none hover:text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent'
+
+// First row of each device group carries the device cell, spanning the group.
+const isFirstOfDevice = (idx: number): boolean =>
+    idx === 0 || deviceTableData.value[idx - 1].deviceUID !== deviceTableData.value[idx].deviceUID
+const deviceRowSpan = (idx: number): number => {
+    let span = 1
+    for (let i = idx + 1; i < deviceTableData.value.length; i++) {
+        if (deviceTableData.value[i].deviceUID !== deviceTableData.value[idx].deviceUID) break
+        span++
+    }
+    return span
 }
 
 const initTableData = () => {
@@ -86,6 +105,8 @@ const initTableData = () => {
             const channelModeSetting = modeSettings.get(device.uid)?.get(channelName)
             let settingType = 'Unknown'
             let settingInfo: string = 'Unknown'
+            let profileUID: UID | undefined = undefined
+            const channelTarget = controlChannelRoute(channelInfo, device.uid, channelName)
             if (channelInfo.speed_options != null) {
                 if (channelModeSetting == null) {
                     // This means there doesn't exist a setting for this channel.
@@ -109,6 +130,7 @@ const initTableData = () => {
                             : channelModeSetting.profile_uid === '0'
                               ? t('common.unmanaged')
                               : 'Unknown'
+                    if (profile != null && profile.uid !== '0') profileUID = profile.uid
                 }
             } else if (channelInfo.lighting_modes.length > 0) {
                 if (channelModeSetting == null) {
@@ -141,6 +163,8 @@ const initTableData = () => {
                 channelLabel: channelSettings.name,
                 settingType: settingType,
                 settingInfo: settingInfo,
+                channelTarget: channelTarget,
+                profileUID: profileUID,
             })
         }
     }
@@ -171,94 +195,169 @@ onMounted(async () => {
         initTableData()
     })
 })
+
+const router = useRouter()
+const confirm = useConfirm()
+
+const updateModeWithCurrentSettings = (): void => {
+    confirm.require({
+        message: t('views.modes.updateModeConfirm', { name: currentMode.value.name }),
+        header: t('views.modes.editMode'),
+        icon: mdiAlertOutline,
+        accept: async () => {
+            await settingsStore.updateModeSettings(currentMode.value.uid)
+        },
+    })
+}
+
+const duplicateMode = async (): Promise<void> => {
+    const newMode = await settingsStore.duplicateMode(currentMode.value.uid)
+    if (newMode != null) {
+        await router.push({ name: 'modes', params: { modeUID: newMode.uid } })
+    }
+}
+
+const deleteMode = (): void => {
+    confirm.require({
+        message: t('views.modes.deleteModeConfirm', { name: currentMode.value.name }),
+        header: t('views.modes.deleteMode'),
+        icon: mdiAlertOutline,
+        accept: async () => {
+            await settingsStore.deleteMode(currentMode.value.uid)
+            await router.push({ name: 'cooling-modes' })
+        },
+    })
+}
 </script>
 
 <template>
-    <div class="flex h-[3.6rem] border-b-4 border-border-one items-center justify-between">
-        <div class="flex flex-row overflow-hidden">
-            <entity-title-rename
-                :current-name="currentMode.name"
-                :save-name-function="saveNameFunction"
-            />
-            <div
-                class="px-4 py-2 flex flex-row leading-none items-center"
-                v-tooltip.top="t('views.mode.modeHint')"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
-        </div>
-        <div
-            class="p-2"
-            v-tooltip.top="{ value: t('views.mode.currentlyActive'), disabled: !isActivated }"
-        >
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
-                label="Save"
-                v-tooltip.top="t('views.mode.activateMode')"
-                :disabled="isActivated"
-                @click="activateMode"
-            >
-                <svg-icon
-                    class="outline-0"
-                    type="mdi"
-                    :path="mdiBookmarkCheckOutline"
-                    :size="deviceStore.getREMSize(1.5)"
-                />
-            </Button>
-        </div>
-    </div>
-    <div class="h-full pb-14">
-        <DataTable
-            :value="deviceTableData"
-            row-group-mode="rowspan"
-            :group-rows-by="['deviceName', 'rowID']"
-            scrollable
-            scroll-height="flex"
-            :pt="{
-                tableContainer: () => ({
-                    class: ['rounded-none border-0 border-border-one'],
-                }),
-            }"
-        >
-            <Column field="deviceName" :header="t('components.sensorTable.device')">
-                <template #body="slotProps">
-                    <div class="flex leading-none items-center">
-                        <div class="mr-2">
+    <div class="flex h-full flex-col">
+        <entity-page-header>
+            <template #title>
+                <div class="flex flex-row overflow-hidden">
+                    <entity-title-rename
+                        :current-name="currentMode.name"
+                        :save-name-function="saveNameFunction"
+                    />
+                    <HelpIcon class="px-4 py-2" :text="t('views.mode.modeHint')" />
+                </div>
+            </template>
+            <template #actions>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.modes.updateToCurrent')"
+                    @click="updateModeWithCurrentSettings"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentSaveOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.modes.duplicateMode')"
+                    @click="duplicateMode"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentDuplicate"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.modes.deleteMode')"
+                    @click="deleteMode"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDeleteOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <div
+                    class="p-2"
+                    v-tooltip.top="{
+                        value: t('views.mode.currentlyActive'),
+                        disabled: !isActivated,
+                    }"
+                >
+                    <UiButton
+                        class="w-32"
+                        v-tooltip.top="t('views.mode.activateMode')"
+                        :disabled="isActivated"
+                        @click="activateMode"
+                    >
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiBookmarkCheckOutline"
+                            :size="deviceStore.getREMSize(1.5)"
+                        />
+                    </UiButton>
+                </div>
+            </template>
+        </entity-page-header>
+        <div class="min-h-0 flex-1 overflow-y-auto">
+            <UiTable sticky-header>
+                <template #head>
+                    <tr>
+                        <th>{{ t('components.sensorTable.device') }}</th>
+                        <th>{{ t('components.sensorTable.channel') }}</th>
+                        <th>{{ t('components.modeTable.setting') }}</th>
+                        <th></th>
+                    </tr>
+                </template>
+                <tr v-for="(row, idx) in deviceTableData" :key="row.rowID">
+                    <td v-if="isFirstOfDevice(idx)" :rowspan="deviceRowSpan(idx)" class="align-top">
+                        <RouterLink
+                            :to="{ name: 'devices-device', params: { deviceUID: row.deviceUID } }"
+                            class="flex leading-none items-center"
+                            :class="linkClass"
+                        >
                             <svg-icon
                                 type="mdi"
                                 :path="mdiMemory"
                                 :size="deviceStore.getREMSize(1.3)"
+                                class="mr-2"
                             />
-                        </div>
-                        <div>{{ slotProps.data.deviceName }}</div>
-                    </div>
-                </template>
-            </Column>
-            <!-- This workaround with rowID is needed because of an issue with DataTable and rowGrouping -->
-            <!-- Otherwise channelLabels from other devices are grouped together if they have the same name -->
-            <Column field="rowID" :header="t('components.sensorTable.channel')">
-                <template #body="slotProps">
-                    <span
-                        class="pi pi-minus mr-2"
-                        :style="{ color: slotProps.data.channelColor }"
-                    />{{ slotProps.data.channelLabel }}
-                </template>
-            </Column>
-            <Column field="settingType" :header="t('components.modeTable.setting')">
-                <template #body="slotProps">
-                    {{ slotProps.data.settingType }}
-                </template>
-            </Column>
-            <Column field="settingInfo" header="">
-                <template #body="slotProps">
-                    {{ slotProps.data.settingInfo }}
-                </template>
-            </Column>
-        </DataTable>
+                            {{ row.deviceName }}
+                        </RouterLink>
+                    </td>
+                    <td>
+                        <RouterLink
+                            :to="row.channelTarget"
+                            class="flex items-center gap-2"
+                            :class="linkClass"
+                        >
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiMinusThick"
+                                :size="14"
+                                class="shrink-0"
+                                :style="{ color: row.channelColor }"
+                            />
+                            {{ row.channelLabel }}
+                        </RouterLink>
+                    </td>
+                    <td>{{ row.settingType }}</td>
+                    <td>
+                        <RouterLink
+                            v-if="row.profileUID != null"
+                            :to="{ name: 'profiles', params: { profileUID: row.profileUID } }"
+                            :class="linkClass"
+                        >
+                            {{ row.settingInfo }}
+                        </RouterLink>
+                        <template v-else>{{ row.settingInfo }}</template>
+                    </td>
+                </tr>
+            </UiTable>
+        </div>
     </div>
 </template>
 

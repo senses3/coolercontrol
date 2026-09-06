@@ -1,24 +1,10 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ops::Not;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
@@ -27,14 +13,14 @@ use crate::api::actor::{CalibrationBatchEntry, CalibrationBatchStatus, Calibrati
 use crate::api::CCError;
 use crate::calibration::{
     self, others_over_limit_note, BatchBeginError, BatchEntry, BatchEntryPhase, Calibration,
-    CalibrationBatchState, CalibrationEntry, CalibrationStore, ChannelKey, DiagnosisFailure,
-    DiagnosisHost, DiagnosisProgress, DiagnosisRegistry, DiagnosisSettings, FanStateMap,
-    HottestTemp, RepoWriter, SettingsSnapshot, SnapshotKind, CALIBRATION_TEMP_HINT,
+    CalibrationAlertGate, CalibrationBatchState, CalibrationEntry, CalibrationStore, ChannelKey,
+    DiagnosisFailure, DiagnosisHost, DiagnosisProgress, DiagnosisRegistry, DiagnosisSettings,
+    FanStateMap, HottestTemp, RepoWriter, SettingsSnapshot, SnapshotKind, CALIBRATION_TEMP_HINT,
 };
 use crate::config::Config;
 use crate::device::{
-    ChannelExtensionNames, ChannelName, ChannelStatus, DeviceType, DeviceUID, Duty, Status,
-    TempStatus, RPM, UID,
+    ChannelExtensionNames, ChannelInfo, ChannelName, ChannelStatus, DeviceType, DeviceUID, Duty,
+    Status, TempStatus, RPM, UID,
 };
 use crate::engine::commanders::graph::GraphProfileCommander;
 use crate::engine::commanders::lcd::{LcdCommander, DEFAULT_LCD_SHUTDOWN_IMAGE};
@@ -48,7 +34,7 @@ use crate::repositories::repository::{DeviceLock, Repository};
 use crate::rt;
 use crate::setting::{
     ChannelExtensions, FunctionUID, LcdModeKind, LcdModeName, LcdSettings, LightingSettings,
-    Profile, ProfileType, ProfileUID, Setting, SettingKind, DEFAULT_FUNCTION_UID,
+    Profile, ProfileType, ProfileUID, Setting, SettingKind, TempSource, DEFAULT_FUNCTION_UID,
 };
 use crate::{cc_fs, repositories, AllDevices, Repos};
 use anyhow::{anyhow, Context, Result};
@@ -58,8 +44,6 @@ use mime::Mime;
 use moro_local::Scope;
 use std::time::Instant;
 
-const IMAGE_FILENAME_PNG: &str = "lcd_image.png";
-const IMAGE_FILENAME_GIF: &str = "lcd_image.gif";
 const LCD_SHUTDOWN_IMAGE_DIR: &str = "lcd_shutdown";
 const SYNC_CHANNEL_NAME: &str = "sync";
 
@@ -97,6 +81,7 @@ pub struct Engine {
     /// notification system is created. None in tests; the broadcast is
     /// then a no-op.
     notification_handle: RefCell<Option<NotificationHandle>>,
+    alert_gate: RefCell<Option<Rc<dyn CalibrationAlertGate>>>,
     overrides: Rc<OverridesController>,
 }
 
@@ -169,6 +154,7 @@ impl Engine {
             calibration_batch: Rc::new(CalibrationBatchState::new()),
             calibration_statuses: RefCell::new(HashMap::new()),
             notification_handle: RefCell::new(None),
+            alert_gate: RefCell::new(None),
             overrides,
         }
     }
@@ -353,17 +339,8 @@ impl Engine {
             && &temp_source.device_uid == device_uid
             && hw_curve_enabled
         {
-            info!(
-                "Applying | hardware internal profile:: {}",
-                self.log_device_channel(device_uid, channel_name)
-            );
-            repo.apply_setting_speed_profile(
-                device_uid,
-                channel_name,
-                temp_source,
-                profile.speed_profile().unwrap(),
-            )
-            .await
+            self.apply_hw_curve_profile(device_uid, channel_name, profile, temp_source, repo)
+                .await
         } else if speed_options.fixed_enabled {
             repo.apply_setting_manual_control(device_uid, channel_name)
                 .await?;
@@ -379,6 +356,40 @@ impl Engine {
                 "Speed Profiles not enabled for this device: {device_uid}"
             ))
         }
+    }
+
+    /// Hands a Graph Profile to the channel's own firmware curve. Split from
+    /// `set_graph_profile` so that function stays inside the line budget.
+    async fn apply_hw_curve_profile(
+        &self,
+        device_uid: &UID,
+        channel_name: &str,
+        profile: &Profile,
+        temp_source: &TempSource,
+        repo: &Rc<dyn Repository>,
+    ) -> Result<()> {
+        let key: ChannelKey = (device_uid.clone(), channel_name.to_string());
+        // The firmware owns the channel now, so the dispatcher's
+        // kick/sustain state for it is stale.
+        self.fan_state_map.forget(&key);
+        // Present: `set_graph_profile` rejects a profile without one before reaching here.
+        let speed_profile = profile.speed_profile().unwrap();
+        // A calibrated channel's curve is drawn in true-duty, which the
+        // firmware cannot interpret. Functions are time-domain and can't
+        // be baked into a static curve, but this mapping is point-wise.
+        let mapped_profile = self.calibration_store.map_curve_points(&key, speed_profile);
+        info!(
+            "Applying | hardware internal profile:: {} | calibration mapped: {}",
+            self.log_device_channel(device_uid, channel_name),
+            mapped_profile.is_some()
+        );
+        repo.apply_setting_speed_profile(
+            device_uid,
+            channel_name,
+            temp_source,
+            mapped_profile.as_deref().unwrap_or(speed_profile),
+        )
+        .await
     }
 
     async fn set_mix_profile(
@@ -653,6 +664,13 @@ impl Engine {
         )
         .await
         .and_then(|(content_type, image_data)| {
+            if content_type == mime::IMAGE_GIF && lcd_info.gif_supported.not() {
+                return Err(CCError::UserError {
+                    msg: "This screen's firmware cannot display gifs. Choose a static image."
+                        .to_string(),
+                }
+                .into());
+            }
             if image_data.len() > lcd_info.max_image_size_bytes as usize {
                 Err(CCError::UserError {
                     msg: format!(
@@ -667,20 +685,47 @@ impl Engine {
         })
     }
 
-    pub async fn save_lcd_image(&self, content_type: &Mime, file_data: Vec<u8>) -> Result<String> {
-        let image_path = if content_type == &mime::IMAGE_GIF {
-            paths::config_dir().join(IMAGE_FILENAME_GIF)
+    /// Saves the image a channel currently displays. One file per channel: a single shared
+    /// file let a second screen overwrite the first screen's image.
+    pub async fn save_lcd_image(
+        &self,
+        device_uid: &str,
+        channel_name: &str,
+        content_type: &Mime,
+        file_data: Vec<u8>,
+    ) -> Result<String> {
+        Self::save_channel_image(
+            paths::lcd_image_dir(),
+            device_uid,
+            channel_name,
+            content_type,
+            file_data,
+        )
+        .await
+    }
+
+    /// Writes a per-channel image into `dir` and returns its absolute path for the config.
+    async fn save_channel_image(
+        dir: &Path,
+        device_uid: &str,
+        channel_name: &str,
+        content_type: &Mime,
+        file_data: Vec<u8>,
+    ) -> Result<String> {
+        cc_fs::create_dir_all(dir).await?;
+        let extension = if content_type == &mime::IMAGE_GIF {
+            "gif"
         } else {
-            paths::config_dir().join(IMAGE_FILENAME_PNG)
+            "png"
         };
+        let image_path = dir.join(format!("{device_uid}-{channel_name}.{extension}"));
         cc_fs::write(&image_path, file_data).await?;
-        let image_location = image_path
-            .to_str()
-            .map(ToString::to_string)
-            .ok_or_else(|| CCError::InternalError {
+        image_path.to_str().map(ToString::to_string).ok_or_else(|| {
+            CCError::InternalError {
                 msg: "Path to str conversion".to_string(),
-            })?;
-        Ok(image_location)
+            }
+            .into()
+        })
     }
 
     /// Saves an LCD shutdown image to the dedicated subdirectory.
@@ -692,21 +737,14 @@ impl Engine {
         content_type: &Mime,
         file_data: Vec<u8>,
     ) -> Result<String> {
-        let shutdown_dir = paths::config_dir().join(LCD_SHUTDOWN_IMAGE_DIR);
-        cc_fs::create_dir_all(&shutdown_dir).await?;
-        let filename = if content_type == &mime::IMAGE_GIF {
-            format!("{device_uid}-{channel_name}.gif")
-        } else {
-            format!("{device_uid}-{channel_name}.png")
-        };
-        let image_path = shutdown_dir.join(&filename);
-        cc_fs::write(&image_path, file_data).await?;
-        image_path.to_str().map(ToString::to_string).ok_or_else(|| {
-            CCError::InternalError {
-                msg: "Path to str conversion".to_string(),
-            }
-            .into()
-        })
+        Self::save_channel_image(
+            &paths::config_dir().join(LCD_SHUTDOWN_IMAGE_DIR),
+            device_uid,
+            channel_name,
+            content_type,
+            file_data,
+        )
+        .await
     }
 
     /// Applies all persisted LCD shutdown images to their respective devices.
@@ -720,10 +758,26 @@ impl Engine {
             }
         };
         let mut channels_with_settings = HashSet::with_capacity(shutdown_settings.len());
+        let mut dropped_stale = false;
         for (device_uid, channel_name, lcd_settings) in shutdown_settings {
+            if Self::shutdown_setting_is_stale(&lcd_settings) {
+                warn!(
+                    "LCD shutdown image for {device_uid}:{channel_name} is gone; \
+                     dropping the stale setting and using the stock image"
+                );
+                self.config
+                    .remove_lcd_shutdown_setting(&device_uid, &channel_name);
+                dropped_stale = true;
+                continue;
+            }
             channels_with_settings.insert((device_uid.clone(), channel_name.clone()));
             self.apply_explicit_lcd_shutdown(&device_uid, &channel_name, lcd_settings)
                 .await;
+        }
+        if dropped_stale {
+            if let Err(err) = self.config.save_config_file().await {
+                warn!("Failed to save config after dropping stale LCD shutdown settings: {err}");
+            }
         }
         self.apply_default_lcd_shutdown_images(&channels_with_settings)
             .await;
@@ -827,13 +881,40 @@ impl Engine {
                 let SettingKind::Lcd { ref lcd } = settings.kind else {
                     continue;
                 };
-                if lcd.mode_name() == LcdModeName::Temp || lcd.mode_name() == LcdModeName::Carousel
-                {
+                if Self::needs_default_shutdown_image(lcd) {
                     result.push((device_uid.clone(), channel_name.clone()));
                 }
             }
         }
         result
+    }
+
+    /// Whether a channel's live LCD setting should hand over to the stock shutdown image.
+    ///
+    /// Temp and Carousel are live readings that would otherwise freeze on screen. An Image
+    /// whose file is gone is included too: for an externally driven screen the engine
+    /// persists its own shutdown image as the current setting, so removing that image leaves
+    /// a dangling reference here, and a missing file cannot be shown at shutdown anyway.
+    fn needs_default_shutdown_image(lcd: &LcdSettings) -> bool {
+        match lcd.mode_name() {
+            LcdModeName::Temp | LcdModeName::Carousel => true,
+            LcdModeName::Image => Self::lcd_image_is_missing(lcd),
+            LcdModeName::None | LcdModeName::Liquid => false,
+        }
+    }
+
+    /// Whether an `Image` setting's file is gone. Only meaningful for `Image`: every other
+    /// mode carries no file at all and would read here as missing.
+    fn lcd_image_is_missing(lcd: &LcdSettings) -> bool {
+        lcd.image_file_processed()
+            .is_none_or(|path| cc_fs::exists(path).not())
+    }
+
+    /// A stored shutdown setting that can no longer be shown, because its image was removed
+    /// by hand or with the clear endpoint. The setting no longer describes anything, so it is
+    /// dropped and the channel falls back to the stock image.
+    fn shutdown_setting_is_stale(lcd: &LcdSettings) -> bool {
+        lcd.mode_name() == LcdModeName::Image && Self::lcd_image_is_missing(lcd)
     }
 
     /// Processes and applies the embedded default shutdown image to a single LCD channel.
@@ -951,7 +1032,10 @@ impl Engine {
             .map_err(|err| CCError::InternalError {
                 msg: err.to_string(),
             })?;
-        let content_type = if image_path.ends_with(IMAGE_FILENAME_GIF) {
+        let content_type = if Path::new(&image_path)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
+        {
             mime::IMAGE_GIF
         } else {
             mime::IMAGE_PNG
@@ -1067,7 +1151,7 @@ impl Engine {
     /// waking from sleep, as the status history is no longer sequential.
     pub fn reinitialize_all_status_histories(&self) -> Result<()> {
         let poll_rate = self.config.get_settings()?.poll_rate;
-        for (_uid, device) in self.all_devices.iter() {
+        for device in self.all_devices.values() {
             let most_recent_status = device.borrow().status_current().unwrap();
             let adjusted_recent_status = Status {
                 // The next snapshot will most likely be after another loop interval:
@@ -1097,8 +1181,23 @@ impl Engine {
     pub async fn thinkpad_fan_control(&self, enable: &bool) -> Result<()> {
         repositories::utils::thinkpad_fan_control(enable)
             .await
-            .map(|()| info!("Successfully enabled ThinkPad Fan Control"))
-            .inspect_err(|err| error!("Error attempting to enable ThinkPad Fan Control: {err}"))
+            .map(|()| {
+                let state = if *enable { "enabled" } else { "disabled" };
+                info!("Successfully {state} ThinkPad Fan Control");
+                Self::set_thinkpad_fan_control_info(&self.all_devices, *enable);
+            })
+            .inspect_err(|err| error!("Error attempting to set ThinkPad Fan Control: {err}"))
+    }
+
+    /// Keeps the cached device info in sync with the applied `fan_control` option,
+    /// so clients see the new state without a daemon restart.
+    fn set_thinkpad_fan_control_info(all_devices: &AllDevices, enable: bool) {
+        for device in all_devices.values() {
+            let mut device = device.borrow_mut();
+            if device.info.thinkpad_fan_control.is_some() {
+                device.info.thinkpad_fan_control = Some(enable);
+            }
+        }
     }
 
     /// This function finds out if the give Profile UID is in use, and if so, updates
@@ -1132,7 +1231,7 @@ impl Engine {
         let affected_overlay_profiles = self
             .get_profiles_affected_by(profile_uid, ProfileType::Overlay)
             .await;
-        for (device_uid, _device) in self.all_devices.iter() {
+        for device_uid in self.all_devices.keys() {
             if let Ok(config_settings) = self.config.get_device_settings(device_uid) {
                 for setting in config_settings {
                     let SettingKind::Profile {
@@ -1212,7 +1311,7 @@ impl Engine {
             }
             self.config.update_profile(mix_profile.clone())?;
         }
-        for (device_uid, _device) in self.all_devices.iter() {
+        for device_uid in self.all_devices.keys() {
             if let Ok(config_settings) = self.config.get_device_settings(device_uid) {
                 for setting in config_settings {
                     let SettingKind::Profile {
@@ -1273,7 +1372,7 @@ impl Engine {
                         .any(|p_uid| affected_profiles.iter().any(|p| &p.uid == p_uid))
             })
             .collect::<Vec<_>>();
-        for (device_uid, _device) in self.all_devices.iter() {
+        for device_uid in self.all_devices.keys() {
             if let Ok(config_settings) = self.config.get_device_settings(device_uid) {
                 for setting in config_settings {
                     let SettingKind::Profile {
@@ -1450,6 +1549,23 @@ impl Engine {
     /// during repo initialization).
     pub fn set_notification_handle(&self, handle: NotificationHandle) {
         self.notification_handle.borrow_mut().replace(handle);
+    }
+
+    /// Wire the calibration preflight alert gate. Called by `main.rs` after
+    /// the alert controller is constructed (the engine is built earlier).
+    pub fn set_alert_gate(&self, gate: Rc<dyn CalibrationAlertGate>) {
+        self.alert_gate.borrow_mut().replace(gate);
+    }
+
+    /// The name of an alert already Active on the channel, if any. A sweep
+    /// must not run on a fan whose alert fired before the sweep began: the
+    /// alert was not caused by calibration, so the fan itself is suspect.
+    /// No-op (None) if no gate is wired (tests, early startup).
+    pub fn active_alert_blocking(&self, key: &ChannelKey) -> Option<String> {
+        self.alert_gate
+            .borrow()
+            .as_ref()
+            .and_then(|gate| gate.active_alert_for_channel(&key.0, &key.1))
     }
 
     /// No-op if no handle is wired (tests, early startup).
@@ -1632,10 +1748,11 @@ impl Engine {
                 "calibration already in progress for {device_uid}:{channel_name}"
             )));
         }
+        if let Some(alert_name) = self.active_alert_blocking(&key) {
+            return Err(DiagnosisFailure::BlockedByAlert { alert_name });
+        }
         let cancellation = self.diagnosis_registry.register(key.clone());
         let settings = DiagnosisSettings::default();
-        let device_uid_for_event = key.0.clone();
-        let channel_name_for_event = key.1.clone();
         info!(
             "Calibration started for {}",
             self.log_device_channel(&key.0, &key.1)
@@ -1672,20 +1789,43 @@ impl Engine {
                 outcome = Err(DiagnosisFailure::PersistFailed(err.to_string()));
             }
         }
-        let status = match &outcome {
+        let status = self.log_calibration_outcome(&key, &outcome);
+        self.broadcast_calibration_outcome(&key, &outcome);
+        self.store_calibration_status(key, status);
+        outcome
+    }
+
+    /// Logs a terminal diagnosis outcome and renders it as the status event.
+    fn log_calibration_outcome(
+        &self,
+        key: &ChannelKey,
+        outcome: &std::result::Result<Calibration, DiagnosisFailure>,
+    ) -> CalibrationStatus {
+        let (device_uid, channel_name) = (key.0.clone(), key.1.clone());
+        match outcome {
             Ok(calibration) => {
+                let warning_detail = if calibration.warnings.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        ": {}",
+                        calibration
+                            .warnings
+                            .iter()
+                            .map(describe_warning)
+                            .collect::<Vec<_>>()
+                            .join("; ")
+                    )
+                };
                 info!(
-                    "Calibration completed for {} (curve_kind={:?}, rpm_max={}, warnings={})",
+                    "Calibration completed for {} (curve_kind={:?}, rpm_max={}, warnings={}{})",
                     self.log_device_channel(&key.0, &key.1),
                     calibration.curve_kind,
                     calibration.rpm_max,
-                    calibration.warnings.len()
+                    calibration.warnings.len(),
+                    warning_detail
                 );
-                CalibrationStatus::from_completion(
-                    device_uid_for_event,
-                    channel_name_for_event,
-                    calibration.clone(),
-                )
+                CalibrationStatus::from_completion(device_uid, channel_name, calibration.clone())
             }
             Err(DiagnosisFailure::Cancelled) => {
                 info!(
@@ -1693,8 +1833,8 @@ impl Engine {
                     self.log_device_channel(&key.0, &key.1)
                 );
                 CalibrationStatus::from_failure(
-                    device_uid_for_event,
-                    channel_name_for_event,
+                    device_uid,
+                    channel_name,
                     &DiagnosisFailure::Cancelled,
                 )
             }
@@ -1704,16 +1844,9 @@ impl Engine {
                     self.log_device_channel(&key.0, &key.1),
                     describe_failure(failure)
                 );
-                CalibrationStatus::from_failure(
-                    device_uid_for_event,
-                    channel_name_for_event,
-                    failure,
-                )
+                CalibrationStatus::from_failure(device_uid, channel_name, failure)
             }
-        };
-        self.broadcast_calibration_outcome(&key, &outcome);
-        self.store_calibration_status(key, status);
-        outcome
+        }
     }
 
     /// Send a desktop notification describing the terminal outcome of a
@@ -1785,6 +1918,11 @@ impl Engine {
         self.diagnosis_registry.is_in_flight(key)
     }
 
+    /// Shared handle for calibration-aware callers (alert suppression).
+    pub fn diagnosis_registry(&self) -> Rc<DiagnosisRegistry> {
+        Rc::clone(&self.diagnosis_registry)
+    }
+
     /// Validate and install a calibration batch without running it; the
     /// actor spawns `drive_calibration_batch` next. Maps the state
     /// machine's typed rejection onto a daemon error for the boundary.
@@ -1793,6 +1931,23 @@ impl Engine {
         channels: Vec<ChannelKey>,
         concurrency: usize,
     ) -> Result<()> {
+        let blocked: Vec<String> = channels
+            .iter()
+            .filter_map(|key| {
+                self.active_alert_blocking(key).map(|alert_name| {
+                    format!(
+                        "{} (alert '{alert_name}')",
+                        self.log_device_channel(&key.0, &key.1)
+                    )
+                })
+            })
+            .collect();
+        if blocked.is_empty().not() {
+            return Err(anyhow!(
+                "cannot calibrate, alerts are active on: {}",
+                blocked.join(", ")
+            ));
+        }
         self.calibration_batch
             .try_begin(channels, concurrency)
             .map(|_token| ())
@@ -1974,6 +2129,9 @@ fn describe_failure(failure: &DiagnosisFailure) -> String {
             CALIBRATION_TEMP_HINT,
         ),
         DiagnosisFailure::Cancelled => "cancelled".to_string(),
+        DiagnosisFailure::BlockedByAlert { alert_name } => {
+            format!("alert '{alert_name}' is active on this channel")
+        }
         DiagnosisFailure::WriteFailed(msg) => format!("write failed: {msg}"),
         DiagnosisFailure::RestoreFailed(msg) => format!("restore failed: {msg}"),
         DiagnosisFailure::PersistFailed(msg) => format!("could not save calibration: {msg}"),
@@ -2069,6 +2227,29 @@ impl DiagnosisHost for Engine {
             .await
     }
 
+    fn duty_floor(&self, device_uid: &UID, channel_name: &str) -> Duty {
+        let Some(device_lock) = self.all_devices.get(device_uid) else {
+            return 0;
+        };
+        let (device_type, info_floor) = {
+            let device = device_lock.borrow();
+            // The raw `min_duty`, not the calibration-widened effective
+            // one: a Smooth calibration reports 0 there by design.
+            let info_floor = device
+                .info
+                .channels
+                .get(channel_name)
+                .and_then(ChannelInfo::speed_options)
+                .map_or(0, |options| options.min_duty);
+            (device.d_type, info_floor)
+        };
+        let repo_floor = self
+            .repos
+            .get(&device_type)
+            .map_or(0, |repo| repo.duty_floor(device_uid, channel_name));
+        info_floor.max(repo_floor).min(100)
+    }
+
     async fn hottest_temp(&self, limit_celsius: f64) -> HottestTemp {
         let mut hottest = HottestTemp {
             celsius: 0.0,
@@ -2159,7 +2340,55 @@ impl DiagnosisHost for Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::{Device, DeviceInfo};
     use crate::setting::{LcdModeKind, LcdSettings, Setting, SettingKind};
+    use std::cell::RefCell;
+
+    fn device_with_thinkpad_info(name: &str, thinkpad_fan_control: Option<bool>) -> Device {
+        Device::new(
+            name.to_string(),
+            DeviceType::Hwmon,
+            0,
+            None,
+            DeviceInfo {
+                thinkpad_fan_control,
+                ..Default::default()
+            },
+            Some(name.to_string()),
+            1.0,
+        )
+    }
+
+    // Only ThinkPad devices get their cached fan control state updated.
+    #[test]
+    fn thinkpad_fan_control_info_updated() {
+        let thinkpad = device_with_thinkpad_info("thinkpad", Some(false));
+        let other = device_with_thinkpad_info("other", None);
+        let all_devices: AllDevices = Rc::new(HashMap::from([
+            (thinkpad.uid.clone(), Rc::new(RefCell::new(thinkpad))),
+            (other.uid.clone(), Rc::new(RefCell::new(other))),
+        ]));
+
+        Engine::set_thinkpad_fan_control_info(&all_devices, true);
+        for device in all_devices.values() {
+            let device = device.borrow();
+            if device.name == "thinkpad" {
+                assert_eq!(device.info.thinkpad_fan_control, Some(true));
+            } else {
+                assert_eq!(device.info.thinkpad_fan_control, None);
+            }
+        }
+
+        Engine::set_thinkpad_fan_control_info(&all_devices, false);
+        for device in all_devices.values() {
+            let device = device.borrow();
+            if device.name == "thinkpad" {
+                assert_eq!(device.info.thinkpad_fan_control, Some(false));
+            } else {
+                assert_eq!(device.info.thinkpad_fan_control, None);
+            }
+        }
+    }
 
     fn lcd_settings_with_image(image_path: Option<String>) -> LcdSettings {
         LcdSettings {

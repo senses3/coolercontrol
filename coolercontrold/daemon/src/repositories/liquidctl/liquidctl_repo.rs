@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::RefCell;
 use std::clone::Clone;
@@ -28,9 +13,11 @@ use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::device::{
-    ChannelName, DeviceType, DeviceUID, Duty, LcInfo, Status, Temp, TempInfo, TypeIndex, UID,
+    ChannelKind, ChannelName, DeviceInfo, DeviceType, DeviceUID, Duty, LcInfo, Status, Temp,
+    TempInfo, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
+use crate::hardware_support::HardwareSupportController;
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, FailureLogAction};
 use crate::repositories::hwmon::devices;
@@ -88,6 +75,8 @@ pub struct LiquidctlRepo {
     run_token: CancellationToken,
     device_mapper: DeviceMapper,
     devices: HashMap<UID, DeviceLock>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     preloaded_statuses: RefCell<HashMap<u8, LCStatus>>,
     failsafe_statuses: RefCell<HashMap<TypeIndex, FailsafeStatusData>>,
     disabled_channels: RefCell<HashMap<UID, Vec<ChannelName>>>,
@@ -97,6 +86,63 @@ pub struct LiquidctlRepo {
     /// never opens more concurrent connections to one device than liqctld (which processes each
     /// device serially) can use.
     device_permits: HashMap<u8, Semaphore>,
+}
+
+/// What liqctld reports gif support under, in the statuses `initialize` returns.
+const LCD_GIF_SUPPORT_KEY: &str = "lcd gif support";
+/// What the image mode is called on a screen that cannot animate.
+const LCD_IMAGE_MODE_NAME_NO_GIF: &str = "Image";
+
+/// Whether liqctld reported that this device's firmware refuses gifs.
+///
+/// An absent key means the device was never asked, which is every device but the one screen
+/// that can refuse, so only an explicit denial withdraws anything.
+fn lcd_gif_refused(status_map: &StatusMap) -> bool {
+    status_map
+        .get(LCD_GIF_SUPPORT_KEY)
+        .is_some_and(|supported| supported == "false")
+}
+
+/// Takes the gif capability off every LCD channel of a device whose firmware refuses it.
+///
+/// liqctld answers for this rather than the daemon deciding: liquidctl gates its refusal on
+/// the USB product id as well as the firmware major, and the product id never leaves that
+/// process. Runs before anything reads the device list, so the mode is never offered at all.
+fn withdraw_lcd_gif_support(device_info: &mut DeviceInfo) {
+    for channel in device_info.channels.values_mut() {
+        let ChannelKind::Lcd { modes, info } = &mut channel.kind else {
+            continue;
+        };
+        if let Some(lcd_info) = info.as_mut() {
+            lcd_info.gif_supported = false;
+        }
+        for mode in modes.iter_mut().filter(|mode| mode.image) {
+            mode.frontend_name = LCD_IMAGE_MODE_NAME_NO_GIF.to_string();
+        }
+    }
+}
+
+/// Maps a device onto what the hardware report prints for it. A pure helper so
+/// the mapping is testable without standing up liqctld.
+///
+/// Starts from the shape every repository shares, then adds the two things
+/// only this one knows: the liquidctl driver class, which is more precise than
+/// the generic driver name, and the device firmware.
+fn liquidctl_summary(device: &Device, enabled: bool) -> crate::hardware_report::DeviceSummary {
+    let mut summary = crate::hardware_report::DeviceSummary::from_device(device, enabled);
+    if let Some(lc_info) = device.lc_info.as_ref() {
+        summary.driver = Some(lc_info.driver_type.to_string());
+        summary
+            .firmware_version
+            .clone_from(&lc_info.firmware_version);
+    }
+    summary.hwmon_backed = device
+        .info
+        .driver_info
+        .locations
+        .iter()
+        .any(|location| location.contains("hwmon"));
+    summary
 }
 
 impl LiquidctlRepo {
@@ -163,12 +209,46 @@ impl LiquidctlRepo {
             run_token,
             device_mapper: DeviceMapper::new(),
             devices: HashMap::new(),
+            hardware_support: None,
             preloaded_statuses: RefCell::new(HashMap::new()),
             failsafe_statuses: RefCell::new(HashMap::new()),
             disabled_channels: RefCell::new(HashMap::new()),
             device_delays: HashMap::new(),
             device_permits: HashMap::new(),
         })
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
+    /// Retains one detected device for the report, enabled or not. Reads only
+    /// what is already in memory, so generating a report never re-enumerates
+    /// USB devices.
+    fn record_detected_device(&self, device: &Device, enabled: bool) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_device_summary(&device.uid, liquidctl_summary(device, enabled));
+    }
+
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, device_lock) in &self.devices {
+            hardware_support.record_device_channels(device_uid, &device_lock.borrow().info);
+        }
     }
 
     /// Spawns the liqctld supervisor on the sidecar Tokio runtime. Sets `running` true now and
@@ -290,7 +370,11 @@ impl LiquidctlRepo {
                 poll_rate,
             );
             let cc_device_setting = self.config.get_cc_settings_for_device(&device.uid)?;
-            if cc_device_setting.as_ref().is_some_and(|s| s.disable) {
+            let disabled = cc_device_setting.as_ref().is_some_and(|s| s.disable);
+            // Recorded before the skip: a disabled device must still appear in
+            // the report, or "not detected" and "turned off" look identical.
+            self.record_detected_device(&device, disabled.not());
+            if disabled {
                 info!(
                     "Skipping disabled device: {} with UID: {}",
                     device.name, device.uid
@@ -574,12 +658,16 @@ impl LiquidctlRepo {
             .initialize_device(&device_index, None)
             .await?;
         let mut device = device_lock.borrow_mut();
-        let lc_info = device
+        let status_map = Self::create_status_map(&status_response.status);
+        let firmware_version = device_support::get_firmware_ver(&status_map);
+        device
             .lc_info
             .as_mut()
-            .expect("This should always be set for LIQUIDCTL devices");
-        lc_info.firmware_version =
-            device_support::get_firmware_ver(&Self::create_status_map(&status_response.status));
+            .expect("This should always be set for LIQUIDCTL devices")
+            .firmware_version = firmware_version;
+        if lcd_gif_refused(&status_map) {
+            withdraw_lcd_gif_support(&mut device.info);
+        }
         Ok(())
     }
 
@@ -853,21 +941,13 @@ impl LiquidctlRepo {
             .acquire()
             .await
             .expect("device permit never closed");
-        // We set several settings at once for lcd/screen settings
-        // We first start with re-initializing the device, as this helps clear LCD related settings
-        // and gives more consistent results when applying images.
+        // This used to re-initialize the device first: ~800 ms of a ~950 ms apply, spent waiting
+        // on the device's next lighting-info report. It cleared the image artifacts liquidctl's
+        // bucket allocator causes by rewriting the displayed bucket, which liqctld now avoids at
+        // the source and re-initializes itself on the fallback that cannot. Screens with an
+        // unrelated protocol (Lian Li GA II LCD, MSI Coreliquid) have no allocator and never had
+        // the artifacts; if one ever needs this, restore it for that driver, not for everything.
         let start_lcd_settings_apply = Instant::now();
-        self.liqctld_client
-            .initialize_device(&device_data.type_index, None)
-            .await
-            .map(|_| ()) // ignore successful result
-            .map_err(|err| {
-                anyhow!(
-                    "Error on LCD initialization for LIQUIDCTL Device #{}: {} - {err}",
-                    device_data.type_index,
-                    device_data.uid
-                )
-            })?;
         if let Some(brightness) = lcd_settings.brightness {
             if let Err(err) = self
                 .send_screen_request(
@@ -1150,6 +1230,7 @@ impl Repository for LiquidctlRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("LIQUIDCTL Repository initialized");
         Ok(())
     }
@@ -1517,7 +1598,8 @@ fn find_duplicate_names<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repositories::liquidctl::liqctld_client::DeviceProperties;
+    use crate::device::{ChannelInfo, LcdInfo, LcdMode, LcdModeType};
+    use crate::repositories::liquidctl::liqctld_client::{DeviceProperties, LCStatus};
 
     const DEV_PROPS: DeviceProperties = DeviceProperties {
         speed_channels: Vec::new(),
@@ -1783,5 +1865,182 @@ mod tests {
                 "the waiter proceeds once the delay elapses and the permit drops"
             );
         });
+    }
+
+    fn status_map_of(entries: &[(&str, &str)]) -> StatusMap {
+        let statuses: LCStatus = entries
+            .iter()
+            .map(|(key, value)| ((*key).to_string(), (*value).to_string(), String::new()))
+            .collect();
+        LiquidctlRepo::create_status_map(&statuses)
+    }
+
+    fn lcd_device_info() -> DeviceInfo {
+        let mut channels = HashMap::new();
+        channels.insert(
+            "lcd".to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Lcd {
+                    modes: vec![
+                        LcdMode {
+                            name: "image".to_string(),
+                            frontend_name: "Image/gif".to_string(),
+                            brightness: true,
+                            orientation: true,
+                            image: true,
+                            colors_min: 0,
+                            colors_max: 0,
+                            type_: LcdModeType::Liquidctl,
+                        },
+                        LcdMode {
+                            name: "liquid".to_string(),
+                            frontend_name: "Liquid(default)".to_string(),
+                            brightness: true,
+                            orientation: true,
+                            image: false,
+                            colors_min: 0,
+                            colors_max: 0,
+                            type_: LcdModeType::Liquidctl,
+                        },
+                    ],
+                    info: Some(LcdInfo {
+                        screen_width: 240,
+                        screen_height: 240,
+                        max_image_size_bytes: 24_320 * 1024,
+                        gif_supported: true,
+                    }),
+                },
+            },
+        );
+        channels.insert(
+            "pump".to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::InfoOnly,
+            },
+        );
+        DeviceInfo {
+            channels,
+            ..Default::default()
+        }
+    }
+
+    fn lcd_info_of(device_info: &DeviceInfo) -> &LcdInfo {
+        let ChannelKind::Lcd { info, .. } = &device_info.channels["lcd"].kind else {
+            panic!("the lcd channel should be an lcd channel");
+        };
+        info.as_ref().expect("lcd info should be present")
+    }
+
+    fn lcd_modes_of(device_info: &DeviceInfo) -> &Vec<LcdMode> {
+        let ChannelKind::Lcd { modes, .. } = &device_info.channels["lcd"].kind else {
+            panic!("the lcd channel should be an lcd channel");
+        };
+        modes
+    }
+
+    /// Goal: only liqctld can answer for gif support, and only for the one firmware that
+    /// refuses it, so silence and consent both have to leave the mode alone. Method: the
+    /// three answers a status map can carry, keyed as liqctld actually sends it.
+    #[test]
+    fn gif_support_is_withdrawn_only_on_an_explicit_refusal() {
+        assert!(
+            lcd_gif_refused(&status_map_of(&[("LCD Gif Support", "false")])),
+            "liqctld sends the key capitalized; the status map is what lowercases it"
+        );
+        assert!(lcd_gif_refused(&status_map_of(&[("LCD Gif Support", "true")])).not());
+        assert!(
+            lcd_gif_refused(&status_map_of(&[("Firmware version", "2.0.0")])).not(),
+            "a device that was never asked keeps the mode"
+        );
+        assert!(lcd_gif_refused(&status_map_of(&[])).not());
+    }
+
+    /// Goal: a firmware that cannot animate must stop advertising that it can, in the flag
+    /// the upload path checks and in the name the user reads. Method: withdraw and read both.
+    #[test]
+    fn withdrawing_gif_support_clears_the_flag_and_renames_the_image_mode() {
+        let mut device_info = lcd_device_info();
+
+        withdraw_lcd_gif_support(&mut device_info);
+
+        assert!(lcd_info_of(&device_info).gif_supported.not());
+        let modes = lcd_modes_of(&device_info);
+        assert_eq!(modes[0].frontend_name, "Image");
+        assert_eq!(
+            modes[1].frontend_name, "Liquid(default)",
+            "a mode that takes no image never offered a gif to withdraw"
+        );
+    }
+
+    /// Goal: the withdrawal walks every channel of the device, so it must not disturb the
+    /// ones that have nothing to do with a screen. Method: a device with a non-LCD channel.
+    #[test]
+    fn withdrawing_gif_support_leaves_other_channels_alone() {
+        let mut device_info = lcd_device_info();
+
+        withdraw_lcd_gif_support(&mut device_info);
+
+        assert_eq!(device_info.channels.len(), 2);
+        assert!(matches!(
+            device_info.channels["pump"].kind,
+            ChannelKind::InfoOnly
+        ));
+    }
+}
+
+#[cfg(test)]
+mod summary_tests {
+    use super::*;
+    use crate::device::{DeviceInfo, DeviceType, DriverInfo, DriverType};
+
+    fn device_with(driver: DriverInfo) -> Device {
+        Device::new(
+            "NZXT Kraken".to_string(),
+            DeviceType::Liquidctl,
+            1,
+            None,
+            DeviceInfo {
+                driver_info: driver,
+                ..Default::default()
+            },
+            None,
+            1.0,
+        )
+    }
+
+    /// Goal: the report has to say whether a liquidctl device is backed by a
+    /// kernel driver, since that decides whether hwmon shows it too. Method:
+    /// one device whose driver locations mention hwmon and one that does not.
+    #[test]
+    fn hwmon_backing_comes_from_the_driver_locations() {
+        let backed = liquidctl_summary(
+            &device_with(DriverInfo {
+                drv_type: DriverType::Liquidctl,
+                name: Some("Kraken".to_string()),
+                version: Some("1.14.0".to_string()),
+                locations: vec!["/sys/class/hwmon/hwmon4".to_string()],
+            }),
+            true,
+        );
+        assert!(backed.hwmon_backed);
+        assert!(backed.enabled);
+        assert_eq!(backed.driver.as_deref(), Some("Kraken"));
+        assert_eq!(backed.driver_version.as_deref(), Some("1.14.0"));
+
+        let usb_only = liquidctl_summary(
+            &device_with(DriverInfo {
+                drv_type: DriverType::Liquidctl,
+                name: Some("Kraken".to_string()),
+                version: Some("1.14.0".to_string()),
+                locations: vec!["/dev/hidraw3".to_string()],
+            }),
+            false,
+        );
+        // A disabled device still belongs in the report: it explains why the
+        // app shows nothing for hardware the user can see is plugged in.
+        assert!(usb_only.hwmon_backed.not());
+        assert!(usb_only.enabled.not());
     }
 }

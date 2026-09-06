@@ -1,23 +1,11 @@
 #! /usr/bin/env python3
 
-#  CoolerControl - monitor and control your cooling and other devices
-#  Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
-#
-#  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 import concurrent
 import importlib.metadata
+import io
 import json
 import logging
 import logging as log
@@ -65,6 +53,17 @@ from liquidctl.driver.hydro_platinum import HydroPlatinum
 from liquidctl.driver.kraken2 import Kraken2
 from liquidctl.driver.kraken3 import KrakenZ3
 from liquidctl.driver.smart_device import SmartDevice, SmartDevice2
+from liquidctl.error import NotSupportedByDriver, Timeout
+from PIL import Image
+
+_ORIGINAL_KRAKENZ3_CONNECT = KrakenZ3.connect
+_ORIGINAL_SWITCH_BUCKET = KrakenZ3._switch_bucket
+_ORIGINAL_SEND_DATA = KrakenZ3._send_data
+_ORIGINAL_SET_SCREEN = KrakenZ3.set_screen
+_ORIGINAL_INITIALIZE = KrakenZ3.initialize
+_ORIGINAL_SEND_2023_FW2 = getattr(KrakenZ3, "_send_2023_data_fw2", None)
+# Which packing layouts the C path replaced, reported per device by the profile line.
+_LCD_PACKING_PATCHED: set = set()
 
 #####################################################################
 # Basic Setup
@@ -84,6 +83,543 @@ MAX_CONNECT_LIQUIDCTL_RETRIES: int = 5
 # unconditionally so a device wedged in an uninterruptible USB read can never stall systemd past its
 # TimeoutStopSec.
 SHUTDOWN_DEADLINE_SECS: float = 4.0
+
+#####################################################################
+# liquidctl patches
+#####################################################################
+
+# Probe used to validate a packing replacement against the original. Square, like every
+# LCD liquidctl supports, with all three channels distinct so a swapped channel or a
+# wrong rotation cannot pass unnoticed.
+_PACKING_PROBE_SIZE: int = 8
+
+
+# A Kraken LCD frame is written to a "bucket" of device memory, then displayed by switching
+# to it.  liquidctl caps each bulk transfer at 512 bytes for the Z-series (every 2023/2024
+# model already uses 2 MB), so a 320x320 frame becomes 800 synchronous USB transfers, and it
+# rescans all 16 buckets on every frame.  That is where an LCD update's 1.2-2.0 s goes.
+# KrakenZPlayground drives the same device (0x1e71:0x3008) at 30 fps by writing the frame in
+# one transfer and alternating between two pinned buckets.
+_LCD_BULK_TRANSFER_BYTES: int = 2 * 1024 * 1024
+# Prefix of the first bulk message, copied from liquidctl's `_send_data`.
+_LCD_BULK_HEADER: tuple = (
+    0x12,
+    0xFA,
+    0x01,
+    0xE8,
+    0xAB,
+    0xCD,
+    0xEF,
+    0x98,
+    0x76,
+    0x54,
+    0x32,
+    0x10,
+)
+# Reply prefix for a bucket query, checked before trusting the offsets it carries.
+_LCD_BUCKET_REPLY_PREFIX: list = [0x31, 0x04]
+# Bucket memory is accounted in 1 KiB slots.
+_LCD_BUCKET_SLOT_BYTES: int = 1024
+# `_switch_bucket`'s mode for displaying a bucket. Its other caller passes 0x2, which selects
+# liquid mode and carries a bucket index of 0 that means nothing.
+_LCD_SWITCH_DISPLAY_MODE: int = 0x4
+# The one model liquidctl refuses gifs on, and only at firmware 2.x.
+_LCD_GIF_UNSUPPORTED_PID: int = 0x300E
+
+
+def _connect_with_whole_frame_transfers(self, **kwargs):
+    """Raises the bulk transfer cap so a frame is written in one transfer, not 800.
+
+    liquidctl's own cap is kept: a transfer that fails at the raised size returns to it.
+    """
+    result = _ORIGINAL_KRAKENZ3_CONNECT(self, **kwargs)
+    stock = getattr(self, "bulk_buffer_size", _LCD_BULK_TRANSFER_BYTES)
+    if stock < _LCD_BULK_TRANSFER_BYTES:
+        self._cc_stock_bulk_size = stock
+        self.bulk_buffer_size = _LCD_BULK_TRANSFER_BYTES
+    return result
+
+
+def _switch_bucket_tracking_active(self, *args, **kwargs):
+    """Records the displayed bucket and the pair we rotate between.
+
+    The pair is learned rather than assumed to be 0 and 1: buckets already in use, or a
+    differently sized upload, send liquidctl's allocator elsewhere and the rotation has to
+    follow it instead of switching itself off.
+    """
+    switched = _ORIGINAL_SWITCH_BUCKET(self, *args, **kwargs)
+    if switched.__bool__() is False or args.__len__() == 0:
+        return switched
+    mode = kwargs.get(
+        "mode", args[1] if args.__len__() > 1 else _LCD_SWITCH_DISPLAY_MODE
+    )
+    if mode != _LCD_SWITCH_DISPLAY_MODE:
+        # `set_screen(.., "liquid")` and `_delete_all_buckets` both switch mode with bucket 0.
+        # Learning that pair would rotate the next frames into a bucket holding no frame.
+        return switched
+    bucket = args[0]
+    pair = getattr(self, "_cc_bucket_pair", ())
+    if bucket not in pair:
+        pair = (pair[-1], bucket) if pair else (bucket,)
+    self._cc_bucket_pair = pair
+    self._cc_active_bucket = bucket
+    return switched
+
+
+def _log_lcd_profile_once(self, path, frame_bytes, slots):
+    """Reports what this screen is and how it is driven, once per device.
+
+    Info level so a bug report carries it without the reporter re-running with debug. Every
+    field is read defensively: a diagnostic must not be why an LCD apply fails on a model
+    nobody here has.
+    """
+    if getattr(self, "_cc_profile_logged", False):
+        return
+    self._cc_profile_logged = True
+    firmware = getattr(self, "_fw", None)
+    resolution = getattr(self, "lcd_resolution", None)
+    packing = "rgb565" if path == "fw2" else "rgbx"
+    replaced = (
+        "_prepare_static_file_rgb16" if packing == "rgb565" else "_prepare_static_file"
+    )
+    log.info(
+        "LCD %s pid=%s fw=%s res=%s bulk=%s path=%s packing=%s%s frame=%s slots=%s",
+        type(self).__name__,
+        f"0x{getattr(self.device, 'product_id', 0):04x}",
+        ".".join(str(part) for part in firmware) if firmware else "unknown",
+        f"{resolution[0]}x{resolution[1]}" if resolution else "unknown",
+        getattr(self, "bulk_buffer_size", "unknown"),
+        path,
+        packing,
+        "" if replaced in _LCD_PACKING_PATCHED else "-unpatched",
+        frame_bytes,
+        slots,
+    )
+
+
+def _initialize_repriming_the_lcd(self, *args, **kwargs):
+    """Re-arms the firmware 2.x doubled first frame.
+
+    Called at boot, on resume and on reconnect, which is the state liquidctl's own comment
+    says that second transfer is there for.
+    """
+    self._cc_fw2_primed = False
+    return _ORIGINAL_INITIALIZE(self, *args, **kwargs)
+
+
+def _write_frame_fw2(self, data, bulk_info):
+    """One firmware 2.x transfer: open, the frame, close.
+
+    No buckets. This firmware streams the frame straight at the screen, which is why none of
+    the rotation applies here and why there is nothing to keep off the display.
+    """
+    self._write_then_read([0x36, 0x01, 0x00, 0x01, 0x06])
+    _bulk_write_frame(self, list(_LCD_BULK_HEADER) + bulk_info, data)
+    self._write_then_read([0x36, 0x02])
+
+
+def _send_frame_fw2(self, data, bulk_info):
+    """Kraken 2023 firmware 2.x transfer, doubled only on the first frame after an initialize.
+
+    liquidctl sends every frame twice here, commenting that the second is "only required
+    once after initialization" and that NZXT's own software does the same at init. A daemon
+    that stays connected can take that at its word: prime once, then one frame per apply
+    instead of two. Why the device wants the second is unestablished, so it is kept for the
+    frame liquidctl says needs it rather than reasoned away.
+
+    The drain matters more than it looks. `_write_then_read` returns whichever report
+    arrives next and checks nothing, so a status report the device sent unasked while the
+    frame was decoded becomes the answer to the transfer-start command, and every read after
+    it is one behind until something clears the queue.
+    """
+    _log_lcd_profile_once(self, "fw2", len(data), "n/a")
+    self.device.clear_enqueued_reports()
+    _write_frame_fw2(self, data, bulk_info)
+    if getattr(self, "_cc_fw2_primed", False):
+        return
+    _write_frame_fw2(self, data, bulk_info)
+    self._cc_fw2_primed = True
+
+
+def lcd_gif_supported(lc_device) -> Optional[bool]:
+    """Whether this screen can show a gif, or None where the device does not answer for it.
+
+    liquidctl refuses gifs on the Kraken 2023 at firmware 2.x (its issue #631) and gates
+    that on the product id and the firmware major together. The daemon never sees a product
+    id, so the answer travels rather than the inputs. Read after `initialize`, which is what
+    populates `_fw`.
+    """
+    if isinstance(lc_device, KrakenZ3) is False:
+        return None
+    if getattr(lc_device.device, "product_id", None) != _LCD_GIF_UNSUPPORTED_PID:
+        return True
+    firmware = getattr(lc_device, "_fw", None)
+    return None if firmware is None else firmware[0] != 2
+
+
+def _set_screen_with_drained_queue(self, channel, mode, value, **kwargs):
+    """Drains queued reports before liquidctl reads the screen's brightness and orientation.
+
+    `set_screen` opens with a `_read_until` for the [0x31, 0x01] reply that gives up after twelve
+    reports, raising "missing messages (attempts=12, missing=1)". The device streams status
+    reports unasked, which is why `_get_status_directly` reads one without writing first, and
+    nothing consumes them while a frame is prepared and uploaded, so the backlog accumulates
+    across applies until that read starves.
+
+    The drain in `_send_frame_to_spare_bucket` runs after that read and cannot cover it. The
+    per-apply `initialize` drained here, which is why this appeared only once it was dropped.
+    """
+    self.device.clear_enqueued_reports()
+    try:
+        return _ORIGINAL_SET_SCREEN(self, channel, mode, value, **kwargs)
+    except NotSupportedByDriver:
+        # Firmware 2.x cannot show gifs at all (liquidctl issue #631). Said once per device:
+        # the daemon re-applies on a schedule, and the error alone reads as a fault.
+        if mode == "gif" and not getattr(self, "_cc_gif_unsupported_logged", False):
+            self._cc_gif_unsupported_logged = True
+            log.warning(
+                "This Kraken's firmware does not support LCD gifs; still images work. "
+                "Choose a non-gif LCD mode to stop the repeated errors."
+            )
+        raise
+
+
+def _log_lcd_size_fallback_once(self, bucket, capacity, slots_needed):
+    """Says once per device that frames are outgrowing the bucket they rotate through.
+
+    The rotation reuses an allocation, so a frame larger than the one that made it has
+    nowhere to go and takes liquidctl's own upload, re-initialize and all. Only variable
+    content does this: a static image is a fixed size for a given screen, a gif is not, and
+    a 640x640 screen is where gifs get big enough to leave no room for a second bucket. At
+    debug this left an LCD that is slow for a knowable reason looking mysterious.
+    """
+    if getattr(self, "_cc_size_fallback_logged", False):
+        return
+    self._cc_size_fallback_logged = True
+    log.info(
+        "LCD frames are outgrowing bucket %s (needs %s KiB, holds %s), so these frames take "
+        "liquidctl's slower upload. Expected with gifs, which vary in size.",
+        bucket,
+        slots_needed,
+        capacity,
+    )
+
+
+def _fall_back_to_liquidctl(self, data, bulk_info, reason):
+    """Hands the frame to liquidctl's own upload, recording which gate turned it away.
+
+    A silent fallback reads as a working rotation while every frame pays the re-initialize.
+    """
+    log.debug("LCD rotation skipped (%s); using liquidctl's own upload", reason)
+    return _send_data_with_clean_slate(self, data, bulk_info)
+
+
+def _send_data_with_clean_slate(self, data, bulk_info):
+    """liquidctl's own frame upload, preceded by the re-initialization it needs.
+
+    This path can rewrite the displayed bucket, so it keeps the artifact clearing. A failed
+    initialize still uploads: a possible artifact beats no image.
+    """
+    try:
+        self.initialize()
+    except Exception as err:  # noqa: BLE001
+        log.warning("Could not re-initialize before an LCD frame upload: %s", err)
+    return _ORIGINAL_SEND_DATA(self, data, bulk_info)
+
+
+def _bulk_write_frame(self, header, data):
+    """Writes the frame at the connection's transfer size, whole where it fits.
+
+    Handed over unsliced in that case: slicing a 400 KB frame copies it, every frame. The
+    loop is what makes the cap mean something once it is lowered.
+
+    A write that timed out cannot be resumed, so the retry is the next frame, and it takes
+    liquidctl's own transfer size. liquidctl cannot do that, since each run starts over; a
+    daemon that stays up is what makes remembering the failure worth anything.
+    """
+    chunk = getattr(self, "bulk_buffer_size", 0) or len(data)
+    try:
+        self._bulk_write(header)
+        if len(data) <= chunk:
+            self._bulk_write(data)
+            return
+        for start in range(0, len(data), chunk):
+            end = start + chunk
+            self._bulk_write(data[start:end])
+    except Timeout:
+        # Only a timeout says anything about the transfer size. A disconnect raises
+        # `USBError`, and blaming the size for that would slow every later frame.
+        stock = getattr(self, "_cc_stock_bulk_size", chunk)
+        if stock < chunk:
+            self.bulk_buffer_size = stock
+            log.warning(
+                "An LCD frame timed out in one %d byte write; falling back to "
+                "liquidctl's %d byte transfers for this device.",
+                chunk,
+                stock,
+            )
+        raise
+
+
+def _send_frame_to_spare_bucket(self, data, bulk_info):
+    """Writes a frame to the bucket that is not on screen, reusing its existing allocation.
+
+    liquidctl queries all 16 buckets and allocates a fresh one per frame, ~16 HID round trips,
+    and once all 16 are occupied it rewrites whichever is on screen. That rewriting produced
+    the occasional image artifacts, and the per-apply `initialize` is what cleared them. This
+    rotation never touches the displayed bucket, so it needs none of that, which is what makes
+    dropping that initialize safe; the fallback keeps it, since it returns to the allocator.
+
+    Every value on the wire comes from liquidctl's helpers or the device (the memory offset is
+    read back, never computed). Anything unexpected falls back to `_send_data` unchanged.
+    """
+    header = list(_LCD_BULK_HEADER) + bulk_info
+    slots_needed = -(-(len(header) + len(data)) // _LCD_BUCKET_SLOT_BYTES)
+    _log_lcd_profile_once(self, "rotation", len(data), slots_needed)
+
+    pair = getattr(self, "_cc_bucket_pair", ())
+    active_bucket = getattr(self, "_cc_active_bucket", None)
+    if len(pair) < 2 or active_bucket not in pair:
+        # Not rotating yet: let liquidctl allocate and learn the bucket it picks. Two frames
+        # establish it, so this repeating means `_switch_bucket` is not reporting success.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"pair={pair} active={active_bucket}"
+        )
+
+    target_bucket = pair[0] if pair[1] == active_bucket else pair[1]
+
+    # Drain again: `set_screen` drained on entry, but decoding and resizing the frame since
+    # then gave the stream time to refill. What a backlog costs depends on which read meets it.
+    # `_write_then_read` takes a leftover as the answer and goes silently off by one, which the
+    # prefix check below guards; `_delete_bucket` burns its twelve attempts and raises.
+    # Whether this path orphans its own report is unestablished: `_write([0x36, 0x02])` below
+    # reads no reply, and the firmware-2 path issues that command through `_write_then_read`.
+    self.device.clear_enqueued_reports()
+
+    bucket = self._write_then_read([0x30, 0x04, target_bucket])
+    if list(bucket[0:2]) != _LCD_BUCKET_REPLY_PREFIX:
+        # Not the bucket's reply, so its bytes mean nothing: an offset read out of an
+        # unrelated report would place the frame anywhere.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"reply prefix {list(bucket[0:2])}"
+        )
+    occupied = any(bucket[15:])
+    capacity = int.from_bytes([bucket[19], bucket[20]], "little")
+    if not occupied or capacity < slots_needed:
+        # First use of this bucket, or the frame outgrew it. Only the second is worth
+        # reporting: the first is how a rotation starts.
+        if occupied:
+            _log_lcd_size_fallback_once(self, target_bucket, capacity, slots_needed)
+        return _fall_back_to_liquidctl(
+            self,
+            data,
+            bulk_info,
+            f"bucket {target_bucket} occupied={occupied} "
+            f"capacity={capacity} needs={slots_needed}",
+        )
+
+    memory_start = [bucket[17], bucket[18]]
+    self._write_then_read([0x36, 0x03])
+    # One delete, though liquidctl's `_prepare_bucket` deletes twice when it reuses a bucket
+    # that holds data. It reaches that only with all 16 occupied, and this device answers one
+    # delete here: a redundant one costs a round trip per frame, and if the device does not
+    # reply to it `_read_until_first_match` burns twelve reads and then asserts mid-frame.
+    # An incomplete free is caught by the setup below instead.
+    if not self._delete_bucket(target_bucket):
+        # The device refused (0x9, in use). liquidctl answers that by moving to another
+        # bucket, which is the allocation this rotation exists to avoid doing itself.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"bucket {target_bucket} delete refused"
+        )
+    if not self._setup_bucket(
+        target_bucket,
+        target_bucket + 1,
+        memory_start,
+        list(slots_needed.to_bytes(2, "little")),
+    ):
+        # The allocation was never re-established, so writing now puts a torn frame in
+        # memory and the switch below would then display it.
+        return _fall_back_to_liquidctl(
+            self, data, bulk_info, f"bucket {target_bucket} setup refused"
+        )
+    self._write_then_read([0x36, 0x01, target_bucket])
+    _bulk_write_frame(self, header, data)
+    self._write([0x36, 0x02])
+    self._switch_bucket(target_bucket)
+    # Record what we asked for rather than what the switch reported. liquidctl never reads
+    # the end-of-transfer reply above, so `_switch_bucket`'s success flag is taken from that
+    # stale message instead of its own; believing a false negative would leave the rotation
+    # pointed at the bucket that is now on screen, and the next frame would overwrite it.
+    self._cc_active_bucket = target_bucket
+
+
+def patch_kraken_lcd_transfer() -> bool:
+    """Installs the whole-frame transfer and the two-bucket rotation.
+
+    Returns whether both were installed.  These change how the device is driven rather than
+    what bytes it receives, so unlike the packing replacement they cannot be verified against
+    a reference here; they degrade to liquidctl's own path whenever their preconditions do
+    not hold.
+    """
+    required = (
+        "_send_data",
+        "_switch_bucket",
+        "_delete_bucket",
+        "_setup_bucket",
+        "_bulk_write",
+        "_write_then_read",
+        "_write",
+        "set_screen",
+        "initialize",
+    )
+    missing = [name for name in required if hasattr(KrakenZ3, name) is False]
+    if missing:
+        log.warning("liquidctl KrakenZ3 is missing %s; LCD transfer unpatched", missing)
+        return False
+    KrakenZ3.connect = _connect_with_whole_frame_transfers
+    KrakenZ3._switch_bucket = _switch_bucket_tracking_active
+    KrakenZ3._send_data = _send_frame_to_spare_bucket
+    KrakenZ3.set_screen = _set_screen_with_drained_queue
+    KrakenZ3.initialize = _initialize_repriming_the_lcd
+    if _ORIGINAL_SEND_2023_FW2 is not None:
+        KrakenZ3._send_2023_data_fw2 = _send_frame_fw2
+    log.debug("LCD transfer patched to whole-frame writes with a two-bucket rotation")
+    return True
+
+
+# Channel-to-bit-position maps for the RGB565 frame buffer the Kraken 2023 firmware 2.x wants,
+# applied with bytes.translate. Each places a channel's bits where they belong in one of the two
+# output bytes; the ranges never overlap, so the halves combine with a plain OR.
+_RGB565_RED_HIGH: bytes = bytes(value & 0xF8 for value in range(256))
+_RGB565_GREEN_HIGH: bytes = bytes(value >> 5 for value in range(256))
+_RGB565_GREEN_LOW: bytes = bytes((value & 0x1C) << 3 for value in range(256))
+_RGB565_BLUE_LOW: bytes = bytes(value >> 3 for value in range(256))
+
+
+def _packed_static_file(self, path, rotation):
+    """Drop-in for `KrakenZ3._prepare_static_file` that packs the framebuffer in C.
+
+    liquidctl builds it with a per-pixel python loop: 409,600 `list.append` calls for a
+    320x320 screen, about 12 ms of CPU per image. Pillow emits the same RGBX bytes in one
+    call; only its padding byte differs (0xFF where the loop writes 0x00), so this zeroes
+    it. `_send_data` consumes the result with `len()` and slicing, which a bytearray
+    supports, so the transfer path is unchanged.
+    """
+    image = (
+        Image.open(path)
+        .resize(self.lcd_resolution)
+        .rotate(rotation * -90)
+        .convert("RGB")
+    )
+    packed = bytearray(image.tobytes("raw", "RGBX"))
+    packed[3::4] = b"\x00" * (len(packed) // 4)
+    return packed
+
+
+def _packed_static_file_rgb16(self, path, rotation):
+    """Drop-in for `KrakenZ3._prepare_static_file_rgb16`, the Kraken 2023 firmware 2.x path.
+
+    Same per-pixel loop problem as the RGBX packing, but this one emits RGB565, high byte
+    first: RRRRRGGG GGGBBBBB. Pillow has no encoder for that layout, so the channels are
+    combined here instead: translate moves each channel's bits into place, and the two halves
+    are OR-ed as whole buffers (their bit ranges are disjoint, so nothing carries). Everything
+    stays in C, which is what makes it cheap.
+    """
+    image = (
+        Image.open(path)
+        .resize(self.lcd_resolution)
+        .rotate(rotation * -90)
+        .convert("RGB")
+    )
+    pixels = image.tobytes("raw", "RGB")
+    red, green, blue = pixels[0::3], pixels[1::3], pixels[2::3]
+    pixel_count = len(red)
+    high = int.from_bytes(red.translate(_RGB565_RED_HIGH), "big") | int.from_bytes(
+        green.translate(_RGB565_GREEN_HIGH), "big"
+    )
+    low = int.from_bytes(green.translate(_RGB565_GREEN_LOW), "big") | int.from_bytes(
+        blue.translate(_RGB565_BLUE_LOW), "big"
+    )
+    frame_buffer = bytearray(pixel_count * 2)
+    frame_buffer[0::2] = high.to_bytes(pixel_count, "big")
+    frame_buffer[1::2] = low.to_bytes(pixel_count, "big")
+    return frame_buffer
+
+
+def _packing_matches(original, candidate) -> bool:
+    """Whether `candidate` reproduces `original` byte for byte, at every rotation.
+
+    Run before installing a replacement so an unexpected Pillow build cannot put wrong
+    bytes on someone's screen: a mismatch keeps liquidctl's own implementation.
+    """
+
+    class _Probe:
+        lcd_resolution = (_PACKING_PROBE_SIZE, _PACKING_PROBE_SIZE)
+
+    image = Image.new("RGB", (_PACKING_PROBE_SIZE, _PACKING_PROBE_SIZE))
+    pixels = image.load()
+    for y in range(_PACKING_PROBE_SIZE):
+        for x in range(_PACKING_PROBE_SIZE):
+            pixels[x, y] = (x * 31, y * 31, 255 - x * 31)
+    encoded = io.BytesIO()
+    image.save(encoded, format="PNG")
+    probe = _Probe()
+    for rotation in (0, 1, 2, 3):
+        encoded.seek(0)
+        expected = bytes(original(probe, encoded, rotation))
+        encoded.seek(0)
+        try:
+            actual = bytes(candidate(probe, encoded, rotation))
+        except Exception:  # noqa: BLE001 - any failure means keep the original
+            return False
+        if actual != expected:
+            return False
+    return True
+
+
+def patch_kraken_lcd_packing() -> bool:
+    """Installs the C-level framebuffer packing, where it matches liquidctl's output.
+
+    Two layouts: RGBX for every Kraken with a screen, and RGB565 for the Kraken 2023 on
+    firmware 2.x. Each is checked against liquidctl's own implementation before being
+    installed, so a mismatch costs CPU rather than putting wrong bytes on a screen.
+
+    A liquidctl older than the one the C path reproduces will not match, and will not
+    carry the RGB565 method at all. Both are supported: the stock implementation is used
+    and everything still works, which is why neither reports as a warning.
+
+    Returns whether both were installed.
+    """
+    replacements = (
+        ("_prepare_static_file", _packed_static_file),
+        ("_prepare_static_file_rgb16", _packed_static_file_rgb16),
+    )
+    installed = 0
+    for name, replacement in replacements:
+        original = getattr(KrakenZ3, name, None)
+        if original is None:
+            log.info(
+                "This liquidctl has no KrakenZ3.%s, so that LCD packing stays on "
+                "liquidctl's own code. Expected on liquidctl older than its Kraken "
+                "2023 firmware 2.x support, such as the one Debian bookworm ships.",
+                name,
+            )
+            continue
+        if not _packing_matches(original, replacement):
+            log.info(
+                "This liquidctl packs %s differently to the implementation the C path "
+                "reproduces, so liquidctl's own code stays in use. Expected on older "
+                "liquidctl, such as the one Debian bookworm ships. The only effect is "
+                "that LCD updates cost more CPU.",
+                name,
+            )
+            continue
+        setattr(KrakenZ3, name, replacement)
+        _LCD_PACKING_PATCHED.add(name)
+        installed += 1
+    log.debug("LCD framebuffer packing patched to Pillow's C path (%d of 2)", installed)
+    return installed == len(replacements)
+
 
 #####################################################################
 # Models
@@ -989,7 +1525,11 @@ class DeviceService:
                 f"LC #{device_id} {lc_device.__class__.__name__}initialize() "
                 f"RESPONSE: {lc_init_status}"
             )
-            return self._stringify_status(lc_init_status)
+            statuses = self._stringify_status(lc_init_status)
+            gif_supported = lcd_gif_supported(lc_device)
+            if gif_supported is not None:
+                statuses.append(("LCD Gif Support", str(gif_supported).lower(), ""))
+            return statuses
         except BaseException as os_exc:
             # OSError can happen when a device was found and there's a permissions error
             # OSError: read error sometimes happens when the OS/Device isn't ready.
@@ -1744,6 +2284,8 @@ def main() -> None:
     with open("/proc/self/comm", "w") as f:
         f.write("coolercontrol-liqctld")
     log.info("liqctld service starting...")
+    patch_kraken_lcd_packing()
+    patch_kraken_lcd_transfer()
     device_service = DeviceService()
     # We call liquidctl to find all devices, so that we can adjust the number of threads needed
     #  for parallel device communication.

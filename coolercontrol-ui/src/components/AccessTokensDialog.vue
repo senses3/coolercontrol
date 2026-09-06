@@ -1,46 +1,31 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
-import { onMounted, ref, type Ref } from 'vue'
+import { computed, onMounted, ref, type Ref } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
-import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
+import { useConfirm } from '@/shell/confirm'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { ErrorResponse } from '@/models/ErrorResponse'
 import type { AccessTokenInfo, CreateTokenResponse } from '@/models/AccessToken'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import Tag from 'primevue/tag'
-import FloatLabel from 'primevue/floatlabel'
-import DatePicker from 'primevue/datepicker'
-import Message from 'primevue/message'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
+// @ts-ignore
+import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
+import { mdiAlertOutline, mdiClose, mdiContentCopy, mdiPlus, mdiTrashCanOutline } from '@mdi/js'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiTable from '@/shell/ui/UiTable.vue'
+import UiTag from '@/shell/ui/UiTag.vue'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 const confirm = useConfirm()
 const toast = useToast()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const tokens: Ref<AccessTokenInfo[]> = ref([])
 const newLabel: Ref<string> = ref('')
@@ -94,8 +79,8 @@ async function deleteToken(tokenId: string): Promise<void> {
     confirm.require({
         message: t('auth.tokenDeleteConfirm'),
         header: t('auth.tokenDeleteHeader'),
-        icon: 'pi pi-exclamation-triangle',
-        acceptClass: '!bg-red-500 hover:!bg-red-600',
+        icon: mdiAlertOutline,
+        acceptClass: '!bg-error !text-error-fg hover:!bg-error/90',
         accept: async () => {
             const result = await deviceStore.daemonClient.deleteToken(tokenId)
             if (result instanceof ErrorResponse) {
@@ -161,117 +146,154 @@ function expiryStatus(expiresAt: string | null): { label: string; severity: stri
     return { label: t('auth.active'), severity: 'success' }
 }
 
+// Bridge the Date model to a native datetime-local input (local-time string).
+const pad = (n: number): string => String(n).padStart(2, '0')
+const toLocalInput = (date: Date): string =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+const nowLocal = toLocalInput(new Date())
+// Date-picker locale precedence: the UI language is the ultimate decider; when it
+// carries no region (e.g. plain 'en'/'de'), borrow the region from the OS locale
+// as a fallback. (Chromium only exposes the OS language-locale here, not a
+// separate regional-format setting, so that is the best fallback available.)
+const dateLocale = computed<string>(() => {
+    try {
+        const ui = new Intl.Locale(locale.value)
+        if (ui.region != null) return ui.baseName
+        const osRegion = new Intl.Locale(Intl.DateTimeFormat().resolvedOptions().locale).region
+        return osRegion != null ? `${ui.language}-${osRegion}` : ui.baseName
+    } catch {
+        return locale.value
+    }
+})
+const expiryLocal = computed<string>({
+    get: () => (newExpiry.value ? toLocalInput(newExpiry.value) : ''),
+    set: (value) => {
+        newExpiry.value = value ? new Date(value) : null
+    },
+})
+
 onMounted(loadTokens)
 </script>
 
 <template>
     <!-- Created token alert -->
-    <Message v-if="createdToken" severity="warn" :closable="true" @close="createdToken = null">
+    <div
+        v-if="createdToken"
+        class="relative mb-4 rounded-lg border-l-4 border-warning bg-warning/10 p-4 pr-10 text-text-color"
+    >
+        <button
+            type="button"
+            aria-label="close"
+            class="absolute right-2 top-2 rounded p-1 text-text-color-secondary outline-none hover:text-text-color"
+            @click="createdToken = null"
+        >
+            <svg-icon type="mdi" :path="mdiClose" :size="18" />
+        </button>
         <div class="flex flex-col gap-2">
             <span class="font-semibold">{{ t('auth.tokenCreated') }}</span>
-            <span class="text-sm">{{ t('auth.tokenCreatedDetail') }}</span>
+            <span class="text-sm text-text-color-secondary">{{
+                t('auth.tokenCreatedDetail')
+            }}</span>
             <div class="flex items-center gap-2">
-                <code class="bg-bg-one px-2 py-1 rounded-lg text-sm break-all">
+                <code class="break-all rounded-lg bg-bg-one px-2 py-1 text-sm">
                     {{ createdToken.token }}
                 </code>
-                <Button icon="pi pi-copy" severity="secondary" text rounded @click="copyToken" />
+                <UiButton variant="ghost" size="icon" @click="copyToken">
+                    <svg-icon type="mdi" :path="mdiContentCopy" :size="18" />
+                </UiButton>
             </div>
         </div>
-    </Message>
+    </div>
 
     <!-- Create form -->
-    <div class="flex items-end gap-3 mt-6 mb-4">
-        <FloatLabel class="flex-grow">
-            <InputText
+    <div class="mt-6 mb-4 flex items-end gap-3">
+        <div class="flex-grow">
+            <label for="token-label" class="mb-1 ml-1 block text-sm text-text-color-secondary">{{
+                t('auth.tokenLabel')
+            }}</label>
+            <UiInput
                 id="token-label"
                 v-model="newLabel"
-                class="w-full h-12"
-                :class="{ filled: newLabel.trim().length > 0 }"
+                class="w-full"
                 @keydown.enter="createToken"
                 autofocus
             />
-            <label for="token-label">{{ t('auth.tokenLabel') }}</label>
-        </FloatLabel>
-        <FloatLabel>
-            <DatePicker
+        </div>
+        <div>
+            <label for="token-expiry" class="mb-1 ml-1 block text-sm text-text-color-secondary">{{
+                t('auth.tokenExpiry')
+            }}</label>
+            <input
                 id="token-expiry"
-                v-model="newExpiry"
-                class="h-12"
-                :class="{ filled: newExpiry != null }"
-                :min-date="new Date()"
-                show-time
-                hour-format="24"
-                date-format="yy-mm-dd"
+                v-model="expiryLocal"
+                :lang="dateLocale"
+                type="datetime-local"
+                :min="nowLocal"
+                class="h-10 rounded-lg border border-border-one bg-bg-one px-3 text-text-color outline-none focus:ring-2 focus:ring-accent"
             />
-            <label for="token-expiry">{{ t('auth.tokenExpiry') }}</label>
-        </FloatLabel>
-        <div class="flex items-center gap-2" v-tooltip.top="t('auth.writeAccessTooltip')">
+        </div>
+        <div class="flex h-10 items-center gap-2" v-tooltip.top="t('auth.writeAccessTooltip')">
             <label for="token-write-access" class="whitespace-nowrap">
                 {{ t('auth.writeAccess') }}
             </label>
-            <el-switch v-model="newWriteAccess" size="large" input-id="token-write-access" />
+            <UiSwitch v-model="newWriteAccess" input-id="token-write-access" />
         </div>
-        <Button
-            class="!bg-accent/80 hover:!bg-accent/100 h-12"
-            :label="t('auth.createToken')"
-            icon="pi pi-plus"
-            @click="createToken"
-            :disabled="newLabel.trim().length === 0"
-        />
+        <UiButton class="gap-1" @click="createToken" :disabled="newLabel.trim().length === 0">
+            <svg-icon type="mdi" :path="mdiPlus" :size="18" />
+            {{ t('auth.createToken') }}
+        </UiButton>
     </div>
 
     <!-- Token list -->
-    <DataTable
-        :value="tokens"
-        :loading="loading"
-        striped-rows
-        size="small"
-        :empty-message="t('auth.noTokens')"
-    >
-        <Column field="label" :header="t('auth.label')" />
-        <Column field="created_at" :header="t('auth.created')">
-            <template #body="{ data }">{{ formatDate(data.created_at) }}</template>
-        </Column>
-        <Column field="expires_at" :header="t('auth.expires')">
-            <template #body="{ data }">
-                <Tag
-                    :value="expiryStatus(data.expires_at).label"
-                    :severity="expiryStatus(data.expires_at).severity as any"
+    <UiTable bordered>
+        <template #head>
+            <tr>
+                <th>{{ t('auth.label') }}</th>
+                <th>{{ t('auth.created') }}</th>
+                <th>{{ t('auth.expires') }}</th>
+                <th>{{ t('auth.writeAccess') }}</th>
+                <th>{{ t('auth.lastUsed') }}</th>
+                <th class="w-20">{{ t('auth.actions') }}</th>
+            </tr>
+        </template>
+        <tr v-if="loading">
+            <td colspan="6" class="text-center text-text-color-secondary">
+                {{ t('common.loading') }}
+            </td>
+        </tr>
+        <tr v-else-if="tokens.length === 0">
+            <td colspan="6" class="text-center text-text-color-secondary">
+                {{ t('auth.noTokens') }}
+            </td>
+        </tr>
+        <tr v-for="token in tokens" v-else :key="token.id">
+            <td>{{ token.label }}</td>
+            <td>{{ formatDate(token.created_at) }}</td>
+            <td>
+                <UiTag
+                    :value="expiryStatus(token.expires_at).label"
+                    :severity="expiryStatus(token.expires_at).severity as any"
                 />
-                <span v-if="data.expires_at" class="ml-2">
-                    {{ formatDate(data.expires_at) }}
-                </span>
-            </template>
-        </Column>
-        <Column field="write_access" :header="t('auth.writeAccess')">
-            <template #body="{ data }">
-                <Tag v-if="data.write_access" :value="t('common.yes')" severity="warn" />
-                <Tag v-else :value="t('common.no')" severity="success" />
-            </template>
-        </Column>
-        <Column field="last_used" :header="t('auth.lastUsed')">
-            <template #body="{ data }">
-                {{ data.last_used ? formatDate(data.last_used) : t('auth.neverUsed') }}
-            </template>
-        </Column>
-        <Column :header="t('auth.actions')" style="width: 5rem">
-            <template #body="{ data }">
-                <Button
-                    icon="pi pi-trash"
-                    severity="danger"
-                    text
-                    rounded
-                    @click="deleteToken(data.id)"
-                />
-            </template>
-        </Column>
-    </DataTable>
+                <span v-if="token.expires_at" class="ml-2">{{ formatDate(token.expires_at) }}</span>
+            </td>
+            <td>
+                <UiTag v-if="token.write_access" :value="t('common.yes')" severity="warn" />
+                <UiTag v-else :value="t('common.no')" severity="success" />
+            </td>
+            <td>{{ token.last_used ? formatDate(token.last_used) : t('auth.neverUsed') }}</td>
+            <td>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    class="text-error"
+                    :aria-label="t('auth.actions')"
+                    @click="deleteToken(token.id)"
+                >
+                    <svg-icon type="mdi" :path="mdiTrashCanOutline" :size="18" />
+                </UiButton>
+            </td>
+        </tr>
+    </UiTable>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>

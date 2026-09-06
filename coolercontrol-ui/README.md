@@ -17,7 +17,8 @@ and processes are handled by the daemon.
 ## Requirements
 
 - make
-- nodejs >= 22.0.0
+- nodejs >= 22.22.2 (the minimum our dependency tree declares; CI and releases build with Node 24
+  LTS, which is what we test against)
 - npm
 
 ## Installation
@@ -54,18 +55,45 @@ make dev
 
 ## Held-back Dependencies
 
-- `"element-plus": "2.13.0"`, 2.13.1 breaks at least the main device menu layout
-- `"primevue": "4.5.5"` exact-pinned: updates can break our PrimeVue Tailwind implementation, and
-  4.5.x's reworked Popover (a content ResizeObserver that re-aligns after render) needs the
-  hover-menu workaround in `AppTreeMenu.vue`. Re-test menu popover positioning when bumping.
-- `"tailwindcss-primeui": "0.4.0"` breaks our original Primevue tailwind implementation
 - `"@types/node": "22.19.19"` for compat with the current tsconfig node version
+- `"typescript": "^6.0.3"` because 7.x is the native (Go) port, which no longer ships the JavaScript
+  compiler API. Its `exports` map offers only `lib/version.cjs` and `unstable/*`, so `vue-tsc` dies
+  on startup resolving `typescript/lib/tsc` (`ERR_PACKAGE_PATH_NOT_EXPORTED`). Our own code is
+  already 7.x clean: the native `tsc` reports no errors on this project beyond the `.vue` imports it
+  cannot resolve. Revisit when vuejs/language-tools ships a `vue-tsc` that targets the native
+  compiler.
 - `"tailwindcss": "3.4.19",` the upgrade to 4.x looks to be significant work
   - https://tailwindcss.com/docs/upgrade-guide
   - Looks like 4.0 only works for Chrome 111+ (We need to support 90+ for older debian/ubuntu
     distros with QtWebEngine)
   - https://wiki.qt.io/QtWebEngine/ChromiumVersions
 - "Overrides" section is to handle some current vulnerabilities in the dev dependencies.
+  - `js-beautify: ^2.0.3` because `@vue/test-utils` still declares `^1.14.9`, whose `editorconfig`
+    and `minimatch` chain holds the vulnerable `brace-expansion` (GHSA-mh99-v99m-4gvg). Only
+    `brace-expansion` 5.0.8+ carries the fix and only `minimatch` 10 can consume it: 5.0.8 exports
+    an object instead of a function, so forcing it under an older `minimatch` clears the audit but
+    breaks at runtime with `expand is not a function`.
+- `npm-run-all2` replaces the unmaintained `npm-run-all`, which held `minimatch` 3 and with it the
+  same vulnerable `brace-expansion`. Same `run-s` and `run-p` binaries, no script changes.
+
+## Dependency Install Scripts
+
+npm 12 blocks dependency install scripts unless the package is listed in the `allowScripts` field of
+`package.json`. Builders on npm 10 (Ubuntu 22.04) never see this; newer ones warn on every `npm ci`,
+and would fail outright under `--strict-allow-scripts`. All three packages that reach us are denied,
+because none of their scripts do anything this project needs:
+
+- `vue-demi` (via `reka-ui` and `@vueuse/*`) switches its entry files to the installed Vue major.
+  The published `lib/index.mjs`, `lib/index.cjs` and `lib/index.d.ts` are already byte-identical to
+  the `lib/v3/` variants, and we are on Vue 3, so the script rewrites those files with themselves.
+  Only `lib/index.iife.js` differs, and that is the `unpkg`/`jsdelivr` entry, which no bundler uses.
+- `@parcel/watcher` (via `sass`) compiles from source only when no prebuilt binary matches. The
+  lockfile carries all twelve prebuilt platform packages.
+- `core-js` (via `@vitejs/plugin-legacy`) prints a funding banner.
+
+`false` denials are silent rather than merely blocked, and cannot be swept back in by
+`npm install-scripts approve --all`. After dependency bumps, re-review with `npm install-scripts ls`
+and add new entries rather than approving blindly.
 
 ## Formatting
 

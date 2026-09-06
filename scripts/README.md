@@ -28,3 +28,23 @@ Set LCD screen image:
 ```
 
 View the `cc.py` script for examples and information.
+
+## Icon generation
+
+The app icons, the notification icons and the animated logo are generated, not hand-drawn. Re-run
+these after changing the mark, and commit what they write. They need `cairosvg`, `pillow` and
+`numpy` (`python3 -m pip install cairosvg pillow numpy`).
+
+```bash
+./gen-app-icons.py             # symbolic + colour SVGs, PNGs, PWA icons, favicon, LCD shutdown
+./gen-notification-icons.py    # shutdown, information, alert-*
+./make-animated-icon.py        # coolercontrol-animated.gif, from the colour SVG
+```
+
+Run `gen-app-icons.py` before `make-animated-icon.py`: the GIF is rendered from the colour SVG the
+first one writes. `gen-app-icons.py --check` renders everything without writing, which catches an
+SVG that a renderer silently drops.
+
+Follow any of them with `make ci-fmt` from the repo root. They write plain PNGs, and CI runs oxipng
+over the tree, so a generated icon fails `make ci-check` until it has been optimised. Optimisation
+is lossless, so it never changes what the icon looks like.

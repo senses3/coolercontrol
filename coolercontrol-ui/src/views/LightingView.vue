@@ -1,20 +1,7 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
@@ -25,23 +12,24 @@ import { useSettingsStore } from '@/stores/SettingsStore'
 import { DeviceSettingReadDTO, DeviceSettingWriteLightingDTO } from '@/models/DaemonSettings'
 import { LightingMode, LightingModeType } from '@/models/LightingMode'
 import { computed, inject, nextTick, onMounted, ref, type Ref, watch } from 'vue'
-import InputNumber from 'primevue/inputnumber'
-import { ElSwitch } from 'element-plus'
 import CCColorPicker from '@/components/CCColorPicker.vue'
-import Button from 'primevue/button'
-import { mdiContentSaveOutline } from '@mdi/js'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
-import Select from 'primevue/select'
-import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
-import Slider from 'primevue/slider'
+import { mdiAlertOutline, mdiContentSaveOutline } from '@mdi/js'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { useConfirm } from 'primevue/useconfirm'
+import { useConfirm } from '@/shell/confirm'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiListbox from '@/shell/ui/UiListbox.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiSlider from '@/shell/ui/UiSlider.vue'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { Emitter, EventType } from 'mitt'
 
 interface Props {
-    deviceId: UID
+    deviceUID: UID
     channelName: string
 }
 
@@ -55,8 +43,9 @@ const settingsStore = useSettingsStore()
 const confirm = useConfirm()
 
 const channelLabel = ref(
-    settingsStore.allUIDeviceSettings.get(props.deviceId)?.sensorsAndChannels.get(props.channelName)
-        ?.name ?? props.channelName,
+    settingsStore.allUIDeviceSettings
+        .get(props.deviceUID)
+        ?.sensorsAndChannels.get(props.channelName)?.name ?? props.channelName,
 )
 const contextIsDirty: Ref<boolean> = ref(false)
 const lightingModes: Array<LightingMode> = []
@@ -64,7 +53,7 @@ const noneLightingMode = new LightingMode('none', 'None', 0, 0, false, false, Li
 lightingModes.push(noneLightingMode)
 const lightingSpeeds: Array<string> = []
 for (const device of deviceStore.allDevices()) {
-    if (device.uid != props.deviceId) {
+    if (device.uid != props.deviceUID) {
         continue
     }
     for (const mode of device.info?.channels.get(props.channelName)?.lighting_modes ?? []) {
@@ -75,8 +64,13 @@ for (const device of deviceStore.allDevices()) {
     }
 }
 
-let startingMode: LightingMode = noneLightingMode
-let startingSpeed: string =
+const daemonSetting = computed<DeviceSettingReadDTO | undefined>(() =>
+    settingsStore.allDaemonDeviceSettings.get(props.deviceUID)?.settings.get(props.channelName),
+)
+const defaultColor = 'rgb(255, 255, 255)' // default LED color
+const rgbString = (rgbTuple: [number, number, number]): string =>
+    `rgb(${rgbTuple[0]}, ${rgbTuple[1]}, ${rgbTuple[2]})`
+const defaultSpeed: string =
     lightingSpeeds.length === 0
         ? 'none'
         : lightingSpeeds.length === 1
@@ -84,55 +78,56 @@ let startingSpeed: string =
           : lightingSpeeds.length === 5
             ? lightingSpeeds[2]
             : lightingSpeeds[Math.floor(lightingSpeeds.length / 2)]
-let startingBackwardEnabled = false
-let startingNumberOfColors: number = 0
-let colorsUI: Array<Ref<string>> = []
-const startingDeviceSetting: DeviceSettingReadDTO | undefined =
-    settingsStore.allDaemonDeviceSettings.get(props.deviceId)?.settings.get(props.channelName)
-if (startingDeviceSetting?.lighting != null) {
-    startingMode =
-        lightingModes.find(
-            (mode: LightingMode) => mode.name === startingDeviceSetting.lighting?.mode,
-        ) ?? noneLightingMode
-    if (startingMode.speed_enabled) {
-        startingSpeed =
-            lightingSpeeds.find(
-                (speed: string) => speed === startingDeviceSetting.lighting?.speed,
-            ) ?? startingSpeed
-    }
-    if (startingMode.backward_enabled) {
-        startingBackwardEnabled = startingDeviceSetting.lighting.backward ?? false
-    }
-    if (startingMode.max_colors > 0) {
-        startingNumberOfColors =
-            startingDeviceSetting.lighting.colors.length ?? startingNumberOfColors
-        for (const rgbTuple of startingDeviceSetting.lighting.colors) {
-            colorsUI.push(ref(`rgb(${rgbTuple[0]}, ${rgbTuple[1]}, ${rgbTuple[2]})`))
-        }
+
+// One ref per possible color for the page's lifetime. The pickers bind to these,
+// and only the first `selectedNumberOfColors` are ever shown or saved.
+const colorsUI: Array<Ref<string>> = Array.from({ length: absoluteMaxColors }, () =>
+    ref(defaultColor),
+)
+const selectedMode: Ref<LightingMode> = ref(noneLightingMode)
+const selectedSpeed: Ref<string> = ref(defaultSpeed)
+const selectedBackwardEnabled: Ref<boolean> = ref(false)
+const selectedNumberOfColors: Ref<number> = ref(0)
+
+const seedFromDaemonSetting = (): void => {
+    const lighting = daemonSetting.value?.lighting
+    const mode =
+        lighting != null
+            ? (lightingModes.find((candidate) => candidate.name === lighting.mode) ??
+              noneLightingMode)
+            : noneLightingMode
+    selectedMode.value = mode
+    selectedSpeed.value = mode.speed_enabled
+        ? (lightingSpeeds.find((speed) => speed === lighting?.speed) ?? defaultSpeed)
+        : defaultSpeed
+    selectedBackwardEnabled.value = mode.backward_enabled ? (lighting?.backward ?? false) : false
+    selectedNumberOfColors.value = mode.max_colors > 0 ? (lighting?.colors.length ?? 0) : 0
+    for (const [index, color] of colorsUI.entries()) {
+        const rgbTuple = lighting?.colors[index]
+        color.value = rgbTuple != null ? rgbString(rgbTuple) : defaultColor
     }
 }
-for (let i = 0; i < absoluteMaxColors - startingMode.max_colors; i++) {
-    colorsUI.push(ref('rgb(255, 255, 255)')) // default LED color is white
-}
+seedFromDaemonSetting()
 
-const selectedMode: Ref<LightingMode> = ref(startingMode)
-const selectedSpeed: Ref<string> = ref(startingSpeed)
-const selectedBackwardEnabled: Ref<boolean> = ref(startingBackwardEnabled)
-const selectedNumberOfColors: Ref<number> = ref(startingNumberOfColors)
+// Activating a Mode rewrites this channel's lighting in the daemon, as does any
+// other client. The state above is seeded once, so follow the daemon whenever its
+// setting really changes. Compared as a signature string: every settings reload
+// hands back new DTO objects, so object identity would fire on unrelated saves.
+watch(
+    () => JSON.stringify(daemonSetting.value?.lighting ?? null),
+    () => {
+        seedFromDaemonSetting()
+        // The dirty watcher runs on the same flush, off these very writes. The page
+        // now matches the daemon, so clear the flag once that watcher has had its turn.
+        nextTick(() => (contextIsDirty.value = false))
+    },
+)
 
-const colorsToShow = computed(() => {
-    return colorsUI.slice(0, selectedNumberOfColors.value)
-})
+const colorsToShow = computed(() => colorsUI.slice(0, selectedNumberOfColors.value))
 
 const getDefaultColor = (colorIndex: number): string => {
-    if (
-        startingDeviceSetting?.lighting != null &&
-        startingDeviceSetting.lighting.colors.length > colorIndex
-    ) {
-        const rgbTuple = startingDeviceSetting.lighting.colors[colorIndex]
-        return `rgb(${rgbTuple[0]}, ${rgbTuple[1]}, ${rgbTuple[2]})`
-    }
-    return 'rgb(255, 255, 255)'
+    const rgbTuple = daemonSetting.value?.lighting?.colors[colorIndex]
+    return rgbTuple != null ? rgbString(rgbTuple) : defaultColor
 }
 
 const parseRgbString = (rgbColor: string): [number, number, number] => {
@@ -147,7 +142,7 @@ const parseRgbString = (rgbColor: string): [number, number, number] => {
 
 const saveLighting = async (): Promise<void> => {
     if (selectedMode.value.type === LightingModeType.NONE) {
-        await settingsStore.saveDaemonDeviceSettingReset(props.deviceId, props.channelName)
+        await settingsStore.saveDaemonDeviceSettingReset(props.deviceUID, props.channelName)
         contextIsDirty.value = false
         return
     }
@@ -163,32 +158,51 @@ const saveLighting = async (): Promise<void> => {
             setting.colors.push(parseRgbString(colorsUI[i].value))
         }
     }
-    await settingsStore.saveDaemonDeviceSettingLighting(props.deviceId, props.channelName, setting)
+    await settingsStore.saveDaemonDeviceSettingLighting(props.deviceUID, props.channelName, setting)
     contextIsDirty.value = false
 }
+const defaultLabel = computed(() =>
+    settingsStore.defaultChannelLabel(props.deviceUID, props.channelName),
+)
 const saveNameFunction = async (newName: string): Promise<boolean> => {
-    // User names are persisted as daemon name overrides. An empty name
-    // removes the override and reloads the UI.
-    const success = await settingsStore.saveChannelName(props.deviceId, props.channelName, newName)
+    // User names are persisted as daemon name overrides. An empty name removes
+    // the override and falls back to the detected label, which has to be read
+    // before saving drops the override it is derived from.
+    const applied = newName.length > 0 ? newName : defaultLabel.value
+    const success = await settingsStore.saveChannelName(props.deviceUID, props.channelName, newName)
     if (!success) {
         return false
     }
-    if (newName.length > 0) {
-        channelLabel.value = newName
-        emitter.emit('device-sensor-name-update', {
-            deviceUID: props.deviceId,
-            sensorId: props.channelName,
-            name: newName,
-        })
-    }
+    channelLabel.value = applied
+    emitter.emit('device-sensor-name-update', {
+        deviceUID: props.deviceUID,
+        sensorId: props.channelName,
+        name: applied,
+    })
     return true
 }
 
-const changeLightingSpeed = (event: ListboxChangeEvent): void => {
-    if (event.value === null) {
+const modeOptions = computed(() =>
+    lightingModes.map((mode: LightingMode) => ({ label: mode.frontend_name, value: mode.name })),
+)
+const selectedModeName = computed<string | undefined>({
+    get: () => selectedMode.value?.name,
+    set: (name) => {
+        const mode = lightingModes.find((candidate: LightingMode) => candidate.name === name)
+        if (mode != null) selectedMode.value = mode
+    },
+})
+const speedOptions = computed(() =>
+    lightingSpeeds.map((speed: string) => ({
+        label: deviceStore.toTitleCase(speed),
+        value: speed,
+    })),
+)
+const changeLightingSpeed = (value: string | string[] | undefined): void => {
+    if (value == null || Array.isArray(value)) {
         return // do not update on unselect
     }
-    selectedSpeed.value = event.value
+    selectedSpeed.value = value
 }
 
 const numberColorsScrolled = (event: WheelEvent): void => {
@@ -228,7 +242,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: 'There are unsaved changes made to these Lighting Settings.',
             header: 'Unsaved Changes',
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: 'Stay',
             acceptLabel: 'Discard',
@@ -255,169 +269,140 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="flex border-b-4 border-border-one items-center justify-between">
-        <entity-title-rename :current-name="channelLabel" :save-name-function="saveNameFunction" />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div class="p-2 flex flex-row">
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
-                    :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    label="Save"
-                    v-tooltip.top="t('views.lighting.saveLightingSettings')"
-                    @click="saveLighting"
-                >
-                    <svg-icon
-                        class="outline-0"
-                        type="mdi"
-                        :path="mdiContentSaveOutline"
-                        :size="deviceStore.getREMSize(1.5)"
-                    />
-                </Button>
-            </div>
-        </div>
-    </div>
-    <ScrollAreaRoot style="--scrollbar-size: 10px">
-        <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <div class="w-full flex flex-col lg:flex-row">
-                <div id="left-side">
-                    <div class="mt-0 mr-4 w-96">
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lighting.lightingMode') }}<br />
-                        </small>
-                        <Select
-                            v-model="selectedMode"
-                            :options="lightingModes"
-                            option-label="frontend_name"
-                            placeholder="Mode"
-                            class="w-full mt-1"
-                            dropdown-icon="pi pi-sun"
-                            scroll-height="40rem"
-                            v-tooltip.top="t('views.lighting.lightingMode')"
-                            filter
-                            size="large"
-                            variant="filled"
-                        >
-                            <template #option="slotProps">
-                                <div class="flex align-items-center">
-                                    <div>{{ slotProps.option.frontend_name }}</div>
-                                </div>
-                            </template>
-                        </Select>
-                    </div>
-                    <div v-if="selectedMode.speed_enabled" class="mt-4 mr-4 w-96">
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lighting.speed') }}
-                        </small>
-                        <Listbox
-                            :model-value="selectedSpeed"
-                            :options="lightingSpeeds"
-                            :option-label="(value: string) => deviceStore.toTitleCase(value)"
-                            class="w-full"
-                            checkmark
-                            placeholder="Speed"
-                            list-style="max-height: 100%"
-                            v-tooltip.top="t('views.lighting.speed')"
-                            @change="changeLightingSpeed"
+    <div class="flex h-full flex-col">
+        <entity-page-header>
+            <template #title>
+                <entity-title-rename
+                    :current-name="channelLabel"
+                    :fallback-name="defaultLabel"
+                    :save-name-function="saveNameFunction"
+                />
+            </template>
+            <template #actions>
+                <div class="p-2 flex flex-row">
+                    <UiButton
+                        class="w-32"
+                        :class="{ 'animate-pulse-fast': contextIsDirty }"
+                        v-tooltip.top="t('views.lighting.saveLightingSettings')"
+                        @click="saveLighting"
+                    >
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiContentSaveOutline"
+                            :size="deviceStore.getREMSize(1.5)"
                         />
-                    </div>
-                    <div v-if="selectedMode.backward_enabled" class="mt-4 mr-4 w-96">
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lighting.direction') }}<br />
-                        </small>
-                        <div
-                            class="bg-bg-two border border-border-one p-1 rounded-lg text-center items-center"
-                        >
-                            <el-switch
-                                v-model="selectedBackwardEnabled"
-                                size="large"
-                                :active-text="t('views.lighting.backward')"
-                                :inactive-text="t('views.lighting.forward')"
-                                style="--el-switch-off-color: rgb(var(--colors-accent))"
+                    </UiButton>
+                </div>
+            </template>
+        </entity-page-header>
+        <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
+            <ScrollAreaViewport class="p-4 h-full w-full">
+                <div class="w-full flex flex-col lg:flex-row">
+                    <div id="left-side">
+                        <div class="mt-0 mr-4 w-96">
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lighting.lightingMode') }}<br />
+                            </small>
+                            <span
+                                v-tooltip.top="t('views.lighting.lightingMode')"
+                                class="mt-1 block w-full"
+                            >
+                                <UiSelect
+                                    v-model="selectedModeName"
+                                    :options="modeOptions"
+                                    class="w-full"
+                                />
+                            </span>
+                        </div>
+                        <div v-if="selectedMode.speed_enabled" class="mt-4 mr-4 w-96">
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lighting.speed') }}
+                            </small>
+                            <UiListbox
+                                :model-value="selectedSpeed"
+                                :options="speedOptions"
+                                class="w-full"
+                                v-tooltip.top="t('views.lighting.speed')"
+                                @update:model-value="changeLightingSpeed"
                             />
+                        </div>
+                        <div v-if="selectedMode.backward_enabled" class="mt-4 mr-4 w-96">
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lighting.direction') }}<br />
+                            </small>
+                            <div
+                                class="bg-bg-two border border-border-one p-1 rounded-lg text-center items-center"
+                            >
+                                <span class="inline-flex items-center justify-center gap-2 p-2">
+                                    <span>{{ t('views.lighting.forward') }}</span>
+                                    <UiSwitch v-model="selectedBackwardEnabled" two-sided />
+                                    <span>{{ t('views.lighting.backward') }}</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div
+                            v-if="selectedMode.max_colors > 0"
+                            class="mt-4 mr-4 w-96 border-border-one"
+                        >
+                            <small class="ml-3 font-light text-sm text-text-color-secondary">
+                                {{ t('views.lighting.numberOfColors') }}<br />
+                            </small>
+                            <div class="rounded-lg border border-border-one bg-bg-two p-3">
+                                <UiNumberInput
+                                    v-model="selectedNumberOfColors"
+                                    class="mt-0.5"
+                                    :min="selectedMode.min_colors"
+                                    :max="selectedMode.max_colors"
+                                    :step="1"
+                                    v-tooltip.top="t('views.lighting.numberOfColorsTooltip')"
+                                    :disabled="selectedMode.min_colors == selectedMode.max_colors"
+                                />
+                                <UiSlider
+                                    v-model="selectedNumberOfColors"
+                                    class="mt-3 !w-full px-1"
+                                    :step="1"
+                                    :min="selectedMode.min_colors"
+                                    :max="selectedMode.max_colors"
+                                    :disabled="selectedMode.min_colors == selectedMode.max_colors"
+                                />
+                            </div>
                         </div>
                     </div>
                     <div
+                        id="right-side"
                         v-if="selectedMode.max_colors > 0"
-                        class="mt-4 mr-4 w-96 border-border-one"
+                        class="flex h-full mt-4 ml-1"
                     >
-                        <small class="ml-3 font-light text-sm text-text-color-secondary">
-                            {{ t('views.lighting.numberOfColors') }}<br />
-                        </small>
-                        <InputNumber
-                            placeholder="Number of Colors"
-                            v-model="selectedNumberOfColors"
-                            mode="decimal"
-                            class="mt-0.5 w-full"
-                            showButtons
-                            :min="selectedMode.min_colors"
-                            :max="selectedMode.max_colors"
-                            :use-grouping="false"
-                            :step="1"
-                            button-layout="horizontal"
-                            :input-style="{ width: '8rem' }"
-                            v-tooltip.top="t('views.lighting.numberOfColorsTooltip')"
-                            :disabled="selectedMode.min_colors == selectedMode.max_colors"
-                        >
-                            <template #incrementicon>
-                                <span class="pi pi-plus" />
-                            </template>
-                            <template #decrementicon>
-                                <span class="pi pi-minus" />
-                            </template>
-                        </InputNumber>
-                        <Slider
-                            v-model="selectedNumberOfColors"
-                            class="!w-[23.25rem] ml-1.5"
-                            :step="1"
-                            :min="selectedMode.min_colors"
-                            :max="selectedMode.max_colors"
-                            :disabled="selectedMode.min_colors == selectedMode.max_colors"
-                        />
-                    </div>
-                </div>
-                <div
-                    id="right-side"
-                    v-if="selectedMode.max_colors > 0"
-                    class="flex h-full mt-4 ml-1"
-                >
-                    <div class="content-center flex justify-center">
-                        <div class="color-wrapper mt-1">
-                            <c-c-color-picker
-                                v-for="(color, index) in colorsToShow"
-                                class="m-2"
-                                :key="index"
-                                v-model="color.value"
-                                color-format="rgb"
-                                :default-color="getDefaultColor(index)"
-                                :size="10"
-                            />
+                        <div class="content-center flex justify-center">
+                            <div class="color-wrapper mt-1">
+                                <c-c-color-picker
+                                    v-for="(color, index) in colorsToShow"
+                                    class="m-2"
+                                    :key="index"
+                                    v-model="color.value"
+                                    color-format="rgb"
+                                    :default-color="getDefaultColor(index)"
+                                    :size="10"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
-            orientation="vertical"
-        >
-            <ScrollAreaThumb
-                class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar
+                class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
+                orientation="vertical"
+            >
+                <ScrollAreaThumb
+                    class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
+                />
+            </ScrollAreaScrollbar>
+        </ScrollAreaRoot>
+    </div>
 </template>
 
 <style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-    // switch active text color:
-    --el-color-primary: rgb(var(--colors-text-color));
-    // switch inactive text color:
-    --el-text-color-primary: rgb(var(--colors-text-color));
-}
-
 .color-wrapper {
     display: flex;
     flex-wrap: wrap;

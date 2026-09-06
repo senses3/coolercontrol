@@ -1,30 +1,18 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiArrowLeft, mdiMemory } from '@mdi/js'
-import Button from 'primevue/button'
+import { mdiArrowLeft } from '@mdi/js'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import Select from 'primevue/select'
-import { ref, Ref, toRaw, watch } from 'vue'
+import { computed, ref, Ref, toRaw, watch } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { ProfileTempSource } from '@/models/Profile.ts'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
@@ -126,6 +114,32 @@ if (props.tempSource != null) {
         }
     }
 }
+const tempKey = (deviceUID: string, tempName: string): string => `${deviceUID}/${tempName}`
+const tempSourceGroups = computed<UiOptionGroup[]>(() =>
+    tempSources.value.map((device) => ({
+        label: device.deviceName,
+        options: device.temps.map((temp) => ({
+            label: temp.tempFrontendName,
+            value: tempKey(temp.deviceUID, temp.tempName),
+            color: temp.lineColor,
+            rightText:
+                temp.limitInfo != null
+                    ? `${temp.limitInfo.badge} · ${temp.temp} ${t('common.tempUnit')}`
+                    : `${temp.temp} ${t('common.tempUnit')}`,
+        })),
+    })),
+)
+const chosenTempKey = computed<string | undefined>({
+    get: () =>
+        chosenTemp.value != null
+            ? tempKey(chosenTemp.value.deviceUID, chosenTemp.value.tempName)
+            : undefined,
+    set: (key) => {
+        chosenTemp.value = tempSources.value
+            .flatMap((device) => device.temps)
+            .find((temp) => tempKey(temp.deviceUID, temp.tempName) === key)
+    },
+})
 const nextStep = () => {
     if (chosenTemp.value == null) {
         return
@@ -169,70 +183,34 @@ watch(rawStore.currentDeviceStatus, () => {
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.tempSource') }}
                 </small>
-                <Select
-                    v-model="chosenTemp"
-                    :options="tempSources"
-                    class="w-full h-11 !justify-end"
-                    option-label="tempFrontendName"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
+                <UiGroupedSelect
+                    v-model="chosenTempKey"
+                    :groups="tempSourceGroups"
                     :placeholder="t('views.profiles.tempSource')"
-                    :filter-placeholder="t('common.search')"
                     filter
-                    checkmark
-                    scroll-height="40rem"
+                    :filter-placeholder="t('common.search')"
                     :invalid="chosenTemp == null"
-                    dropdown-icon="pi pi-inbox"
-                >
-                    <template #optiongroup="slotProps">
-                        <div class="flex items-center">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMemory"
-                                :size="deviceStore.getREMSize(1.3)"
-                                class="mr-2"
-                            />
-                            <div>{{ slotProps.option.deviceName }}</div>
-                        </div>
-                    </template>
-                    <template #option="slotProps">
-                        <div class="flex w-full items-center justify-between">
-                            <div>
-                                <span
-                                    class="pi pi-minus mr-2 ml-1"
-                                    :style="{ color: slotProps.option.lineColor }"
-                                />{{ slotProps.option.tempFrontendName }}
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span
-                                    v-if="slotProps.option.limitInfo != null"
-                                    class="text-xs opacity-70"
-                                    v-tooltip.top="slotProps.option.limitInfo.message"
-                                >
-                                    {{ slotProps.option.limitInfo.badge }}
-                                </span>
-                                <span>{{ slotProps.option.temp }} {{ t('common.tempUnit') }}</span>
-                            </div>
-                        </div>
-                    </template>
-                </Select>
+                    class="w-full"
+                />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="chosenTemp == null"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>

@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Device UID derivation.
 //!
@@ -140,6 +125,19 @@ mod tests {
     use super::*;
 
     // -- create_uid_from: the hashing contract -----------------------------------------------
+
+    #[test]
+    fn create_uid_from_matches_a_known_sha256_vector() {
+        // Goal: pin the exact UID bytes. UIDs key every persisted setting, so a change in the
+        // hashing crate or in what gets fed to it would silently orphan a user's whole config.
+        // Method: compare against a sha256 of "Hwmon" + the device id, computed independently.
+        let device_id = "/sys/devices/platform/test/hwmon/hwmon0".to_owned();
+        let uid = Device::create_uid_from("ignored", DeviceType::Hwmon, 0, Some(&device_id));
+        assert_eq!(
+            uid,
+            "091c1c7e743cc5404f3476bfde4e489fab977a93127bb319bf9f68393bdb028a"
+        );
+    }
 
     #[test]
     fn create_uid_from_produces_64_char_lower_hex() {

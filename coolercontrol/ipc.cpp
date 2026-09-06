@@ -1,18 +1,5 @@
-// CoolerControl - monitor and control your cooling and other devices
-// Copyright (c) 2021-2025  Guy Boldon and contributors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// SPDX-FileCopyrightText: 2025 Guy Boldon and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ipc.h"
 
@@ -31,6 +18,12 @@ IPC::IPC(QObject* parent)
           &MainWindow::setTrayMenuModes, Qt::QueuedConnection);
   connect(m_mainWindow, &MainWindow::acknowledgeDaemonErrorsSignal, m_mainWindow,
           &MainWindow::acknowledgeDaemonErrors, Qt::QueuedConnection);
+  connect(m_mainWindow, &MainWindow::setAlertsActiveSignal, m_mainWindow,
+          &MainWindow::setAlertsActive, Qt::QueuedConnection);
+  connect(m_mainWindow, &MainWindow::setTranslationsSignal, m_mainWindow,
+          &MainWindow::setTranslations, Qt::QueuedConnection);
+  connect(m_mainWindow, &MainWindow::setPinnedSensorsSignal, m_mainWindow,
+          &MainWindow::setPinnedSensors, Qt::QueuedConnection);
   connect(m_mainWindow, &MainWindow::forceQuitSignal, m_mainWindow, &MainWindow::forceQuit,
           Qt::QueuedConnection);
   connect(m_mainWindow, &MainWindow::forceRefreshSignal, m_mainWindow, &MainWindow::forceRefresh,
@@ -68,6 +61,8 @@ QString IPC::directoryPathDialog(const QString& title) const {
                                            QFileDialog::ShowDirsOnly);
 }
 
+QString IPC::getSystemPalette() const { return m_mainWindow->systemPaletteJson(); }
+
 void IPC::setStartInTray(const bool startInTray) const {
   m_settings->setValue(SETTING_START_IN_TRAY.data(), startInTray);
 }
@@ -94,6 +89,18 @@ void IPC::saveWindowGeometry(const QByteArray& geometry) const {
 }
 
 void IPC::acknowledgeDaemonIssues() const { emit m_mainWindow->acknowledgeDaemonErrorsSignal(); }
+
+void IPC::setAlertsActive(const bool active) const {
+  emit m_mainWindow->setAlertsActiveSignal(active);
+}
+
+void IPC::setTranslations(const QString& translationsJson) const {
+  emit m_mainWindow->setTranslationsSignal(translationsJson);
+}
+
+void IPC::setPinnedSensors(const QString& sensorsJson) const {
+  emit m_mainWindow->setPinnedSensorsSignal(sensorsJson);
+}
 
 void IPC::syncSettings() const { m_settings->sync(); }
 

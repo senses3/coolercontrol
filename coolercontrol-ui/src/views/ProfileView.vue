@@ -1,26 +1,26 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiContentSaveOutline, mdiInformationSlabCircleOutline, mdiMemory } from '@mdi/js'
+import {
+    mdiAlertOutline,
+    mdiArrowTopRightBottomLeft,
+    mdiChartMultiple,
+    mdiContentDuplicate,
+    mdiContentSaveOutline,
+    mdiDeleteOutline,
+    mdiExportVariant,
+    mdiFan,
+    mdiMinus,
+    mdiPlus,
+    mdiPlusCircleOutline,
+} from '@mdi/js'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import type { TablePosition } from '@/models/UISettings.ts'
 import {
     Function,
     FunctionType,
@@ -31,8 +31,6 @@ import {
     getProfileTypeDisplayName,
     getProfileMixFunctionTypeDisplayName,
 } from '@/models/Profile.ts'
-import Button from 'primevue/button'
-import MultiSelect from 'primevue/multiselect'
 import {
     computed,
     inject,
@@ -45,8 +43,6 @@ import {
     toRaw,
     type WatchStopHandle,
 } from 'vue'
-import InputNumber from 'primevue/inputnumber'
-import Knob from 'primevue/knob'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import * as echarts from 'echarts/core'
 import {
@@ -64,19 +60,35 @@ import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import type { GraphicComponentLooseOption } from 'echarts/types/dist/shared.d.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { $enum } from 'ts-enum-util'
 import MixProfileEditorChart from '@/components/MixProfileEditorChart.vue'
-import Select from 'primevue/select'
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { useConfirm } from 'primevue/useconfirm'
+import {
+    onBeforeRouteLeave,
+    onBeforeRouteUpdate,
+    type RouteLocationRaw,
+    useRouter,
+} from 'vue-router'
+import { useConfirm } from '@/shell/confirm'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
 import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import OverlayProfileEditorChart from '@/components/OverlayProfileEditorChart.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import { Emitter, EventType } from 'mitt'
 import { useProfileLimitInfo, type LimitInfo } from '@/composables/useProfileLimitInfo.ts'
+import { defaultGraphCurve, placeholderGraphCurve } from '@/shell/cooling/defaultCurve.ts'
 import HealthWarning from '@/components/HealthWarning.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import UiKnob from '@/shell/ui/UiKnob.vue'
+import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
+import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 echarts.use([
     GridComponent,
@@ -93,6 +105,15 @@ echarts.use([
 
 interface Props {
     profileUID: string
+    // Fixed graph height when embedded (e.g. '26rem'); viewport-based when absent.
+    graphHeight?: string
+    // Hides the internal save button; the host page saves via the exposed
+    // saveProfileState (e.g. the channel page's Apply button).
+    hideSave?: boolean
+    // Channel context when embedded in a channel page; lets charts show the
+    // channel's live Actual duty next to the calculated Target.
+    channelDeviceUID?: string
+    channelName?: string
 }
 
 const props = defineProps<Props>()
@@ -112,8 +133,14 @@ const { getLimitInfo } = useProfileLimitInfo()
 const contextIsDirty: Ref<boolean> = ref(false)
 const tableDataKey: Ref<number> = ref(0)
 
+// Deleting drops the profile from the store while this page is still mounted,
+// and every render here dereferences it, so hold what was opened and fall back
+// to it. The fallback covers the moment between the delete and the route change
+// that unmounts this page, and the same moment when another client deletes it.
+const openedProfile = settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!
 const currentProfile = computed(
-    () => settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
+    () =>
+        settingsStore.profiles.find((profile) => profile.uid === props.profileUID) ?? openedProfile,
 )
 const selectedType: Ref<ProfileType> = ref(currentProfile.value.p_type)
 const profileTypeOptions = computed(() => {
@@ -270,8 +297,8 @@ const offsetMemberProfileOptions: Ref<Array<Profile>> = computed(() =>
     ),
 )
 const chosenMemberProfiles: Ref<Array<Profile>> = ref(
-    currentProfile.value.member_profile_uids.map(
-        (uid) => settingsStore.profiles.find((profile) => profile.uid === uid)!,
+    currentProfile.value.member_profile_uids.map((uid) =>
+        settingsStore.profiles.find((profile) => profile.uid === uid)!,
     ),
 )
 const chosenOverlayMemberProfile: Ref<Profile | undefined> = ref(
@@ -304,6 +331,99 @@ const overlayOffsetTypeOptions: Array<{ value: string; label: string }> = [
 const selectedTemp: Ref<number | undefined> = ref()
 const selectedDuty: Ref<number | undefined> = ref()
 const selectedStaticOffset: Ref<number | undefined> = ref()
+
+// String-keyed models for the kit selects.
+const selectedTypeModel = computed<string | undefined>({
+    get: () => selectedType.value,
+    set: (value) => {
+        if (value != null) selectedType.value = value as ProfileType
+    },
+})
+const chosenProfileMixFunctionModel = computed<string | undefined>({
+    get: () => chosenProfileMixFunction.value,
+    set: (value) => {
+        if (value != null) chosenProfileMixFunction.value = value as ProfileMixFunctionType
+    },
+})
+const chosenOverlayOffsetTypeModel = computed<string | undefined>({
+    get: () => chosenOverlayOffsetType.value,
+    set: (value) => {
+        if (value != null) chosenOverlayOffsetType.value = value
+    },
+})
+const { profileGroups, functionGroups: toFunctionGroups } = useLibraryGroups()
+const memberProfileGroups = profileGroups(() =>
+    memberProfileOptions.value.map((profile) => ({
+        uid: profile.uid,
+        name: profile.name,
+    })),
+)
+const chosenMemberProfileUids = computed<string[]>({
+    get: () => chosenMemberProfiles.value.map((profile) => profile.uid),
+    set: (uids) => {
+        chosenMemberProfiles.value = uids
+            .map((uid) => settingsStore.profiles.find((profile) => profile.uid === uid))
+            .filter((profile): profile is Profile => profile != null)
+    },
+})
+const overlayBaseGroups = profileGroups(() =>
+    offsetMemberProfileOptions.value.map((profile) => ({
+        uid: profile.uid,
+        name: profile.name,
+    })),
+)
+const chosenOverlayMemberProfileUid = computed<string | undefined>({
+    get: () => chosenOverlayMemberProfile.value?.uid,
+    set: (uid) => {
+        chosenOverlayMemberProfile.value = settingsStore.profiles.find(
+            (profile) => profile.uid === uid,
+        )
+    },
+})
+const functionGroups = toFunctionGroups(() =>
+    settingsStore.functions.map((fn) => ({ uid: fn.uid, name: fn.name })),
+)
+const chosenFunctionUid = computed<string | undefined>({
+    get: () => chosenFunction.value.uid,
+    set: (uid) => {
+        const found = settingsStore.functions.find((fn) => fn.uid === uid)
+        if (found != null) chosenFunction.value = found
+    },
+})
+const tempKey = (deviceUID: string, tempName: string): string => `${deviceUID}/${tempName}`
+const tempSourceGroups = computed<UiOptionGroup[]>(() =>
+    tempSources.value.map((device) => ({
+        label: device.deviceName,
+        options: device.temps.map((temp) => ({
+            label: temp.tempFrontendName,
+            value: tempKey(temp.deviceUID, temp.tempName),
+            color: temp.lineColor,
+            rightText:
+                temp.limitInfo != null
+                    ? `${temp.limitInfo.badge} · ${temp.temp} ${t('common.tempUnit')}`
+                    : `${temp.temp} ${t('common.tempUnit')}`,
+        })),
+    })),
+)
+const chosenTempKey = computed<string | undefined>({
+    get: () =>
+        chosenTemp.value != null
+            ? tempKey(chosenTemp.value.deviceUID, chosenTemp.value.tempName)
+            : undefined,
+    set: (key) => {
+        chosenTemp.value = tempSources.value
+            .flatMap((device) => device.temps)
+            .find((temp) => tempKey(temp.deviceUID, temp.tempName) === key)
+    },
+})
+const selectedDutyModel = computed<number>({
+    get: () => selectedDuty.value ?? 0,
+    set: (value) => (selectedDuty.value = value),
+})
+const selectedStaticOffsetModel = computed<number>({
+    get: () => selectedStaticOffset.value ?? 0,
+    set: (value) => (selectedStaticOffset.value = value),
+})
 const selectedGraphOffset: Ref<Array<[number, number]>> = ref([])
 const selectedPointIndex: Ref<number | undefined> = ref()
 const selectedTempSourceTemp: Ref<number | undefined> = ref()
@@ -346,38 +466,18 @@ interface PointData {
     }
 }
 
-const lineSpace = (
-    startValue: number,
-    stopValue: number,
-    cardinality: number,
-    precision: number,
-): Array<number> => {
-    const arr = []
-    const step = (stopValue - startValue) / (cardinality - 1)
-    for (let i = 0; i < cardinality; i++) {
-        const value = startValue + step * i
-        arr.push(deviceStore.round(value, precision))
-    }
-    return arr
-}
-
 const defaultDataValues = (): Array<PointData> => {
     const result: Array<PointData> = []
     if (selectedTempSource != null) {
-        const profileLength =
-            selectedTempSource.profileMinLength <= 5 && selectedTempSource.profileMaxLength >= 5
-                ? 5
-                : selectedTempSource.profileMaxLength
-        const temps = lineSpace(
+        const curve = defaultGraphCurve(
             Math.max(selectedTempSource.tempMin, axisXTempMin.value),
             Math.min(selectedTempSource.tempMax, axisXTempMax.value),
-            profileLength,
-            1,
+            selectedTempSource.profileMinLength,
+            selectedTempSource.profileMaxLength,
         )
-        const duties = lineSpace(dutyMin, dutyMax, profileLength, 0)
-        for (const [index, temp] of temps.entries()) {
+        for (const [temp, duty] of curve) {
             result.push({
-                value: [temp, duties[index]],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
@@ -385,10 +485,9 @@ const defaultDataValues = (): Array<PointData> => {
             })
         }
     } else {
-        for (let i = 0; i < 100; i = i + 25) {
-            const value = 25 * i
+        for (const [temp, duty] of placeholderGraphCurve()) {
             result.push({
-                value: [value, value],
+                value: [temp, duty],
                 symbolSize: defaultSymbolSize,
                 itemStyle: {
                     color: defaultSymbolColor,
@@ -454,6 +553,51 @@ const setTempSourceTemp = (): void => {
     selectedTempSourceTemp.value = Number(tempValue)
 }
 setTempSourceTemp()
+
+// ----- live Actual duty (channel context only) -----
+// The Mix and Overlay editors already draw this line; the Graph editor is
+// the same chart with the same channel context, so it draws it too. Only
+// the actual is shown: the target is the curve itself.
+const hasChannelContext = props.channelDeviceUID != null && props.channelName != null
+
+const actualDutyLineData: [{ value: number[] }, { value: number[] }] = [
+    { value: [] },
+    { value: [] },
+]
+
+const actualDutyColor = (): string =>
+    (hasChannelContext
+        ? settingsStore.allUIDeviceSettings
+              .get(props.channelDeviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.color
+        : undefined) || colors.themeColors.text_color
+
+const getActualDuty = (): number | undefined => {
+    if (!hasChannelContext) return undefined
+    const duty = deviceStore.currentDeviceStatus
+        .get(props.channelDeviceUID!)
+        ?.get(props.channelName!)?.duty
+    if (duty == null) return undefined
+    const value = Number.parseFloat(duty)
+    return Number.isNaN(value) ? undefined : value
+}
+
+const setActualDutyLine = (): number | undefined => {
+    const duty = getActualDuty()
+    if (duty == null) {
+        actualDutyLineData[0].value = []
+        actualDutyLineData[1].value = []
+        return undefined
+    }
+    actualDutyLineData[0].value = [axisXTempMin.value, duty]
+    actualDutyLineData[1].value = [axisXTempMax.value, duty]
+    return duty
+}
+
+const actualDutyMarkData = (duty: number | undefined): Array<object> =>
+    duty == null ? [] : [{ coord: [axisXTempMax.value - 5, duty], value: duty }]
+
+const getDutyPosition = (duty: number): string => (duty < 91 ? 'top' : 'bottom')
 
 const option = {
     title: {
@@ -545,6 +689,8 @@ const option = {
             xAxisIndex: 0,
             filterMode: 'none',
             preventDefaultMouseMove: false,
+            zoomOnMouseWheel: 'ctrl',
+            moveOnMouseWheel: false,
             throttle: 25,
         },
     ],
@@ -688,6 +834,45 @@ const option = {
     animation: true,
     animationDuration: 200,
     animationDurationUpdate: 200,
+}
+
+if (hasChannelContext) {
+    const initialActualDuty = setActualDutyLine()
+    option.series.push({
+        id: 'actualDutyLine',
+        type: 'line',
+        smooth: false,
+        symbol: 'none',
+        lineStyle: {
+            color: actualDutyColor(),
+            width: 2,
+            type: 'solid',
+        },
+        emphasis: {
+            disabled: true,
+        },
+        data: actualDutyLineData,
+        markPoint: {
+            symbolSize: 0,
+            label: {
+                position: getDutyPosition(initialActualDuty ?? 0),
+                align: 'right',
+                fontSize: deviceStore.getREMSize(1.0),
+                color: actualDutyColor(),
+                formatter: (params: any): string => {
+                    if (params.value == null) return ''
+                    return (
+                        t('views.profiles.actualDuty') + ' ' + Number(params.value).toFixed(0) + '%'
+                    )
+                },
+                shadowColor: colors.themeColors.bg_one,
+                shadowBlur: 10,
+            },
+            data: actualDutyMarkData(initialActualDuty),
+        },
+        z: 101,
+        silent: true,
+    } as any)
 }
 
 const setGraphData = () => {
@@ -834,6 +1019,19 @@ watch(chosenFunction, () => {
 
 watch(rawStore.currentDeviceStatus, () => {
     updateTemps()
+    if (hasChannelContext) {
+        const actualDuty = setActualDutyLine()
+        controlGraph.value?.setOption({
+            series: {
+                id: 'actualDutyLine',
+                data: actualDutyLineData,
+                markPoint: {
+                    data: actualDutyMarkData(actualDuty),
+                    label: { position: getDutyPosition(actualDuty ?? 0) },
+                },
+            },
+        })
+    }
     if (selectedTempSource == null) {
         return
     }
@@ -1121,6 +1319,7 @@ const createDraggableGraphics = (): void => {
     // Add shadow circles (which is not visible) to enable drag.
     createGraphicDataFromPointData()
     controlGraph.value?.setOption({ graphic: graphicData })
+    graphicsCreated = true
 }
 
 const addPointToLine = (params: any) => {
@@ -1247,18 +1446,22 @@ const deletePointFromLine = (params: any) => {
 
 //--------------------------------------------------------------------------------------------------
 
-// Points table position (local state, not persisted)
-type TablePosition = 'top-left' | 'bottom-right'
-const tablePosition: Ref<TablePosition> = ref('top-left')
+// Points table position, persisted per profile: where the table sits out of the way depends on
+// the shape of that profile's curve.
+const tablePosition = computed({
+    get: () => settingsStore.pointsTablePosition(props.profileUID),
+    set: (position: TablePosition) =>
+        settingsStore.setPointsTablePosition(props.profileUID, position),
+})
+
+const cycleTablePosition = () => {
+    tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
+}
 
 const tablePositionClasses = computed(() => ({
     'top-16 left-[5.5rem]': tablePosition.value === 'top-left',
     'bottom-16 right-[7rem]': tablePosition.value === 'bottom-right',
 }))
-
-const cycleTablePosition = () => {
-    tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
-}
 
 const selectPointFromTable = (idx: number) => {
     tempDutyTextWatchStopper()
@@ -1338,13 +1541,13 @@ const handleDutyScroll = (event: WheelEvent, idx: number): void => {
 
 // Direct input handlers for table cells
 const handleTempInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === 0 || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === 0 || idx === data.length - 1) return
     const clampedTemp = Math.max(getPointTempMin(idx), Math.min(value, getPointTempMax(idx)))
     updatePointFromTable(idx, clampedTemp, data[idx].value[1])
 }
 
 const handleDutyInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === data.length - 1) return
     const clampedDuty = Math.max(dutyMin, Math.min(value, dutyMax))
     updatePointFromTable(idx, data[idx].value[0], clampedDuty)
 }
@@ -1507,33 +1710,33 @@ const canAddPointAfter = (idx: number): boolean => {
     return lowerRoom + upperRoom >= deficit
 }
 
+// Held at module scope so onUnmounted can reach them. Note this computed re-evaluates
+// whenever selectedType or chosenTemp changes, so it re-enters the branch below repeatedly;
+// releasing the previous observer and timeout first keeps exactly one of each alive.
+let resizeObserver: ResizeObserver | null = null
+let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
+let debouncedUpdatePosition: _.DebouncedFunc<() => void> | null = null
+// The drag circles only exist once createDraggableGraphics has run for the
+// current chart instance. A position-only update before that asks ECharts to
+// create a graphic with no type, which throws and leaves the layer broken.
+// The shell swaps its whole tree at 768px, so a narrow drag remounts this view
+// and lands in that window on every resize event until the circles are back.
+let graphicsCreated = false
+
 const showGraph = computed(() => {
     const shouldShow =
         selectedType.value != null &&
         selectedType.value === ProfileType.Graph &&
         chosenTemp.value != null
     if (shouldShow) {
-        setTimeout(() => {
+        if (graphicsTimeout !== null) clearTimeout(graphicsTimeout)
+        resizeObserver?.disconnect()
+        debouncedUpdatePosition?.cancel()
+        graphicsCreated = false
+        graphicsTimeout = setTimeout(() => {
             // debounce because we need to wait for the graph to be rendered
-            const resizeObserver = new ResizeObserver(
-                _.debounce(
-                    () => {
-                        controlGraph.value?.setOption({
-                            graphic: data.map(function (item, _dataIndex) {
-                                return {
-                                    type: 'circle',
-                                    position: controlGraph.value?.convertToPixel(
-                                        'grid',
-                                        item.value,
-                                    ),
-                                }
-                            }),
-                        })
-                    },
-                    200,
-                    { leading: false },
-                ),
-            )
+            debouncedUpdatePosition = _.debounce(updatePosition, 200, { leading: false })
+            resizeObserver = new ResizeObserver(debouncedUpdatePosition)
             resizeObserver.observe(controlGraph.value?.$el)
             createDraggableGraphics() // we need to create AFTER the element is visible and rendered
         }, 500) // due to graph resizing, we really need a substantial delay on creation
@@ -1579,6 +1782,9 @@ const showOverlayChart = computed(
         selectedType.value === ProfileType.Overlay &&
         chosenOverlayMemberProfile.value != null,
 )
+// Both editable charts answer to the same mouse actions, so the header hint
+// covers either one.
+const showsEditableChart = computed(() => showGraph.value || showOverlayChart.value)
 const mixProfileKeys: Ref<string> = computed(() =>
     chosenMemberProfiles.value.map((p) => p.uid).join(':'),
 )
@@ -1791,6 +1997,9 @@ const addScrollEventListeners = (): void => {
     document?.querySelector('.duty-knob-input')?.addEventListener('wheel', dutyScrolled)
 }
 const contextIsVerifiedClean = (): boolean => {
+    // Deleting the Profile leaves this view mounted with nothing left to check.
+    // Dereferencing it here would throw inside the route guard and block the redirect.
+    if (currentProfile.value == null) return true
     // For Profiles, we need deep checks to see what's changed, if anything.
     if (currentProfile.value.p_type === ProfileType.Fixed) {
         return currentProfile.value.speed_fixed === selectedDuty.value
@@ -1826,7 +2035,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.profiles.unsavedChanges'),
             header: t('views.profiles.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),
@@ -1838,20 +2047,167 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         })
     })
 }
+const router = useRouter()
+
+const duplicateProfile = async (): Promise<void> => {
+    const source = currentProfile.value
+    // Copies, not the source's arrays: saveProfileState empties speed_profile and
+    // member_profile_uids in place, so a shared array means editing the original
+    // wipes the duplicate's curve.
+    const newProfile = new Profile(
+        `${source.name} ${t('common.copy')}`,
+        source.p_type,
+        source.speed_fixed,
+        source.temp_source,
+        source.speed_profile.map((point): [number, number] => [point[0], point[1]]),
+        [...source.member_profile_uids],
+        source.mix_function_type,
+    )
+    newProfile.function_uid = source.function_uid
+    newProfile.temp_max = source.temp_max
+    newProfile.temp_min = source.temp_min
+    newProfile.offset_profile = source.offset_profile.map((point): [number, number] => [
+        point[0],
+        point[1],
+    ])
+    // saveProfile looks its subject up in the store, so the copy has to be pushed before
+    // it can be persisted. Take it back out when the save fails: a phantom entry would
+    // otherwise sit in the sidebar until a reload, and editing it would call
+    // updateProfile against a UID the daemon has never seen.
+    settingsStore.profiles.push(newProfile)
+    if (!(await settingsStore.saveProfile(newProfile.uid))) {
+        const index = settingsStore.profiles.findIndex((profile) => profile.uid === newProfile.uid)
+        if (index >= 0) settingsStore.profiles.splice(index, 1)
+        toast.add({
+            severity: 'error',
+            summary: t('common.error'),
+            detail: t('views.profiles.profileUpdateError'),
+            life: 3000,
+        })
+        return
+    }
+    toast.add({
+        severity: 'success',
+        summary: t('common.success'),
+        detail: t('views.profiles.profileDuplicated'),
+        life: 3000,
+    })
+    await router.push({ name: 'profiles', params: { profileUID: newProfile.uid } })
+}
+
+const deleteProfile = (): void => {
+    if (currentProfile.value.uid === '0') return // can't delete default
+    const associatedChannelSettings: Array<string> = []
+    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+        for (const channelSetting of setting.settings.values()) {
+            if (channelSetting.profile_uid === currentProfile.value.uid) {
+                associatedChannelSettings.push(
+                    settingsStore.allUIDeviceSettings
+                        .get(deviceUID)!
+                        .sensorsAndChannels.get(channelSetting.channel_name)!.name,
+                )
+            }
+        }
+    }
+    const deleteMessage: string =
+        associatedChannelSettings.length === 0
+            ? t('views.profiles.deleteProfileConfirm', { name: currentProfile.value.name })
+            : t('views.profiles.deleteProfileWithChannelsConfirm', {
+                  name: currentProfile.value.name,
+                  channels: associatedChannelSettings.join(', '),
+              })
+    confirm.require({
+        message: deleteMessage,
+        header: t('views.profiles.deleteProfile'),
+        icon: mdiAlertOutline,
+        accept: async () => {
+            contextIsDirty.value = false
+            // Leave first: the store reloads several times inside the delete,
+            // and every one of them re-renders a page whose profile is gone.
+            const deletedUID = currentProfile.value.uid
+            await router.push({ name: 'section-cooling' })
+            await settingsStore.deleteProfile(deletedUID)
+            toast.add({
+                severity: 'success',
+                summary: t('common.success'),
+                detail: t('views.profiles.profileDeleted'),
+                life: 3000,
+            })
+        },
+    })
+}
+
+const { openProfileApplyWizard } = useToolWizards()
+
+// Channels currently driven by this profile (where-used).
+// Where-used: speed channels driven by this profile, plus Mix/Overlay profiles
+// that reference it as a member or base (both stored in member_profile_uids).
+interface UsedByItem {
+    key: string
+    label: string
+    icon: string
+    to: RouteLocationRaw
+}
+const usedByItems = computed((): UsedByItem[] => {
+    const items: UsedByItem[] = []
+    for (const [deviceUID, setting] of settingsStore.allDaemonDeviceSettings) {
+        for (const channelSetting of setting.settings.values()) {
+            if (channelSetting.profile_uid === currentProfile.value.uid) {
+                const label =
+                    settingsStore.allUIDeviceSettings
+                        .get(deviceUID)
+                        ?.sensorsAndChannels.get(channelSetting.channel_name)?.name ??
+                    channelSetting.channel_name
+                items.push({
+                    key: `channel-${deviceUID}-${channelSetting.channel_name}`,
+                    label,
+                    icon: mdiFan,
+                    to: {
+                        name: 'cooling-channel',
+                        params: { deviceUID, channelName: channelSetting.channel_name },
+                    },
+                })
+            }
+        }
+    }
+    for (const profile of settingsStore.profiles) {
+        if (
+            profile.uid !== currentProfile.value.uid &&
+            profile.member_profile_uids.includes(currentProfile.value.uid)
+        ) {
+            items.push({
+                key: `profile-${profile.uid}`,
+                label: profile.name,
+                icon: mdiChartMultiple,
+                to: { name: 'profiles', params: { profileUID: profile.uid } },
+            })
+        }
+    }
+    return items
+})
+
+// Hidden until the first measurement sizes it, so the initial fit-to-window
+// happens off-screen and fades in rather than showing as a resize flash.
+const graphReady = ref(false)
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('control-graph')
     const controlPanel = document.getElementById('control-panel')
+    if (graphEl != null && props.graphHeight != null) {
+        graphEl.style.height = props.graphHeight
+        return
+    }
     if (graphEl != null && controlPanel != null) {
-        const panelHeight = controlPanel.getBoundingClientRect().height
-        if (panelHeight > 56) {
-            graphEl.style.height = `max(calc(100vh - (${panelHeight}px + 4.5rem)), 20rem)`
-        } else {
-            // 4rem panel height + 4rem for duty/temp bar
-            graphEl.style.height = 'max(calc(100vh - 8rem), 20rem)'
-        }
+        // Fill the viewport from wherever the graph starts (works inside the
+        // shell content area). The small bottom inset mirrors the chart's side
+        // padding so the axes sit roughly equidistant from the pane edges.
+        const top = Math.ceil(graphEl.getBoundingClientRect().top)
+        graphEl.style.height = `max(calc(100vh - ${top}px - 1rem), 20rem)`
     }
 }
 const updatePosition = (): void => {
+    if (!graphicsCreated) {
+        return
+    }
     controlGraph.value?.setOption({
         graphic: data.slice(0, data.length - 1).map((item, dataIndex) => ({
             id: dataIndex,
@@ -1889,7 +2245,10 @@ onMounted(async () => {
         })
     })
     window.addEventListener('resize', updateResponsiveGraphHeight)
-    setTimeout(updateResponsiveGraphHeight)
+    setTimeout(() => {
+        updateResponsiveGraphHeight()
+        graphReady.value = true
+    })
 
     // handle the graphics on graph resize & zoom
     controlGraph.value?.chart?.on('dataZoom', updatePosition)
@@ -1971,18 +2330,37 @@ onMounted(async () => {
             contextIsDirty.value = true
         },
     )
-    onBeforeRouteUpdate(checkForUnsavedChanges)
-    onBeforeRouteLeave(checkForUnsavedChanges)
+    // Fixed Profiles have no graph points, so the duty is their only edit.
+    // Graph Profiles also set selectedDuty on point selection, which is not an edit.
+    watch(selectedDuty, (duty) => {
+        if (selectedType.value !== ProfileType.Fixed) return
+        if (duty !== currentProfile.value.speed_fixed) contextIsDirty.value = true
+    })
+    // An embedded editor saves through its host page (hideSave), which prompts
+    // for its changes along with its own. Two guards would ask twice.
+    if (!props.hideSave) {
+        onBeforeRouteUpdate(checkForUnsavedChanges)
+        onBeforeRouteLeave(checkForUnsavedChanges)
+    }
 })
 onUnmounted(() => {
     window.removeEventListener('resize', updateResponsiveGraphHeight)
     window.removeEventListener('resize', updatePosition)
     window.removeEventListener('resize', updateKnobSize)
     stopRepeat()
+    if (graphicsTimeout !== null) {
+        clearTimeout(graphicsTimeout)
+        graphicsTimeout = null
+    }
+    resizeObserver?.disconnect()
+    resizeObserver = null
+    debouncedUpdatePosition?.cancel()
+    debouncedUpdatePosition = null
+    graphicsCreated = false
 })
 
-// Prevent the Knob component from consuming non-left mouse button clicks (e.g. browser
-// back/forward buttons). Stop the event before it reaches PrimeVue's handler, then
+// Prevent the knob from consuming non-left mouse button clicks (e.g. browser
+// back/forward buttons). Stop the event before it reaches the knob's handler, then
 // manually trigger history navigation so the browser gesture still works.
 function onKnobMousedown(e: MouseEvent) {
     if (e.button === 0) return
@@ -1994,207 +2372,178 @@ function onKnobMouseup(e: MouseEvent) {
     if (e.button === 3) window.history.back()
     else if (e.button === 4) window.history.forward()
 }
+
+// For host pages that embed this editor and drive saving themselves.
+defineExpose({ saveProfileState, contextIsDirty })
 </script>
 
 <template>
-    <div
-        id="control-panel"
-        class="flex flex-wrap border-b-4 border-border-one items-center justify-between"
-    >
-        <entity-title-rename
-            :current-name="currentProfile.name"
-            :save-name-function="saveNameFunction"
-        />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div v-if="selectedType === ProfileType.Mix" class="p-2 pr-0 flex flex-row">
-                <Select
-                    v-model="chosenProfileMixFunction"
-                    :options="mixFunctionTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.mixFunction')"
-                    class="max-w-48 mr-3"
-                    checkmark
-                    dropdown-icon="pi pi-sliders-v"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.profiles.applyMixFunction')"
-                />
-                <MultiSelect
-                    v-model="chosenMemberProfiles"
-                    :options="memberProfileOptions"
-                    option-label="name"
-                    :placeholder="t('views.profiles.memberProfiles')"
-                    class="max-w-48"
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-chart-line"
-                    v-tooltip.top="t('views.profiles.profilesToMix')"
-                    :invalid="chosenMemberProfiles.length < 2"
-                />
-            </div>
-            <div v-else-if="selectedType === ProfileType.Overlay" class="p-2 pr-0 flex flex-row">
-                <InputNumber
-                    v-if="chosenOverlayOffsetType === 'static'"
-                    :placeholder="t('common.offset')"
-                    v-model="selectedStaticOffset"
-                    mode="decimal"
-                    class="w-full h-[2.375rem] mr-3"
-                    :suffix="` ${t('common.percentUnit')}`"
-                    :prefix="staticOffsetPrefix"
-                    showButtons
-                    :min="offsetMin"
-                    :max="offsetMax"
-                    :use-grouping="false"
-                    :step="1"
-                    button-layout="horizontal"
-                    :input-style="{ width: '5rem' }"
-                    :disabled="chosenOverlayMemberProfile == null"
-                    v-tooltip.top="t('views.profiles.staticOffset')"
-                >
-                    <template #incrementicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
-                <Select
-                    v-model="chosenOverlayOffsetType"
-                    :options="overlayOffsetTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.offsetType')"
-                    class="max-w-48 mr-3"
-                    checkmark
-                    dropdown-icon="pi pi-sliders-v"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.profiles.offsetType')"
-                />
-                <Select
-                    v-model="chosenOverlayMemberProfile"
-                    :options="offsetMemberProfileOptions"
-                    option-label="name"
-                    :placeholder="t('views.profiles.baseProfile')"
-                    class="max-w-48"
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-chart-line"
-                    :invalid="chosenOverlayMemberProfile == null"
-                    v-tooltip.top="t('views.profiles.baseProfile')"
-                />
-            </div>
-            <div v-else-if="selectedType === ProfileType.Graph" class="flex flex-wrap justify-end">
-                <div class="p-2 pr-1">
-                    <Select
-                        v-model="chosenFunction"
-                        :options="settingsStore.functions"
-                        option-label="name"
-                        :placeholder="t('views.profiles.function')"
-                        class="w-44 h-[2.375rem]"
-                        checkmark
-                        dropdown-icon="pi pi-directions"
-                        scroll-height="40rem"
-                        v-tooltip.top="t('views.profiles.functionToApply')"
-                    />
-                </div>
-                <div class="p-2 pr-0">
-                    <Select
-                        v-model="chosenTemp"
-                        :options="tempSources"
-                        class="w-44 h-[2.375rem]"
-                        option-label="tempFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="temps"
-                        :placeholder="t('views.profiles.tempSource')"
-                        :filter-placeholder="t('common.search')"
-                        filter
-                        checkmark
-                        scroll-height="40rem"
-                        :invalid="chosenTemp == null || tempSourceInvalid"
-                        dropdown-icon="pi pi-inbox"
-                        v-tooltip.top="{ escape: false, value: t('views.profiles.tempSource') }"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex w-full items-center justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.tempFrontendName }}
-                                </div>
-                                <div class="flex items-center gap-3">
-                                    <span
-                                        v-if="slotProps.option.limitInfo != null"
-                                        class="text-xs opacity-70"
-                                        v-tooltip.top="slotProps.option.limitInfo.message"
-                                    >
-                                        {{ slotProps.option.limitInfo.badge }}
-                                    </span>
-                                    <span
-                                        >{{ slotProps.option.temp }}
-                                        {{ t('common.tempUnit') }}</span
-                                    >
-                                </div>
-                            </div>
-                        </template>
-                    </Select>
-                </div>
-            </div>
-            <div v-else-if="selectedType === ProfileType.Fixed" class="p-2 pr-0">
-                <InputNumber
-                    :placeholder="t('common.duty')"
-                    v-model="selectedDuty"
-                    inputId="selected-duty"
-                    mode="decimal"
-                    class="duty-input w-full h-[2.375rem]"
-                    :suffix="` ${t('common.percentUnit')}`"
-                    showButtons
-                    :min="dutyMin"
-                    :max="dutyMax"
-                    :disabled="selectedPointIndex == null && !showDutyKnob"
-                    :use-grouping="false"
-                    :step="1"
-                    button-layout="horizontal"
-                    :input-style="{ width: '5rem' }"
-                    v-tooltip.top="t('views.profiles.fixedDuty')"
-                >
-                    <template #incrementicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
-            </div>
-            <div class="p-2">
-                <Select
-                    v-model="selectedType"
-                    :options="profileTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.profiles.profileType')"
-                    class="w-[6.5rem] h-[2.375rem] mr-3"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
+    <entity-page-header id="control-panel">
+        <template #title>
+            <entity-title-rename
+                :current-name="currentProfile.name"
+                :save-name-function="saveNameFunction"
+            />
+            <HelpIcon
+                v-if="showsEditableChart"
+                class="ml-1"
+                :label="t('common.mouseActions')"
+                :text="t('views.profiles.graphProfileMouseActions')"
+                side="bottom"
+            />
+            <HelpIcon
+                v-else-if="showMixChart"
+                class="ml-1"
+                :text="t('views.profiles.targetHint')"
+                side="bottom"
+            />
+        </template>
+        <template #controls>
+            <div class="p-2 pr-0">
+                <span
                     v-tooltip.top="{
                         escape: false,
                         value: t('views.profiles.tooltip.profileType'),
                     }"
+                >
+                    <UiSelect
+                        v-model="selectedTypeModel"
+                        :options="profileTypeOptions"
+                        :placeholder="t('views.profiles.profileType')"
+                        class="w-44"
+                    />
+                </span>
+            </div>
+            <div v-if="selectedType === ProfileType.Mix" class="p-2 pr-0 flex flex-row">
+                <span v-tooltip.top="t('views.profiles.applyMixFunction')" class="mr-3">
+                    <UiSelect
+                        v-model="chosenProfileMixFunctionModel"
+                        :options="mixFunctionTypeOptions"
+                        :placeholder="t('views.profiles.mixFunction')"
+                        class="w-44"
+                    />
+                </span>
+                <span v-tooltip.top="t('views.profiles.profilesToMix')">
+                    <UiMultiSelect
+                        v-model="chosenMemberProfileUids"
+                        :groups="memberProfileGroups"
+                        :placeholder="t('views.profiles.memberProfiles')"
+                        class="w-44"
+                        :invalid="chosenMemberProfiles.length < 2"
+                    />
+                </span>
+            </div>
+            <div v-else-if="selectedType === ProfileType.Overlay" class="p-2 pr-0 flex flex-row">
+                <UiNumberInput
+                    v-if="chosenOverlayOffsetType === 'static'"
+                    v-model="selectedStaticOffsetModel"
+                    class="mr-3"
+                    :prefix="staticOffsetPrefix"
+                    :suffix="t('common.percentUnit')"
+                    :min="offsetMin"
+                    :max="offsetMax"
+                    :disabled="chosenOverlayMemberProfile == null"
+                    v-tooltip.top="t('views.profiles.staticOffset')"
                 />
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
+                <span v-tooltip.top="t('views.profiles.offsetType')" class="mr-3">
+                    <UiSelect
+                        v-model="chosenOverlayOffsetTypeModel"
+                        :options="overlayOffsetTypeOptions"
+                        :placeholder="t('views.profiles.offsetType')"
+                        class="w-44"
+                    />
+                </span>
+                <span v-tooltip.top="t('views.profiles.baseProfile')">
+                    <UiGroupedSelect
+                        v-model="chosenOverlayMemberProfileUid"
+                        :groups="overlayBaseGroups"
+                        :placeholder="t('views.profiles.baseProfile')"
+                        class="w-44"
+                        :invalid="chosenOverlayMemberProfile == null"
+                    />
+                </span>
+            </div>
+            <div v-else-if="selectedType === ProfileType.Graph" class="flex flex-wrap justify-end">
+                <div class="p-2 pr-1">
+                    <span v-tooltip.top="{ escape: false, value: t('views.profiles.tempSource') }">
+                        <UiGroupedSelect
+                            v-model="chosenTempKey"
+                            :groups="tempSourceGroups"
+                            :placeholder="t('views.profiles.tempSource')"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            class="w-44"
+                            :invalid="chosenTemp == null || tempSourceInvalid"
+                        />
+                    </span>
+                </div>
+                <div class="p-2 pr-0">
+                    <span v-tooltip.top="t('views.profiles.functionToApply')">
+                        <UiGroupedSelect
+                            v-model="chosenFunctionUid"
+                            :groups="functionGroups"
+                            :placeholder="t('views.profiles.function')"
+                            class="w-44"
+                        />
+                    </span>
+                </div>
+            </div>
+            <div v-else-if="selectedType === ProfileType.Fixed" class="p-2 pr-0">
+                <UiNumberInput
+                    v-model="selectedDutyModel"
+                    class="duty-input"
+                    :suffix="t('common.percentUnit')"
+                    :min="dutyMin"
+                    :max="dutyMax"
+                    :disabled="selectedPointIndex == null && !showDutyKnob"
+                    v-tooltip.top="t('views.profiles.fixedDuty')"
+                />
+            </div>
+        </template>
+        <template #actions>
+            <template v-if="!hideSave">
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('components.wizards.profileApply.applyProfile')"
+                    @click="openProfileApplyWizard(currentProfile.uid)"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiExportVariant"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('layout.menu.tooltips.duplicate')"
+                    @click="duplicateProfile"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiContentDuplicate"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+                <UiButton
+                    v-if="currentProfile.uid !== '0'"
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.profiles.deleteProfile')"
+                    @click="deleteProfile"
+                >
+                    <svg-icon
+                        type="mdi"
+                        :path="mdiDeleteOutline"
+                        :size="deviceStore.getREMSize(1.25)"
+                    />
+                </UiButton>
+            </template>
+            <div v-if="!hideSave" class="p-2">
+                <UiButton
+                    class="w-32"
                     :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    :label="t('common.save')"
                     v-tooltip.top="t('views.profiles.saveProfile')"
                     @click="saveProfileState"
                 >
@@ -2204,77 +2553,61 @@ function onKnobMouseup(e: MouseEvent) {
                         :path="mdiContentSaveOutline"
                         :size="deviceStore.getREMSize(1.5)"
                     />
-                </Button>
+                </UiButton>
             </div>
-        </div>
+        </template>
         <!-- Inside #control-panel so the chart-height observer accounts for it. -->
-        <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
-    </div>
-    <!-- The UI Display: -->
-    <div v-if="showGraph" class="flex flex-col w-full">
-        <div class="flex flex-row justify-between mt-4 w-full">
-            <InputNumber
-                :placeholder="t('components.axisOptions.min')"
-                v-model="axisXTempMin"
-                mode="decimal"
-                class="h-11 mx-4"
-                :suffix="` ${t('common.tempUnit')}`"
-                showButtons
-                :min="inputAxisMinNumberMin"
-                :max="inputAxisMinNumberMax"
-                :use-grouping="false"
-                :step="5"
-                button-layout="horizontal"
-                :input-style="{ width: '5rem' }"
-                :disabled="selectedTempSource == null"
-                v-tooltip.top="t('views.profiles.minProfileTemp')"
-            >
-                <template #incrementicon>
-                    <span class="pi pi-plus" />
-                </template>
-                <template #decrementicon>
-                    <span class="pi pi-minus" />
-                </template>
-            </InputNumber>
-            <div class="flex flex-row items-center">
-                <div
-                    class="p-2 mx-4 leading-none items-center"
-                    v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
+        <div
+            v-if="!hideSave && usedByItems.length > 0"
+            class="w-full mx-4 mb-2 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-text-color-secondary"
+        >
+            <span>{{ t('views.profiles.usedBy') }}:</span>
+            <span v-for="(item, index) in usedByItems" :key="item.key" class="whitespace-nowrap">
+                <RouterLink
+                    :to="item.to"
+                    class="inline-flex items-center gap-1 rounded align-middle text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-accent"
                 >
                     <svg-icon
                         type="mdi"
-                        class="h-7"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.25)"
+                        :path="item.icon"
+                        :size="14"
+                        class="shrink-0 text-text-color-secondary"
                     />
-                </div>
+                    {{ item.label }}
+                </RouterLink>
+                <span v-if="index < usedByItems.length - 1">,</span>
+            </span>
+        </div>
+        <health-warning kind="profile" :entity-uid="props.profileUID" class="w-full mx-2 mb-2" />
+    </entity-page-header>
+    <!-- The UI Display: -->
+    <div v-if="showGraph" class="flex flex-col w-full">
+        <div class="flex flex-row justify-between mt-4 w-full">
+            <UiNumberInput
+                v-model="axisXTempMin"
+                class="mx-4"
+                :suffix="t('common.tempUnit')"
+                :min="inputAxisMinNumberMin"
+                :max="inputAxisMinNumberMax"
+                :step="5"
+                :disabled="selectedTempSource == null"
+                v-tooltip.top="t('views.profiles.minProfileTemp')"
+            />
+            <div class="flex flex-row items-center">
                 <span v-if="selectedLimitInfo != null" class="text-sm opacity-70">
                     {{ selectedLimitInfo.message }}
                 </span>
             </div>
-            <InputNumber
-                :placeholder="t('components.axisOptions.max')"
+            <UiNumberInput
                 v-model="axisXTempMax"
-                mode="decimal"
-                class="h-11 mx-4"
-                :suffix="` ${t('common.tempUnit')}`"
-                showButtons
+                class="mx-4"
+                :suffix="t('common.tempUnit')"
                 :min="inputAxisMaxNumberMin"
                 :max="inputAxisMaxNumberMax"
-                :use-grouping="false"
                 :step="5"
-                button-layout="horizontal"
-                :input-style="{ width: '5rem' }"
                 :disabled="selectedTempSource == null"
                 v-tooltip.top="t('views.profiles.maxProfileTemp')"
-            >
-                <template #incrementicon>
-                    <span class="pi pi-plus" />
-                </template>
-                <template #decrementicon>
-                    <span class="pi pi-minus" />
-                </template>
-            </InputNumber>
+            />
         </div>
     </div>
     <div id="profile-display" class="flex flex-col h-full">
@@ -2286,10 +2619,10 @@ function onKnobMouseup(e: MouseEvent) {
             @mousedown.capture="onKnobMousedown"
             @mouseup.capture="onKnobMouseup"
         >
-            <Knob
-                v-model="selectedDuty"
+            <UiKnob
+                v-model="selectedDutyModel"
                 class="duty-knob-input m-2 w-full h-full flex justify-center"
-                :value-template="(value) => `${value}${t('common.percentUnit')}`"
+                :value-template="(value: number) => `${value}${t('common.percentUnit')}`"
                 :min="dutyMin"
                 :max="dutyMax"
                 :step="1"
@@ -2300,7 +2633,8 @@ function onKnobMouseup(e: MouseEvent) {
         <div v-else-if="showGraph" class="relative">
             <v-chart
                 id="control-graph"
-                class="pt-6 pr-11 pl-4 pb-6"
+                class="pt-6 pr-11 pl-4 pb-4 transition-opacity duration-200"
+                :class="{ 'opacity-0': !graphReady }"
                 ref="controlGraph"
                 :option="option"
                 :autoresize="true"
@@ -2320,14 +2654,15 @@ function onKnobMouseup(e: MouseEvent) {
                     <span class="font-semibold text-text-color cursor-default">{{
                         t('views.profiles.points')
                     }}</span>
-                    <Button
-                        @click="cycleTablePosition"
-                        icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                        text
-                        rounded
-                        class="!w-7 !h-7 !p-0"
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        class="!h-7 !w-7"
                         v-tooltip.top="t('views.profiles.moveTable')"
-                    />
+                        @click="cycleTablePosition"
+                    >
+                        <svg-icon type="mdi" :path="mdiArrowTopRightBottomLeft" :size="14" />
+                    </UiButton>
                 </div>
                 <table class="w-full">
                     <thead class="sticky top-7 bg-bg-two/95 cursor-default">
@@ -2365,11 +2700,10 @@ function onKnobMouseup(e: MouseEvent) {
                                         handleTempScroll($event, idx)
                                     "
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -2380,30 +2714,29 @@ function onKnobMouseup(e: MouseEvent) {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="point.value[0]"
-                                        @update:modelValue="handleTempInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="1"
-                                        :maxFractionDigits="1"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3.75rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[0].toFixed(1)"
                                         :min="getPointTempMin(idx)"
                                         :max="getPointTempMax(idx)"
-                                        :suffix="t('common.tempUnit')"
+                                        step="0.1"
                                         :disabled="idx === 0 || idx === data.length - 1"
-                                        :inputStyle="{
-                                            width: '3.75rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        @change="
+                                            handleTempInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -2414,7 +2747,9 @@ function onKnobMouseup(e: MouseEvent) {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
                                 </div>
                             </td>
 
@@ -2426,11 +2761,10 @@ function onKnobMouseup(e: MouseEvent) {
                                         idx !== data.length - 1 && handleDutyScroll($event, idx)
                                     "
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === data.length - 1 || data[idx].value[1] <= dutyMin
                                         "
@@ -2439,30 +2773,29 @@ function onKnobMouseup(e: MouseEvent) {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="point.value[1]"
-                                        @update:modelValue="handleDutyInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="0"
-                                        :maxFractionDigits="0"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[1].toFixed(0)"
                                         :min="dutyMin"
                                         :max="dutyMax"
-                                        :suffix="t('common.percentUnit')"
+                                        step="1"
                                         :disabled="idx === data.length - 1"
-                                        :inputStyle="{
-                                            width: '3rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        @change="
+                                            handleDutyInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
                                         :disabled="
                                             idx === data.length - 1 || data[idx].value[1] >= dutyMax
                                         "
@@ -2471,33 +2804,39 @@ function onKnobMouseup(e: MouseEvent) {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
                                 </div>
                             </td>
 
                             <!-- Add/Remove Actions -->
                             <td class="px-0.5 py-0.5">
                                 <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                                    <Button
+                                    <UiButton
                                         v-if="canAddPointAfter(idx)"
-                                        icon="pi pi-plus-circle"
-                                        text
-                                        severity="success"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !text-success"
                                         v-tooltip.top="t('views.profiles.addPointAfter')"
                                         @click.stop="addPointFromTable(idx)"
-                                    />
-                                    <Button
+                                    >
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiPlusCircleOutline"
+                                            :size="14"
+                                        />
+                                    </UiButton>
+                                    <UiButton
                                         v-if="canRemovePoint(idx)"
-                                        icon="pi pi-trash"
-                                        text
-                                        severity="danger"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !text-error"
                                         v-tooltip.top="t('views.profiles.removePoint')"
                                         @click.stop="removePointFromTable(idx)"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiDeleteOutline" :size="14" />
+                                    </UiButton>
                                 </div>
                             </td>
                         </tr>
@@ -2510,6 +2849,8 @@ function onKnobMouseup(e: MouseEvent) {
             class="p-6"
             :profiles="chosenMemberProfiles"
             :mixFunctionType="chosenProfileMixFunction"
+            :channel-device-u-i-d="channelDeviceUID"
+            :channel-name="channelName"
             :key="mixProfileKeys"
         />
         <div
@@ -2517,11 +2858,11 @@ function onKnobMouseup(e: MouseEvent) {
             @mousedown.capture="onKnobMousedown"
             @mouseup.capture="onKnobMouseup"
         >
-            <Knob
-                v-model="selectedStaticOffset"
-                class="m-2 w-full h-full flex justify-center outline-none !outline-0"
+            <UiKnob
+                v-model="selectedStaticOffsetModel"
+                class="m-2 w-full h-full flex justify-center"
                 :value-template="
-                    (value) =>
+                    (value: number) =>
                         value > 0
                             ? `+${value}${t('common.percentUnit')}`
                             : `${value}${t('common.percentUnit')}`
@@ -2537,6 +2878,8 @@ function onKnobMouseup(e: MouseEvent) {
         <OverlayProfileEditorChart
             v-else-if="showOverlayChart"
             :profile-u-i-d="currentProfile.uid"
+            :channel-device-u-i-d="props.channelDeviceUID"
+            :channel-name="props.channelName"
             @changed="(points) => (selectedGraphOffset = points)"
         />
     </div>
@@ -2551,22 +2894,15 @@ function onKnobMouseup(e: MouseEvent) {
     cursor: default;
 }
 
-// Compact styling for points table InputNumber components
-:deep(.table-input) {
-    input {
-        background: transparent;
-        border: none;
-        height: 1.5rem;
-
-        &:focus {
-            box-shadow: none;
-            background: var(--cc-bg-one);
-        }
-
-        &:disabled {
-            opacity: 0.6;
-        }
-    }
+// Points table inputs: no native number spinners.
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.table-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 // This is needed particularly in Tauri, as it moves to multiline flex-wrap as soon as the scrollbar

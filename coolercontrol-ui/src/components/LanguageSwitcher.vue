@@ -1,60 +1,35 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <template>
-    <Select
-        v-model="currentLocale"
-        :options="localeOptions"
-        optionLabel="name"
-        optionValue="code"
-        @change="changeLocale"
-        class="w-full h-[2.375rem]"
-        :loading="isLoading"
-        :pt="{
-            input: { class: 'text-center' },
-            trigger: { class: 'flex justify-center items-center' },
-            label: { class: 'text-center w-full' },
-            panel: { class: 'border-2 border-border-one rounded-lg shadow-lg bg-bg-one' },
-        }"
-    >
-        <template #value="slotProps">
-            <div class="flex justify-center items-center w-full h-full">
-                {{
-                    slotProps.value
-                        ? localeOptions.find((option) => option.code === slotProps.value)?.name
-                        : t('layout.settings.selectLanguage')
-                }}
-            </div>
-        </template>
-    </Select>
+    <UiSelect
+        v-model="currentLanguage"
+        :options="languageSelectOptions"
+        :placeholder="t('layout.settings.selectLanguage')"
+        :disabled="isLoading"
+        class="w-full"
+        @update:model-value="changeLanguage"
+    />
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import Select from 'primevue/select'
-import { useConfirm } from 'primevue/useconfirm'
-import { useToast } from 'primevue/usetoast'
+import { mdiTranslate } from '@mdi/js'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import { useConfirm } from '@/shell/confirm'
+import { useToast } from '@/shell/toast'
+import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import { detectSystemLanguage, SYSTEM_LANGUAGE } from '@/i18n/locale.ts'
 
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const confirm = useConfirm()
 const toast = useToast()
-const currentLocale = ref(localStorage.getItem('locale') || 'en')
+const settingsStore = useSettingsStore()
+// The stored setting, which is `system` rather than the language it resolves to.
+const currentLanguage = ref(settingsStore.language)
 const isLoading = ref(false)
 
 const localeOptions = [
@@ -72,59 +47,55 @@ const localeOptions = [
     { name: '한국어', code: 'ko' },
 ]
 
-// Ensure currentLocale matches locale when component is mounted
-onMounted(() => {
-    // If they don't match, use locale as the source of truth
-    if (currentLocale.value !== locale.value) {
-        currentLocale.value = locale.value
-    }
+// Named with what it currently resolves to, so the entry is not a mystery and
+// a user can see which language following the system will actually give them.
+const systemLabel = computed(() => {
+    const detected = detectSystemLanguage()
+    const name = localeOptions.find((option) => option.code === detected)?.name ?? detected
+    return `${t('layout.settings.systemLanguage')} (${name})`
 })
+const languageSelectOptions = computed(() => [
+    { label: systemLabel.value, value: SYSTEM_LANGUAGE },
+    ...localeOptions.map((option) => ({ label: option.name, value: option.code })),
+])
 
-function changeLocale(event: { value: string }) {
-    const selectedLocale = event.value
+// The store owns the setting, and it can change from elsewhere: a reload picks
+// up the daemon's copy after this component has already read it.
+watch(
+    () => settingsStore.language,
+    (setting) => {
+        currentLanguage.value = setting
+    },
+)
 
-    // We should actually compare the target language with the current locale value, not currentLocale
-    if (selectedLocale === locale.value) {
-        return
-    }
+function changeLanguage(value: string | undefined) {
+    if (value == null || value === settingsStore.language) return
 
-    // Show confirmation dialog
     confirm.require({
         message: t('layout.settings.languageChangeConfirmMessage'),
         header: t('layout.settings.languageChangeConfirm'),
-        icon: 'pi pi-language',
+        icon: mdiTranslate,
         acceptLabel: t('common.ok'),
         rejectLabel: t('common.cancel'),
         accept: () => {
             try {
-                // Set loading state
                 isLoading.value = true
+                settingsStore.language = value
+                settingsStore.applyLanguage()
 
-                // Update language settings
-                locale.value = selectedLocale
-                localStorage.setItem('locale', selectedLocale)
+                // Kept for the settings page, which recomputes its theme option
+                // labels off this event.
+                window.dispatchEvent(new CustomEvent('language-changed', { detail: value }))
 
-                // Apply new language setting to HTML element
-                document.querySelector('html')?.setAttribute('lang', selectedLocale)
-
-                // Force refresh application state to ensure all components dependent on i18n are updated
-                window.dispatchEvent(
-                    new CustomEvent('language-changed', { detail: selectedLocale }),
-                )
-
-                // Show success toast instead of refreshing the page
                 toast.add({
                     severity: 'success',
                     summary: t('common.success'),
                     detail: t('layout.settings.languageChangeSuccess'),
                     life: 3000,
                 })
-
-                // Reset loading state
                 isLoading.value = false
             } catch (error) {
                 isLoading.value = false
-                // Show error toast if language switch fails
                 toast.add({
                     severity: 'error',
                     summary: t('common.error'),
@@ -134,18 +105,9 @@ function changeLocale(event: { value: string }) {
             }
         },
         reject: () => {
-            // User canceled the operation, restore original selection
-            currentLocale.value = locale.value
+            // Canceled, so put the select back on the stored setting.
+            currentLanguage.value = settingsStore.language
         },
     })
 }
-
-// Watch for language changes
-watch(
-    () => locale.value,
-    (newLocale) => {
-        currentLocale.value = newLocale
-        document.querySelector('html')?.setAttribute('lang', newLocale)
-    },
-)
 </script>

@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { createI18n } from 'vue-i18n'
 import en from './locales/en.ts'
@@ -30,8 +15,11 @@ import pt from './locales/pt.ts'
 import hi from './locales/hi.ts'
 import ko from './locales/ko.ts'
 
-// Get saved language settings or use English as default
-const savedLocale = localStorage.getItem('locale') || 'en'
+// The cached setting stands in until the daemon's copy arrives with the rest
+// of the UI settings, which is well after this instance has to exist.
+import { readCachedLanguage, resolveLanguage } from './locale.ts'
+
+const savedLocale = resolveLanguage(readCachedLanguage())
 
 const i18n = createI18n({
     legacy: false, // Use Composition API

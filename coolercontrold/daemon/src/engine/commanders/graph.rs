@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -26,8 +11,8 @@ use crate::config::Config;
 use crate::device::{ChannelName, DeviceUID, Duty, UID};
 use crate::engine::main::DutyWritersByType;
 use crate::engine::processors::functions::{
-    FunctionDutyThresholdPostProcessor, FunctionEMAPreProcessor, FunctionIdentityPreProcessor,
-    FunctionSafetyLatchProcessor, FunctionStandardPostProcessor, FunctionStandardPreProcessor,
+    FunctionDutyThresholdPostProcessor, FunctionIdentityPreProcessor, FunctionSafetyLatchProcessor,
+    FunctionStandardPostProcessor, FunctionStandardPreProcessor,
 };
 use crate::engine::processors::profiles::GraphProcessor;
 use crate::engine::{
@@ -42,7 +27,6 @@ use moro_local::Scope;
 struct ProcessorCollection {
     fun_safety_latch: FunctionSafetyLatchProcessor,
     fun_identity_pre: FunctionIdentityPreProcessor,
-    fun_ema_pre: FunctionEMAPreProcessor,
     fun_std_pre: FunctionStandardPreProcessor,
     graph_proc: GraphProcessor,
     fun_duty_thresh_post: FunctionDutyThresholdPostProcessor,
@@ -86,7 +70,6 @@ impl GraphProfileCommander {
                 ProcessorCollection {
                     fun_safety_latch: FunctionSafetyLatchProcessor::new(),
                     fun_identity_pre: FunctionIdentityPreProcessor::new(all_devices.clone()),
-                    fun_ema_pre: FunctionEMAPreProcessor::new(all_devices.clone()),
                     fun_std_pre,
                     graph_proc: GraphProcessor::new(),
                     fun_duty_thresh_post: FunctionDutyThresholdPostProcessor::new(),
@@ -247,7 +230,6 @@ impl GraphProfileCommander {
         }
         .apply(&self.processors.fun_safety_latch)
         .apply(&self.processors.fun_identity_pre)
-        .apply(&self.processors.fun_ema_pre)
         .apply(&self.processors.fun_std_pre)
         .apply(&self.processors.graph_proc)
         .apply(&self.processors.fun_duty_thresh_post)

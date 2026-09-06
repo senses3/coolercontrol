@@ -1,29 +1,21 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import VChart from 'vue-echarts'
-import { mdiInformationSlabCircleOutline } from '@mdi/js'
-import InputNumber from 'primevue/inputnumber'
-import Button from 'primevue/button'
-import { computed, onMounted, onUnmounted, ref, Ref, watch, type WatchStopHandle } from 'vue'
+import {
+    mdiArrowTopRightBottomLeft,
+    mdiDeleteOutline,
+    mdiMinus,
+    mdiPlus,
+    mdiPlusCircleOutline,
+} from '@mdi/js'
+import UiButton from '@/shell/ui/UiButton.vue'
+import { computed, onMounted, onUnmounted, ref, Ref, toRaw, watch, type WatchStopHandle } from 'vue'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -38,12 +30,14 @@ import { LineChart } from 'echarts/charts'
 import { CanvasRenderer } from 'echarts/renderers'
 import { UniversalTransition } from 'echarts/features'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import { currentProfileDuty, interpolateOffsetProfile } from '@/shell/cooling/profileCurve.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { useI18n } from 'vue-i18n'
 import type { GraphicComponentLooseOption } from 'echarts/types/dist/shared'
 import _ from 'lodash'
 import { UID } from '@/models/Device.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import type { TablePosition } from '@/models/UISettings.ts'
 
 echarts.use([
     GridComponent,
@@ -60,18 +54,25 @@ echarts.use([
 
 const props = defineProps<{
     profileUID: UID
+    // Optional channel context (set when embedded in a channel page): adds the live Actual duty
+    // line, so the fan's real output can be compared with what this overlay is asking for.
+    channelDeviceUID?: string
+    channelName?: string
 }>()
 const emit = defineEmits<{
     (e: 'changed', points: Array<[number, number]>): void
 }>()
 
 const deviceStore = useDeviceStore()
+// The raw state, as the other live charts do: the pinia proxy does not react to the shallowRef
+// the status stream publishes with triggerRef.
+const rawStore = toRaw(deviceStore.$state)
 const settingsStore = useSettingsStore()
 const colors = useThemeColorsStore()
 const { t } = useI18n()
 
-const currentProfile = computed(
-    () => settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
+const currentProfile = computed(() =>
+    settingsStore.profiles.find((profile) => profile.uid === props.profileUID)!,
 )
 
 const selectedDuty: Ref<number | undefined> = ref()
@@ -206,10 +207,10 @@ const option = {
     xAxis: {
         name: t('views.profiles.profileOutputDuty'),
         nameLocation: 'middle',
-        nameGap: deviceStore.getREMSize(2.0),
+        nameGap: deviceStore.getREMSize(1.0),
         nameTextStyle: {
-            color: colors.themeColors.text_color,
-            fontSize: deviceStore.getREMSize(1.25),
+            color: colors.themeColors.text_color_secondary,
+            fontSize: deviceStore.getREMSize(0.85),
         },
         min: dutyMin,
         max: dutyMax,
@@ -238,10 +239,10 @@ const option = {
     yAxis: {
         name: t('views.profiles.offsetDuty'),
         nameLocation: 'middle',
-        nameGap: deviceStore.getREMSize(3.25),
+        nameGap: deviceStore.getREMSize(2.0),
         nameTextStyle: {
-            color: colors.themeColors.text_color,
-            fontSize: deviceStore.getREMSize(1.25),
+            color: colors.themeColors.text_color_secondary,
+            fontSize: deviceStore.getREMSize(0.85),
         },
         min: offsetMin,
         max: offsetMax,
@@ -276,6 +277,8 @@ const option = {
             yAxisIndex: 0,
             filterMode: 'none',
             preventDefaultMouseMove: false,
+            zoomOnMouseWheel: 'ctrl',
+            moveOnMouseWheel: false,
             minValueSpan: 20,
             throttle: 25,
         },
@@ -420,6 +423,171 @@ const controlPointMotionForOffsetY = (posY: number, selectedPointIndex: number):
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+// ----- live Base / Target / Actual duties -----
+//
+// Both of these are duties, and this chart's x-axis IS duty, so they are vertical lines on it
+// rather than the horizontal ones the Mix chart draws. The base duty is not drawn: it is the
+// input this curve reads, and a third line made the chart too busy to read.
+
+interface LineValue {
+    value: Array<number>
+}
+const targetDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
+const actualDutyLineData: [LineValue, LineValue] = [{ value: [] }, { value: [] }]
+
+const hasChannelContext = props.channelDeviceUID != null && props.channelName != null
+
+const tempOf = (tempSource?: { device_uid: string; temp_name: string }): number | undefined => {
+    if (tempSource == null) return undefined
+    const temp = deviceStore.currentDeviceStatus
+        .get(tempSource.device_uid)
+        ?.get(tempSource.temp_name)?.temp
+    return temp != null ? Number(temp) : undefined
+}
+
+// What the profile this overlay sits on top of is asking for right now: the input to the curve,
+// and half of the Target below.
+const liveBaseDuty = (): number | undefined => {
+    const baseUID = currentProfile.value?.member_profile_uids[0]
+    if (baseUID == null) return undefined
+    const base = settingsStore.profiles.find((profile) => profile.uid === baseUID)
+    if (base == null) return undefined
+    return currentProfileDuty(base, settingsStore.profiles, tempOf)
+}
+
+// The overlay's own output: the base duty plus the offset the edited curve applies to it. Read
+// from the chart's points rather than the saved profile, so the line follows an unsaved edit.
+const liveTargetDuty = (baseDuty: number | undefined): number | undefined => {
+    if (baseDuty == null) return undefined
+    const offsetPoints = data.map((point): [number, number] => [point.value[0], point.value[1]])
+    if (offsetPoints.length === 0) return undefined
+    const offset = interpolateOffsetProfile(offsetPoints, baseDuty)
+    return Math.min(dutyMax, Math.max(dutyMin, baseDuty + offset))
+}
+
+const liveActualDuty = (): number | undefined => {
+    if (!hasChannelContext) return undefined
+    const duty = deviceStore.currentDeviceStatus
+        .get(props.channelDeviceUID!)
+        ?.get(props.channelName!)?.duty
+    if (duty == null) return undefined
+    const value = Number.parseFloat(String(duty))
+    return Number.isNaN(value) ? undefined : value
+}
+
+const actualDutyColor = (): string =>
+    (hasChannelContext
+        ? settingsStore.allUIDeviceSettings
+              .get(props.channelDeviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.color
+        : undefined) || colors.themeColors.text_color
+
+// A vertical line spanning the offset axis, or empty when the duty is unknown.
+const setVerticalLine = (line: [LineValue, LineValue], duty: number | undefined): void => {
+    if (duty == null) {
+        line[0].value = []
+        line[1].value = []
+        return
+    }
+    line[0].value = [duty, offsetMin]
+    line[1].value = [duty, offsetMax]
+}
+
+const markData = (duty: number | undefined, offset: number): Array<object> =>
+    duty == null ? [] : [{ coord: [duty, offset], value: duty }]
+
+// Where each label is anchored on the offset axis: mirrored near the two ends, far enough in that
+// the text clears the axis lines, far enough out that neither crowds the curve around zero.
+const TARGET_LABEL_OFFSET = 80
+const ACTUAL_LABEL_OFFSET = -80
+
+const dutyLabel = (key: string) => ({
+    position: 'top' as const,
+    fontSize: deviceStore.getREMSize(1.0),
+    // Rotated to read up the line it belongs to, like the temp label on a graph profile.
+    rotate: 90,
+    offset: [0, -2],
+    formatter: (params: any): string =>
+        params.value == null ? '' : `${t(key)} ${Number(params.value).toFixed(0)}%`,
+    shadowColor: colors.themeColors.bg_one,
+    shadowBlur: 10,
+})
+
+// Recomputes both lines into their shared arrays and hands back the duties the labels need.
+const currentLiveDuties = (): { target: number | undefined; actual: number | undefined } => {
+    const target = liveTargetDuty(liveBaseDuty())
+    const actual = liveActualDuty()
+    setVerticalLine(targetDutyLineData, target)
+    setVerticalLine(actualDutyLineData, actual)
+    return { target, actual }
+}
+
+// Called on every status tick and after any edit to the curve; the series read the same arrays,
+// so a full setOption elsewhere redraws the current values.
+const updateLiveLines = (): void => {
+    const { target: targetDuty, actual: actualDuty } = currentLiveDuties()
+    controlGraph.value?.setOption({
+        series: [
+            {
+                id: 'targetDutyLine',
+                data: targetDutyLineData,
+                markPoint: { data: markData(targetDuty, TARGET_LABEL_OFFSET) },
+            },
+            {
+                id: 'actualDutyLine',
+                data: actualDutyLineData,
+                markPoint: { data: markData(actualDuty, ACTUAL_LABEL_OFFSET) },
+            },
+        ],
+    })
+}
+
+// The two live series: Target dashed in the accent (what this profile asks for, before the
+// channel's Function), Actual in the channel's own color. Seeded with the current duties so the
+// lines are there on the first paint: the chart has no option to merge into until vue-echarts
+// commits this one, so a setOption before then has no series to find.
+const initialDuties = currentLiveDuties()
+for (const line of [
+    {
+        id: 'targetDutyLine',
+        data: targetDutyLineData,
+        color: colors.themeColors.accent,
+        type: 'dashed' as const,
+        labelKey: 'views.profiles.targetDuty',
+        duty: initialDuties.target,
+        labelOffset: TARGET_LABEL_OFFSET,
+    },
+    {
+        id: 'actualDutyLine',
+        data: actualDutyLineData,
+        color: actualDutyColor(),
+        type: 'dotted' as const,
+        labelKey: 'views.profiles.actualDuty',
+        duty: initialDuties.actual,
+        labelOffset: ACTUAL_LABEL_OFFSET,
+    },
+]) {
+    // The option literal types its series from the editor's own point series, so a live line
+    // pushed here does not fit that shape.
+    ;(option.series as Array<any>).push({
+        id: line.id,
+        type: 'line',
+        smooth: false,
+        symbol: 'none',
+        lineStyle: { color: line.color, width: 2, type: line.type },
+        emphasis: { disabled: true },
+        data: line.data,
+        markPoint: {
+            symbolSize: 0,
+            label: { ...dutyLabel(line.labelKey), color: line.color },
+            data: markData(line.duty, line.labelOffset),
+        },
+        z: 100,
+        silent: true,
+    })
+}
+
+//----------------------------------------------------------------------------------------------------------------------
 const controlGraph = ref<InstanceType<typeof VChart> | null>(null)
 
 const setDutyAndOffsetValues = (dataIndex: number): void => {
@@ -455,6 +623,7 @@ const afterPointDragging = (dataIndex: number, posXY: [number, number]): void =>
             position: controlGraph.value?.convertToPixel('grid', item.value),
         })),
     })
+    updateLiveLines()
     tableDataKey.value++
 }
 
@@ -497,6 +666,7 @@ const createWatcherOfDutyOffsetText = (): WatchStopHandle =>
                 ],
                 graphic: graphicData,
             })
+            updateLiveLines()
         },
         { flush: 'post' },
     )
@@ -587,6 +757,7 @@ const createDraggableGraphics = (): void => {
     // Add shadow circles (which is not visible) to enable drag.
     createGraphicDataFromPointData()
     controlGraph.value?.setOption({ graphic: graphicData })
+    graphicsCreated = true
 }
 
 const addPointToLine = (params: any) => {
@@ -652,6 +823,7 @@ const addPointToLine = (params: any) => {
     // this needs a bit of time for the graph to refresh before being set correctly:
     setTimeout(() => (selectedPointIndex.value = indexToInsertAt), 50)
     setTimeout(() => showTooltip(indexToInsertAt), 350) // wait until point animation is complete before showing tooltip
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -704,6 +876,7 @@ const deletePointFromLine = (params: any) => {
         true,
     )
     controlGraph.value?.setOption(option, { replaceMerge: ['series', 'graphic'], silent: true })
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -714,14 +887,13 @@ const deletePointFromLine = (params: any) => {
 // Minimum duty separation between points (1%)
 const MIN_DUTY_SEPARATION = 1
 
-// Points table position (local state, not persisted)
-type TablePosition = 'top-left' | 'bottom-right'
-const tablePosition: Ref<TablePosition> = ref('top-left')
-
-const tablePositionClasses = computed(() => ({
-    'top-14 left-[7.5rem]': tablePosition.value === 'top-left',
-    'bottom-36 right-[6.5rem]': tablePosition.value === 'bottom-right',
-}))
+// Points table position, persisted per profile: where the table sits out of the way depends on
+// the shape of that profile's curve.
+const tablePosition = computed({
+    get: () => settingsStore.pointsTablePosition(props.profileUID),
+    set: (position: TablePosition) =>
+        settingsStore.setPointsTablePosition(props.profileUID, position),
+})
 
 const cycleTablePosition = () => {
     tablePosition.value = tablePosition.value === 'top-left' ? 'bottom-right' : 'top-left'
@@ -763,6 +935,7 @@ const refreshGraphAfterTableEdit = (): void => {
         ],
         graphic: graphicData,
     })
+    updateLiveLines()
     tableDataKey.value++
 }
 
@@ -802,13 +975,13 @@ const handleOffsetTableScroll = (event: WheelEvent, idx: number): void => {
 
 // Direct input handlers for table cells
 const handleDutyTableInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === 0 || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === 0 || idx === data.length - 1) return
     const clampedDuty = Math.max(getPointDutyMin(idx), Math.min(value, getPointDutyMax(idx)))
     updatePointFromTable(idx, clampedDuty, data[idx].value[1])
 }
 
 const handleOffsetTableInput = (idx: number, value: number | null): void => {
-    if (value == null) return
+    if (value == null || Number.isNaN(value)) return
     const clampedOffset = Math.max(offsetMin, Math.min(value, offsetMax))
     updatePointFromTable(idx, data[idx].value[0], clampedOffset)
 }
@@ -922,6 +1095,7 @@ const addPointFromTable = (afterIdx: number): void => {
 
     selectedPointIndex.value = afterIdx + 1
     setDutyAndOffsetValues(afterIdx + 1)
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -940,6 +1114,7 @@ const removePointFromTable = (idx: number): void => {
     // @ts-ignore
     option.graphic = graphicData
     controlGraph.value?.setOption(option, { replaceMerge: ['series', 'graphic'], silent: true })
+    updateLiveLines()
     tableDataKey.value++
     emit('changed', collectPoints())
 }
@@ -1053,6 +1228,9 @@ const updateResponsiveGraphHeight = (): void => {
     }
 }
 const updatePosition = (): void => {
+    if (!graphicsCreated) {
+        return
+    }
     controlGraph.value?.setOption({
         graphic: data.map((item, dataIndex) => ({
             id: dataIndex,
@@ -1060,6 +1238,17 @@ const updatePosition = (): void => {
         })),
     })
 }
+
+// Static anchors inside the plot, like the Graph editor's table. Values were
+// measured against the rendered grid; insets are constant (fixed tick format,
+// rem-scaled fonts and paddings).
+const tablePositionClasses = computed(() => ({
+    'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',
+    // Clears the x-axis name and the last duty label, which sit below and right of the plot area:
+    // the graph editors' 7rem right offset, and enough bottom to stay off the axis line.
+    'bottom-[7rem] right-[7rem]': tablePosition.value === 'bottom-right',
+}))
+
 //----------------------------------------------------------------------------------------------------------------------
 
 const addScrollEventListeners = (): void => {
@@ -1069,7 +1258,24 @@ const addScrollEventListeners = (): void => {
     document?.querySelector('.offset-input')?.addEventListener('wheel', offsetScrolled)
 }
 
+// Held at module scope so onUnmounted can reach them. The observer is created inside a
+// delayed timeout, so unmounting before it fires would otherwise strand an observer that
+// nothing can ever disconnect.
+let resizeObserver: ResizeObserver | null = null
+let debouncedUpdatePosition: _.DebouncedFunc<() => void> | null = null
+// The drag circles only exist once createDraggableGraphics has run. A
+// position-only update before that asks ECharts to create a graphic with no
+// type, which throws and leaves the layer broken. The shell swaps its whole
+// tree at 768px, so a narrow drag remounts this view and lands in that window
+// on every resize event until the circles are back.
+let graphicsCreated = false
+let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
+
 onMounted(async () => {
+    // The live lines follow the status stream: Base moves with its temp source, Actual with the
+    // fan. Their first values are already in the option, so nothing is drawn here.
+    watch(rawStore.currentDeviceStatus, () => updateLiveLines())
+
     // Make sure on selected Point change, that there is only one.
     watch(selectedPointIndex, (dataIndex) => {
         for (const [index, pointData] of data.entries()) {
@@ -1093,24 +1299,10 @@ onMounted(async () => {
     window.addEventListener('resize', updatePosition)
     addScrollEventListeners()
 
-    setTimeout(() => {
+    graphicsTimeout = setTimeout(() => {
         // debounce because we need to wait for the graph to be rendered
-        const resizeObserver = new ResizeObserver(
-            _.debounce(
-                () => {
-                    controlGraph.value?.setOption({
-                        graphic: data.map(function (item, _dataIndex) {
-                            return {
-                                type: 'circle',
-                                position: controlGraph.value?.convertToPixel('grid', item.value),
-                            }
-                        }),
-                    })
-                },
-                200,
-                { leading: false },
-            ),
-        )
+        debouncedUpdatePosition = _.debounce(updatePosition, 200, { leading: false })
+        resizeObserver = new ResizeObserver(debouncedUpdatePosition)
         resizeObserver.observe(controlGraph.value?.$el)
         createDraggableGraphics() // we need to create AFTER the element is visible and rendered
     }, 500) // due to graph resizing, we really need a substantial delay on creation
@@ -1118,215 +1310,224 @@ onMounted(async () => {
 onUnmounted(() => {
     window.removeEventListener('resize', updateResponsiveGraphHeight)
     window.removeEventListener('resize', updatePosition)
+    if (graphicsTimeout !== null) {
+        clearTimeout(graphicsTimeout)
+        graphicsTimeout = null
+    }
+    resizeObserver?.disconnect()
+    resizeObserver = null
+    debouncedUpdatePosition?.cancel()
+    debouncedUpdatePosition = null
+    graphicsCreated = false
 })
 </script>
 
 <template>
-    <div class="flex flex-row justify-center mt-4 mx-4 w-full">
-        <div class="flex flex-row">
-            <div
-                class="p-2 mx-4 leading-none items-center"
-                v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="h-7"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
-        </div>
-    </div>
     <div id="profile-display" class="flex flex-col h-full relative">
-        <v-chart
-            id="control-graph"
-            class="pt-6 pr-11 pl-4 pb-6"
-            ref="controlGraph"
-            :option="option"
-            :autoresize="true"
-            :manual-update="true"
-            @contextmenu="deletePointFromLine"
-            @zr:click="addPointToLine"
-            @zr:contextmenu="deletePointFromLine"
-        />
-        <!-- Points Table Overlay -->
-        <div
-            class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
-            :class="tablePositionClasses"
-        >
+        <div class="relative">
+            <v-chart
+                id="control-graph"
+                class="pt-6 pr-11 pl-4 pb-6"
+                ref="controlGraph"
+                :option="option"
+                :autoresize="true"
+                :manual-update="true"
+                @contextmenu="deletePointFromLine"
+                @zr:click="addPointToLine"
+                @zr:contextmenu="deletePointFromLine"
+            />
+            <!-- Points Table Overlay -->
             <div
-                class="flex justify-between items-center px-2 py-1 border-b border-border-one sticky top-0 bg-bg-two/95"
+                class="absolute z-10 bg-bg-two/90 border border-border-one rounded-lg shadow-lg max-h-[calc(100vh-6rem)] overflow-y-auto"
+                :class="tablePositionClasses"
             >
-                <span class="font-semibold text-text-color cursor-default">{{
-                    t('views.profiles.points')
-                }}</span>
-                <Button
-                    @click="cycleTablePosition"
-                    icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                    text
-                    rounded
-                    class="!w-7 !h-7 !p-0"
-                    v-tooltip.top="t('views.profiles.moveTable')"
-                />
-            </div>
-            <table class="w-full">
-                <thead class="sticky top-7 bg-bg-two/95 cursor-default">
-                    <tr class="text-text-color-secondary">
-                        <th class="px-2 py-1 text-left">#</th>
-                        <th class="px-1 py-1 text-center">{{ t('common.duty') }}</th>
-                        <th class="px-1 py-1 text-center">{{ t('common.offset') }}</th>
-                        <th class="px-1 py-1 w-6"></th>
-                    </tr>
-                </thead>
-                <tbody :key="tableDataKey">
-                    <tr
-                        v-for="(point, idx) in data"
-                        :key="`${tableDataKey}-${idx}`"
-                        class="group cursor-pointer"
-                        :class="{
-                            'bg-accent/30': idx === selectedPointIndex,
-                            'hover:bg-bg-one/20': idx !== selectedPointIndex,
-                        }"
-                        @click="selectPointFromTable(idx)"
+                <div
+                    class="flex justify-between items-center px-2 py-1 border-b border-border-one sticky top-0 bg-bg-two/95"
+                >
+                    <span class="font-semibold text-text-color cursor-default">{{
+                        t('views.profiles.points')
+                    }}</span>
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        class="!h-7 !w-7"
+                        v-tooltip.top="t('views.profiles.moveTable')"
+                        @click="cycleTablePosition"
                     >
-                        <!-- Point Index -->
-                        <td class="px-2 py-0.5 text-text-color-secondary">
-                            {{ idx + 1 }}
-                        </td>
+                        <svg-icon type="mdi" :path="mdiArrowTopRightBottomLeft" :size="14" />
+                    </UiButton>
+                </div>
+                <table class="w-full">
+                    <thead class="sticky top-7 bg-bg-two/95 cursor-default">
+                        <tr class="text-text-color-secondary">
+                            <th class="px-2 py-1 text-left">#</th>
+                            <th class="px-1 py-1 text-center">{{ t('common.duty') }}</th>
+                            <th class="px-1 py-1 text-center">{{ t('common.offset') }}</th>
+                            <th class="px-1 py-1 w-6"></th>
+                        </tr>
+                    </thead>
+                    <tbody :key="tableDataKey">
+                        <tr
+                            v-for="(point, idx) in data"
+                            :key="`${tableDataKey}-${idx}`"
+                            class="group cursor-pointer"
+                            :class="{
+                                'bg-accent/30': idx === selectedPointIndex,
+                                'hover:bg-bg-one/20': idx !== selectedPointIndex,
+                            }"
+                            @click="selectPointFromTable(idx)"
+                        >
+                            <!-- Point Index -->
+                            <td class="px-2 py-0.5 text-text-color-secondary">
+                                {{ idx + 1 }}
+                            </td>
 
-                        <!-- Duty Cell with +/- buttons -->
-                        <td class="pr-2 py-1">
-                            <div
-                                class="flex items-center justify-center gap-0.5"
-                                @wheel.prevent="
-                                    idx !== 0 &&
-                                    idx !== data.length - 1 &&
-                                    handleDutyTableScroll($event, idx)
-                                "
-                            >
-                                <Button
-                                    icon="pi pi-minus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="
-                                        idx === 0 ||
-                                        idx === data.length - 1 ||
-                                        data[idx].value[0] <= getPointDutyMin(idx)
+                            <!-- Duty Cell with +/- buttons -->
+                            <td class="pr-2 py-1">
+                                <div
+                                    class="flex items-center justify-center gap-0.5"
+                                    @wheel.prevent="
+                                        idx !== 0 &&
+                                        idx !== data.length - 1 &&
+                                        handleDutyTableScroll($event, idx)
                                     "
-                                    @pointerdown.stop="startRepeat(() => decrementPointDuty(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                                <InputNumber
-                                    :modelValue="point.value[0]"
-                                    @update:modelValue="handleDutyTableInput(idx, $event)"
-                                    @focus="selectPointFromTable(idx)"
-                                    mode="decimal"
-                                    :minFractionDigits="0"
-                                    :maxFractionDigits="0"
-                                    :min="getPointDutyMin(idx)"
-                                    :max="getPointDutyMax(idx)"
-                                    :suffix="t('common.percentUnit')"
-                                    :disabled="idx === 0 || idx === data.length - 1"
-                                    :inputStyle="{
-                                        width: '3rem',
-                                        textAlign: 'center',
-                                        padding: '0.125rem',
-                                    }"
-                                    class="table-input"
-                                />
-                                <Button
-                                    icon="pi pi-plus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="
-                                        idx === 0 ||
-                                        idx === data.length - 1 ||
-                                        data[idx].value[0] >= getPointDutyMax(idx)
-                                    "
-                                    @pointerdown.stop="startRepeat(() => incrementPointDuty(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                            </div>
-                        </td>
+                                >
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
+                                        :disabled="
+                                            idx === 0 ||
+                                            idx === data.length - 1 ||
+                                            data[idx].value[0] <= getPointDutyMin(idx)
+                                        "
+                                        @pointerdown.stop="
+                                            startRepeat(() => decrementPointDuty(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[0].toFixed(0)"
+                                        :min="getPointDutyMin(idx)"
+                                        :max="getPointDutyMax(idx)"
+                                        step="1"
+                                        :disabled="idx === 0 || idx === data.length - 1"
+                                        @change="
+                                            handleDutyTableInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
+                                    />
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
+                                        :disabled="
+                                            idx === 0 ||
+                                            idx === data.length - 1 ||
+                                            data[idx].value[0] >= getPointDutyMax(idx)
+                                        "
+                                        @pointerdown.stop="
+                                            startRepeat(() => incrementPointDuty(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
+                                </div>
+                            </td>
 
-                        <!-- Offset Cell with +/- buttons -->
-                        <td class="pr-2 py-1">
-                            <div
-                                class="flex items-center justify-center gap-0.5"
-                                @wheel.prevent="handleOffsetTableScroll($event, idx)"
-                            >
-                                <Button
-                                    icon="pi pi-minus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="data[idx].value[1] <= offsetMin"
-                                    @pointerdown.stop="startRepeat(() => decrementPointOffset(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                                <InputNumber
-                                    :modelValue="Math.round(point.value[1]) || 0"
-                                    @update:modelValue="handleOffsetTableInput(idx, $event)"
-                                    @focus="selectPointFromTable(idx)"
-                                    mode="decimal"
-                                    :minFractionDigits="0"
-                                    :maxFractionDigits="0"
-                                    :min="offsetMin"
-                                    :max="offsetMax"
-                                    :suffix="t('common.percentUnit')"
-                                    :inputStyle="{
-                                        width: '3.5rem',
-                                        textAlign: 'center',
-                                        padding: '0.125rem',
-                                    }"
-                                    class="table-input"
-                                />
-                                <Button
-                                    icon="pi pi-plus"
-                                    text
-                                    size="small"
-                                    class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
-                                    :disabled="data[idx].value[1] >= offsetMax"
-                                    @pointerdown.stop="startRepeat(() => incrementPointOffset(idx))"
-                                    @pointerup.stop="stopRepeat"
-                                    @pointerleave="stopRepeat"
-                                />
-                            </div>
-                        </td>
+                            <!-- Offset Cell with +/- buttons -->
+                            <td class="pr-2 py-1">
+                                <div
+                                    class="flex items-center justify-center gap-0.5"
+                                    @wheel.prevent="handleOffsetTableScroll($event, idx)"
+                                >
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
+                                        :disabled="data[idx].value[1] <= offsetMin"
+                                        @pointerdown.stop="
+                                            startRepeat(() => decrementPointOffset(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3.5rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="(Math.round(point.value[1]) || 0).toFixed(0)"
+                                        :min="offsetMin"
+                                        :max="offsetMax"
+                                        step="1"
+                                        @change="
+                                            handleOffsetTableInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
+                                    />
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5"
+                                        :disabled="data[idx].value[1] >= offsetMax"
+                                        @pointerdown.stop="
+                                            startRepeat(() => incrementPointOffset(idx))
+                                        "
+                                        @pointerup.stop="stopRepeat"
+                                        @pointerleave="stopRepeat"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
+                                </div>
+                            </td>
 
-                        <!-- Action buttons (add/remove) -->
-                        <td class="px-1 py-0.5">
-                            <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                                <Button
-                                    v-if="canAddPointAfter(idx)"
-                                    icon="pi pi-plus-circle"
-                                    text
-                                    severity="success"
-                                    size="small"
-                                    class="!w-6 !h-6 !p-0"
-                                    v-tooltip.top="t('views.profiles.addPointAfter')"
-                                    @click.stop="addPointFromTable(idx)"
-                                />
-                                <Button
-                                    v-if="canRemovePoint(idx)"
-                                    icon="pi pi-trash"
-                                    text
-                                    severity="danger"
-                                    size="small"
-                                    class="!w-6 !h-6 !p-0"
-                                    v-tooltip.top="t('views.profiles.removePoint')"
-                                    @click.stop="removePointFromTable(idx)"
-                                />
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                            <!-- Action buttons (add/remove) -->
+                            <td class="px-1 py-0.5">
+                                <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
+                                    <UiButton
+                                        v-if="canAddPointAfter(idx)"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !text-success"
+                                        v-tooltip.top="t('views.profiles.addPointAfter')"
+                                        @click.stop="addPointFromTable(idx)"
+                                    >
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiPlusCircleOutline"
+                                            :size="14"
+                                        />
+                                    </UiButton>
+                                    <UiButton
+                                        v-if="canRemovePoint(idx)"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !text-error"
+                                        v-tooltip.top="t('views.profiles.removePoint')"
+                                        @click.stop="removePointFromTable(idx)"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiDeleteOutline" :size="14" />
+                                    </UiButton>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </template>
@@ -1338,21 +1539,14 @@ onUnmounted(() => {
     height: max(calc(100vh - 8rem), 20rem);
 }
 
-// Compact styling for points table InputNumber components
-:deep(.table-input) {
-    input {
-        background: transparent;
-        border: none;
-        height: 1.5rem;
-
-        &:focus {
-            box-shadow: none;
-            background: var(--cc-bg-one);
-        }
-
-        &:disabled {
-            opacity: 0.6;
-        }
-    }
+// Points table inputs: no native number spinners.
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.table-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 </style>

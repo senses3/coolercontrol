@@ -1,27 +1,12 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::token::{self, StoredToken};
+use crate::token::{self, StoredToken, TokenDigest};
 use anyhow::Result;
 use chrono::{DateTime, Local};
 use log::{error, trace, warn};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -42,6 +27,15 @@ pub struct TokenHandle {
 }
 
 impl TokenHandle {
+    /// A poisoned cache must not take authentication down with it. The map holds only
+    /// last-used timestamps, so continuing with whatever state survived is strictly
+    /// better than failing every subsequent token validation.
+    fn cache(&self) -> MutexGuard<'_, HashMap<String, DateTime<Local>>> {
+        self.last_used_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
     pub async fn new(cancel_token: CancellationToken) -> Self {
         // Token IO uses `sidecar_fs` (always Tokio), so load on the sidecar Tokio runtime.
         let tokens = match crate::sidecar::handle().run(token::load_tokens).await {
@@ -94,12 +88,17 @@ impl TokenHandle {
         write_access: bool,
     ) -> Result<(StoredToken, String)> {
         let raw_token = token::generate_token();
+        // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md. `digest` is
+        // what validation reads; the argon2 hash is written only so a 4.3.x daemon can
+        // still validate this token after a downgrade.
         let hash = token::hash_token(&raw_token)?;
+        let digest = token::digest_token(&raw_token);
         let id = Uuid::new_v4().to_string();
         let stored = StoredToken {
             id,
             label,
             hash,
+            digest: Some(digest),
             created_at: Local::now(),
             expires_at,
             last_used: None,
@@ -113,10 +112,7 @@ impl TokenHandle {
 
     pub async fn list(&self) -> Result<Vec<StoredToken>> {
         let tokens = self.tokens.read().await;
-        let cache = self
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned");
+        let cache = self.cache();
         Ok(tokens
             .iter()
             .map(|t| {
@@ -130,12 +126,7 @@ impl TokenHandle {
     }
 
     pub async fn delete(&self, id: String) -> Result<()> {
-        {
-            self.last_used_cache
-                .lock()
-                .expect("last_used_cache poisoned")
-                .remove(&id);
-        }
+        self.cache().remove(&id);
         let mut tokens = self.tokens.write().await;
         tokens.retain(|t| t.id != id);
         token::save_tokens(&tokens).await
@@ -143,29 +134,44 @@ impl TokenHandle {
 
     pub async fn validate(&self, raw_token: String) -> Result<TokenValidation> {
         let tokens = self.tokens.read().await;
-        match token::validate_token(&raw_token, &tokens) {
-            Some((id, write_access)) => {
-                drop(tokens);
-                self.last_used_cache
-                    .lock()
-                    .expect("last_used_cache poisoned")
-                    .insert(id, Local::now());
-                if write_access {
-                    Ok(TokenValidation::ValidReadWrite)
-                } else {
-                    Ok(TokenValidation::ValidReadOnly)
-                }
-            }
-            None => Ok(TokenValidation::Invalid),
+        let Some(matched) = token::validate_token(&raw_token, &tokens) else {
+            return Ok(TokenValidation::Invalid);
+        };
+        drop(tokens);
+        self.cache().insert(matched.id.clone(), Local::now());
+        if let Some(digest) = matched.upgrade_digest {
+            self.persist_digest(&matched.id, digest).await;
+        }
+        if matched.write_access {
+            Ok(TokenValidation::ValidReadWrite)
+        } else {
+            Ok(TokenValidation::ValidReadOnly)
+        }
+    }
+
+    /// Records the digest of a token that just matched on the legacy argon2 path, so
+    /// it never pays the KDF again.
+    ///
+    /// Failures are logged rather than propagated: the caller has already
+    /// authenticated, and a failed upgrade costs nothing worse than one more argon2
+    /// verify on the next request.
+    async fn persist_digest(&self, id: &str, digest: TokenDigest) {
+        let mut tokens = self.tokens.write().await;
+        let Some(token) = tokens.iter_mut().find(|token| token.id == id) else {
+            return; // deleted between validation and upgrade
+        };
+        if token.digest.is_some() {
+            return; // a concurrent validation upgraded it first
+        }
+        token.digest = Some(digest);
+        if let Err(err) = token::save_tokens(&tokens).await {
+            warn!("Failed to persist upgraded token digest for {id}: {err}");
         }
     }
 
     async fn flush_last_used(&self) -> Result<()> {
         let updates: HashMap<String, DateTime<Local>> = {
-            let mut cache = self
-                .last_used_cache
-                .lock()
-                .expect("last_used_cache poisoned");
+            let mut cache = self.cache();
             if cache.is_empty() {
                 return Ok(());
             }
@@ -184,6 +190,7 @@ impl TokenHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::ops::Not;
 
     fn make_stored_token(raw: &str) -> (StoredToken, String) {
         make_stored_token_with_write(raw, true)
@@ -195,12 +202,22 @@ mod tests {
             id: Uuid::new_v4().to_string(),
             label: "Test Token".to_string(),
             hash,
+            digest: Some(token::digest_token(raw)),
             created_at: Local::now(),
             expires_at: None,
             last_used: None,
             write_access,
         };
         (stored, raw.to_string())
+    }
+
+    /// A token as stored before 5.0.0: argon2 hash, no digest.
+    fn make_legacy_token(raw: &str) -> StoredToken {
+        let (stored, _) = make_stored_token(raw);
+        StoredToken {
+            digest: None,
+            ..stored
+        }
     }
 
     fn make_handle_with_tokens(tokens: Vec<StoredToken>) -> TokenHandle {
@@ -241,6 +258,79 @@ mod tests {
         assert_eq!(result, TokenValidation::Invalid);
     }
 
+    /// Goal: a token minted before 5.0.0 still authenticates through the argon2
+    /// fallback, so upgrading the daemon does not invalidate anyone's tokens.
+    #[tokio::test]
+    async fn test_validate_legacy_token_still_authenticates() {
+        let raw = token::generate_token();
+        let handle = make_handle_with_tokens(vec![make_legacy_token(&raw)]);
+
+        let result = handle.validate(raw).await.unwrap();
+        assert_eq!(result, TokenValidation::ValidReadWrite);
+    }
+
+    /// Goal: validating a legacy token records its digest, so the KDF is paid at most
+    /// once more per token.
+    #[tokio::test]
+    async fn test_validate_legacy_token_records_digest() {
+        let raw = token::generate_token();
+        let handle = make_handle_with_tokens(vec![make_legacy_token(&raw)]);
+        assert_eq!(handle.tokens.read().await[0].digest, None);
+
+        handle.validate(raw.clone()).await.unwrap();
+
+        let tokens = handle.tokens.read().await;
+        assert_eq!(tokens[0].digest, Some(token::digest_token(&raw)));
+    }
+
+    /// Goal: prove the upgraded token authenticates off the digest alone.
+    ///
+    /// Method: validate once to trigger the upgrade, then corrupt the argon2 hash and
+    /// validate again. Success is only possible if the digest path handled it.
+    #[tokio::test]
+    async fn test_upgraded_token_validates_without_argon2() {
+        let raw = token::generate_token();
+        let handle = make_handle_with_tokens(vec![make_legacy_token(&raw)]);
+        handle.validate(raw.clone()).await.unwrap();
+
+        {
+            let mut tokens = handle.tokens.write().await;
+            tokens[0].hash = "$argon2id$v=19$m=19456,t=2,p=1$corrupt$corrupt".to_string();
+        }
+
+        let result = handle.validate(raw).await.unwrap();
+        assert_eq!(result, TokenValidation::ValidReadWrite);
+    }
+
+    /// Goal: an already-upgraded token is left alone, so concurrent validations cannot
+    /// each rewrite the store.
+    #[tokio::test]
+    async fn test_persist_digest_is_noop_when_already_set() {
+        let raw = token::generate_token();
+        let (stored, _) = make_stored_token(&raw);
+        let id = stored.id.clone();
+        let original = stored.digest.clone();
+        let handle = make_handle_with_tokens(vec![stored]);
+
+        handle
+            .persist_digest(&id, token::digest_token("a-different-token"))
+            .await;
+
+        assert_eq!(handle.tokens.read().await[0].digest, original);
+    }
+
+    /// Goal: a token deleted between validation and upgrade does not resurrect or panic.
+    #[tokio::test]
+    async fn test_persist_digest_ignores_missing_token() {
+        let handle = make_handle_with_tokens(Vec::new());
+
+        handle
+            .persist_digest("gone", token::digest_token("x"))
+            .await;
+
+        assert!(handle.tokens.read().await.is_empty());
+    }
+
     #[tokio::test]
     async fn test_validate_updates_last_used_cache() {
         let raw = token::generate_token();
@@ -250,11 +340,7 @@ mod tests {
 
         handle.validate(raw).await.unwrap();
 
-        let cache = handle
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned");
-        assert!(cache.contains_key(&token_id));
+        assert!(handle.cache().contains_key(&token_id));
     }
 
     #[tokio::test]
@@ -285,13 +371,7 @@ mod tests {
 
         // Note: delete calls save_tokens which writes to disk — skip for unit test
         // Instead, verify the in-memory state changes
-        {
-            handle
-                .last_used_cache
-                .lock()
-                .expect("last_used_cache poisoned")
-                .remove(&token_id);
-        }
+        handle.cache().remove(&token_id);
         {
             let mut tokens = handle.tokens.write().await;
             tokens.retain(|t| t.id != token_id);
@@ -299,11 +379,7 @@ mod tests {
 
         let listed = handle.list().await.unwrap();
         assert!(listed.is_empty());
-        assert!(!handle
-            .last_used_cache
-            .lock()
-            .unwrap()
-            .contains_key(&token_id));
+        assert!(handle.cache().contains_key(&token_id).not());
     }
 
     #[tokio::test]
@@ -333,20 +409,13 @@ mod tests {
 
         // Validate to populate cache
         handle.validate(raw).await.unwrap();
-        assert!(!handle
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned")
-            .is_empty());
+        assert!(handle.cache().is_empty().not());
 
         // Flush merges cache into tokens (save_tokens will fail without filesystem,
         // but we can verify the merge logic by checking token state)
         {
             let updates: HashMap<String, DateTime<Local>> = {
-                let mut cache = handle
-                    .last_used_cache
-                    .lock()
-                    .expect("last_used_cache poisoned");
+                let mut cache = handle.cache();
                 std::mem::take(&mut *cache)
             };
             let mut tokens = handle.tokens.write().await;
@@ -358,11 +427,7 @@ mod tests {
         }
 
         // Cache should be empty after flush
-        assert!(handle
-            .last_used_cache
-            .lock()
-            .expect("last_used_cache poisoned")
-            .is_empty());
+        assert!(handle.cache().is_empty());
         // Token should have last_used set
         let tokens = handle.tokens.read().await;
         let t = tokens.iter().find(|t| t.id == token_id).unwrap();

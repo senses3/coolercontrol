@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 // ! These are somewhat "integration" tests for the control engine of CoolerControl.
 // ! The setup and tests are meant to cover the main control functions as well as the
@@ -47,6 +32,7 @@ mod engine_tests {
     struct MockRepository {
         device_type: DeviceType,
         set_speeds: Rc<RefCell<Vec<u8>>>,
+        applied_profiles: Rc<RefCell<Vec<Vec<(Temp, Duty)>>>>,
         should_fail: Rc<Cell<bool>>,
     }
 
@@ -104,8 +90,14 @@ mod engine_tests {
             _device_uid: &UID,
             _channel_name: &str,
             _temp_source: &TempSource,
-            _speed_profile: &[(f64, u8)],
+            speed_profile: &[(f64, u8)],
         ) -> Result<()> {
+            if self.should_fail.get() {
+                return Err(anyhow!("Simulated failure to apply speed profile"));
+            }
+            self.applied_profiles
+                .borrow_mut()
+                .push(speed_profile.to_vec());
             Ok(())
         }
 
@@ -139,22 +131,31 @@ mod engine_tests {
         async fn reinitialize_devices(&self) {}
     }
 
-    fn setup_single_device() -> (
-        DeviceLock,
-        Engine,
-        Rc<Config>,
-        Rc<RefCell<Vec<u8>>>,
-        Rc<Cell<bool>>,
-    ) {
+    /// One hwmon mock device with an Engine over it, plus every handle
+    /// the tests assert on. The setup wrappers below pick what they need.
+    struct MockHarness {
+        device: DeviceLock,
+        engine: Engine,
+        config: Rc<Config>,
+        set_speeds: Rc<RefCell<Vec<u8>>>,
+        applied_profiles: Rc<RefCell<Vec<Vec<(Temp, Duty)>>>>,
+        should_fail: Rc<Cell<bool>>,
+        calibration_store: Rc<crate::calibration::CalibrationStore>,
+        fan_state_map: Rc<crate::calibration::FanStateMap>,
+    }
+
+    fn setup_harness() -> MockHarness {
         let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
         let mut repos = Repositories::default();
         let set_speeds = Rc::new(RefCell::new(Vec::new()));
+        let applied_profiles = Rc::new(RefCell::new(Vec::new()));
         let should_fail = Rc::new(Cell::new(false));
 
         // Create mock repository
         let mock_repo = Rc::new(MockRepository {
             device_type: DeviceType::Hwmon,
             set_speeds: Rc::clone(&set_speeds),
+            applied_profiles: Rc::clone(&applied_profiles),
             should_fail: Rc::clone(&should_fail),
         });
         repos.hwmon = Some(mock_repo);
@@ -185,12 +186,32 @@ mod engine_tests {
             all_devices,
             &all_repos,
             Rc::clone(&config),
-            calibration_store,
-            fan_state_map,
+            Rc::clone(&calibration_store),
+            Rc::clone(&fan_state_map),
             Rc::new(crate::overrides::OverridesController::empty()),
         );
 
-        (device, engine, config, set_speeds, should_fail)
+        MockHarness {
+            device,
+            engine,
+            config,
+            set_speeds,
+            applied_profiles,
+            should_fail,
+            calibration_store,
+            fan_state_map,
+        }
+    }
+
+    fn setup_single_device() -> (
+        DeviceLock,
+        Engine,
+        Rc<Config>,
+        Rc<RefCell<Vec<u8>>>,
+        Rc<Cell<bool>>,
+    ) {
+        let h = setup_harness();
+        (h.device, h.engine, h.config, h.set_speeds, h.should_fail)
     }
 
     fn create_controllable_fan(device: &DeviceLock, fan_name: &str) -> ChannelName {
@@ -1666,47 +1687,8 @@ mod engine_tests {
     }
 
     fn setup_calibrated_device() -> (DeviceLock, Engine, Rc<crate::calibration::CalibrationStore>) {
-        let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
-        let mut repos = Repositories::default();
-        let set_speeds = Rc::new(RefCell::new(Vec::new()));
-        let should_fail = Rc::new(Cell::new(false));
-
-        let mock_repo = Rc::new(MockRepository {
-            device_type: DeviceType::Hwmon,
-            set_speeds,
-            should_fail,
-        });
-        repos.hwmon = Some(mock_repo);
-
-        let device = Rc::new(RefCell::new(Device::new(
-            "Test Device".to_string(),
-            DeviceType::Hwmon,
-            0,
-            None,
-            DeviceInfo::default(),
-            None,
-            1.0,
-        )));
-        let device_uid = device.borrow().uid.clone();
-        devices.insert(device_uid, Rc::clone(&device));
-
-        let all_devices = Rc::new(devices);
-        let all_repos = Rc::new(repos);
-        let config = Rc::new(Config::init_default_config().unwrap());
-        config.create_device_list(&all_devices);
-
-        let calibration_store = Rc::new(crate::calibration::CalibrationStore::empty());
-        let fan_state_map = Rc::new(crate::calibration::FanStateMap::new());
-        let engine = Engine::new(
-            all_devices,
-            &all_repos,
-            Rc::clone(&config),
-            Rc::clone(&calibration_store),
-            fan_state_map,
-            Rc::new(crate::overrides::OverridesController::empty()),
-        );
-
-        (device, engine, calibration_store)
+        let h = setup_harness();
+        (h.device, h.engine, h.calibration_store)
     }
 
     /// Build an Engine over one hwmon mock device, returning the config
@@ -1714,41 +1696,9 @@ mod engine_tests {
     /// `setup_calibrated_device` but exposes the `config` and
     /// `set_speeds` handles a snapshot/restore test needs to assert on.
     fn setup_engine_with_speed_recorder() -> (Engine, Rc<Config>, DeviceUID, Rc<RefCell<Vec<u8>>>) {
-        let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
-        let mut repos = Repositories::default();
-        let set_speeds = Rc::new(RefCell::new(Vec::new()));
-        let mock_repo = Rc::new(MockRepository {
-            device_type: DeviceType::Hwmon,
-            set_speeds: Rc::clone(&set_speeds),
-            should_fail: Rc::new(Cell::new(false)),
-        });
-        repos.hwmon = Some(mock_repo);
-
-        let device = Rc::new(RefCell::new(Device::new(
-            "Test Device".to_string(),
-            DeviceType::Hwmon,
-            0,
-            None,
-            DeviceInfo::default(),
-            None,
-            1.0,
-        )));
-        let device_uid = device.borrow().uid.clone();
-        devices.insert(device_uid.clone(), Rc::clone(&device));
-
-        let all_devices = Rc::new(devices);
-        let all_repos = Rc::new(repos);
-        let config = Rc::new(Config::init_default_config().unwrap());
-        config.create_device_list(&all_devices);
-        let engine = Engine::new(
-            all_devices,
-            &all_repos,
-            Rc::clone(&config),
-            Rc::new(crate::calibration::CalibrationStore::empty()),
-            Rc::new(crate::calibration::FanStateMap::new()),
-            Rc::new(crate::overrides::OverridesController::empty()),
-        );
-        (engine, config, device_uid, set_speeds)
+        let h = setup_harness();
+        let device_uid = h.device.borrow().uid.clone();
+        (h.engine, h.config, device_uid, h.set_speeds)
     }
 
     fn sample_smooth_calibration() -> crate::calibration::Calibration {
@@ -2135,6 +2085,70 @@ mod engine_tests {
             let key: crate::calibration::ChannelKey = (device_uid, "fan1".to_string());
             assert!(!calibration_store.has(&key));
             assert!(!engine.is_calibration_in_progress(&key));
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn start_calibration_diagnosis_blocked_by_active_alert() {
+        // Goal: an alert already Active on the channel aborts the sweep in
+        // preflight: the alert was not caused by calibration, so the fan
+        // itself is suspect. Nothing is persisted or registered.
+        cc_fs::test_runtime(async {
+            use crate::calibration::{CalibrationAlertGate, DiagnosisFailure};
+            struct StubGate;
+            impl CalibrationAlertGate for StubGate {
+                fn active_alert_for_channel(
+                    &self,
+                    _device_uid: &str,
+                    channel_name: &str,
+                ) -> Option<String> {
+                    (channel_name == "fan1").then(|| "Fan Alarm".to_string())
+                }
+            }
+            let (device, engine, calibration_store) = setup_calibrated_device();
+            let device_uid = device.borrow().uid.clone();
+            engine.set_alert_gate(Rc::new(StubGate));
+            let err = engine
+                .start_calibration_diagnosis(device_uid.clone(), "fan1".to_string())
+                .await
+                .expect_err("active alert blocks the sweep");
+            assert!(matches!(err, DiagnosisFailure::BlockedByAlert { .. }));
+            let key: crate::calibration::ChannelKey = (device_uid, "fan1".to_string());
+            assert!(!calibration_store.has(&key));
+            assert!(!engine.is_calibration_in_progress(&key));
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn calibration_batch_begin_rejects_active_alert() {
+        // Goal: a batch listing a channel with an Active alert is rejected
+        // upfront, naming the offending alert, and no batch is installed; a
+        // batch on an unblocked channel still begins.
+        cc_fs::test_runtime(async {
+            use crate::calibration::CalibrationAlertGate;
+            struct StubGate;
+            impl CalibrationAlertGate for StubGate {
+                fn active_alert_for_channel(
+                    &self,
+                    _device_uid: &str,
+                    channel_name: &str,
+                ) -> Option<String> {
+                    (channel_name == "fan1").then(|| "Fan Alarm".to_string())
+                }
+            }
+            let (device, engine, _calibration_store) = setup_calibrated_device();
+            let device_uid = device.borrow().uid.clone();
+            engine.set_alert_gate(Rc::new(StubGate));
+            let err = engine
+                .begin_calibration_batch(vec![(device_uid.clone(), "fan1".to_string())], 1)
+                .expect_err("blocked channel rejects the batch");
+            assert!(err.to_string().contains("Fan Alarm"));
+            // The rejected batch was never installed, so a clean one begins.
+            engine
+                .begin_calibration_batch(vec![(device_uid, "fan2".to_string())], 1)
+                .expect("unblocked channel begins");
         });
     }
 
@@ -2556,6 +2570,616 @@ mod engine_tests {
                     "fan2 must keep its duty (not in clear scope)"
                 );
             }
+        });
+    }
+
+    /// A fan whose channel supports a firmware-internal curve, the
+    /// prerequisite for the `set_graph_profile` hardware branch.
+    fn create_firmware_curve_fan(device: &DeviceLock, fan_name: &str) -> ChannelName {
+        let fan_channel_name = fan_name.to_string();
+        device.borrow_mut().info.channels.insert(
+            fan_channel_name.clone(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Speed(SpeedOptions {
+                    fixed_enabled: true,
+                    extension: Some(crate::device::ChannelExtensionNames::AutoHWCurve),
+                    ..Default::default()
+                }),
+            },
+        );
+        fan_channel_name
+    }
+
+    /// Turn on the user-facing firmware-controlled profile toggle.
+    fn enable_hw_curve(config: &Config, device_uid: &UID, channel_name: &str) {
+        use crate::setting::{CCChannelSettings, CCDeviceSettings, ChannelExtensions};
+        let mut cc_settings = CCDeviceSettings::default();
+        cc_settings.channel_settings.insert(
+            channel_name.to_string(),
+            CCChannelSettings {
+                extension: Some(ChannelExtensions::AutoHWCurve {
+                    auto_hw_curve_enabled: true,
+                }),
+                ..Default::default()
+            },
+        );
+        config.set_cc_settings_for_device(device_uid, &cc_settings);
+    }
+
+    /// Apply a Graph profile to a firmware-curve channel and return the
+    /// points the repo received.
+    async fn apply_firmware_curve_profile(
+        h: &MockHarness,
+        points: Vec<(Temp, Duty)>,
+    ) -> Vec<(Temp, Duty)> {
+        let fan = create_firmware_curve_fan(&h.device, "fan1");
+        let temp = create_temp(&h.device, "temp1");
+        let device_uid = h.device.borrow().uid.clone();
+        enable_hw_curve(&h.config, &device_uid, &fan);
+        let profile_uid = create_graph_profile_with_temp_source(
+            &h.config,
+            points,
+            TempSource {
+                device_uid: device_uid.clone(),
+                temp_name: temp,
+            },
+        );
+        h.engine
+            .set_profile(&device_uid, &fan, &profile_uid)
+            .await
+            .expect("firmware profile applies");
+        let applied = h.applied_profiles.borrow();
+        assert_eq!(applied.len(), 1, "exactly one curve write expected");
+        applied[0].clone()
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_maps_points_through_calibration() {
+        // Goal: a calibrated channel draws its curve in true-duty, which
+        // the firmware cannot interpret. The hardware branch must write
+        // device-duty instead, or the firmware runs the fan below its
+        // calibrated floor. Expected values follow from the fixture's
+        // linear curve (rpm = duty * 20, floor 100 rpm at duty 5):
+        // true 10 -> 14, true 50 -> 52. The 0 and 100 endpoints are
+        // preserved exactly so an off-point stays off (AMD's zero-RPM
+        // detection depends on it) and full duty stays full.
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            h.calibration_store.insert_unsaved(
+                (device_uid, "fan1".to_string()),
+                sample_smooth_calibration(),
+            );
+
+            let applied = apply_firmware_curve_profile(
+                &h,
+                vec![(30.0, 0), (50.0, 10), (70.0, 50), (90.0, 100)],
+            )
+            .await;
+
+            assert_eq!(
+                applied,
+                vec![(30.0, 0), (50.0, 14), (70.0, 52), (90.0, 100)]
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_passes_through_when_uncalibrated() {
+        // Goal: without a calibration the curve must reach the repo
+        // byte-identical to what the user drew. This is the regression
+        // lock for every existing firmware-curve user.
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let points = vec![(30.0, 20), (50.0, 40), (70.0, 100)];
+
+            let applied = apply_firmware_curve_profile(&h, points.clone()).await;
+
+            assert_eq!(applied, points);
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_passes_through_for_stepped_calibration() {
+        // Goal: a stepped channel has no forward map (duties pass
+        // through in software mode too), so the firmware curve must not
+        // be rewritten.
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            let mut stepped = sample_smooth_calibration();
+            stepped.curve_kind = crate::calibration::CurveKind::Stepped;
+            h.calibration_store
+                .insert_unsaved((device_uid, "fan1".to_string()), stepped);
+            let points = vec![(30.0, 20), (50.0, 40), (70.0, 100)];
+
+            let applied = apply_firmware_curve_profile(&h, points.clone()).await;
+
+            assert_eq!(applied, points);
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn firmware_curve_forgets_stale_dispatcher_state() {
+        // Goal: the dispatcher's kick/sustain state describes writes the
+        // daemon makes itself. Once the firmware owns the channel it is
+        // stale, and the status augmenter's cache tier would otherwise
+        // keep displaying the last commanded true-duty.
+        use crate::calibration::{ChannelEntry, FanState};
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            let key = (device_uid, "fan1".to_string());
+            h.fan_state_map.replace(
+                key.clone(),
+                ChannelEntry {
+                    state: FanState::On,
+                    under_diagnosis: false,
+                    commanded_true_duty: Some(42),
+                },
+            );
+            assert_eq!(h.fan_state_map.commanded_true_duty(&key), Some(42));
+
+            let _ = apply_firmware_curve_profile(&h, vec![(30.0, 20), (70.0, 100)]).await;
+
+            assert!(
+                h.fan_state_map.commanded_true_duty(&key).is_none(),
+                "entering firmware control must drop the dispatcher state"
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn duty_floor_comes_from_channel_info_and_repository() {
+        // Goal: the sweep's floor is the stricter of what the channel
+        // reports (a liquidctl pump header's min_duty, say) and what the
+        // repository clamps behind the daemon's back (an RDNA3 card's
+        // PMFW speed range). Channels that report no minimum and sit on
+        // a repository without a clamp keep a floor of 0, which is the
+        // pre-floor duty sequence.
+        use crate::calibration::DiagnosisHost;
+        cc_fs::test_runtime(async {
+            let h = setup_harness();
+            let device_uid = h.device.borrow().uid.clone();
+            create_controllable_fan(&h.device, "fan1");
+            h.device.borrow_mut().info.channels.insert(
+                "pump".to_string(),
+                ChannelInfo {
+                    label: None,
+                    kind: ChannelKind::Speed(SpeedOptions {
+                        min_duty: 20,
+                        fixed_enabled: true,
+                        ..Default::default()
+                    }),
+                },
+            );
+
+            assert_eq!(h.engine.duty_floor(&device_uid, "fan1"), 0);
+            assert_eq!(h.engine.duty_floor(&device_uid, "pump"), 20);
+            // Unknown channel and unknown device both degrade to no floor.
+            assert_eq!(h.engine.duty_floor(&device_uid, "nope"), 0);
+            assert_eq!(
+                h.engine.duty_floor(&"no-such-device".to_string(), "fan1"),
+                0
+            );
+        });
+    }
+}
+
+#[cfg(test)]
+mod lcd_shutdown_tests {
+    use crate::cc_fs;
+    use crate::config::Config;
+    use crate::device::{
+        ChannelInfo, ChannelKind, Device, DeviceInfo, DeviceType, DeviceUID, LcdInfo, UID,
+    };
+    use crate::engine::main::Engine;
+    use crate::paths;
+    use crate::repositories::repository::{DeviceList, DeviceLock, Repositories, Repository};
+    use crate::setting::{LcdModeKind, LcdSettings, Setting, SettingKind};
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use mime;
+    use serial_test::serial;
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    const LCD_CHANNEL: &str = "lcd";
+
+    /// Records what actually reached the screen, so a test can tell the stock
+    /// shutdown image apart from a user's own.
+    struct LcdRecorder {
+        applied: Rc<RefCell<Vec<LcdSettings>>>,
+    }
+
+    #[async_trait(?Send)]
+    impl Repository for LcdRecorder {
+        fn device_type(&self) -> DeviceType {
+            DeviceType::Liquidctl
+        }
+        async fn initialize_devices(&mut self) -> Result<()> {
+            Ok(())
+        }
+        async fn devices(&self) -> DeviceList {
+            Vec::new()
+        }
+        async fn preload_statuses(self: Rc<Self>) {}
+        async fn update_statuses(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn shutdown(&self) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_reset(&self, _d: &UID, _c: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_manual_control(&self, _d: &UID, _c: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_speed_fixed(&self, _d: &UID, _c: &str, _s: u8) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_speed_profile(
+            &self,
+            _d: &UID,
+            _c: &str,
+            _t: &crate::setting::TempSource,
+            _p: &[(f64, u8)],
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_lighting(
+            &self,
+            _d: &UID,
+            _c: &str,
+            _l: &crate::setting::LightingSettings,
+        ) -> Result<()> {
+            Ok(())
+        }
+        async fn apply_setting_lcd(&self, _d: &UID, _c: &str, lcd: &LcdSettings) -> Result<()> {
+            self.applied.borrow_mut().push(lcd.clone());
+            Ok(())
+        }
+        async fn apply_setting_pwm_mode(&self, _d: &UID, _c: &str, _m: u8) -> Result<()> {
+            Ok(())
+        }
+        async fn reinitialize_devices(&self) {}
+    }
+
+    fn setup_lcd_engine() -> (Engine, Rc<Config>, DeviceUID, Rc<RefCell<Vec<LcdSettings>>>) {
+        let applied = Rc::new(RefCell::new(Vec::new()));
+        let mut repos = Repositories::default();
+        repos.liquidctl = Some(Rc::new(LcdRecorder {
+            applied: Rc::clone(&applied),
+        }));
+
+        let mut info = DeviceInfo::default();
+        info.channels.insert(
+            LCD_CHANNEL.to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Lcd {
+                    modes: Vec::new(),
+                    info: Some(LcdInfo {
+                        screen_width: 320,
+                        screen_height: 320,
+                        max_image_size_bytes: 10_000_000,
+                        gif_supported: true,
+                    }),
+                },
+            },
+        );
+        let device = Rc::new(RefCell::new(Device::new(
+            "Test LCD Device".to_string(),
+            DeviceType::Liquidctl,
+            0,
+            None,
+            info,
+            None,
+            1.0,
+        )));
+        let device_uid = device.borrow().uid.clone();
+        let mut devices: HashMap<DeviceUID, DeviceLock> = HashMap::new();
+        devices.insert(device_uid.clone(), device);
+
+        let all_devices = Rc::new(devices);
+        let config = Rc::new(Config::init_default_config().unwrap());
+        config.create_device_list(&all_devices);
+        let engine = Engine::new(
+            all_devices,
+            &Rc::new(repos),
+            Rc::clone(&config),
+            Rc::new(crate::calibration::CalibrationStore::empty()),
+            Rc::new(crate::calibration::FanStateMap::new()),
+            Rc::new(crate::overrides::OverridesController::empty()),
+        );
+        (engine, config, device_uid, applied)
+    }
+
+    fn lcd_setting(mode: LcdModeKind) -> Setting {
+        Setting {
+            channel_name: LCD_CHANNEL.to_string(),
+            kind: SettingKind::Lcd {
+                lcd: LcdSettings {
+                    brightness: None,
+                    orientation: None,
+                    colors: Vec::new(),
+                    mode,
+                },
+            },
+        }
+    }
+
+    /// Goal: a live Temp screen with no shutdown setting gets the stock image, which is
+    /// the baseline the bug report expects to hold after a removal.
+    #[test]
+    #[serial]
+    fn temp_mode_without_a_shutdown_setting_gets_the_stock_image() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Temp { temp_source: None }),
+            );
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert_eq!(applied.borrow().len(), 1, "the stock image must be applied");
+        });
+    }
+
+    /// Goal: two screens must not share one image file. A single shared name let the second
+    /// upload overwrite the first screen's picture, and both settings then named that file.
+    #[test]
+    #[serial]
+    fn each_channel_gets_its_own_live_image_file() {
+        cc_fs::test_runtime(async {
+            let (engine, _config, device_uid, _applied) = setup_lcd_engine();
+            let first = engine
+                .save_lcd_image(
+                    &device_uid,
+                    "lcd1",
+                    &mime::IMAGE_PNG,
+                    b"screen-one".to_vec(),
+                )
+                .await
+                .unwrap();
+            let second = engine
+                .save_lcd_image(
+                    &device_uid,
+                    "lcd2",
+                    &mime::IMAGE_PNG,
+                    b"screen-two".to_vec(),
+                )
+                .await
+                .unwrap();
+
+            assert_ne!(first, second, "each channel needs its own file");
+            let kept = cc_fs::read_image(std::path::Path::new(&first))
+                .await
+                .unwrap();
+            assert_eq!(
+                kept, b"screen-one",
+                "the second screen's upload must not overwrite the first"
+            );
+        });
+    }
+
+    /// Goal: a gif keeps its extension, since the retrieved content type is read back off the
+    /// path. The old check matched one fixed filename, which a per-channel path never is.
+    #[test]
+    #[serial]
+    fn a_gif_keeps_its_extension_on_a_per_channel_path() {
+        cc_fs::test_runtime(async {
+            let (engine, _config, device_uid, _applied) = setup_lcd_engine();
+            let path = engine
+                .save_lcd_image(&device_uid, LCD_CHANNEL, &mime::IMAGE_GIF, b"gif".to_vec())
+                .await
+                .unwrap();
+
+            assert!(path.ends_with(".gif"), "a gif must stay a gif: {path}");
+        });
+    }
+
+    /// Goal: someone deletes the shutdown image by hand. The stored setting then describes a
+    /// file that is not there, so it must be dropped and the stock image used instead.
+    #[test]
+    #[serial]
+    fn a_hand_removed_shutdown_image_drops_its_setting_and_uses_the_stock_image() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Temp { temp_source: None }),
+            );
+            let user_image = paths::config_dir().join("lcd_shutdown/gone.png");
+            config.set_lcd_shutdown_setting(
+                &device_uid,
+                LCD_CHANNEL,
+                &LcdSettings {
+                    brightness: None,
+                    orientation: None,
+                    colors: Vec::new(),
+                    mode: LcdModeKind::Image {
+                        image_file_processed: Some(user_image.to_str().unwrap().to_string()),
+                    },
+                },
+            );
+            // The file was never written: this is the hand-deleted state.
+            assert_eq!(config.get_all_lcd_shutdown_settings().unwrap().len(), 1);
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert!(
+                config.get_all_lcd_shutdown_settings().unwrap().is_empty(),
+                "the stale shutdown setting must be dropped from the config"
+            );
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the stock image must stand in for the missing one"
+            );
+        });
+    }
+
+    /// Goal: negative space. A shutdown image that is still on disk must be applied and its
+    /// setting kept, or the pruning would eat working configurations.
+    #[test]
+    #[serial]
+    fn a_present_shutdown_image_is_applied_and_kept() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Temp { temp_source: None }),
+            );
+            let user_image = paths::config_dir().join("lcd_shutdown/present.png");
+            cc_fs::create_dir_all(&paths::config_dir().join("lcd_shutdown"))
+                .await
+                .unwrap();
+            cc_fs::write(&user_image, b"not-a-real-png".to_vec())
+                .await
+                .unwrap();
+            config.set_lcd_shutdown_setting(
+                &device_uid,
+                LCD_CHANNEL,
+                &LcdSettings {
+                    brightness: None,
+                    orientation: None,
+                    colors: Vec::new(),
+                    mode: LcdModeKind::Image {
+                        image_file_processed: Some(user_image.to_str().unwrap().to_string()),
+                    },
+                },
+            );
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert_eq!(
+                config.get_all_lcd_shutdown_settings().unwrap().len(),
+                1,
+                "a working shutdown setting must survive"
+            );
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the user's image must be applied"
+            );
+        });
+    }
+
+    /// Goal: negative space. A user's own picture that is still on disk is theirs to keep,
+    /// so widening the fallback must not paint the stock image over a working screen.
+    #[test]
+    #[serial]
+    fn a_present_user_image_is_left_alone() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            let picture = paths::config_dir().join("lcd_images/mine.png");
+            cc_fs::create_dir_all(&paths::config_dir().join("lcd_images"))
+                .await
+                .unwrap();
+            cc_fs::write(&picture, b"not-a-real-png".to_vec())
+                .await
+                .unwrap();
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Image {
+                    image_file_processed: Some(picture.to_str().unwrap().to_string()),
+                }),
+            );
+
+            engine.apply_lcd_shutdown_images().await;
+
+            assert!(
+                applied.borrow().is_empty(),
+                "a screen showing an existing image must be left as the user set it"
+            );
+        });
+    }
+
+    /// Goal: negative space. None and Liquid mean the device drives its own screen, so the
+    /// engine must keep its hands off regardless of the Image widening.
+    #[test]
+    #[serial]
+    fn device_driven_modes_are_left_alone() {
+        cc_fs::test_runtime(async {
+            for mode in [LcdModeKind::None, LcdModeKind::Liquid] {
+                let (engine, config, device_uid, applied) = setup_lcd_engine();
+                config.set_device_setting(&device_uid, &lcd_setting(mode));
+
+                engine.apply_lcd_shutdown_images().await;
+
+                assert!(
+                    applied.borrow().is_empty(),
+                    "a device-driven screen must not get the stock image"
+                );
+            }
+        });
+    }
+
+    /// Goal: the reported bug. An externally driven screen (coolerdash and friends) has its
+    /// current setting rewritten to the shutdown image when that image is applied. After the
+    /// user removes the shutdown image, the stock embedded image must still take over.
+    #[test]
+    #[serial]
+    fn stock_image_returns_after_removing_an_applied_shutdown_image() {
+        cc_fs::test_runtime(async {
+            let (engine, config, device_uid, applied) = setup_lcd_engine();
+            // An external service owns the screen: its image lives outside the config dir.
+            config.set_device_setting(
+                &device_uid,
+                &lcd_setting(LcdModeKind::Image {
+                    image_file_processed: Some("/run/coolerdash/live.png".to_string()),
+                }),
+            );
+            // The user sets their own shutdown image.
+            let user_image = paths::config_dir().join("lcd_shutdown/user.png");
+            cc_fs::create_dir_all(&paths::config_dir().join("lcd_shutdown"))
+                .await
+                .unwrap();
+            cc_fs::write(&user_image, b"not-a-real-png".to_vec())
+                .await
+                .unwrap();
+            let shutdown = LcdSettings {
+                brightness: None,
+                orientation: None,
+                colors: Vec::new(),
+                mode: LcdModeKind::Image {
+                    image_file_processed: Some(user_image.to_str().unwrap().to_string()),
+                },
+            };
+            config.set_lcd_shutdown_setting(&device_uid, LCD_CHANNEL, &shutdown);
+
+            // First shutdown: the user's image is applied, and because the screen was
+            // externally driven the engine persists it as the current setting.
+            engine.apply_lcd_shutdown_images().await;
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the user's image must be applied"
+            );
+
+            // The user removes the shutdown image: the file goes and the setting goes.
+            cc_fs::remove_file(&user_image).await.unwrap();
+            config.remove_lcd_shutdown_setting(&device_uid, LCD_CHANNEL);
+            applied.borrow_mut().clear();
+
+            // Second shutdown: nothing is configured, so the stock image must be used.
+            engine.apply_lcd_shutdown_images().await;
+
+            assert_eq!(
+                applied.borrow().len(),
+                1,
+                "the stock embedded shutdown image must be applied once the user's is removed"
+            );
         });
     }
 }

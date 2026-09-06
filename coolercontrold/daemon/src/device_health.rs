@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Daemon-authoritative tracking of unhealthy device references and channels.
 //!
@@ -30,6 +15,7 @@
 use crate::api::actor::DeviceHealthHandle;
 use crate::config::Config;
 use crate::device::{DeviceType, DeviceUID, TempName, UID};
+use crate::hardware_support::{ChannelVerdictRef, SystemFinding};
 use crate::overrides::OverridesController;
 use crate::setting::{CustomSensor, Profile, SettingKind, TempSource};
 use crate::{AllDevices, Repos};
@@ -122,11 +108,28 @@ pub enum HealthEvent {
 }
 
 /// Full current health snapshot returned by `GET /devices/health`.
+///
+/// Two sections with different meanings, deliberately not interleaved.
+/// `failsafe`, `missing`, `stale_source` and `firmware_overrides` are
+/// **current state**: conditions that can clear on their own.
+/// `channel_capabilities` and `system_findings` are **permanent**: facts about
+/// what this hardware can do, which will not change while the machine is
+/// running. Presenting a permanent capability as a fault would imply the user
+/// should wait for it to resolve; presenting a fault as a capability would
+/// imply the opposite.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct DeviceHealthDto {
     pub failsafe: Vec<FailsafeRef>,
     pub missing: Vec<SourceRef>,
     pub stale_source: Vec<SourceRef>,
+    /// Current state: firmware reclaimed a channel this daemon controls.
+    pub firmware_overrides: Vec<ChannelVerdictRef>,
+    /// Permanent: channels that cannot be driven, and why. Controllable
+    /// channels are omitted; there is nothing to report about working hardware.
+    pub channel_capabilities: Vec<ChannelVerdictRef>,
+    /// Permanent: machine-scope facts, such as a detected chip with no driver
+    /// bound or a probe blocked by the environment.
+    pub system_findings: Vec<SystemFinding>,
 }
 
 struct LcdRef {
@@ -148,6 +151,7 @@ pub struct DeviceHealthController {
     missing: RefCell<Vec<SourceRef>>,
     stale_source: RefCell<Vec<SourceRef>>,
     failsafe: RefCell<Vec<FailsafeRef>>,
+    hardware_support: Option<Rc<crate::hardware_support::HardwareSupportController>>,
     /// Temp-source references extracted from config. Re-extracted only when the
     /// config generation moves, so unchanged ticks parse no config at all.
     candidates: RefCell<Vec<SourceRef>>,
@@ -172,7 +176,19 @@ impl DeviceHealthController {
             failsafe: RefCell::new(Vec::new()),
             candidates: RefCell::new(Vec::new()),
             config_generation_seen: Cell::new(None),
+            hardware_support: None,
         }
+    }
+
+    /// Attaches the hardware-support registry that supplies the permanent
+    /// capability section. Absent in tests, which yields empty sections.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<crate::hardware_support::HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
     }
 
     pub fn set_handle(&self, handle: DeviceHealthHandle) {
@@ -180,10 +196,22 @@ impl DeviceHealthController {
     }
 
     pub fn get_all(&self) -> DeviceHealthDto {
+        let (channel_capabilities, firmware_overrides) = self
+            .hardware_support
+            .as_ref()
+            .map_or_else(Default::default, |hs| hs.partitioned_verdicts());
+        let system_findings = self
+            .hardware_support
+            .as_ref()
+            .map(|hs| hs.system_findings())
+            .unwrap_or_default();
         DeviceHealthDto {
             failsafe: self.failsafe.borrow().clone(),
             missing: self.missing.borrow().clone(),
             stale_source: self.stale_source.borrow().clone(),
+            firmware_overrides,
+            channel_capabilities,
+            system_findings,
         }
     }
 
@@ -884,7 +912,8 @@ mod tests {
     #[test]
     fn device_health_dto_serializes_snapshot_shape() {
         // Goal: guard the GET /devices/health shape: top-level failsafe,
-        // missing, and stale arrays, empty lists serialized as [] not omitted.
+        // missing, and stale arrays, the two hardware-support sections, and
+        // empty lists serialized as [] not omitted.
         let dto = DeviceHealthDto {
             failsafe: vec![FailsafeRef {
                 device_uid: "dev1".to_string(),
@@ -894,6 +923,9 @@ mod tests {
             }],
             missing: Vec::new(),
             stale_source: Vec::new(),
+            firmware_overrides: Vec::new(),
+            channel_capabilities: Vec::new(),
+            system_findings: Vec::new(),
         };
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(
@@ -907,7 +939,62 @@ mod tests {
                 }],
                 "missing": [],
                 "stale_source": [],
+                "firmware_overrides": [],
+                "channel_capabilities": [],
+                "system_findings": [],
             })
+        );
+    }
+
+    /// Goal: the permanent and current sections must not be interleaved. A
+    /// firmware reclaim can clear on its own and belongs with the faults; a
+    /// channel with no pwm never changes and belongs with the capabilities.
+    /// Method: record one of each and check which section each lands in.
+    #[test]
+    fn verdict_sections_split_permanent_from_current() {
+        let controller = crate::rt::test_runtime(async {
+            crate::hardware_support::HardwareSupportController::init(None, true).await
+        });
+        let evidence = crate::hardware_support::ChannelEvidence {
+            has_pwm: true,
+            pwm_writable: true,
+            has_rpm: true,
+            has_pwm_enable: true,
+        };
+        controller.record_channel_diagnosis(
+            "dev1",
+            "fan1",
+            crate::hardware_support::diagnose_channel(evidence.clone(), "nct6687", true),
+        );
+        let no_pwm = crate::hardware_support::ChannelEvidence {
+            has_pwm: false,
+            pwm_writable: false,
+            has_rpm: true,
+            has_pwm_enable: false,
+        };
+        controller.record_channel_diagnosis(
+            "dev1",
+            "fan2",
+            crate::hardware_support::diagnose_channel(no_pwm, "some_driver", false),
+        );
+        // A working channel is reported in neither section.
+        controller.record_channel_diagnosis(
+            "dev1",
+            "fan3",
+            crate::hardware_support::diagnose_channel(evidence, "some_driver", false),
+        );
+        let (permanent, current) = controller.partitioned_verdicts();
+        assert_eq!(current.len(), 1, "expected one current-state verdict");
+        assert_eq!(current[0].channel_name, "fan1");
+        assert_eq!(
+            current[0].verdict,
+            crate::hardware_support::ChannelVerdict::FirmwareOverride
+        );
+        assert_eq!(permanent.len(), 1, "expected one permanent verdict");
+        assert_eq!(permanent[0].channel_name, "fan2");
+        assert_eq!(
+            permanent[0].verdict,
+            crate::hardware_support::ChannelVerdict::NoPwm
         );
     }
 }

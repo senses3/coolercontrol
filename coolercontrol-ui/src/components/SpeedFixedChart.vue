@@ -1,20 +1,7 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 import * as echarts from 'echarts/core'
@@ -25,7 +12,7 @@ import { type UID } from '@/models/Device'
 import { useDeviceStore } from '@/stores/DeviceStore'
 import { useSettingsStore } from '@/stores/SettingsStore'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore'
-import { onMounted, Ref, ref, toRaw, watch } from 'vue'
+import { onMounted, onUnmounted, Ref, ref, toRaw, watch } from 'vue'
 
 echarts.use([CanvasRenderer, GaugeChart])
 
@@ -262,12 +249,16 @@ watch(rawStore.currentDeviceStatus, () => {
     })
 })
 
+// Held at module scope so onUnmounted can reach it. An observer left connected keeps the
+// gauge element, and everything its callback closes over, reachable for the life of the page.
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
     const getGaugeBase = (rect: DOMRect): number => Math.min(rect.width, rect.height)
     const gaugeEl: HTMLElement = fixedGaugeChart.value?.$el!
     gaugeBasePx.value = getGaugeBase(gaugeEl.getBoundingClientRect())
 
-    const resizeObserver = new ResizeObserver((_) => {
+    resizeObserver = new ResizeObserver((_) => {
         gaugeBasePx.value = getGaugeBase(gaugeEl.getBoundingClientRect())
         fixedGaugeChart.value?.setOption({
             series: [
@@ -335,6 +326,11 @@ onMounted(() => {
         })
     })
 })
+
+onUnmounted(() => {
+    resizeObserver?.disconnect()
+    resizeObserver = null
+})
 </script>
 
 <template>
@@ -349,7 +345,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .control-graph {
-    height: min(calc(100vw - 20rem), calc(90vh));
+    height: var(--gauge-height, min(calc(100vw - 20rem), calc(90vh)));
     width: 100%;
 }
 </style>

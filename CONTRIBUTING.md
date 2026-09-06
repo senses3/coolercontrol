@@ -36,7 +36,7 @@ not only to keep the project maintainable, but also to provide consistent value 
 Contributions are made to this repo via Issues and Merge Requests (MRs). A few general guidelines
 that cover both:
 
-- Search for existing [Issues](https://gitlab.com/coolercontrol/coolercontrol/-/issues) and
+- Search for existing [Issues](https://gitlab.com/coolercontrol/coolercontrol/-/work_items) and
   [MRs](https://gitlab.com/coolercontrol/coolercontrol/-/merge_requests) before creating your own.
 - We work hard to make sure issues are handled in a timely manner but, depending on the impact, it
   could take a while to investigate the root cause. A friendly ping in the comment thread to the
@@ -104,6 +104,15 @@ To use it, make sure you have [Nix installed](https://nixos.org/download/#nix-in
 
 Then run `nix-shell /path/to/coolercontrol/shell.nix`. This will give a shell without modifying your
 system.
+
+#### Copyright headers
+
+Every file must declare its copyright and license, which CI verifies with
+[REUSE](https://reuse.software). Source files carry a two-line SPDX header; everything else is
+covered by `REUSE.toml`. New files need a header, and `make copyright-fix` adds one for you, dating
+it from the file's first commit. Check your work with `make copyright-check`.
+
+Both targets need the `reuse` tool: `pipx install "reuse[charset-normalizer]"`.
 
 ## AI-Assisted Contributions
 

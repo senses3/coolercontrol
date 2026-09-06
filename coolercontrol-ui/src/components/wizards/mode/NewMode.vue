@@ -1,25 +1,13 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import InputText from 'primevue/inputtext'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { computed, inject, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { useRouter } from 'vue-router'
@@ -27,7 +15,6 @@ import { useI18n } from 'vue-i18n'
 import { Emitter, EventType } from 'mitt'
 import { DEFAULT_NAME_STRING_LENGTH, useDeviceStore } from '@/stores/DeviceStore.ts'
 import { mdiContentSaveOutline } from '@mdi/js'
-import Button from 'primevue/button'
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
@@ -59,25 +46,24 @@ const saveMode = async (): Promise<void> => {
             <div class="mt-0">
                 <small class="ml-3 font-light text-sm"> {{ t('common.name') }}: </small>
                 <div class="mt-0 flex flex-col">
-                    <InputText
+                    <UiInput
                         v-model="chosenName"
-                        :placeholder="t('common.name')"
-                        ref="inputArea"
-                        id="property-name"
-                        class="w-full h-11"
-                        :invalid="nameInvalid"
-                        :input-style="{ background: 'rgb(var(--colors-bg-one))' }"
                         autofocus
+                        :placeholder="t('common.name')"
+                        class="w-full"
+                        :class="{ '!border-error': nameInvalid }"
                         @keydown.enter="saveMode"
                     />
                 </div>
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" :label="t('common.cancel')" @click="emit('close')" />
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('close')">
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="saveMode"
             >
@@ -87,7 +73,7 @@ const saveMode = async (): Promise<void> => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

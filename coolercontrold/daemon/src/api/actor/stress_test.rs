@@ -1,28 +1,14 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::collections::HashMap;
 use std::ops::Not;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
-use log::{debug, info, warn};
+use log::{debug, info, log, warn, Level};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
@@ -44,6 +30,16 @@ const WATCHDOG_GRACE_SECS: u64 = 10;
 /// GPU driver ioctl). Moving on keeps the actor responsive; the kernel reaps
 /// the zombie when the blocking syscall returns.
 const STOP_REAP_TIMEOUT_SECS: u64 = 5;
+/// Workers for stress-ng's opengl stressor. One worker leaves a modern
+/// card mostly idle: reporters on RTX 4000-series and newer saw hardly
+/// any load until several render contexts ran concurrently.
+const STRESS_NG_GPU_WORKERS: &str = "4";
+/// Where the kernel exposes DRM devices, and the source of the GPU picker's
+/// render nodes. Overridden in tests.
+const DRM_CLASS_PATH: &str = "/sys/class/drm";
+/// Bound on the GPU enumeration subprocess. Vulkan init is ~100 ms on a
+/// healthy system; anything near this bound means a stuck driver.
+const GPU_LIST_TIMEOUT_SECS: u64 = 15;
 
 /// Which backend is running (or will run) a stress test.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -74,6 +70,43 @@ impl StressKind {
     }
 }
 
+/// One GPU as reported by the `stress-gpu-list` subprocess. Crosses a
+/// process boundary as JSON, so both ends live in this module.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuAdapter {
+    /// `vendor:device` in hex, wgpu's view of the PCI ID.
+    pub pci_id: String,
+    pub name: String,
+    pub discrete: bool,
+}
+
+/// A GPU the user can pick, with everything needed to aim either backend at
+/// it. The two backends select differently: the built-in one filters wgpu
+/// adapters by PCI ID, stress-ng opens a DRM render node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GpuTarget {
+    /// Selection key. The PCI slot (`0000:03:00.0`) when the adapter matched
+    /// a DRM device, else the PCI ID plus its position. Slots stay distinct
+    /// for two identical cards, which PCI IDs do not.
+    pub id: String,
+    pub name: String,
+    pub discrete: bool,
+    /// Position in the enumerated adapter list, which is how the built-in
+    /// backend picks between two cards of the same model.
+    pub index: usize,
+    pub pci_id: String,
+    pub render_node: Option<String>,
+}
+
+/// A DRM device as sysfs describes it. Only the fields needed to match an
+/// enumerated adapter to its render node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DrmDevice {
+    pci_id: String,
+    slot: String,
+    render_node: Option<String>,
+}
+
 impl std::fmt::Display for StressBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -89,6 +122,36 @@ struct StressNgCaps {
     path: Option<PathBuf>,
 }
 
+/// Why the GPU list is being enumerated, which decides how a failure is reported.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum GpuQuery {
+    /// Listing what exists. A machine with no GPU is a normal machine and the
+    /// user has nothing to fix, so a failure only informs.
+    List,
+    /// A stress test the user asked to start, which is not going to run.
+    Start,
+}
+
+impl GpuQuery {
+    const fn failure_level(self) -> Level {
+        match self {
+            Self::List => Level::Info,
+            Self::Start => Level::Warn,
+        }
+    }
+
+    /// Whether this query still has something to say once `reported` has been logged for the
+    /// current outage. A GPU-less machine is listed on every UI load, so a repeat is dropped;
+    /// a Start still warns after a List has only informed.
+    const fn worth_reporting_after(self, reported: Option<Self>) -> bool {
+        match reported {
+            None => true,
+            Some(Self::List) => matches!(self, Self::Start),
+            Some(Self::Start) => false,
+        }
+    }
+}
+
 struct StressTestActor {
     receiver: mpsc::Receiver<StressTestMessage>,
     /// Clone handed to each watchdog task so it can self-message on expiry.
@@ -96,6 +159,15 @@ struct StressTestActor {
     /// without racing on a recycled PID.
     sender: mpsc::Sender<StressTestMessage>,
     stress_ng: StressNgCaps,
+    /// GPU picker list, enumerated on first use and kept: adapters do not
+    /// come and go, and each enumeration costs a subprocess and a Vulkan
+    /// init. `None` until the first successful enumeration, so a transient
+    /// failure does not stick.
+    gpu_targets: Option<Vec<GpuTarget>>,
+    /// How the current enumeration outage was already reported, so the retry
+    /// that every listing performs does not repeat the line. Cleared once
+    /// enumeration works.
+    gpu_failure_reported: Option<GpuQuery>,
     cpu_child: Option<Child>,
     cpu_duration_secs: Option<u16>,
     cpu_backend: Option<StressBackend>,
@@ -127,10 +199,14 @@ enum StressTestMessage {
     StartGpu {
         duration_secs: Option<u16>,
         backend: Option<StressBackend>,
+        gpu_id: Option<String>,
         respond_to: oneshot::Sender<Result<()>>,
     },
     StopGpu {
         respond_to: oneshot::Sender<Result<()>>,
+    },
+    ListGpus {
+        respond_to: oneshot::Sender<Vec<GpuTarget>>,
     },
     StartRam {
         duration_secs: Option<u16>,
@@ -190,6 +266,8 @@ impl StressTestActor {
             receiver,
             sender,
             stress_ng,
+            gpu_targets: None,
+            gpu_failure_reported: None,
             cpu_child: None,
             cpu_duration_secs: None,
             cpu_backend: None,
@@ -344,7 +422,11 @@ impl StressTestActor {
     /// inherit that restricted affinity. The built-in stress subcommands
     /// call `reset_cpu_affinity()` internally, but stress-ng does not.
     /// We use `pre_exec` to reset affinity to all online CPUs before exec.
-    fn spawn_stress_ng(path: &PathBuf, args: &[&str], label: &str) -> Result<Child> {
+    fn spawn_stress_ng<I, S>(path: &PathBuf, args: I, label: &str) -> Result<Child>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
         let mut cmd = Command::new(path);
         cmd.args(args)
             .kill_on_drop(true)
@@ -371,7 +453,11 @@ impl StressTestActor {
     }
 
     /// Spawn a built-in stress subprocess with the given arguments.
-    fn spawn_builtin(args: &[&str], label: &str) -> Result<Child> {
+    fn spawn_builtin<I, S>(args: I, label: &str) -> Result<Child>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
         let bin_path = Self::bin_path()?;
         let mut cmd = Command::new(&bin_path);
         cmd.args(args)
@@ -441,7 +527,7 @@ impl StressTestActor {
                 );
                 Self::spawn_stress_ng(
                     path,
-                    &["--cpu", &threads_str, "--timeout", &timeout_str],
+                    ["--cpu", &threads_str, "--timeout", &timeout_str],
                     "CPU",
                 )
             }
@@ -453,7 +539,7 @@ impl StressTestActor {
                     bin_path.display()
                 );
                 Self::spawn_builtin(
-                    &[
+                    [
                         "stress-cpu",
                         "--timeout",
                         &duration_str,
@@ -478,10 +564,89 @@ impl StressTestActor {
         }
     }
 
+    /// The GPU picker list, enumerated on first use and cached thereafter.
+    /// Returns an empty list when enumeration fails, which leaves the UI with
+    /// "all GPUs" as its only choice rather than a broken picker.
+    async fn gpu_targets(&mut self, asked_by: GpuQuery) -> Vec<GpuTarget> {
+        if let Some(targets) = self.gpu_targets.as_ref() {
+            return targets.clone();
+        }
+        let targets = match Self::enumerate_gpu_targets().await {
+            Ok(targets) => targets,
+            Err(e) => {
+                if asked_by.worth_reporting_after(self.gpu_failure_reported) {
+                    log!(
+                        asked_by.failure_level(),
+                        "Could not enumerate GPUs for stress testing: {e}"
+                    );
+                    self.gpu_failure_reported = Some(asked_by);
+                }
+                return Vec::new();
+            }
+        };
+        self.gpu_failure_reported = None;
+        self.gpu_targets = Some(targets.clone());
+        targets
+    }
+
+    /// Run the adapter enumeration out of process and pair the result with
+    /// sysfs. Both halves are needed: only wgpu can tell discrete from
+    /// integrated, and only sysfs knows the render nodes.
+    async fn enumerate_gpu_targets() -> Result<Vec<GpuTarget>> {
+        let bin_path = Self::bin_path()?;
+        let child = Command::new(&bin_path)
+            .arg("stress-gpu-list")
+            .kill_on_drop(true)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| anyhow!("Failed to run GPU enumeration subprocess: {e}"))?;
+        // Vulkan init can hang on a wedged driver. The actor handles messages
+        // one at a time, so waiting forever here would block every later
+        // request, `StopAll` included. Dropping the child on timeout kills it.
+        let output = tokio::time::timeout(
+            Duration::from_secs(GPU_LIST_TIMEOUT_SECS),
+            child.wait_with_output(),
+        )
+        .await
+        .map_err(|_| anyhow!("GPU enumeration timed out after {GPU_LIST_TIMEOUT_SECS}s"))?
+        .map_err(|e| anyhow!("Failed to run GPU enumeration subprocess: {e}"))?;
+        if output.status.success().not() {
+            return Err(anyhow!(
+                "GPU enumeration failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        let adapters: Vec<GpuAdapter> = serde_json::from_slice(&output.stdout)
+            .map_err(|e| anyhow!("Failed to parse the enumerated GPU list: {e}"))?;
+        let targets = build_gpu_targets(adapters, &read_drm_devices(Path::new(DRM_CLASS_PATH)));
+        info!(
+            "GPUs available for stress testing: {}",
+            targets
+                .iter()
+                .map(|t| format!("{} ({})", t.name, t.id))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        Ok(targets)
+    }
+
+    /// Resolve a caller's GPU selection against the enumerated list. An
+    /// unknown ID is an error: silently falling back to every GPU would load
+    /// hardware the user did not ask to load.
+    async fn resolve_gpu_target(&mut self, gpu_id: &str) -> Result<GpuTarget> {
+        self.gpu_targets(GpuQuery::Start)
+            .await
+            .into_iter()
+            .find(|target| target.id == gpu_id)
+            .ok_or_else(|| anyhow!("GPU {gpu_id} is not available for stress testing"))
+    }
+
     async fn start_gpu(
         &mut self,
         duration_secs: Option<u16>,
         backend: Option<StressBackend>,
+        gpu_id: Option<String>,
     ) -> Result<()> {
         if self.gpu_child.is_some() {
             return Err(anyhow!("GPU stress test is already running"));
@@ -489,9 +654,13 @@ impl StressTestActor {
         let duration_secs = duration_secs
             .unwrap_or(DEFAULT_DURATION_SECS)
             .min(MAX_DURATION_SECS);
+        let target = match gpu_id {
+            Some(id) => Some(self.resolve_gpu_target(&id).await?),
+            None => None,
+        };
 
         let resolved = Self::resolve_backend(backend);
-        let mut child = self.spawn_gpu(resolved, duration_secs)?;
+        let mut child = self.spawn_gpu(resolved, duration_secs, target.as_ref())?;
         if let Err(e) = Self::check_early_exit(&mut child, "GPU").await {
             // The GPU stressor is an optional stress-ng feature and is not
             // compiled into many distro packages; surface that hint so the
@@ -516,9 +685,13 @@ impl StressTestActor {
         Ok(())
     }
 
-    fn spawn_gpu(&self, backend: StressBackend, duration_secs: u16) -> Result<Child> {
-        let timeout_str = format!("{duration_secs}s");
-        let duration_str = duration_secs.to_string();
+    fn spawn_gpu(
+        &self,
+        backend: StressBackend,
+        duration_secs: u16,
+        target: Option<&GpuTarget>,
+    ) -> Result<Child> {
+        let scope = target.map_or("all GPUs", |t| t.name.as_str());
         match backend {
             StressBackend::StressNg => {
                 let path = self
@@ -526,12 +699,13 @@ impl StressTestActor {
                     .path
                     .as_ref()
                     .ok_or_else(|| anyhow!("stress-ng is not installed"))?;
-                info!("Starting GPU stress test via stress-ng: {duration_secs}s");
-                Self::spawn_stress_ng(path, &["--gpu", "1", "--timeout", &timeout_str], "GPU")
+                let args = stress_ng_gpu_args(duration_secs, target)?;
+                info!("Starting GPU stress test via stress-ng: {duration_secs}s, {scope}");
+                Self::spawn_stress_ng(path, &args, "GPU")
             }
             StressBackend::BuiltIn => {
-                info!("Starting GPU stress test (built-in): {duration_secs}s");
-                Self::spawn_builtin(&["stress-gpu", "--timeout", &duration_str], "GPU")
+                info!("Starting GPU stress test (built-in): {duration_secs}s, {scope}");
+                Self::spawn_builtin(builtin_gpu_args(duration_secs, target), "GPU")
             }
         }
     }
@@ -611,7 +785,7 @@ impl StressTestActor {
                 );
                 Self::spawn_stress_ng(
                     path,
-                    &[
+                    [
                         "--vm",
                         &workers_str,
                         "--vm-bytes",
@@ -629,7 +803,7 @@ impl StressTestActor {
                     alloc_bytes / (1024 * 1024)
                 );
                 Self::spawn_builtin(
-                    &[
+                    [
                         "stress-ram",
                         "--bytes",
                         &alloc_str,
@@ -717,7 +891,7 @@ impl StressTestActor {
                 );
                 Self::spawn_stress_ng(
                     ng_path,
-                    &[
+                    [
                         "--hdd",
                         &threads_str,
                         "--temp-path",
@@ -734,7 +908,7 @@ impl StressTestActor {
                      {device_path}, {thread_count} threads, {duration_secs}s"
                 );
                 Self::spawn_builtin(
-                    &[
+                    [
                         "stress-drive",
                         "--device",
                         device_path,
@@ -874,14 +1048,19 @@ impl ApiActor<StressTestMessage> for StressTestActor {
             StressTestMessage::StartGpu {
                 duration_secs,
                 backend,
+                gpu_id,
                 respond_to,
             } => {
-                let result = self.start_gpu(duration_secs, backend).await;
+                let result = self.start_gpu(duration_secs, backend, gpu_id).await;
                 let _ = respond_to.send(result);
             }
             StressTestMessage::StopGpu { respond_to } => {
                 self.stop_gpu().await;
                 let _ = respond_to.send(Ok(()));
+            }
+            StressTestMessage::ListGpus { respond_to } => {
+                let targets = self.gpu_targets(GpuQuery::List).await;
+                let _ = respond_to.send(targets);
             }
             StressTestMessage::StartRam {
                 duration_secs,
@@ -968,6 +1147,183 @@ fn find_mount_point(device_path: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Build stress-ng's GPU arguments. stress-ng aims at one device node, so a
+/// selected GPU without one cannot be reached by this backend.
+///
+/// # Errors
+///
+/// Returns an error if the selected GPU exposes no DRM render node.
+fn stress_ng_gpu_args(duration_secs: u16, target: Option<&GpuTarget>) -> Result<Vec<String>> {
+    let mut args = vec![
+        "--gpu".to_string(),
+        STRESS_NG_GPU_WORKERS.to_string(),
+        "--timeout".to_string(),
+        format!("{duration_secs}s"),
+    ];
+    if let Some(target) = target {
+        let render_node = target.render_node.as_ref().ok_or_else(|| {
+            anyhow!(
+                "{} has no DRM render node for stress-ng to open; \
+                 use the built-in backend to stress it",
+                target.name
+            )
+        })?;
+        args.push("--gpu-devnode".to_string());
+        args.push(render_node.clone());
+    }
+    Ok(args)
+}
+
+/// Build the built-in backend's GPU arguments. It picks the adapter by
+/// position, because two cards of the same model share a PCI ID; the ID
+/// rides along so the subprocess can reject a list that has since shifted.
+fn builtin_gpu_args(duration_secs: u16, target: Option<&GpuTarget>) -> Vec<String> {
+    let mut args = vec![
+        "stress-gpu".to_string(),
+        "--timeout".to_string(),
+        duration_secs.to_string(),
+    ];
+    if let Some(target) = target {
+        args.push("--gpu-index".to_string());
+        args.push(target.index.to_string());
+        args.push("--gpu-id".to_string());
+        args.push(target.pci_id.clone());
+    }
+    args
+}
+
+/// Enumerate the GPUs this machine can stress.
+///
+/// Called from the `stress-gpu-list` subcommand, never from the daemon
+/// itself: it initializes Vulkan, and the daemon keeps GPU drivers out of
+/// its own address space for the same reason the stress runs subprocess out.
+///
+/// # Errors
+///
+/// Returns an error if no hardware GPU adapter is found.
+pub fn enumerate_gpu_adapters() -> Result<Vec<GpuAdapter>> {
+    Ok(cc_stress::list_gpu_adapters()?
+        .into_iter()
+        .map(|adapter| GpuAdapter {
+            pci_id: adapter.pci_id.to_string(),
+            name: adapter.name,
+            discrete: adapter.discrete,
+        })
+        .collect())
+}
+
+/// Read the DRM devices sysfs knows about, so an enumerated adapter can be
+/// matched to the render node stress-ng needs.
+///
+/// Only `uevent` is read: its contents are cached by the kernel, so this
+/// cannot resume a GPU that runtime-suspended itself.
+fn read_drm_devices(drm_class_path: &Path) -> Vec<DrmDevice> {
+    let entries = match std::fs::read_dir(drm_class_path) {
+        Ok(entries) => entries,
+        Err(e) => {
+            warn!("Failed to read {}: {e}", drm_class_path.display());
+            return Vec::new();
+        }
+    };
+    let mut devices = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        // Whole cards only. The same directory holds connectors
+        // ("card1-DP-1") and render nodes, which are reached via the card.
+        let is_card = name.starts_with("card")
+            && name.len() > 4
+            && name[4..].chars().all(|c| c.is_ascii_digit());
+        if is_card.not() {
+            continue;
+        }
+        let device_dir = drm_class_path.join(&name).join("device");
+        let Ok(uevent) = std::fs::read_to_string(device_dir.join("uevent")) else {
+            continue;
+        };
+        let mut fields = HashMap::new();
+        for line in uevent.lines() {
+            if let Some((key, value)) = line.split_once('=') {
+                fields.insert(key.trim(), value.trim());
+            }
+        }
+        // PCI class 0x03xxxx is a display controller. Anything else under
+        // /sys/class/drm is not a GPU we can stress.
+        let is_display = fields
+            .get("PCI_CLASS")
+            .and_then(|class| u32::from_str_radix(class, 16).ok())
+            .is_some_and(|class| class >> 16 == 0x03);
+        if is_display.not() {
+            continue;
+        }
+        let (Some(pci_id), Some(slot)) = (fields.get("PCI_ID"), fields.get("PCI_SLOT_NAME")) else {
+            continue;
+        };
+        devices.push(DrmDevice {
+            pci_id: pci_id.to_lowercase(),
+            slot: (*slot).to_string(),
+            render_node: find_render_node(&device_dir),
+        });
+    }
+    devices.sort_by(|a, b| a.slot.cmp(&b.slot));
+    devices
+}
+
+/// Find the `/dev/dri/renderD*` node belonging to a DRM device, if it has
+/// one. Display-only devices and some proprietary drivers do not.
+fn find_render_node(device_dir: &Path) -> Option<String> {
+    let entries = std::fs::read_dir(device_dir.join("drm")).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with("renderD") {
+            return Some(format!("/dev/dri/{name}"));
+        }
+    }
+    None
+}
+
+/// Pair each enumerated adapter with its DRM device, discrete cards first.
+///
+/// Ordering is what the UI preselects from: users stress the card with the
+/// cooler on it, not the iGPU that happens to enumerate first. `index` keeps
+/// each target pointing at its original adapter across that reordering.
+///
+/// Cards of the same model are paired positionally, both lists being in PCI
+/// enumeration order. That is the best available: wgpu reports no PCI slot,
+/// so nothing else ties an adapter to a DRM device. A mismatch would swap
+/// two cards of the same model, never reach a different model, and only
+/// affects the built-in backend, since stress-ng is handed the render node.
+fn build_gpu_targets(adapters: Vec<GpuAdapter>, drm_devices: &[DrmDevice]) -> Vec<GpuTarget> {
+    let mut claimed = vec![false; drm_devices.len()];
+    let mut targets = Vec::with_capacity(adapters.len());
+    for (index, adapter) in adapters.into_iter().enumerate() {
+        // Claim each DRM device at most once so two identical cards do not
+        // both resolve to the first one's render node.
+        let matched = drm_devices
+            .iter()
+            .enumerate()
+            .find(|(i, drm)| claimed[*i].not() && drm.pci_id == adapter.pci_id);
+        let (id, render_node) = match matched {
+            Some((i, drm)) => {
+                claimed[i] = true;
+                (drm.slot.clone(), drm.render_node.clone())
+            }
+            // No DRM device to name it by. The position keeps the key unique
+            // across identical cards, which the PCI ID alone would not.
+            None => (format!("{}@{index}", adapter.pci_id), None),
+        };
+        targets.push(GpuTarget {
+            id,
+            name: adapter.name,
+            discrete: adapter.discrete,
+            index,
+            pci_id: adapter.pci_id,
+            render_node,
+        });
+    }
+    targets.sort_by_key(|target| target.discrete.not());
+    targets
 }
 
 /// Detect whether the stress-ng binary is installed.
@@ -1057,15 +1413,24 @@ impl StressTestHandle {
         &self,
         duration_secs: Option<u16>,
         backend: Option<StressBackend>,
+        gpu_id: Option<String>,
     ) -> Result<()> {
         let (tx, rx) = oneshot::channel();
         let msg = StressTestMessage::StartGpu {
             duration_secs,
             backend,
+            gpu_id,
             respond_to: tx,
         };
         let _ = self.sender.send(msg).await;
         rx.await?
+    }
+
+    pub async fn list_gpus(&self) -> Vec<GpuTarget> {
+        let (tx, rx) = oneshot::channel();
+        let msg = StressTestMessage::ListGpus { respond_to: tx };
+        let _ = self.sender.send(msg).await;
+        rx.await.unwrap_or_default()
     }
 
     pub async fn stop_gpu(&self) -> Result<()> {
@@ -1156,6 +1521,62 @@ impl StressTestHandle {
 mod tests {
     use super::*;
 
+    /// Goal: a GPU-less machine must not be warned on every listing, since there is nothing
+    /// for the user to fix, while a stress test that cannot start still warrants a warning.
+    /// Methodology: read the level each query kind reports a failed enumeration at.
+    #[test]
+    fn only_a_requested_stress_test_warns_about_missing_gpus() {
+        assert_eq!(
+            GpuQuery::List.failure_level(),
+            Level::Info,
+            "Listing GPUs on a machine that has none is expected"
+        );
+        assert_eq!(
+            GpuQuery::Start.failure_level(),
+            Level::Warn,
+            "A stress test the user started is not going to run"
+        );
+    }
+
+    /// Goal: enumeration is retried on every listing, so a GPU-less machine must log the failure
+    /// once, while a Start must still warn after a List has only informed.
+    /// Methodology: ask each query kind what it adds to each already reported state.
+    #[test]
+    fn an_enumeration_failure_is_reported_once_per_outage() {
+        assert!(
+            GpuQuery::List.worth_reporting_after(None),
+            "The first failure is always reported"
+        );
+        assert!(
+            GpuQuery::Start.worth_reporting_after(None),
+            "The first failure is always reported"
+        );
+
+        assert!(
+            GpuQuery::List
+                .worth_reporting_after(Some(GpuQuery::List))
+                .not(),
+            "Every listing retries, so the info line must not repeat"
+        );
+        assert!(
+            GpuQuery::Start.worth_reporting_after(Some(GpuQuery::List)),
+            "A stress test that cannot start warrants a warning the info line did not give"
+        );
+
+        assert!(
+            GpuQuery::List
+                .worth_reporting_after(Some(GpuQuery::Start))
+                .not(),
+            "A listing adds nothing after a warning"
+        );
+        assert!(
+            GpuQuery::Start
+                .worth_reporting_after(Some(GpuQuery::Start))
+                .not(),
+            "The warning stands until enumeration works again"
+        );
+    }
+
     #[test]
     fn stress_test_status_defaults() {
         // Confirms the default-state shape that callers (UI, tests) rely on.
@@ -1180,6 +1601,237 @@ mod tests {
         assert!(status.drive_active.not());
         assert!(status.stress_ng_available.not());
         assert_eq!(status.cpu_backend, StressBackend::BuiltIn);
+    }
+
+    fn target(id: &str, discrete: bool, render_node: Option<&str>) -> GpuTarget {
+        GpuTarget {
+            id: id.to_string(),
+            name: format!("GPU {id}"),
+            discrete,
+            index: 0,
+            pci_id: "1002:73df".to_string(),
+            render_node: render_node.map(ToString::to_string),
+        }
+    }
+
+    #[test]
+    fn stress_ng_gpu_args_use_several_workers() {
+        // A single worker leaves 4000-series and newer cards nearly idle.
+        // No --gpu-devnode means stress-ng picks its own default device,
+        // which is what "all GPUs" falls back to for this backend.
+        let args = stress_ng_gpu_args(60, None).unwrap();
+        assert_eq!(args, ["--gpu", "4", "--timeout", "60s"]);
+    }
+
+    #[test]
+    fn stress_ng_gpu_args_target_a_render_node() {
+        // stress-ng aims at one device node, defaulting to renderD128, which
+        // is the iGPU on most hybrid systems. A selection must override it.
+        let args = stress_ng_gpu_args(
+            30,
+            Some(&target("0000:03:00.0", true, Some("/dev/dri/renderD129"))),
+        )
+        .unwrap();
+        assert_eq!(
+            args,
+            [
+                "--gpu",
+                "4",
+                "--timeout",
+                "30s",
+                "--gpu-devnode",
+                "/dev/dri/renderD129"
+            ]
+        );
+    }
+
+    #[test]
+    fn stress_ng_gpu_args_reject_a_gpu_with_no_render_node() {
+        // Without a devnode stress-ng would silently fall back to its own
+        // default GPU, loading hardware the user did not select.
+        let err = stress_ng_gpu_args(60, Some(&target("0000:03:00.0", true, None))).unwrap_err();
+        assert!(err.to_string().contains("no DRM render node"));
+    }
+
+    #[test]
+    fn builtin_gpu_args_pass_position_and_pci_id_only_when_targeted() {
+        // Omitting the flags is what keeps "all GPUs" stressing every
+        // adapter. When targeted, position picks between cards of the same
+        // model and the PCI ID is the guard against a shifted list.
+        assert_eq!(
+            builtin_gpu_args(60, None),
+            ["stress-gpu", "--timeout", "60"]
+        );
+        let mut second_card = target("0000:82:00.0", true, None);
+        second_card.index = 1;
+        assert_eq!(
+            builtin_gpu_args(60, Some(&second_card)),
+            [
+                "stress-gpu",
+                "--timeout",
+                "60",
+                "--gpu-index",
+                "1",
+                "--gpu-id",
+                "1002:73df"
+            ]
+        );
+    }
+
+    fn adapter(pci_id: &str, name: &str, discrete: bool) -> GpuAdapter {
+        GpuAdapter {
+            pci_id: pci_id.to_string(),
+            name: name.to_string(),
+            discrete,
+        }
+    }
+
+    fn drm(pci_id: &str, slot: &str, render_node: Option<&str>) -> DrmDevice {
+        DrmDevice {
+            pci_id: pci_id.to_string(),
+            slot: slot.to_string(),
+            render_node: render_node.map(ToString::to_string),
+        }
+    }
+
+    #[test]
+    fn gpu_targets_list_discrete_cards_first() {
+        // The UI preselects the first entry, and users mean the card with a
+        // cooler on it. Enumeration order puts the iGPU first as often as not.
+        let targets = build_gpu_targets(
+            vec![
+                adapter("8086:a780", "Intel UHD", false),
+                adapter("10de:2684", "RTX 4090", true),
+            ],
+            &[
+                drm("8086:a780", "0000:00:02.0", Some("/dev/dri/renderD128")),
+                drm("10de:2684", "0000:01:00.0", Some("/dev/dri/renderD129")),
+            ],
+        );
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].name, "RTX 4090");
+        assert_eq!(targets[0].id, "0000:01:00.0");
+        assert_eq!(
+            targets[0].render_node.as_deref(),
+            Some("/dev/dri/renderD129")
+        );
+        assert_eq!(targets[1].name, "Intel UHD");
+    }
+
+    #[test]
+    fn gpu_targets_claim_each_drm_device_once() {
+        // Two identical cards share a PCI ID, and multi-GPU rigs usually run
+        // matching cards. Matching by ID alone would give both the first
+        // card's render node, so stress-ng would load one card twice and
+        // never touch the other.
+        let targets = build_gpu_targets(
+            vec![
+                adapter("10de:2684", "RTX 4090", true),
+                adapter("10de:2684", "RTX 4090", true),
+            ],
+            &[
+                drm("10de:2684", "0000:01:00.0", Some("/dev/dri/renderD128")),
+                drm("10de:2684", "0000:02:00.0", Some("/dev/dri/renderD129")),
+            ],
+        );
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].id, "0000:01:00.0");
+        assert_eq!(targets[0].index, 0);
+        assert_eq!(
+            targets[0].render_node.as_deref(),
+            Some("/dev/dri/renderD128")
+        );
+        assert_eq!(targets[1].id, "0000:02:00.0");
+        assert_eq!(targets[1].index, 1);
+        assert_eq!(
+            targets[1].render_node.as_deref(),
+            Some("/dev/dri/renderD129")
+        );
+    }
+
+    #[test]
+    fn gpu_targets_keep_their_adapter_position_through_the_sort() {
+        // The sort reorders the list the user picks from, but the built-in
+        // backend addresses adapters by their enumeration position. Losing
+        // that link would stress whichever card sorted into the slot.
+        let targets = build_gpu_targets(
+            vec![
+                adapter("8086:a780", "Intel UHD", false),
+                adapter("10de:2684", "RTX 4090", true),
+            ],
+            &[],
+        );
+        assert_eq!(targets[0].name, "RTX 4090");
+        assert_eq!(targets[0].index, 1);
+        assert_eq!(targets[1].name, "Intel UHD");
+        assert_eq!(targets[1].index, 0);
+    }
+
+    #[test]
+    fn gpu_targets_fall_back_to_the_pci_id_when_sysfs_has_no_match() {
+        // An adapter with no DRM device is still stressable by the built-in
+        // backend, which selects by position. It just cannot be handed to
+        // stress-ng, and `stress_ng_gpu_args` is what refuses that. The
+        // position keeps the key unique when two identical cards land here.
+        let targets = build_gpu_targets(
+            vec![
+                adapter("10de:2684", "RTX 4090", true),
+                adapter("10de:2684", "RTX 4090", true),
+            ],
+            &[],
+        );
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].id, "10de:2684@0");
+        assert_eq!(targets[1].id, "10de:2684@1");
+        assert_eq!(targets[0].render_node, None);
+    }
+
+    #[test]
+    fn drm_devices_are_read_from_display_controllers_only() {
+        // /sys/class/drm mixes whole cards with connectors ("card1-DP-1")
+        // and holds non-display DRM devices. Only real GPUs may reach the
+        // picker, and only their uevent may be read: touching other
+        // attributes can resume a runtime-suspended card.
+        let root = tempfile::tempdir().unwrap();
+        let drm_path = root.path();
+        let write_card = |name: &str, class: &str, render: Option<&str>| {
+            let device_dir = drm_path.join(name).join("device");
+            std::fs::create_dir_all(&device_dir).unwrap();
+            std::fs::write(
+                device_dir.join("uevent"),
+                format!(
+                    "DRIVER=amdgpu\nPCI_CLASS={class}\nPCI_ID=1002:73DF\n\
+                     PCI_SLOT_NAME=0000:0{}:00.0\n",
+                    name.trim_start_matches("card")
+                ),
+            )
+            .unwrap();
+            if let Some(render) = render {
+                std::fs::create_dir_all(device_dir.join("drm").join(render)).unwrap();
+            }
+        };
+        write_card("card1", "30000", Some("renderD128"));
+        // A non-display DRM device, e.g. an accelerator.
+        write_card("card2", "120000", None);
+        // A connector, which carries no device directory of its own.
+        std::fs::create_dir_all(drm_path.join("card1-DP-1")).unwrap();
+
+        let devices = read_drm_devices(drm_path);
+        assert_eq!(
+            devices,
+            vec![drm(
+                "1002:73df",
+                "0000:01:00.0",
+                Some("/dev/dri/renderD128")
+            )]
+        );
+    }
+
+    #[test]
+    fn drm_devices_are_empty_when_the_class_is_missing() {
+        // Containers and odd kernels have no /sys/class/drm. The picker must
+        // degrade to "all GPUs" rather than fail the request.
+        assert!(read_drm_devices(Path::new("/nonexistent/class/drm")).is_empty());
     }
 
     #[test]

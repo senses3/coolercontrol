@@ -83,7 +83,7 @@ hide_duplicate_devices = true
 # Will skip initialization calls for liquidctl devices. ONLY USE if you are doing initialiation manually.
 no_init = false
 
-# Startup Delay (seconds) is an integer value between 0 and 10
+# Startup Delay (seconds) is an integer value between 0 and 120
 startup_delay = 2
 
 # For ThinkPads, wheather to use the 'full-speed' option when settings the fan to 100%
@@ -149,10 +149,27 @@ drivetemp_suspend = false
 # modules at startup. This helps ensure all hwmon chips are available. (x86_64 only)
 # sensors_auto_detect = true
 
+# Whether to apply the "label" and "ignore" statements from the lm-sensors configuration files
+# (/etc/sensors3.conf, /etc/sensors.conf and /etc/sensors.d/). Labels set there replace the ones
+# the kernel driver reports, and ignored sensors are hidden. Names set in CoolerControl itself
+# always win. The files are read once at startup and are never written to.
+# sensors_conf_enabled = true
+
 # Whether to listen for kernel device add/remove events (e.g. USB hotplug) at startup.
 # When enabled, the daemon watches for hardware changes and notifies connected clients.
 # Disable this in containers or environments without netlink socket access.
 # device_listener_enabled = true
+
+# Power profile to Mode mapping:
+# When the system power profile changes, CoolerControl activates the Mode mapped to the new
+# profile. The profile is read over D-Bus from power-profiles-daemon or the tuned-ppd shim;
+# TLP does not expose one. Profiles left unmapped are ignored, and the mapping is also editable
+# from the Modes page in the UI. Every change is published on the SSE "system" event whether or
+# not a Mode is mapped.
+# [power_profile_modes]
+# power-saver = "<mode uid>"
+# balanced = "<mode uid>"
+# performance = "<mode uid>"
 
 # CoolerControl Device settings Example:
 # [settings.4b9cd1bc5fb2921253e6b7dd5b1b011086ea529d915a86b3560c236084452807]

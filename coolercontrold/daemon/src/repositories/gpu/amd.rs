@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -234,7 +219,7 @@ impl GpuAMD {
 
     async fn init_load(device_path: &Path) -> Option<HwmonChannelInfo> {
         let load_path = device_path.join("gpu_busy_percent");
-        match cc_fs::read_sysfs(&load_path).await {
+        match cc_fs::read_sysfs_value(&load_path).await {
             Ok(load) => match fans::check_parsing_8(load) {
                 Ok(_) => Some(HwmonChannelInfo {
                     hwmon_type: HwmonChannelType::Load,
@@ -748,7 +733,10 @@ impl GpuAMD {
             if channel.hwmon_type != HwmonChannelType::Load {
                 continue;
             }
-            let result = cc_fs::read_sysfs(driver.device_path.join("gpu_busy_percent"))
+            let result = driver
+                .hwmon
+                .fds
+                .read_value(&driver.device_path.join("gpu_busy_percent"))
                 .await
                 .and_then(fans::check_parsing_8);
             if let Ok(load) = result {
@@ -842,6 +830,21 @@ impl GpuAMD {
         cc_fs::write(&fan_curve_info.path, b"r\n".to_vec())
             .await
             .with_context(|| "Resetting Fan Curve file to automatic mode")
+    }
+
+    /// PMFW `FAN_CURVE_SPEED` floor for an RDNA3/4 card, `None` for any
+    /// device that takes plain hwmon pwm writes. `set_amd_duty` clamps
+    /// every non-zero duty into this range, so duties in `1..floor` all
+    /// land on the floor.
+    pub fn pmfw_duty_floor(&self, device_uid: &UID) -> Option<Duty> {
+        let fan_curve_info = self
+            .amd_driver_infos
+            .get(device_uid)?
+            .fan_curve_info
+            .as_ref()?;
+        fan_curve_info
+            .changeable
+            .then(|| *fan_curve_info.speed_range.start())
     }
 
     pub async fn set_amd_duty(

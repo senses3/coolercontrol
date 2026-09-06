@@ -1,8 +1,8 @@
 [package]
 name = "cc-stress"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "CPU, GPU, and RAM stress testing for thermal validation"
 categories = ["hardware-support"]
 keywords = ["stress", "hardware", "thermal", "benchmark"]
@@ -15,20 +15,20 @@ license = "GPL-3.0-or-later"
 doctest = false
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = "1.0"
 libc = "0.2"
 nix = { version = "0.31.3", default-features = false, features = [
   "user",
   "sched",
   "ioctl",
 ] }
-# newer versions require >1.85
+# Held at 24: 25 through 30 carry breaking API changes across the stress backends,
+# and moving needs re-validation on real GPUs. Not an MSRV hold.
 wgpu = { version = "24", default-features = false, features = [
   "vulkan-portability",
   "angle",
   "wgsl",
 ] }
-tokio = { version = "1.52.3", default-features = false, features = [
-  "rt",
-  "time",
-] }
+# Only for block_on: wgpu's device request is the one async step, and it
+# resolves without a reactor. The stress loops themselves are plain threads.
+tokio = { version = "1.53", default-features = false, features = ["rt"] }

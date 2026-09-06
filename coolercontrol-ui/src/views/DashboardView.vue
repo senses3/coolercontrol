@@ -1,28 +1,11 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 import { useSettingsStore } from '@/stores/SettingsStore'
-import { computed, inject, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
-import Select from 'primevue/select'
-import MultiSelect from 'primevue/multiselect'
+import { computed, nextTick, onMounted, onUnmounted, type Ref, ref, watch } from 'vue'
 import type { Color, UID } from '@/models/Device.ts'
 import {
     ChartType,
@@ -39,31 +22,108 @@ import { TempInfo } from '@/models/TempInfo.ts'
 import { ChannelInfo } from '@/models/ChannelInfo.ts'
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { mdiInformationSlabCircleOutline, mdiMemory, mdiOverscan, mdiRestart } from '@mdi/js'
+import {
+    mdiAlertOutline,
+    mdiContentCopy,
+    mdiFan,
+    mdiHome,
+    mdiHomeOutline,
+    mdiOverscan,
+    mdiRestart,
+    mdiTrashCanOutline,
+} from '@mdi/js'
 import SensorTable from '@/components/SensorTable.vue'
 import TimeChart from '@/components/TimeChart.vue'
 import { v4 as uuidV4 } from 'uuid'
 import _ from 'lodash'
 import { component as Fullscreen } from 'vue-fullscreen'
 import { useI18n } from 'vue-i18n'
-import { Emitter, EventType } from 'mitt'
+import { useRouter } from 'vue-router'
+import { useWindowSize } from '@vueuse/core'
+import { useConfirm } from '@/shell/confirm'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
+import HealthWarning from '@/components/HealthWarning.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 interface Props {
     dashboardUID?: UID
+    // When both are set, the view renders the channel's private quick-chart
+    // dashboard (channelDashboard) with the filter controls hidden.
+    deviceUID?: UID
+    channelName?: string
 }
 
 const props = defineProps<Props>()
 const { t } = useI18n()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+const router = useRouter()
+const confirm = useConfirm()
 
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
 
+const sensorMode: boolean = props.deviceUID != null && props.channelName != null
+
+const coolingLabel = computed(() => t('layout.shell.cooling'))
+
+// Entity-first companion link: fan/pump channels also have a Cooling page.
+const hasCoolingPage = computed((): boolean => {
+    if (!sensorMode) return false
+    for (const device of deviceStore.allDevices()) {
+        if (device.uid === props.deviceUID) {
+            return device.info?.channels.get(props.channelName!)?.speed_options != null
+        }
+    }
+    return false
+})
+
+const channelLabel = ref(
+    sensorMode
+        ? (settingsStore.allUIDeviceSettings
+              .get(props.deviceUID!)
+              ?.sensorsAndChannels.get(props.channelName!)?.name ?? props.channelName!)
+        : '',
+)
+const createChannelDashboard = (): Dashboard => {
+    const dash = new Dashboard(channelLabel.value)
+    dash.timeRangeSeconds = 300
+    // needed due to reduced default data type range:
+    dash.dataTypes = []
+    dash.deviceChannelNames.push(new DashboardDeviceChannel(props.deviceUID!, props.channelName!))
+    settingsStore.allUIDeviceSettings
+        .get(props.deviceUID!)!
+        .sensorsAndChannels.get(props.channelName!)!.channelDashboard = dash
+    return dash
+}
+
+// Sensors fall back to their detected label; a dashboard keeps its own name.
+const fallbackName = computed(() =>
+    sensorMode
+        ? settingsStore.defaultChannelLabel(props.deviceUID!, props.channelName!)
+        : dashboard.name,
+)
+
 const saveNameFunction = async (newName: string): Promise<boolean> => {
+    if (sensorMode) {
+        // User names are persisted as daemon name overrides. An empty name
+        // removes the override and falls back to the detected label, which has
+        // to be read before saving drops the override it is derived from.
+        const applied = newName.length > 0 ? newName : fallbackName.value
+        const success = await settingsStore.saveChannelName(
+            props.deviceUID!,
+            props.channelName!,
+            newName,
+        )
+        if (!success) return false
+        channelLabel.value = applied
+        return true
+    }
     if (newName.length > 0) {
         dashboard.name = newName
-        emitter.emit('dashboard-name-update', { dashboardUID: dashboard.uid, name: newName })
     }
     return false
 }
@@ -71,14 +131,84 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
 const homeDashboard: Dashboard =
     settingsStore.dashboards.find((dashboard) => dashboard.uid === settingsStore.homeDashboard) ??
     settingsStore.dashboards[0] // show first dashboard if no Home Dashboard set
-const dashboard: Dashboard =
-    props.dashboardUID != null
-        ? (settingsStore.dashboards.find((d) => d.uid === props.dashboardUID) ?? homeDashboard)
-        : homeDashboard
+const dashboard: Dashboard = sensorMode
+    ? (settingsStore.allUIDeviceSettings
+          .get(props.deviceUID!)!
+          .sensorsAndChannels.get(props.channelName!)!.channelDashboard ?? createChannelDashboard())
+    : props.dashboardUID != null
+      ? (settingsStore.dashboards.find((d) => d.uid === props.dashboardUID) ?? homeDashboard)
+      : homeDashboard
 
 // Migrate removed Controls chart type to Time Chart
 if ((dashboard.chartType as string) === 'Controls') {
     dashboard.chartType = ChartType.TIME_CHART
+}
+// A saved types filter on a channel dashboard would annoyingly hide some
+// metrics like i.e. RPMs.
+if (sensorMode && dashboard.dataTypes.length > 0) {
+    dashboard.dataTypes = []
+}
+
+const isHome = computed(() => settingsStore.homeDashboard === dashboard.uid)
+const setHome = (): void => {
+    settingsStore.homeDashboard = dashboard.uid
+}
+
+// Mobile has no side panel, so the dashboard toolbar carries the dashboard switcher
+// (plus an Alerts entry) that the Monitoring panel provides on desktop.
+const { width } = useWindowSize()
+const isMobile = computed(() => width.value < 768)
+const ALERTS_NAV = '__alerts__'
+const dashboardNavOptions = computed(() => [
+    ...settingsStore.dashboards.map((d) => ({ label: d.name, value: d.uid })),
+    { label: t('layout.menu.alerts'), value: ALERTS_NAV },
+])
+const dashboardNav = computed<string>({
+    get: () => dashboard.uid,
+    set: (value) => {
+        if (value === ALERTS_NAV) {
+            router.push({ name: 'monitoring-alerts' })
+        } else if (value !== dashboard.uid) {
+            router.push({ name: 'monitoring-dashboard', params: { dashboardUID: value } })
+        }
+    },
+})
+const duplicateDashboard = (): void => {
+    const copy = new Dashboard(`${dashboard.name} (copy)`)
+    copy.chartType = dashboard.chartType
+    copy.timeRangeSeconds = dashboard.timeRangeSeconds
+    copy.autoScaleDegree = dashboard.autoScaleDegree
+    copy.autoScaleFrequency = dashboard.autoScaleFrequency
+    copy.autoScaleWatts = dashboard.autoScaleWatts
+    copy.degreeMax = dashboard.degreeMax
+    copy.degreeMin = dashboard.degreeMin
+    copy.frequencyMax = dashboard.frequencyMax
+    copy.frequencyMin = dashboard.frequencyMin
+    copy.wattsMax = dashboard.wattsMax
+    copy.wattsMin = dashboard.wattsMin
+    copy.dataTypes = [...dashboard.dataTypes]
+    copy.selectedTags = [...dashboard.selectedTags]
+    copy.deviceChannelNames = dashboard.deviceChannelNames.map(
+        (ch) => new DashboardDeviceChannel(ch.deviceUID, ch.channelName),
+    )
+    settingsStore.dashboards.push(copy)
+    router.push({ name: 'monitoring-dashboard', params: { dashboardUID: copy.uid } })
+}
+const deleteDashboard = (): void => {
+    confirm.require({
+        message: t('views.dashboard.deleteDashboardConfirm', { name: dashboard.name }),
+        header: t('views.dashboard.deleteDashboard'),
+        icon: mdiAlertOutline,
+        accept: () => {
+            const index = settingsStore.dashboards.findIndex((d) => d.uid === dashboard.uid)
+            if (index === -1) return
+            settingsStore.dashboards.splice(index, 1)
+            if (settingsStore.homeDashboard === dashboard.uid) {
+                settingsStore.homeDashboard = undefined
+            }
+            router.push({ name: 'section-monitoring' })
+        },
+    })
 }
 
 const chartTypes = [...$enum(ChartType).values()].map((type) => ({
@@ -187,6 +317,43 @@ const fillChosenSensorSources = (): void => {
 }
 fillChosenSensorSources()
 
+const sensorKey = (sensor: AvailableSensor): string => `${sensor.deviceUID}/${sensor.name}`
+const sensorGroups = computed(() =>
+    filteredSensorSources.value.map((source) => ({
+        label: source.deviceName,
+        options: source.sensors.map((sensor) => ({
+            label: sensor.label,
+            value: sensorKey(sensor),
+            color: sensor.color,
+        })),
+    })),
+)
+const chosenSensorKeys = computed<string[]>({
+    get: () => chosenSensorSources.value.map(sensorKey),
+    set: (keys) => {
+        const all = sensorSources.value.flatMap((source) => source.sensors)
+        chosenSensorSources.value = keys
+            .map((key) => all.find((sensor) => sensorKey(sensor) === key))
+            .filter((sensor): sensor is AvailableSensor => sensor != null)
+        updateDashboardSensorsFilter(chosenSensorSources.value)
+    },
+})
+const tagGroups = computed(() => [
+    {
+        label: '',
+        options: tagOptions.value.map((tag) => ({
+            label: tag.name,
+            value: tag.name,
+            color: tag.color,
+            dot: true,
+        })),
+    },
+])
+const dataTypeGroups = computed(() => [
+    { label: '', options: dataTypes.map((entry) => ({ label: entry.text, value: entry.value })) },
+])
+const chartTypeOptions = chartTypes.map((entry) => ({ label: entry.text, value: entry.value }))
+
 const updateDashboardSensorsFilter = (sensorSources: Array<AvailableSensor>): void => {
     const newSensorsFilter: Array<DashboardDeviceChannel> = []
     sensorSources.forEach((sensor: AvailableSensor) => {
@@ -288,24 +455,27 @@ const addScrollEventListener = (): void => {
 }
 const updateResponsiveGraphHeight = (): void => {
     const graphEl = document.getElementById('u-plot-chart')
-    const controlPanel = document.getElementById('control-panel')
-    if (graphEl != null && controlPanel != null) {
+    if (graphEl != null) {
         if (fullPage.value) {
             graphEl.style.height = 'calc(100vh - 1rem)'
             return
         }
-        const panelHeight = controlPanel.getBoundingClientRect().height
-        if (panelHeight > 77) {
-            // 5.5rem
-            graphEl.style.height = `calc(100vh - (${panelHeight}px + 2rem))`
-        } else {
-            graphEl.style.height = 'calc(100vh - 5.75rem)'
-        }
+        // Fill the viewport from wherever the chart starts; works both at the page
+        // top and inside the shell content area. On mobile the bottom nav sits at the
+        // viewport foot, so subtract its height or the chart runs under it.
+        const top = Math.ceil(graphEl.getBoundingClientRect().top)
+        const bottomNav = document.getElementById('shell-bottom-nav')
+        const bottomNavHeight = bottomNav ? Math.ceil(bottomNav.getBoundingClientRect().height) : 0
+        graphEl.style.height = `calc(100vh - ${top + 12 + bottomNavHeight}px)`
     }
 }
 
-const toggleFullPage = (): void => {
+const toggleFullPage = async (): Promise<void> => {
     fullPage.value = !fullPage.value
+    // The chart is teleported in and out of the full-page wrapper, so measuring
+    // it before the re-render reads its old position: leaving full page would
+    // otherwise keep a viewport-tall chart.
+    await nextTick()
     updateResponsiveGraphHeight()
 }
 
@@ -350,205 +520,228 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div id="control-panel" class="flex border-b-4 border-border-one items-center justify-between">
-        <entity-title-rename
-            :current-name="dashboard.name"
-            :save-name-function="saveNameFunction"
-        />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div
-                v-if="dashboard.chartType == ChartType.TIME_CHART"
-                class="p-2 flex leading-none items-center"
-                v-tooltip.top="t('views.dashboard.mouseActions')"
-            >
-                <svg-icon
-                    type="mdi"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
+    <div class="flex h-full flex-col">
+        <entity-page-header id="control-panel">
+            <template #title>
+                <entity-title-rename
+                    v-if="sensorMode || !isMobile"
+                    :current-name="sensorMode ? channelLabel : dashboard.name"
+                    :fallback-name="fallbackName"
+                    :save-name-function="saveNameFunction"
                 />
-            </div>
-            <div
-                class="p-2 flex leading-none items-center"
-                v-tooltip.top="t('views.dashboard.fullPage')"
-                @click="toggleFullPage"
-            >
-                <svg-icon type="mdi" :path="mdiOverscan" :size="deviceStore.getREMSize(1.25)" />
-            </div>
-            <div v-if="settingsStore.tags.size > 0" class="p-2 pr-0 flex flex-row">
-                <MultiSelect
-                    v-model="dashboard.selectedTags"
-                    :options="tagOptions"
-                    class="w-36 h-[2.375rem]"
-                    :placeholder="t('views.dashboard.filterTags')"
-                    :dropdown-icon="
-                        dashboard.selectedTags.length > 0 ? 'pi pi-filter' : 'pi pi-filter-slash'
-                    "
-                    option-label="name"
-                    option-value="name"
-                    scroll-height="16rem"
-                    v-tooltip.top="t('views.dashboard.filterByTag')"
-                >
-                    <template #option="slotProps">
-                        <div class="flex items-center gap-x-2">
-                            <span
-                                class="w-3 h-3 rounded-full inline-block"
-                                :style="{ backgroundColor: slotProps.option.color }"
-                            />
-                            {{ slotProps.option.name }}
-                        </div>
-                    </template>
-                    <template #value="slotProps">
-                        <span v-if="slotProps.value?.length > 0">
-                            {{ slotProps.value.join(', ') }}
-                        </span>
-                        <span v-else>
-                            {{ slotProps.placeholder }}
-                        </span>
-                    </template>
-                </MultiSelect>
-            </div>
-            <div class="p-2 pr-0 flex flex-row">
-                <MultiSelect
-                    v-model="chosenSensorSources"
-                    :options="filteredSensorSources"
-                    class="w-36 h-[2.375rem]"
-                    :placeholder="t('views.dashboard.filterSensors')"
-                    :filter-placeholder="t('common.search')"
-                    filter
-                    :dropdown-icon="
-                        chosenSensorSources.length > 0 ? 'pi pi-filter' : 'pi pi-filter-slash'
-                    "
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="sensors"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.dashboard.filterBySensor')"
-                    @update:model-value="updateDashboardSensorsFilter"
-                >
-                    <template #optiongroup="slotProps">
-                        <div class="flex items-center">
-                            <svg-icon
-                                type="mdi"
-                                :path="mdiMemory"
-                                :size="deviceStore.getREMSize(1.3)"
-                                class="mr-2"
-                            />
-                            <div>{{ slotProps.option.deviceName }}</div>
-                        </div>
-                    </template>
-                    <template #option="slotProps">
-                        <div class="flex items-center">
-                            <span
-                                class="pi pi-minus mr-2 ml-1"
-                                :style="{ color: slotProps.option.color }"
-                            />
-                            {{ slotProps.option.label }}
-                        </div>
-                    </template>
-                </MultiSelect>
-                <MultiSelect
-                    v-model="dashboard.dataTypes"
-                    :options="dataTypes"
-                    class="ml-3 w-36 h-[2.375rem]"
-                    :placeholder="t('views.dashboard.filterTypes')"
-                    :dropdown-icon="
-                        dashboard.dataTypes.length > 0 ? 'pi pi-filter' : 'pi pi-filter-slash'
-                    "
-                    scroll-height="16rem"
-                    option-label="text"
-                    option-value="value"
-                    v-tooltip.top="t('views.dashboard.filterByDataType')"
-                />
-            </div>
-            <div
-                v-if="dashboard.chartType == ChartType.TIME_CHART"
-                class="p-2 pr-0 flex flex-row bg-bg-one"
-            >
-                <InputNumber
-                    :placeholder="t('views.dashboard.minutes')"
-                    input-id="chart-minutes"
-                    v-model="chartMinutes"
-                    class="h-[2.375rem] chart-minutes"
-                    :suffix="` ${t('views.dashboard.minutes').toLowerCase()}`"
-                    show-buttons
-                    :use-grouping="false"
-                    :step="1"
-                    :min="chartMinutesMin"
-                    :max="chartMinutesMax"
-                    button-layout="horizontal"
-                    :allow-empty="false"
-                    :input-style="{ width: '5rem' }"
-                    v-tooltip.top="t('views.dashboard.timeRange')"
-                >
-                    <template #incrementbuttonicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementbuttonicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
-                <axis-options class="h-[2.375rem] ml-3" :dashboard="dashboard" />
-            </div>
-            <div
-                v-if="dashboard.chartType == ChartType.TABLE"
-                class="p-2 pr-0 flex leading-none items-center bg-bg-one"
-            >
-                <Button
-                    outlined
-                    class="h-[2.375rem] px-3"
-                    @click="sensorTableRef?.resetStats()"
-                    v-tooltip.top="t('components.sensorTable.resetStatsTooltip')"
-                >
-                    <svg-icon type="mdi" :path="mdiRestart" :size="deviceStore.getREMSize(1.1)" />
-                    <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
-                </Button>
-            </div>
-            <div class="p-2 bg-bg-one">
-                <Select
-                    v-model="dashboard.chartType"
-                    :options="chartTypes"
-                    :placeholder="t('views.dashboard.selectChartType')"
-                    class="w-32 h-[2.375rem]"
-                    checkmark
-                    dropdown-icon="pi pi-chart-bar"
-                    scroll-height="400px"
-                    option-label="text"
-                    option-value="value"
-                    v-tooltip.top="t('views.dashboard.chartType')"
-                />
-            </div>
-        </div>
-    </div>
-    <Fullscreen v-model="fullPage" :teleport="true" :page-only="true">
-        <div :class="{ 'full-page-wrapper': fullPage }">
-            <div
-                v-if="fullPage"
-                class="flex flex-row pt-0.5 fixed left-0 top-0 z-50 w-full justify-between"
-            >
-                <div />
-                <div v-tooltip.top="t('views.dashboard.exitFullPage')" @click="toggleFullPage">
-                    <svg-icon
-                        type="mdi"
-                        class="text-text-color-secondary"
-                        :path="mdiOverscan"
-                        :size="deviceStore.getREMSize(1.325)"
+                <span v-else class="w-full p-2">
+                    <UiSelect
+                        v-model="dashboardNav"
+                        :options="dashboardNavOptions"
+                        class="w-full"
                     />
+                </span>
+                <HelpIcon
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    class="ml-1"
+                    :text="t('views.dashboard.mouseActions')"
+                    side="bottom"
+                />
+            </template>
+            <template #controls>
+                <UiButton
+                    v-if="hasCoolingPage"
+                    variant="outline"
+                    v-tooltip.top="t('views.dashboard.openCooling')"
+                    @click="
+                        router.push({
+                            name: 'cooling-channel',
+                            params: {
+                                deviceUID: props.deviceUID!,
+                                channelName: props.channelName!,
+                            },
+                        })
+                    "
+                >
+                    <svg-icon type="mdi" :path="mdiFan" :size="deviceStore.getREMSize(1.1)" />
+                    <span class="ml-1">{{ coolingLabel }}</span>
+                </UiButton>
+                <div
+                    v-if="!sensorMode && settingsStore.tags.size > 0"
+                    class="p-2 pr-0 flex flex-row"
+                >
+                    <span v-tooltip.top="t('views.dashboard.filterByTag')">
+                        <UiMultiSelect
+                            v-model="dashboard.selectedTags"
+                            :groups="tagGroups"
+                            class="w-36"
+                            :placeholder="t('views.dashboard.filterTags')"
+                        />
+                    </span>
                 </div>
-                <div />
+                <div v-if="!sensorMode" class="p-2 pr-0 flex flex-row">
+                    <span v-tooltip.top="t('views.dashboard.filterBySensor')">
+                        <UiMultiSelect
+                            v-model="chosenSensorKeys"
+                            :groups="sensorGroups"
+                            class="w-36"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('views.dashboard.filterSensors')"
+                        />
+                    </span>
+                    <span class="ml-3" v-tooltip.top="t('views.dashboard.filterByDataType')">
+                        <UiMultiSelect
+                            v-model="dashboard.dataTypes"
+                            :groups="dataTypeGroups"
+                            class="w-36"
+                            :placeholder="t('views.dashboard.filterTypes')"
+                        />
+                    </span>
+                </div>
+                <div
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    class="p-2 pr-0 flex flex-row bg-bg-one"
+                >
+                    <UiNumberInput
+                        v-model="chartMinutes"
+                        :min="chartMinutesMin"
+                        :max="chartMinutesMax"
+                        :step="1"
+                        :suffix="t('common.minuteAbbr')"
+                        v-tooltip.top="t('views.dashboard.timeRange')"
+                    />
+                    <axis-options class="h-10 ml-3" :dashboard="dashboard" />
+                </div>
+                <div
+                    v-if="dashboard.chartType == ChartType.TABLE"
+                    class="p-2 pr-0 flex leading-none items-center bg-bg-one"
+                >
+                    <UiButton
+                        variant="outline"
+                        @click="sensorTableRef?.resetStats()"
+                        v-tooltip.top="t('components.sensorTable.resetStatsTooltip')"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiRestart"
+                            :size="deviceStore.getREMSize(1.1)"
+                        />
+                        <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
+                    </UiButton>
+                </div>
+                <div class="p-2 bg-bg-one">
+                    <span v-tooltip.top="t('views.dashboard.chartType')">
+                        <UiSelect
+                            v-model="dashboard.chartType"
+                            :options="chartTypeOptions"
+                            class="w-32"
+                        />
+                    </span>
+                </div>
+            </template>
+            <template #actions>
+                <template v-if="!sensorMode">
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        :class="{ '!text-accent': isHome }"
+                        v-tooltip.top="t('views.dashboard.setAsHome')"
+                        @click="setHome"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="isHome ? mdiHome : mdiHomeOutline"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        v-tooltip.top="t('views.dashboard.duplicateDashboard')"
+                        @click="duplicateDashboard"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiContentCopy"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                    <UiButton
+                        v-if="settingsStore.dashboards.length > 1"
+                        variant="ghost"
+                        size="icon"
+                        v-tooltip.top="t('views.dashboard.deleteDashboard')"
+                        @click="deleteDashboard"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiTrashCanOutline"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        v-tooltip.top="t('views.dashboard.fullPage')"
+                        @click="toggleFullPage"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            :path="mdiOverscan"
+                            :size="deviceStore.getREMSize(1.25)"
+                        />
+                    </UiButton>
+                </template>
+            </template>
+            <!-- Inside #control-panel so the chart-height observer accounts for it. -->
+            <health-warning
+                v-if="sensorMode"
+                kind="channel"
+                :device-uid="props.deviceUID!"
+                :channel-name="props.channelName!"
+                class="w-full mx-2 mb-2"
+            />
+        </entity-page-header>
+        <!-- z-index while full page: the wrapper is fixed but z-auto, so any
+             positioned shell element with a z-index (the panel's scroll fades)
+             paints over the chart. -->
+        <Fullscreen
+            v-model="fullPage"
+            :teleport="true"
+            :page-only="true"
+            class="min-h-0 flex-1"
+            :class="{ 'z-[1200]': fullPage }"
+        >
+            <div class="h-full" :class="{ 'full-page-wrapper': fullPage }">
+                <!-- pr-2 plus the w-10 box put the icon where the header's
+                     full-page button sits, so it does not jump on toggle. -->
+                <div
+                    v-if="fullPage"
+                    class="fixed left-0 top-0 z-50 flex w-full flex-row justify-end pr-2 pt-0.5"
+                >
+                    <div
+                        class="flex w-10 justify-center"
+                        v-tooltip.top="t('views.dashboard.exitFullPage')"
+                        @click="toggleFullPage"
+                    >
+                        <svg-icon
+                            type="mdi"
+                            class="text-text-color-secondary"
+                            :path="mdiOverscan"
+                            :size="deviceStore.getREMSize(1.325)"
+                        />
+                    </div>
+                </div>
+                <TimeChart
+                    v-if="dashboard.chartType == ChartType.TIME_CHART"
+                    :dashboard="viewDashboard"
+                    :key="chartKey"
+                />
+                <SensorTable
+                    v-else-if="dashboard.chartType == ChartType.TABLE"
+                    ref="sensorTableRef"
+                    :dashboard="viewDashboard"
+                    :key="'table' + chartKey"
+                />
             </div>
-            <TimeChart
-                v-if="dashboard.chartType == ChartType.TIME_CHART"
-                :dashboard="viewDashboard"
-                :key="chartKey"
-            />
-            <SensorTable
-                v-else-if="dashboard.chartType == ChartType.TABLE"
-                ref="sensorTableRef"
-                :dashboard="viewDashboard"
-                :key="'table' + chartKey"
-            />
-        </div>
-    </Fullscreen>
+        </Fullscreen>
+    </div>
 </template>
 
 <style lang="scss" scoped>

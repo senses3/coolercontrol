@@ -1,82 +1,46 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 export default {
     common: {
         save: 'Guardar',
+        mouseActions: 'Acciones del ratón',
+        moreInfo: 'Más información',
         cancel: 'Cancelar',
-        confirm: 'Confirmar',
-        delete: 'Eliminar',
-        edit: 'Editar',
         add: 'Añadir',
-        remove: 'Eliminar',
         yes: 'Sí',
         no: 'No',
         ok: 'Aceptar',
         error: 'Error',
         success: 'Éxito',
-        warning: 'Advertencia',
         loading: 'Cargando...',
         restarting: 'Reiniciando...',
-        noData: 'No hay datos disponibles',
         retry: 'Reintentar',
         saveAndRefresh: 'Guardar y actualizar',
         reset: 'Restablecer',
-        back: 'Atrás',
         sslTls: 'SSL/TLS',
         protocol: 'Protocolo',
         address: 'Dirección',
         port: 'Puerto',
         search: 'Buscar',
-        selected: 'Seleccionado',
-        clear: 'Limpiar',
         finish: 'Finalizar',
         next: 'Siguiente',
         previous: 'Anterior',
-        apply: 'Aplicar',
-        defaults: 'Predeterminados',
         unmanaged: 'Sin gestión',
-        readOnly: 'Solo lectura',
-        rename: 'Renombrar',
         password: 'Contraseña',
         currentPassword: 'Contraseña actual',
         newPassword: 'Nueva contraseña',
         confirmPassword: 'Confirmar contraseña',
-        passwordPrompt: 'Ingrese una contraseña',
-        passwordWeak: 'Débil',
-        passwordMedium: 'Medio',
-        passwordStrong: 'Fuerte',
         savePassword: 'Guardar contraseña',
-        editName: 'Editar nombre',
         state: 'Estado',
         name: 'Nombre',
         message: 'Mensaje',
         timestamp: 'Marca de tiempo',
-        overview: 'Resumen',
-        login: 'Iniciar sesión',
-        logout: 'Cerrar sesión',
-        temperature: 'Temperatura',
+        temperature: 'Temp.',
         duty: 'Velocidad',
         offset: 'Desplazamiento',
         stay: 'Quedarse',
         discard: 'Descartar',
-        blankNameResetDefault:
-            'Un nombre en blanco lo restablecerá al valor predeterminado del sistema.',
         copy: '(copia)',
         minuteAbbr: 'min',
         rpmAbbr: 'rpm',
@@ -108,6 +72,215 @@ export default {
         },
     },
     layout: {
+        shell: {
+            search: {
+                hint: 'Buscar dispositivos, sensores, ajustes y acciones',
+                recent: 'Reciente',
+                jumpTo: 'Ir a',
+                noResults: 'No se encontraron coincidencias.',
+                more: '{count} más',
+                kindFan: 'Ventiladores',
+                kindSensor: 'Sensores',
+                kindAction: 'Acciones',
+                kindPage: 'Páginas',
+            },
+            home: 'Inicio',
+            cooling: 'Refrigeración',
+            monitoring: 'Monitoreo',
+            devices: 'Dispositivos',
+            settings: 'Configuración',
+            plugins: 'Plugins',
+            modes: 'Modos',
+            manageModes: 'Gestionar modos',
+            access: 'Acceso',
+            power: 'Energía',
+            noModes: 'No hay modos guardados',
+            supportWizards: {
+                summary: '¡Magos del soporte activados!',
+                detail: 'Gracias a los voluntarios que ayudan a nuestros usuarios a hacer funcionar su hardware y sus controladores.',
+            },
+            coolingPanel: {
+                pinned: 'Fijado',
+                pin: 'Fijar',
+                unpin: 'Desfijar',
+                library: 'Perfiles y Funciones',
+                profiles: 'Perfiles',
+                functions: 'Funciones',
+                addFolder: 'Añadir carpeta',
+                newFolder: 'Nueva carpeta',
+                deleteFolder: 'Eliminar carpeta',
+            },
+            monitoringPanel: {
+                newDashboard: 'Nuevo Panel',
+                createAlert: 'Crear alerta para este sensor',
+                failAlert: 'Crear una alerta de fallo (se activa a 0 rpm)',
+                failAlertSuffix: 'Fallo',
+            },
+            devicesPanel: {
+                disabled: 'Deshabilitado',
+            },
+            sensorDest: {
+                monitoring: 'Monitoreo',
+                cooling: 'Refrigeración',
+                lighting: 'Iluminación',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'Gestionar Dispositivos y Sensores',
+                hint: 'Habilite o deshabilite dispositivos y sensores. Se recomienda deshabilitar los que no se utilizan.',
+                pendingChanges: 'Sin cambios | {count} cambio | {count} cambios',
+                applyRestart: 'Aplicar y Reiniciar',
+                disabledDevices: 'Dispositivos Deshabilitados',
+                openButton: 'Gestionar Dispositivos y Sensores',
+            },
+            toast: {
+                copy: 'Copiar',
+                dismissAll: 'Descartar todo',
+            },
+            homePanel: {
+                overview: 'Resumen',
+                logs: 'Registros',
+            },
+            homePage: {
+                viewLogs: 'Ver Registros',
+                logsAll: 'Todos',
+                logsWarnings: 'Advertencias+',
+                logsErrors: 'Errores',
+                logsNoMatches: 'No hay líneas de registro coincidentes.',
+                getStartedGroup: 'Primeros Pasos',
+                learnGroup: 'Aprender',
+                resourcesGroup: 'Recursos',
+                modeAndAlerts: 'Modo y Alertas',
+                noActiveMode: 'Sin modo activo',
+                setUpCooling: 'Configurar refrigeración',
+            },
+            devicesPage: {
+                landingHint: 'Seleccione un dispositivo para ver sus detalles y configuración.',
+                temps: 'temps',
+                fans: 'ventiladores',
+                lighting: 'iluminación',
+                lcd: 'LCD',
+                deviceDisabled: 'Este dispositivo está deshabilitado.',
+                enableDevice: 'Habilitar Dispositivo',
+                disableUnusedSensors: 'Deshabilitar sensores no utilizados… (recomendado)',
+                sensors: 'Sensores',
+            },
+            hardwareHelp: {
+                missingDevice: '¿Esperabas hardware que no aparece aquí?',
+            },
+            coolingPage: {
+                landingHint:
+                    'Seleccione un ventilador o bomba para ver y ajustar su refrigeración.',
+                noChannels: 'No se detectaron canales de ventilador o bomba.',
+                noneControllable:
+                    'Ninguno de los canales de ventilador o bomba detectados se puede controlar.',
+                noticeBlockedByEnvironment:
+                    'La detección de hardware no pudo ejecutarse, por lo que pueden faltar canales de ventilador y bomba.',
+                fullChart: 'Gráfico completo',
+                guidedSetup: 'Configuración Guiada',
+                setupMenu: {
+                    autoCreateThisFan: 'Crear automáticamente para este ventilador',
+                    createProfile: 'Crear un perfil nuevo',
+                    calibrateThisFan: 'Calibrar este ventilador',
+                    autoCreateAllFans: 'Crear automáticamente para todos los ventiladores',
+                    calibrateAllFans: 'Calibrar todos los ventiladores',
+                },
+                manualAt: 'Manual {duty}%',
+                manualDuty: 'Ciclo manual',
+                modeProfile: 'Perfil',
+                modeManual: 'Manual',
+                modeUnmanaged: 'Sin gestión',
+                unmanagedHint:
+                    'El dispositivo o su firmware controla este canal. CoolerControl no enviará ningún comando de velocidad.',
+                apply: 'Aplicar',
+                saveAndApply: 'Guardar y Aplicar',
+                unsavedChanges: 'Hay cambios en este canal que no se han aplicado.',
+                unsavedChangesHeader: 'Cambios sin guardar',
+                selectProfile: 'Seleccionar un perfil',
+                sharedWith: 'Compartido con {count} más',
+                sharedTooltip: 'Este perfil también controla otros canales.',
+                notShared: 'Solo este ventilador',
+                notSharedTooltip: 'Este perfil solo controla este canal.',
+                forkForFan: 'Bifurcar para este ventilador',
+                forkQualifier: 'copia de {channel}',
+                fork: {
+                    confirmHeader: 'Bifurcar para este ventilador',
+                    confirmMessage:
+                        "Copiar el perfil '{profile}' a un nuevo perfil '{copy}' y asignarlo a {channel}.\n\nEl original queda intacto, así que los cambios aquí solo afectarán a {channel}.",
+                    accept: 'Crear copia',
+                },
+                convert: {
+                    button: 'Convertir para la calibración',
+                    tooltip:
+                        'Este ventilador está calibrado, así que sus velocidades guardadas ahora se leen como velocidades reales y se reasignan en cada escritura. Conviértelas para que el ventilador se comporte como antes de la calibración.',
+                    confirmHeader: 'Convertir para el ventilador calibrado',
+                    confirmProfile:
+                        "Copiar el perfil '{profile}' a un nuevo perfil '{copy}', convertir sus velocidades y asignarlo a {channel}.\n\nConvierte solo velocidades que definiste antes de calibrar este ventilador. Convertir dos veces hace que el ventilador gire a una velocidad incorrecta. El original queda intacto.",
+                    confirmManual:
+                        'Convertir el ciclo manual de {channel} para que el ventilador mantenga la velocidad que tenía antes de la calibración.\n\nConvierte solo un valor que definiste antes de calibrar este ventilador. Convertirlo dos veces hace que el ventilador gire a una velocidad incorrecta.',
+                    nameQualifier: 'calibrado',
+                    accept: 'Convertir',
+                    successProfile:
+                        "Se asignó '{profile}' a {channel} con las velocidades convertidas.",
+                    successManual: 'Ciclo manual convertido a {duty}%.',
+                    error: 'No se pudieron convertir las velocidades de este ventilador.',
+                    floorHeading: 'Algunos puntos se convirtieron a 0%',
+                    floorNotice:
+                        '{count} punto(s) estaban por debajo de la velocidad mínima que se puede fijar en {channel} tras la calibración, así que se convirtieron a 0%. Revisa la nueva curva antes de confiar en ella.',
+                    modesHeading: 'Los modos siguen usando el original',
+                    modesReminder:
+                        'Estos modos siguen asignando el perfil original a {channel}: {modes}. Actualízalos para usar la copia convertida.',
+                },
+                notControllable:
+                    'Este canal informa su velocidad pero CoolerControl no puede controlarlo.',
+                verdictFirmwareOverride:
+                    'CoolerControl estableció este canal en control manual, pero el firmware lo revirtió.',
+                verdictFamilyMayNeedOutOfTree:
+                    'No se encontró un control de ventilador escribible para este canal. En esta familia de chips, a veces lo proporciona otro controlador del kernel.',
+                verdictNotSupportedByDriver:
+                    'El controlador en uso no expone control de ventilador para este canal.',
+                verdictNoPwm:
+                    'El controlador cargado no expone control de ventilador para este canal, solo su velocidad.',
+                verdictPwmReadOnly:
+                    'El controlador cargado expone un control de ventilador para este canal, pero lo marca como de solo lectura.',
+                verdictIgnoresDuty:
+                    'Este canal aceptó cambios de potencia, pero su velocidad medida nunca respondió.',
+                verdictUnverifiable:
+                    'Este canal no tiene un tacómetro utilizable, por lo que no se puede verificar su respuesta a los cambios de potencia.',
+                verdictEvidenceLabel: 'Medido en esta máquina:',
+                evidenceNoPwmFile: 'sin control de ventilador expuesto',
+                evidencePwmNotWritable: 'el control de ventilador es de solo lectura',
+                evidenceHasTachometer: 'lectura de velocidad disponible',
+                evidenceNoTachometer: 'sin lectura de velocidad',
+                verdictLearnMore: '¿Qué puedo hacer al respecto?',
+                verdictFoundSomethingThatWorks: '¿Encontró algo que funciona? Cuéntenoslo',
+                activeMode: 'Activo',
+                previousMode: 'Anterior',
+                activate: 'Activar',
+                noModes:
+                    'Aún no hay modos guardados. Los modos capturan todas las configuraciones de canal para un cambio rápido.',
+                powerProfiles: {
+                    title: 'Perfil de energia del sistema',
+                    description:
+                        'Activar un modo automaticamente cuando cambie el perfil de energia del sistema.',
+                    activeProfile: 'Perfil actual: {profile}',
+                    noMode: 'Ningun modo',
+                    saveFailed: 'No se pudo guardar la asignacion de perfiles de energia.',
+                    profileNames: {
+                        'power-saver': 'Ahorro de energia',
+                        balanced: 'Equilibrado',
+                        performance: 'Rendimiento',
+                    },
+                },
+                miniCurveHint:
+                    'Curva del perfil asignado. El punto marca el objetivo a la temperatura actual de la fuente; la Función del canal da forma al valor real.',
+                chain: {
+                    tempSource: 'Fuente de temperatura',
+                    profile: 'Perfil',
+                    function: 'Función',
+                },
+            },
+        },
         topbar: {
             login: 'Iniciar sesión',
             logout: 'Cerrar sesión',
@@ -121,75 +294,39 @@ export default {
             shutdownError:
                 'Error desconocido al enviar la señal de apagado. Consulte los registros para más detalles.',
             quitDesktopApp: 'Salir de la aplicación',
-            applicationInfo: 'Info y Herramientas',
             back: 'Atrás',
             expandMenu: 'Expandir menú',
             collapseMenu: 'Contraer menú',
-            controls: 'Controles',
             alerts: 'Alertas',
             settings: 'Configuración',
             openInBrowser: 'Abrir en navegador',
-            modes: 'Modos',
             loginSuccessful: 'Inicio de sesión exitoso',
         },
         settings: {
             title: 'Configuración',
-            userInterface: 'Interfaz de Usuario',
-            device: 'Dispositivos',
-            daemon: 'Daemon',
             devices: {
-                devicesAndSensors: 'Dispositivos y sensores',
-                detectionIssues: '¿Problemas de detección? Consulte la',
-                hardwareSupportDoc: 'documentación de soporte de hardware',
                 toggleRequiresRestart:
                     'Cambiar dispositivos o sensores requiere un reinicio del daemon y la interfaz. ¿Está seguro de que desea hacer esto ahora?',
                 enableDevices: 'Habilitar dispositivos',
-                selectTooltip:
-                    'Seleccione dispositivos y sensores para deshabilitar o habilitar.\nSe recomienda encarecidamente deshabilitar los dispositivos y sensores no utilizados.',
                 unknownError:
                     'Error desconocido al intentar aplicar cambios a todos los dispositivos. Consulte los registros para más detalles.',
             },
-            plugin: 'Plugins (beta)',
             plugins: {
-                device: 'Plugin de servicio de dispositivo',
-                integration: 'Plugin de integración',
                 privileged: 'Acceso privilegiado',
                 pluginUrl: 'Página de inicio',
                 restricted: 'Acceso restringido',
                 settingsSaved: 'Configuración del plugin guardada correctamente',
                 settingsNotSaved: 'Error al guardar la configuración del plugin',
             },
-            profiles: 'Perfiles',
-            alerts: 'Alertas',
-            dashboards: 'Paneles',
-            modes: 'Modos',
             appearance: 'Apariencia',
+            general: 'General',
             language: 'Idioma',
             selectLanguage: 'Seleccionar idioma',
-            english: 'Inglés',
-            chinese: 'Chino (Simplificado)',
-            japanese: 'Japonés',
-            chineseTrad: 'Chino (Tradicional)',
-            russian: 'Ruso',
-            german: 'Alemán',
-            french: 'Francés',
-            spanish: 'Español',
-            arabic: 'Árabe',
-            portuguese: 'Portugués',
-            hindi: 'Hindi',
-            theme: 'Tema',
-            themeLight: 'Claro',
-            themeDark: 'Oscuro',
-            themeSystem: 'Sistema',
-            themeCustom: 'Personalizado',
-            themeHighContrastDark: 'Oscuro de alto contraste',
-            themeHighContrastLight: 'Claro de alto contraste',
-            lineThickness: 'Grosor de línea',
+            systemLanguage: 'Sistema',
             fullScreen: 'Pantalla completa',
-            menuBarAlwaysVisible: 'Barra de menú siempre visible',
-            hideMenuCollapseIcon: 'Ocultar icono de contracción del menú',
+            railToCollapse: 'Barra de navegación para contraer',
             eyeCandy: 'Efectos visuales',
-            showOnboarding: 'Mostrar introducción al inicio',
+            interfaceFont: 'Fuente de la interfaz',
             introduction: 'Introducción',
             startTour: 'Iniciar tour',
             timeFormat: 'Formato de hora',
@@ -197,16 +334,11 @@ export default {
             time12h: '12 horas',
             frequencyPrecision: 'Precisión de frecuencia',
             startupPage: 'Página de inicio',
-            sidebarToCollapse: 'Barra lateral a contraer',
-            entitiesBelowSensors: 'Entidades debajo de sensores',
             dashboardLineSize: 'Tamaño de línea del panel',
             themeStyle: 'Estilo del tema',
-            themeMode: {
-                system: 'Sistema',
-                dark: 'Oscuro',
-                light: 'Claro',
-                highContrastDark: 'Oscuro de alto contraste',
-                highContrastLight: 'Claro de alto contraste',
+            themeGroups: {
+                builtIn: 'Integrados',
+                installed: 'Instalados',
                 custom: 'Personalizado',
             },
             desktop: 'Escritorio',
@@ -214,6 +346,12 @@ export default {
             closeToTray: 'Cerrar a bandeja',
             zoom: 'Zoom',
             desktopStartupDelay: 'Retraso de inicio de escritorio',
+            groups: {
+                startup: 'Inicio',
+                performance: 'Rendimiento',
+                devices: 'Dispositivos y detección',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Aplicar configuración al inicio',
             deviceDelayAtStartup: 'Retraso de dispositivo al inicio',
             pollingRate: 'Tasa de sondeo',
@@ -223,15 +361,21 @@ export default {
             hideDuplicateDevices: 'Ocultar dispositivos duplicados',
             drivePowerState: 'Estado de energía del disco',
             sensorsAutoDetect: 'Detección automática de sensores',
+            sensorsConfig: 'Configuración de lm-sensors',
             deviceListener: 'Listener de cambios de dispositivos',
             customTheme: {
                 title: 'Tema Personalizado',
                 accent: 'Color de Acento',
+                accentGradientTo: 'Fin del degradado de acento',
                 bgOne: 'Fondo Primario',
                 bgTwo: 'Fondo Secundario',
                 border: 'Color del Borde',
                 text: 'Color del Texto',
                 textSecondary: 'Color del Texto Secundario',
+                success: 'Éxito',
+                warning: 'Advertencia',
+                error: 'Error',
+                info: 'Información',
                 export: 'Exportar Tema',
                 import: 'Importar Tema',
                 copyCode: 'Copiar Código',
@@ -241,16 +385,15 @@ export default {
                 invalidThemeCode: 'Código de tema no válido',
             },
             tooltips: {
-                introduction: 'Iniciar el recorrido de introducción de la aplicación.',
                 timeFormat: 'Formato de hora: 12 horas (AM/PM) o 24 horas',
                 frequencyPrecision: 'Ajustar la precisión de los valores de frecuencia mostrados.',
                 startupPage: 'La página que se muestra después de cargar la aplicación.',
+                railToCollapse:
+                    'Usar también el área vacía de la barra de navegación para expandir o contraer el menú.',
                 eyeCandy:
                     'Habilitar animaciones visuales como iconos de ventiladores giratorios.\nEsto utilizará algunos recursos adicionales de la GPU.',
-                sidebarCollapse:
-                    'Si mostrar un icono de colapso del menú en la barra lateral,\no usar el área vacía de la barra lateral para expandir o colapsar el menú principal.',
-                entitiesBelowSensors:
-                    'Si mostrar entidades debajo de los sensores del dispositivo en el menú principal.',
+                interfaceFont:
+                    'Usar las fuentes incluidas con CoolerControl o las configuradas en su sistema.',
                 fullScreen: 'Alternar el modo de pantalla completa',
                 lineThickness: 'Ajustar el grosor de las líneas de los gráficos en el panel',
                 startInTray:
@@ -260,6 +403,8 @@ export default {
                 zoom: 'Establecer manualmente el nivel de zoom de la interfaz de usuario.',
                 desktopStartupDelay:
                     'Agrega un retraso antes de iniciar la aplicación de escritorio (en segundos).\nAyuda con problemas que surgen al tener la aplicación de escritorio\niniciada automáticamente al iniciar sesión o al iniciar demasiado rápido',
+                unlockRange: 'Permitir valores fuera del rango recomendado',
+                lockRange: 'Restringir al rango recomendado',
                 applySettingsOnStartup:
                     'Aplicar automáticamente la configuración al iniciar el daemon y al despertar del sueño',
                 deviceDelayAtStartup:
@@ -277,85 +422,43 @@ export default {
                     'Los SSD y los HDD en particular pueden detenerse y entrar en un estado de bajo consumo.\nEsta opción, cuando está habilitada y la unidad lo soporta, informará las temperaturas de la unidad\ncomo 0°C cuando esté detenida para que los perfiles del ventilador puedan ajustarse en consecuencia.',
                 sensorsAutoDetect:
                     'Detectar automáticamente sensores de hardware Super-I/O y cargar\nmódulos del kernel al iniciar. (solo x86_64)',
+                sensorsConfig:
+                    'Usar los nombres de sensores y los sensores ocultos de los archivos\nde configuración de lm-sensors (/etc/sensors3.conf y /etc/sensors.d).\nLos nombres definidos en CoolerControl siempre tienen prioridad.',
                 deviceListener:
                     'Escuchar eventos de adición/eliminación de dispositivos (ej. conexión USB)\ny notificar cuando se detecten cambios de hardware.',
-                daemonAddress:
-                    'La dirección IP o el nombre de dominio del daemon para establecer una conexión.\nAdmite IPv4, IPv6 y nombres de host resolubles por DNS.',
-                daemonPort: 'El puerto utilizado para establecer una conexión con el daemon.',
-                sslTls: 'Si conectarse al daemon usando SSL/TLS.\nSe requiere una configuración de proxy.',
-                triggersRestart: 'Activa un reinicio automático',
-                triggersUIRestart: 'Activa un reinicio automático de la interfaz de usuario',
                 triggersDaemonRestart: 'Activa un reinicio automático del daemon',
-                resetToDefaults: 'Restablecer a la configuración predeterminada',
-                saveAndReload: 'Guardar y recargar la interfaz de usuario',
                 copyThemeCode:
                     'Copia un código compacto que representa tu tema personalizado actual.\nCompártelo en chats o foros.',
                 pasteThemeCode:
                     'Aplica un tema personalizado desde un código (cct1:...) que te hayan compartido.',
-                exportThemeFile: 'Guarda el tema personalizado actual en un archivo JSON.',
-                importThemeFile: 'Carga un tema personalizado desde un archivo JSON.',
             },
             applySettingAndRestart:
                 'Cambiar esta configuración requiere un reinicio del daemon y la interfaz de usuario. ¿Está seguro de que desea hacer esto ahora?',
             restartHeader: 'Aplicar configuración y reiniciar',
-            restartSuccess: 'Reiniciando ahora',
             success: 'Éxito',
             successDetail: 'Operación completada con éxito',
-            settingsAppliedSuccess: 'Configuraciones aplicadas con éxito',
-            restartRequestSuccess: 'Solicitud de reinicio enviada con éxito',
-            colorPickerDialogTitle: 'Seleccionar color',
-            colorPickerConfirm: 'Confirmar',
-            colorPickerCancel: 'Cancelar',
             languageChangeConfirm: '¿Cambiar idioma?',
             languageChangeConfirmMessage:
                 '¿Está seguro de que desea continuar? Si algunos elementos de la interfaz no se muestran correctamente, actualice la página manualmente.',
             languageChangeSuccess: 'Idioma cambiado con éxito.',
             languageChangeError: 'Error al cambiar el idioma. Por favor, inténtelo de nuevo.',
             themeChangeSuccess: 'Tema cambiado con éxito.',
-            entitiesBelowSensorsEnabledMessage:
-                'Las entidades ahora se mostrarán debajo de los sensores.',
-            entitiesBelowSensorsDisabledMessage:
-                'Las entidades ya no se mostrarán debajo de los sensores.',
         },
         menu: {
-            system: 'Sistema',
             dashboards: 'Paneles',
-            profiles: 'Perfiles',
-            functions: 'Funciones',
             customSensors: 'Sensores personalizados',
-            modes: 'Modos',
             alerts: 'Alertas',
             pinned: 'Fijado',
             tooltips: {
-                delete: 'Eliminar',
                 createMode: 'Crear modo desde configuración actual',
                 addProfile: 'Añadir perfil',
-                editName: 'Editar nombre',
                 addAlert: 'Añadir alerta',
-                deleteFunction: 'Eliminar función',
                 addDashboard: 'Añadir panel',
-                deleteDashboard: 'Eliminar panel',
                 duplicate: 'Duplicar',
-                setAsHome: 'Establecer como inicio',
-                save: 'Guardar',
-                deleteMode: 'Eliminar modo',
-                updateWithCurrentSettings: 'Actualizar con configuración actual',
                 rename: 'Renombrar',
-                createModeFromCurrentSettings: 'Crear modo desde configuración actual',
                 addCustomSensor: 'Añadir sensor personalizado',
                 addFunction: 'Añadir función',
                 chooseColor: 'Elegir color',
-                deviceSettings: 'Configuración Avanzada del Dispositivo',
-                options: 'Más Opciones',
-                seeDeviceHealth:
-                    'Para una vista general, ver Estado de los Dispositivos en Info y Herramientas',
-                moveTop: 'Mover al Inicio',
-                moveBottom: 'Mover al Final',
-                disable: 'Deshabilitar',
-                pin: 'Fijar al Inicio',
-                unpin: 'Desfijar',
-                profileApply: 'Aplicar Perfil a ventiladores',
-                tags: 'Gestionar Etiquetas',
             },
         },
         plugins: {
@@ -377,7 +480,7 @@ export default {
             overview: 'Vista General de Plugins',
             gettingStarted:
                 'Los plugins amplían CoolerControl con soporte adicional de dispositivos, integraciones y automatización. Pueden proporcionar nuevos sensores y controles de dispositivos, conectarse a servicios externos o agregar páginas de interfaz personalizadas.',
-            docsLink: 'Documentación de Plugins',
+            findPlugins: 'Buscar e instalar Plugins',
             restartNote:
                 'Si recientemente agregó un nuevo plugin y no aparece aquí, reinicie el demonio de CoolerControl.',
             containerNote:
@@ -388,7 +491,6 @@ export default {
             description: 'Descripción',
             enable: 'Habilitar',
             disable: 'Deshabilitar',
-            disabled: 'Deshabilitado',
             pluginDisabled: 'Plugin deshabilitado.',
             pluginEnabled: 'Plugin habilitado.',
             pluginDisabledRestart: 'Plugin deshabilitado. Reinicie el daemon para aplicar.',
@@ -399,11 +501,8 @@ export default {
             commandCopied: 'Comando copiado al portapapeles',
         },
         add: {
-            dashboard: 'Panel',
-            mode: 'Modo',
             profile: 'Perfil',
             function: 'Función',
-            alert: 'Alerta',
             customSensor: 'Sensor personalizado',
         },
     },
@@ -418,59 +517,18 @@ export default {
                 'No se puede conectar al daemon. Por favor, compruebe si el daemon está en ejecución.',
             connectionRestored: 'Conexión Restaurada',
             connectionRestoredMessage: 'La conexión al daemon ha sido restaurada.',
-            thinkpadFanControl: 'Control de Ventilador ThinkPad',
-            pollRate: 'Tasa de Sondeo',
-            applySettingAndRestart: 'Aplicar Configuración y Reiniciar',
-            changeSetting:
-                'Cambiar esta configuración requiere un reinicio del daemon y la interfaz. ¿Está seguro de que desea hacerlo ahora?',
-            status: {
-                ok: 'Ok',
-                hasWarnings: 'Tiene Advertencias',
-                hasErrors: 'Tiene Errores',
-            },
-        },
-        devices: {
-            detectionIssues: 'Problemas de detección? Consulte la',
-            hardwareSupportDocs: 'Documentación de Soporte de Hardware',
-            selectDevices:
-                'Seleccione dispositivos y sensores para deshabilitar o habilitar.\nSe recomienda encarecidamente deshabilitar los dispositivos y sensores no utilizados.',
-            devicesAndSensors: 'Dispositivos y Sensores',
-            apply: 'Aplicar',
-            applySettingsAndReload: 'Aplicar configuración y recargar',
-            triggersAutoRestart: 'Activa reinicio automático',
-            restartPrompt:
-                'Cambiar dispositivos o sensores requiere un reinicio del daemon y la interfaz. ¿Está seguro de que desea hacerlo ahora?',
-            enableDevices: 'Habilitar Dispositivos',
+            reconnecting: 'Reconectando...',
+            disconnectedFor: 'Desconectado desde hace {time}',
         },
         speed: {
-            automatic: 'Automático',
-            manual: 'Manual',
-            unsavedChanges: 'Cambios no guardados',
-            unsavedChangesMessage: 'Hay cambios no guardados realizados en este canal de control.',
-            manualDuty: 'Ciclo Manual',
-            profileToApply: 'Perfil a aplicar',
-            controlModeAutomaticTooltip: 'Aplicar un Perfil de ventilador a este canal',
-            controlModeManualTooltip: 'Establecer un porcentaje de ciclo fijo manualmente',
-            controlModeUnmanagedTooltip:
-                'Dejar de gestionar este canal, dejando que el hardware o controlador del dispositivo decida',
-            driverNoSupportControl:
-                'Canal de solo lectura. El controlador actual no admite ajustar la velocidad de este canal.',
-            amdOverdriveNotEnabled:
-                'AMD GPU overdrive no está habilitado. Habilítelo en la configuración avanzada de este dispositivo (requiere reinicio).',
-            controlOrView: 'Controlar o Ver',
             applySetting: 'Aplicar Configuración',
-            defaultProfileInfo:
-                'Seleccionar "Sin gestión" indica a CoolerControl que deje de controlar<br/>este ventilador y devuelva el control al controlador del dispositivo.<br/><br/><b>Advertencia:</b> Muchos controladores <i>no</i> tienen control automático<br/>de ventilador. En esos dispositivos, el ventilador permanecerá<br/>a su última velocidad configurada.',
         },
         customSensors: {
             missingSourcesNotice:
                 'Las siguientes fuentes de temperatura ya no están presentes y se eliminarán al guardar: {sources}',
-            newSensor: 'Nuevo Sensor',
             sensorType: 'Tipo de Sensor',
-            type: 'Tipo',
             mixFunction: 'Función de Mezcla',
             howCalculateValue: 'Cómo calcular el valor resultante del sensor',
-            tempFileLocation: 'Ubicación del Archivo de Temperatura',
             tempFile: 'Archivo de Temperatura',
             filePathTooltip:
                 'Introduzca la ruta absoluta al archivo de temperatura a utilizar para este sensor.\nEl archivo debe usar el formato de datos sysfs estándar:\nUn número de punto fijo en miligrados Celsius.\np.ej. 80000 para 80°C.\nEl archivo se verifica al enviarse.',
@@ -496,15 +554,11 @@ export default {
                     'Promedio ponderado que favorece las lecturas recientes. Más suave que el Promedio Temporal con la misma ventana, pero tarda aproximadamente 3 veces la longitud de la ventana en seguir completamente un cambio sostenido. Para ventiladores que deben seguir tendencias reales sin fluctuaciones.',
             },
             tempWeights: 'Pesos de Temperatura',
-            tempWeightsTooltip: 'El peso individual de cada fuente de temperatura seleccionada.',
             tempName: 'Nombre de Temperatura',
             weight: 'Peso',
-            saveSensor: 'Guardar Sensor',
             saveCustomSensor: 'Guardar Sensor Personalizado',
             unsavedChanges: 'Hay cambios no guardados realizados en este Sensor Personalizado.',
             unsavedChangesHeader: 'Cambios no guardados',
-            stay: 'Quedarse',
-            discard: 'Descartar',
             selectCustomSensorFile: 'Seleccionar Archivo de Sensor Personalizado',
             deleteCustomSensor: 'Eliminar Sensor Personalizado',
             deleteCustomSensorConfirm:
@@ -512,46 +566,29 @@ export default {
         },
         dashboard: {
             timeRange: 'Rango de Tiempo',
-            minutes: 'min',
             chartType: 'Tipo de Gráfico',
-            dataType: 'Tipo de Datos',
             filterSensors: 'Filtrar Sensores',
-            showControls: 'Mostrar Controles',
             mouseActions:
-                'Acciones del ratón en el panel:\n- Resaltar selección para hacer zoom.\n- Desplazar para hacer zoom.\n- Clic derecho para mover cuando se hace zoom.\n- Doble clic para restablecer y reanudar la actualización.\n- Ctrl+clic o clic medio para mostrar todos los sensores en la herramienta de ayuda.',
+                'Acciones del ratón en el panel:\n- Resaltar selección para hacer zoom.\n- Ctrl+Desplazar para hacer zoom.\n- Clic derecho para mover cuando se hace zoom.\n- Doble clic para restablecer y reanudar la actualización.\n- Ctrl+clic o clic medio para mostrar todos los sensores en la herramienta de ayuda.',
             fullPage: 'Página Completa',
             filterTags: 'Filtrar Etiquetas',
             filterByTag: 'Filtrar por Etiqueta',
             filterBySensor: 'Filtrar por Sensor',
-            search: 'Buscar',
             filterTypes: 'Filtrar Tipos',
             filterByDataType: 'Filtrar por Tipo de Datos',
-            selectChartType: 'Seleccionar un Tipo de Gráfico',
             exitFullPage: 'Salir de Página Completa',
-            controls: 'Controles',
-            sensorValues: 'Valores de Sensores',
-            selected: 'Seleccionado',
-            clear: 'Limpiar',
             deleteDashboard: 'Eliminar Panel',
             deleteDashboardConfirm: '¿Está seguro de que desea eliminar el panel: "{name}"?',
-            dashboardDeleted: 'Panel Eliminado',
             setAsHome: 'Establecer como Inicio',
             duplicateDashboard: 'Duplicar Panel',
+            openCooling: 'Abrir controles de refrigeración',
         },
         appInfo: {
-            gettingStartedAutoCreate:
-                '{wizard} permite configurar perfiles básicos para todos sus ventiladores de una sola vez.',
-            gettingStartedAutoCreateLink: 'Crear perfiles automáticamente',
-            calibrateFans:
-                'Para un control uniforme, {wizard} para que un % determinado signifique una velocidad similar en cada ventilador.',
-            calibrateFansLink: 'calibre sus ventiladores',
-            title: 'Info y Herramientas',
             noWarranty: 'Este programa viene sin absolutamente ninguna garantía.',
             changeStartupPage: 'Cambiar la página de inicio en Ajustes',
             daemonStatus: 'Estado del Daemon',
             acknowledgeIssues: 'Reconocer Problemas',
             status: 'Estado',
-            processStatus: 'Estado del Proceso',
             host: 'Host',
             uptime: 'Tiempo de funcionamiento',
             version: 'Versión',
@@ -562,36 +599,61 @@ export default {
             disconnected: 'Desconectado',
             helpfulLinks: 'Enlaces Útiles',
             uiTour: 'Recorrido por la UI',
-            uiTourDesc: 'Realice un recorrido guiado por la aplicación',
             gettingStarted: 'Primeros Pasos',
-            gettingStartedGraphProfile: 'Perfil de Gráfico',
-            gettingStartedControlsPage: 'Página de Controles',
-            gettingStartedStep1:
-                'Cree un {profile} en Perfiles de ventilador y ajuste la curva del ventilador.',
-            gettingStartedStep2:
-                'Asígnelo en la {controls} (o en la página del ventilador). Los Perfiles no se aplican automáticamente.',
-            gettingStartedStep3: 'Reutilice el mismo Perfil en tantos ventiladores como desee.',
             helpSettingUp: 'Ayuda para configurar el control de ventiladores',
+            gettingStartedStep1: 'Abra Refrigeración y elija el ventilador que desea controlar.',
+            gettingStartedStep2:
+                'Elija Configuración Guiada y luego Nuevo Perfil para definir su curva del ventilador.',
+            gettingStartedStep3: 'Reutilice ese Perfil en tantos ventiladores como desee.',
+            gettingStartedAutoCreate:
+                '{wizard} permite configurar perfiles básicos para todos sus ventiladores de una sola vez.',
+            gettingStartedAutoCreateLink: 'Crear perfiles automáticamente',
+            calibrateFansLink: 'calibre sus ventiladores',
             hardwareSupport: 'Soporte de Hardware',
-            hardwareSupportDesc: 'Dispositivos compatibles e instalación de controladores',
-            gitRepository: 'Repositorio Git',
-            gitRepositoryDesc: 'Reportar problemas o solicitar funciones',
-            discord: 'Discord',
-            discordDesc: 'Únete a nuestra comunidad de Discord',
             whatsNew: 'Novedades',
-            whatsNewDesc: 'Ver las últimas notas de la versión',
             logsAndDiagnostics: 'Registros y Diagnósticos',
             downloadCurrentLog: 'Descargar Registro Actual',
             deviceHealth: 'Estado de los Dispositivos',
-            deviceHealthTooltip:
-                'Las fuentes de temperatura faltantes se pueden reemplazar editando y<br>guardando de nuevo el Sensor personalizado, Perfil o ajuste LCD afectado.',
             deviceHealthOk: 'Todos los sensores y canales funcionan correctamente.',
+            detection: 'Detección de chips',
+            detectionDescription:
+                'Lo que encontró el sondeo del chip Super-I/O al iniciarse el demonio. Los módulos se cargan al arrancar, así que esta es la ejecución que explica un chip sin controlador.',
+            detectionButton: 'Detección de chips',
+            detectionNotRun:
+                'No se ejecutó ninguna detección, por lo que no se sabe nada sobre los chips Super-I/O de esta máquina.',
+            detectionSecureBoot: 'Arranque seguro',
+            detectionContainer: 'Contenedor',
+            detectionDevPort: '/dev/port disponible',
+            detectionChips: 'Chips detectados',
+            detectionNoChips: 'No se detectaron chips Super-I/O.',
+            detectionBlacklisted: 'Controladores en lista negra',
+            hardwareSupportOk: 'Todo el hardware detectado es compatible y controlable.',
+            hardwareReport: 'Informe de hardware',
+            hardwareReportDescription:
+                'Un resumen de lo que CoolerControl ve en esta máquina, listo para pegar en un canal de soporte. Se excluyen números de serie e identificadores.',
+            hardwareReportFull: 'Incluir el árbol hwmon completo',
+            hardwareReportEmpty: 'No se pudo generar el informe.',
+            hardwareReportButton: 'Informe de hardware',
+            hardwareReportCopy: 'Copiar',
+            hardwareReportCopied: 'Copiado',
+            findingNoDriverBound: 'Se detectó un chip, pero ningún controlador cargado lo atiende.',
+            findingBlacklisted: 'Este controlador está en la lista negra y no se cargó.',
+            findingBlockedByEnvironment:
+                'La detección de hardware no pudo ejecutarse en este entorno.',
+            findingBlockedBySecureBoot:
+                'La detección de hardware no pudo ejecutarse porque el Arranque seguro está activado.',
+            findingBlockedByContainer:
+                'La detección de hardware no pudo ejecutarse dentro de un contenedor.',
+            findingBlockedByNoDevPort:
+                'La detección de hardware no pudo ejecutarse porque /dev/port no está disponible.',
+            findingDetectionUnsupported:
+                'La detección de hardware no es compatible con esta arquitectura.',
             failsafeActive: 'Valores de seguridad en uso',
             missingTempSource: 'Fuente de temperatura faltante',
             staleTempSource: 'La fuente de temperatura usa valores de seguridad',
             stressTest: 'Pruebas de estrés térmico',
             stressTestTooltip:
-                'Genera carga térmica sostenida para validar<br>curvas de ventilador y perfiles de enfriamiento.<br>Los resultados pueden variar según el hardware.<br>Instale stress-ng para backends adicionales.',
+                'Genera carga térmica sostenida para validar\ncurvas de ventilador y perfiles de enfriamiento.\nLos resultados pueden variar según el hardware.\nInstale stress-ng para backends adicionales.',
             cpuStress: 'Estrés de CPU',
             gpuStress: 'Estrés de GPU',
             gpuStressTooltip:
@@ -605,44 +667,69 @@ export default {
             backendTooltip:
                 'Elija el backend de la prueba de estrés.<br>El backend integrado funciona sin dependencias externas.<br>stress-ng (cuando está instalado) proporciona variantes adicionales de estresores.',
             selectDrive: 'Seleccionar disco',
-            threadCount: 'Hilos',
-            duration: 'Duración (s)',
+            selectGpu: 'Seleccionar GPU',
+            allGpus: 'Todas las GPU',
             start: 'Iniciar',
             stop: 'Detener',
             stopAll: 'Detener todo',
             active: 'Activo',
             inactive: 'Inactivo',
-            allCores: 'Todos los núcleos',
             psuWarningHeader: 'Advertencia de alto consumo',
             psuWarningMessage:
                 'Ejecutar las pruebas de estrés de CPU y GPU simultáneamente generará una carga significativa en la fuente de alimentación. Si hace overclocking o usa una fuente de bajo vataje, puede producirse inestabilidad del sistema. ¿Desea continuar?',
             proceed: 'Continuar',
         },
         alerts: {
-            createAlert: 'Crear Alerta',
-            editAlert: 'Editar Alerta',
+            triggersOutside: 'se activa por debajo de {min} o por encima de {max}{unit}',
+            triggersAbove: 'se activa por encima de {max}{unit}',
+            stateSince: '{state} desde {time}',
             deleteAlert: 'Eliminar Alerta',
-            noAlerts: 'No hay alertas configuradas',
+            duplicateAlert: 'Duplicar Alerta',
             alertsOverview: 'Resumen de Alertas',
             alertLogs: 'Registros de Alertas',
             alertTriggered: 'Alerta Activada',
             alertRecovered: 'Alerta Recuperada',
+            alertError: 'Error de alerta',
+            alertSensorsReadable: 'Sensores de alerta legibles',
             deleteAlertConfirm: '¿Está seguro de que desea eliminar: "{name}"?',
             saveAlert: 'Guardar Alerta',
-            channelSource: 'Fuente de Canal para Alerta',
-            channelSourceTooltip: 'La fuente de canal a utilizar para la Alerta',
+            channelSources: 'Fuentes de Canal para Alerta',
+            channelSourcesTooltip:
+                'Las fuentes de canal vigiladas por esta Alerta.\nUn tipo de sensor por Alerta: la primera selección filtra el resto.',
             triggerConditions: 'Condiciones de Activación',
             maxValueTooltip: 'Los valores por encima de esto activarán la alerta.',
             minValueTooltip: 'Los valores por debajo de esto activarán la alerta.',
             warmupDurationTooltip:
                 'Cuánto tiempo debe estar activa una condición para que la alerta se considere activa.\nSe verifica solo a intervalos regulares de sondeo,\npor lo que puede no tener exactamente esta duración.',
+            cooldownDurationTooltip:
+                'Cuánto tiempo debe permanecer el valor dentro del rango antes de que la alerta se recupere.\nEvita alternancias rápidas entre activada y resuelta.',
+            cooldownLessThan: 'condición recuperada por más tiempo que',
+            repeatInterval: 'Repetir notificación cada',
+            repeatIntervalTooltip:
+                'Reenviar la notificación de escritorio a este intervalo mientras la alerta siga activa.\n0 desactiva las notificaciones repetidas.',
+            enabled: 'Habilitada',
+            enabledTooltip: 'Una alerta deshabilitada no se evalúa en absoluto.',
+            sectionGeneral: 'General',
+            sectionNotifications: 'Notificaciones',
+            sectionActions: 'Acciones',
+            silence: 'Silenciar',
+            silenceTooltip:
+                'Silenciar: suprime las notificaciones y el apagado durante un tiempo.\nLa alerta se sigue evaluando y muestra su estado.',
+            silence15m: 'Silenciar durante 15 minutos',
+            silence1h: 'Silenciar durante 1 hora',
+            silence8h: 'Silenciar durante 8 horas',
+            silence24h: 'Silenciar durante 24 horas',
+            unsilence: 'Dejar de silenciar ahora',
+            enableAlert: 'Habilitar Alerta',
+            disableAlert: 'Deshabilitar Alerta',
+            silencedUntil: 'Silenciada hasta {time}',
+            disabledLabel: 'Deshabilitada',
             greaterThan: 'mayor que',
             lessThan: 'menor que',
             newAlert: 'Nueva Alerta',
             warmupGreaterThan: 'condición activada por más tiempo que',
             unsavedChanges: 'Hay cambios no guardados realizados en esta Alerta.',
             unsavedChangesHeader: 'Cambios no guardados',
-            createFailAlert: 'Alerta de fallo',
             desktopNotify: 'notificación de escritorio',
             desktopNotifyTooltip:
                 'Habilitar notificaciones de escritorio cuando se active la alerta.\n(Si es compatible)',
@@ -657,14 +744,14 @@ export default {
                 'Habilitar el apagado del sistema cuando se active la alerta.\nEl apagado del sistema comenzará un minuto después de que se active la alerta\ny se cancelará si la alerta se recupera.',
         },
         profiles: {
+            targetDuty: 'Objetivo',
+            actualDuty: 'Real',
+            targetHint:
+                'El objetivo se calcula a partir de las temperaturas actuales, antes de aplicar la Función del canal. El suavizado y la histéresis pueden hacer que el valor real difiera.',
             createProfile: 'Crear Perfil',
-            editProfile: 'Editar Perfil',
             deleteProfile: 'Eliminar Perfil',
-            noProfiles: 'No hay perfiles configurados',
             profileType: 'Tipo de Perfil',
             fixedDuty: 'Velocidad Fija del Ventilador',
-            selectedPointDuty: 'Velocidad del Punto Seleccionado',
-            selectedPointTemp: 'Temperatura del Punto Seleccionado',
             tempSource: 'Fuente de Temperatura',
             memberProfiles: 'Perfiles Miembros',
             mixFunction: 'Función de Mezcla',
@@ -674,10 +761,9 @@ export default {
             function: 'Función',
             functionToApply: 'Función a aplicar',
             graphProfileMouseActions:
-                'Acciones del ratón en el Perfil Gráfico:\n- Desplazar para zoom.\n- Clic izquierdo en la línea para añadir punto.\n- Clic derecho en el punto para eliminar.\n- Arrastrar punto para mover.',
+                'Acciones del ratón en el Perfil Gráfico:\n- Ctrl+Desplazar para zoom.\n- Clic izquierdo en la línea para añadir punto.\n- Clic derecho en el punto para eliminar.\n- Arrastrar punto para mover.',
             unsavedChanges: 'Hay cambios no guardados en este Perfil.',
             unsavedChangesHeader: 'Cambios No Guardados',
-            appliedFunction: 'Función Aplicada',
             newProfile: 'Nuevo Perfil',
             tooltip: {
                 profileType:
@@ -685,6 +771,7 @@ export default {
             },
             profileDeleted: 'Perfil Eliminado',
             profileDuplicated: 'Perfil Duplicado',
+            usedBy: 'Usado por',
             deleteProfileConfirm: '¿Está seguro de que desea eliminar: "{name}"?',
             deleteProfileWithChannelsConfirm:
                 '"{name}" está siendo utilizado actualmente por: {channels}.\nEliminar este Perfil restablecerá la configuración de esos canales.\n¿Está seguro de que desea eliminar "{name}"?',
@@ -701,8 +788,6 @@ export default {
             offsetTypeGraph: 'Desplazamiento de gráfico',
             baseProfile: 'Perfil base',
             baseProfileRequired: 'Se requiere un Perfil base para un Perfil de superposición.',
-            selectedPointOutputDuty: 'Velocidad de salida del perfil del punto seleccionado',
-            selectedPointOffset: 'Velocidad de desplazamiento del punto seleccionado',
             profileOutputDuty: 'Velocidad de salida del perfil',
             offsetDuty: 'Velocidad de desplazamiento',
             points: 'Puntos',
@@ -715,27 +800,11 @@ export default {
             curveLimitedByFirmware:
                 'Curva limitada a {n} puntos por la curva de ventilador del firmware del dispositivo.',
         },
-        controls: {
-            viewType: 'Tipo de Vista',
-            controlOrView: 'Controlar o Ver',
-            title: 'Controles del Sistema',
-            noControllableChannels: 'No se encontraron canales controlables.',
-            noControlChain: 'No se encontró cadena de control para este canal.',
-            controlFlow: 'Flujo de Control',
-            backToOverview: 'Volver a la vista de controles',
-            switchProfile: 'Cambiar perfil',
-            switchTempSource: 'Cambiar fuente de temperatura',
-            switchFunction: 'Cambiar función',
-            switchMembers: 'Cambiar perfiles miembros',
-            switchBaseProfile: 'Cambiar perfil base',
-            adjustFixedSpeed: 'Ajustar velocidad fija',
-            editSources: 'Editar fuentes',
-        },
         modes: {
             createMode: 'Crear Modo',
             editMode: 'Editar Modo',
+            updateToCurrent: 'Guardar la configuración actual en el modo',
             deleteMode: 'Eliminar Modo',
-            noModes: 'No hay modos configurados',
             deleteModeConfirm: '¿Está seguro de que desea eliminar el modo: "{name}"?',
             updateModeConfirm:
                 '¿Está seguro de que desea sobrescribir "{name}" con la configuración actual?',
@@ -743,16 +812,8 @@ export default {
         },
         functions: {
             createFunction: 'Crear Función',
-            editFunction: 'Editar Función',
             deleteFunction: 'Eliminar Función',
-            noFunctions: 'No hay funciones configuradas',
             saveFunction: 'Guardar Función',
-            functionType: 'Tipo de Función',
-            functionTypeTooltip:
-                'Tipos de función:<br/>' +
-                '- <b>Identidad</b>: Aplica límites de tamaño de paso pero por lo demás pasa el valor del perfil sin cambios.<br/>' +
-                '- <b>Estándar</b>: Aplica límites de tamaño de paso y configuración de histéresis para un control preciso del tiempo de respuesta y estabilidad del ventilador.<br/>' +
-                '- <b>Promedio Móvil Exponencial</b>: Suaviza las fluctuaciones de temperatura usando un promedio ponderado. Más simple pero menos preciso que Estándar.',
             stepSizeTitle: 'Tamaño de Paso',
             fixedStepSize: 'Fijo',
             fixedStepSizeTooltip:
@@ -787,13 +848,6 @@ export default {
             stepSizeMaxDecreasing: 'Máximo Disminuyendo',
             stepSizeMaxDecreasingTooltip:
                 'Tamaño de paso máximo cuando la velocidad del ventilador está disminuyendo.\nLimita la rapidez con la que los ventiladores pueden desacelerar por actualización.',
-            windowSize: 'Tamaño de Ventana',
-            windowSizeTooltip:
-                'Tamaño de muestra de temperatura de ventana usado en el cálculo del promedio móvil exponencial.\nValores más pequeños = respuesta más rápida, más reactivo a picos de temperatura.\nValores más grandes = respuesta más lenta, transiciones de velocidad del ventilador más suaves.\nConsejo: Use una Función Estándar para control preciso sobre el tiempo de respuesta.',
-            emaCustomSensorAvailableNote:
-                'EMA también está disponible como tipo de Sensor Personalizado, lo que permite graficar la temperatura suavizada directamente.',
-            emaDeprecatedWarning:
-                'El tipo de Función EMA está obsoleto. Por favor, cambie al tipo de Sensor Personalizado EMA.',
             hysteresis: 'Histéresis Avanzada',
             hysteresisThreshold: 'Umbral',
             hysteresisThresholdTooltip:
@@ -804,11 +858,10 @@ export default {
             onlyDownward: 'Solo Descendente',
             onlyDownwardTooltip:
                 'Solo aplicar configuración de histéresis cuando la temperatura está disminuyendo.',
-            general: 'General',
+            stepOverrides: 'Anulaciones de paso',
             thresholdHopping: 'Salto de Umbral',
             thresholdHoppingTooltip:
                 'Cuando la velocidad del ventilador permanece sin cambios durante 30+ segundos, los límites de tamaño de paso mínimo e histéresis se omiten temporalmente.\nEsto asegura que los ventiladores eventualmente alcancen su velocidad objetivo, incluso con configuraciones de umbral conservadoras. El tamaño de paso máximo siempre se respeta.',
-            stepOverrides: 'Anulaciones de paso',
             bypassMinAtExtremes: 'Aplicar siempre 0% / 100%',
             bypassMinAtExtremesTooltip:
                 'Cuando está habilitado, los ciclos de trabajo objetivo de 0% o 100% se aplican incluso cuando el cambio es menor que el tamaño de paso mínimo.\nÚtil para garantizar que los ventiladores se detengan completamente o alcancen las RPM máximas. Deshabilitado por defecto.',
@@ -818,26 +871,16 @@ export default {
             newFunction: 'Nueva Función',
             functionDeleted: 'Función Eliminada',
             functionDuplicated: 'Función Duplicada',
+            usedBy: 'Usada por',
             deleteFunctionConfirm: '¿Está seguro de que desea eliminar "{name}"?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" está siendo utilizada actualmente por los Perfiles: {profiles}.\nEliminar esta Función restablecerá las Funciones de esos Perfiles.\n¿Está seguro de que desea eliminar "{name}"?',
-            functionUpdated: 'Función Actualizada',
-            functionUpdateError: 'Hubo un error al intentar actualizar esta Función',
         },
         error: {
             accessDenied: 'Acceso Denegado',
             accessDeniedMessage:
                 'La autenticación falló. Por favor, verifique su contraseña e intente nuevamente.',
             connectionError: 'Error de Conexión CoolerControl',
-            connectionToast: 'No se puede conectar al daemon',
-            connectionToastDetail:
-                'No se puede conectar al daemon. Por favor, asegúrese de que el servicio está en ejecución e intente reconectarse.',
-            connectionRetryFailure: 'Fallo de conexión - reintento fallido',
-            connectionRetryDetail: 'No se pudo conectar al daemon después de múltiples intentos.',
-            errorLoadingGraph: 'Error al cargar el gráfico',
-            highCpuUsageWarning: 'Uso elevado de CPU detectado',
-            highCpuUsageDetail:
-                'El uso actual de CPU es alto.\nPara reducir el impacto en el sistema, considere:\n1. Reducir el número de gráficos mostrados\n2. Reducir el número de sensores monitoreados\n3. Aumentar el intervalo de sondeo',
             pageNotFound: 'Página No Encontrada',
             returnToDashboard: 'Volver al Panel',
             connectionErrorMessage: 'No se pudo conectar al Daemon CoolerControl.',
@@ -854,13 +897,6 @@ export default {
             sslTooltip: 'Si conectarse al daemon usando SSL/TLS.',
             saveTooltip: 'Guardar configuración y recargar la interfaz de usuario',
             resetTooltip: 'Restablecer a la configuración predeterminada',
-        },
-        singleDashboard: {
-            minutes: 'min',
-            chartMouseActions:
-                'Acciones del ratón en el panel:\n- Resaltar para hacer zoom.\n- Desplazar para hacer zoom.\n- Clic derecho para mover cuando se hace zoom.\n- Doble clic para restablecer y reanudar la actualización.',
-            timeRange: 'Rango de tiempo',
-            chartType: 'Tipo de gráfico',
         },
         mode: {
             activateMode: 'Activar modo',
@@ -903,44 +939,20 @@ export default {
             unsavedChangesHeader: 'Cambios no guardados',
             imageTooLarge: 'La imagen es demasiado grande. Por favor, elija una más pequeña.',
             notImageType: 'La imagen no se registra como un tipo de imagen',
+            gifNotSupported:
+                'El firmware de esta pantalla no puede mostrar gifs. Elige una imagen estática.',
         },
         shortcuts: {
+            browserHint:
+                'En un navegador web, use Ctrl+Alt+número en su lugar (los navegadores reservan Ctrl+número para cambiar de pestaña).',
             shortcuts: 'Atajos de teclado',
             ctrl: 'Ctrl',
-            alt: 'Alt',
-            left: 'Izquierda',
-            right: 'Derecha',
             comma: ',',
-            h: 'h',
-            a: 'a',
-            c: 'c',
-            i: 'i',
-            slash: '/',
-            one: '1',
-            two: '2',
-            three: '3',
-            four: '4',
-            f11: 'F11',
             viewShortcuts: 'Atajos de teclado',
-            home: 'Inicio',
             settings: 'Ajustes',
-            info: 'Información de la aplicación',
-            dashboardOne: 'Panel 1',
-            dashboardTwo: 'Panel 2',
-            dashboardThree: 'Panel 3',
-            dashboardFour: 'Panel 4',
-            alerts: 'Alertas',
-            controls: 'Controles',
-            sideMenuCollapse: 'Contraer menú lateral',
-            sideMenuExpand: 'Expandir menú lateral',
-            fullScreen: 'Pantalla completa',
         },
     },
     components: {
-        confirmation: {
-            title: 'Confirmación',
-            message: '¿Está seguro?',
-        },
         aseTek690: {
             sameDeviceID:
                 'Los NZXT Kraken antiguos y los EVGA CLC tienen el mismo ID de dispositivo y CoolerControl no puede determinar qué dispositivo está conectado. Esto es necesario para una comunicación adecuada con el dispositivo.',
@@ -952,9 +964,6 @@ export default {
             rejectLabel: 'No, es un dispositivo EVGA CLC',
         },
         password: {
-            title: 'Introduzca Su Contraseña',
-            newPasswordTitle: 'Introduzca Una Nueva Contraseña',
-            invalidPassword: 'Contraseña Inválida',
             forgotPassword: '¿Olvidó su contraseña?',
             forgotPasswordHelpIntro:
                 'Ejecute este comando en una terminal como root y luego haga clic en Recargar UI:',
@@ -967,48 +976,6 @@ export default {
         },
         notFound: {
             message: 'Al igual que la distribución perfecta de Linux 🐧,\nesta página no existe.',
-        },
-        helloWorld: {
-            message: 'Ha creado con éxito un proyecto con Vite + Vue 3. ¿Qué sigue?',
-        },
-        dashboardInfo: {
-            description:
-                'Los paneles le permiten ver los datos de los sensores de su sistema según sus preferencias. Puede elegir entre gráficos basados en tiempo o en tablas y ajustar los filtros y configuraciones para cada gráfico para centrarse en los datos específicos que desea ver. Además, puede crear múltiples paneles personalizados según sus necesidades.',
-        },
-        modeInfo: {
-            description:
-                "Los modos le permiten guardar la configuración de canales de dispositivos para una aplicación rápida y fácil. Por ejemplo, puede crear un Modo 'Gaming' y un Modo 'Silencioso', permitiéndole cambiar fácilmente entre ellos.",
-            note: 'Tenga en cuenta que puede ser necesario crear diferentes Perfiles de Ventilador para cada Modo, ya que los Modos solo incluyen configuraciones de canales y no abarcan la configuración interna de Perfiles o Funciones.',
-        },
-        alertInfo: {
-            description:
-                'Las alertas se utilizan para notificarle cuando ocurren condiciones específicas. Pueden monitorear temperaturas y velocidades de ventiladores para asegurar que su sistema esté funcionando correctamente. Las alertas están configuradas para rangos de valores de sensores específicos y envían notificaciones cuando los valores exceden o vuelven a rangos de umbral aceptables.',
-        },
-        customSensorInfo: {
-            title: 'Visión General de Sensores Personalizados',
-            description:
-                'Los sensores personalizados le permiten combinar sensores existentes de varias maneras, mejorando su control y eficiencia sobre la refrigeración del sistema. Además, admiten datos basados en archivos, lo que le permite crear scripts para entradas de sensores externos para mayor flexibilidad.',
-            note: 'Nota: Puede usar Perfiles de Mezcla para combinar múltiples salidas de Sensores Personalizados.',
-        },
-        functionInfo: {
-            title: 'Visión General de Funciones',
-            description:
-                'Las funciones son algoritmos configurables aplicados a las salidas de perfil. Le permiten gestionar cuándo ocurren los cambios de velocidad del ventilador, ajustar la configuración de histéresis y utilizar promedios móviles para temperaturas dinámicas.',
-            identityFunction:
-                'La función Identidad es la opción más simple ya que no modifica la salida calculada del perfil; solo le permite establecer rangos mínimos y máximos de cambio de velocidad. Esto es particularmente beneficioso para minimizar las fluctuaciones constantes de velocidad del ventilador.',
-        },
-        profileInfo: {
-            title: 'Visión General de Perfiles',
-            description:
-                'Los perfiles definen configuraciones personalizables para controlar las velocidades de los ventiladores, pudiendo usar el mismo perfil para múltiples ventiladores. Los tipos incluyen:',
-            type: {
-                fixed: 'Velocidad Fija',
-                fanCurve: 'Curva de Ventilador/Gráfico',
-                mix: 'Perfil de Mezcla',
-                default: 'Configuración Predeterminada del Dispositivo',
-            },
-            additionalInfo:
-                'Los perfiles son la base para controlar las velocidades de los ventiladores y pueden mejorarse aún más aplicando funciones de algoritmo más avanzadas.',
         },
         deviceInfo: {
             details: 'Detalles del Dispositivo',
@@ -1023,68 +990,44 @@ export default {
             locations: 'Ubicaciones',
         },
         onboarding: {
+            search: 'Búsqueda',
+            searchDesc:
+                'Encuentre aquí cualquier dispositivo, sensor, ajuste o acción. Pulse Ctrl+K desde cualquier parte de la aplicación.',
             welcome: '¡Bienvenido a CoolerControl!',
             gettingStartedIntro:
-                'Elija un recorrido para orientarse. El Recorrido Rápido cubre lo esencial en pocos pasos. El Recorrido Detallado lo guía por cada menú y botón.',
+                'Haga un recorrido rápido para orientarse. Recorre la barra de navegación y las áreas principales de la aplicación.',
             startTourAgain:
-                'Puede iniciar este recorrido nuevamente en cualquier momento desde la página Información y Herramientas.',
-            quickTour: 'Recorrido Rápido',
-            thoroughTour: 'Recorrido Detallado',
+                'Puede volver a iniciar este recorrido en cualquier momento desde Configuración.',
+            startTour: 'Iniciar Recorrido',
             maybeLater: 'Quizás más tarde',
             openGettingStarted: 'Abrir Documentación de Inicio',
-            finishLater: 'Lo haré yo mismo',
-            appInfo: 'Información y Herramientas',
-            appInfoDesc:
-                'Vea información de la app, estado del daemon, registros, enlaces útiles y herramientas de prueba de carga. Una insignia en el logo le alerta sobre problemas.',
-            controls: 'Controles',
-            controlsDesc:
-                'Ajuste velocidades de ventiladores, aplique Perfiles y gestione cada canal detectado desde un solo lugar.',
-            profiles: 'Perfiles',
-            profilesDesc:
-                'Los Perfiles definen cómo responde un ventilador a los cambios de temperatura. Los Perfiles Gráficos le permiten dibujar curvas personalizadas y reutilizarlas en múltiples dispositivos.',
-            functions: 'Funciones',
-            functionsDesc:
-                'Las Funciones se aplican a los Perfiles para suavizar las transiciones de velocidad del ventilador y reducir el ruido.',
-            systemMenu: 'Menú del Sistema',
-            systemMenuDesc:
-                'El menú principal lista los dispositivos y sensores de este sistema. Cada sección puede expandirse para ver sus canales y controles asignados.',
-            dashboards: 'Paneles',
-            dashboardsDesc:
-                'Los Paneles permiten crear vistas personalizadas con gráficos para monitorear temperaturas, velocidades de ventiladores y otros datos de sensores en tiempo real.',
-            modes: 'Modos',
-            modesDesc:
-                'Los Modos son colecciones guardadas de sus configuraciones. Cambie entre configuraciones como Silencioso y Rendimiento con un solo clic.',
-            alerts: 'Alertas',
-            alertsDesc:
-                'Las Alertas le notifican cuando los valores de los sensores superan los umbrales que elija, para que pueda reaccionar antes de que se conviertan en problemas.',
-            customSensors: 'Sensores Personalizados',
-            customSensorsDesc:
-                'Los Sensores Personalizados combinan datos de sensores existentes de diferentes maneras, o ejecutan su propia salida con script como fuente de temperatura.',
-            quickAdd: 'Agregar Rápido',
-            quickAddDesc: 'Cree rápidamente nuevos Paneles, Perfiles, Funciones y más.',
-            dashboardQuick: 'Menú Rápido de Panel',
-            dashboardQuickDesc:
-                'Salte a cualquier panel, incluso cuando el menú principal esté contraído.',
-            modesQuick: 'Menú Rápido de Modos',
-            modesQuickDesc:
-                'Cambie entre sus Modos guardados desde cualquier lugar de la aplicación.',
-            alertsQuick: 'Resumen de Alertas',
-            alertsQuickDesc:
-                'Vea el estado actual de cada alerta e inspeccione su actividad reciente.',
-            pluginsQuick: 'Resumen de Plugins',
-            pluginsQuickDesc:
-                'Explore los plugins instalados y acceda a cualquiera de ellos desde cualquier lugar de la aplicación.',
+            finishLater: 'Entendido, gracias',
+            home: 'Inicio',
+            homeDesc:
+                'La página de inicio de la aplicación: estado del daemon y salud de los dispositivos de un vistazo, además de registros, información de la app, enlaces útiles y herramientas de prueba de estrés.',
+            cooling: 'Refrigeración',
+            coolingDesc:
+                'Su centro de control de ventiladores: ajuste las velocidades de ventiladores y bombas, y aplique Perfiles y Funciones a cualquier canal.',
+            monitoring: 'Monitoreo',
+            monitoringDesc:
+                'Cree Paneles, observe cada sensor y configure Alertas para monitorear su sistema en tiempo real.',
+            devices: 'Dispositivos',
+            devicesDesc:
+                'Revise el hardware detectado, configure funciones por dispositivo como iluminación RGB y pantallas LCD, y cree Sensores Personalizados.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Explore y abra los plugins instalados que amplían CoolerControl.',
             settings: 'Configuración',
             settingsDesc:
                 'Configure preferencias de interfaz, opciones del daemon y comportamiento del sistema.',
             access: 'Acceso',
-            accessDesc: 'Gestione su contraseña y confirme su nivel de acceso actual.',
+            accessDesc:
+                'Inicie o cierre sesión y cambie su contraseña, y gestione los Tokens de acceso que dan a herramientas y plugins acceso a la API.',
             restartMenu: 'Menú de Reinicio',
             restartMenuDesc:
                 'Recargue la interfaz o reinicie el daemon del sistema cuando sea necesario.',
-            collapseMenu: 'Contraer Menú',
-            collapseMenuDesc:
-                'Expanda o contraiga el menú principal para dar más espacio al resto de la app.',
+            modes: 'Modos',
+            modesDesc:
+                'Los Modos son colecciones guardadas de sus configuraciones. Cambie aquí entre configuraciones como Silencioso y Rendimiento, o gestiónelas.',
             thatsIt: '¡Eso es todo!',
             startNow:
                 'Ya está todo listo. Abra la documentación de Inicio para aprender más, o comience a configurar sus dispositivos.',
@@ -1103,8 +1046,6 @@ export default {
             device: 'Dispositivo',
             channel: 'Canal',
             current: 'Actual',
-            min: 'Mín',
-            max: 'Máx',
             range: 'Rango',
             average: 'Promedio',
             resetStats: 'Restablecer',
@@ -1116,7 +1057,6 @@ export default {
         menuTagAssign: {
             title: 'Asignar Etiquetas',
             noTags: 'No hay etiquetas aún.',
-            newTag: 'Crear Nueva Etiqueta',
             tagName: 'Nombre de etiqueta',
             editTag: 'Editar etiqueta',
             deleteTag: 'Eliminar etiqueta',
@@ -1124,12 +1064,17 @@ export default {
         wizards: {
             calibration: {
                 title: 'Calibrar ventiladores',
-                tooltip: 'Calibrar varios ventiladores para un control de velocidad uniforme',
                 pickIntro:
-                    'Seleccione los ventiladores a calibrar. Los ya calibrados están desmarcados de forma predeterminada.',
+                    'Seleccione los ventiladores a calibrar. Los ya calibrados y los controlados por firmware están desmarcados de forma predeterminada.',
                 noFans: 'No se detectaron ventiladores controlables.',
                 selectAll: 'Seleccionar todo',
                 calibratedBadge: 'calibrado',
+                firmwareControlledBadge: 'controlado por firmware',
+                firmwareControlledDesc:
+                    'El firmware ejecuta el perfil de este canal. La calibración sigue aplicándose: su conversión de ciclo de trabajo se incorpora a la curva entregada al firmware. El impulso de arranque no, porque una curva de firmware no puede expresarlo.',
+                blockedByAlert: "bloqueado: la alerta '{name}' está activa",
+                alertsPausedNote:
+                    '{count} alerta(s) vigilan los ventiladores seleccionados y se pausan durante el barrido de cada ventilador.',
                 idleNote:
                     'La calibración recorre todo el rango de cada ventilador. Es mejor ejecutarla en reposo: hace ruido y tarda unos minutos por ventilador.',
                 concurrencyLabel: 'Ventiladores a la vez',
@@ -1150,51 +1095,6 @@ export default {
                 stageUpSweep: 'Barrido ascendente',
                 stageDownSweep: 'Barrido descendente',
                 stageFinalizing: 'Finalizando',
-            },
-            generate: {
-                title: 'Crear perfiles automáticamente',
-                tooltip:
-                    'Crear automáticamente perfiles para sus ventiladores a partir de unas pocas opciones',
-                stepFans: 'Asignar ventiladores',
-                stepTemps: 'Temperaturas clave',
-                stepPreset: 'Rendimiento',
-                assignIntro:
-                    'Asigne una función a cada ventilador. Deje un ventilador sin asignar para omitirlo.',
-                skip: 'Omitir',
-                noFans: 'No se detectaron ventiladores controlables.',
-                tempsIntro:
-                    'Confirme sus temperaturas clave. Están rellenadas como mejor estimación: verifíquelas.',
-                cpuTemp: 'Temp. CPU',
-                gpuTemp: 'Temp. GPU',
-                liquidTemp: 'Temp. del líquido',
-                ambientTemp: 'Temp. ambiente (opcional)',
-                tempNone: 'Ninguna',
-                presetIntro: 'Elija con qué agresividad deben acelerar los ventiladores.',
-                perKindOverrides: 'Anulaciones por función (avanzado)',
-                cfmCaveat:
-                    'El sesgo de presión positiva se basa en el ciclo de trabajo (duty), no en el flujo de aire: con cantidades de ventiladores desiguales no puede garantizar presión positiva.',
-                generate: 'Generar',
-                preview: 'Vista previa',
-                previewIntro:
-                    'Revise lo que se creará y aplicará. No se guarda nada hasta que confirme.',
-                previewAssignments: 'Asignaciones de ventiladores',
-                willCreateHeader: 'Se creará',
-                startingPointNote:
-                    'Un punto de partida sencillo en lugar de empezar desde cero. No serán perfectos para todos los sistemas, así que verifíquelos, pruébelos y ajústelos después de crearlos.',
-                replaces: 'reemplaza {name}',
-                createApply: 'Crear y aplicar',
-                generated: '{count} perfiles generados.',
-                generateError: 'No se pudieron generar los perfiles.',
-                applyError: 'No se pudieron crear los perfiles.',
-                kind: {
-                    CpuCooler: 'Refrigerador de aire de CPU',
-                    GpuFan: 'Ventilador de GPU',
-                    AioRadiator: 'Radiador AIO',
-                    AioPump: 'Bomba AIO',
-                    CaseIntake: 'Entrada de la caja',
-                    CaseExhaust: 'Salida de la caja',
-                    LaptopFan: 'Ventilador de portátil',
-                },
             },
             fanControl: {
                 fanControlWizard: 'Asistente de Control de Ventiladores',
@@ -1221,7 +1121,7 @@ export default {
                 createNewFunction: 'Nueva Función',
                 existingFunction: 'Elegir Función',
                 defaultFunction: 'Función Predeterminada',
-                chooseFunctionNameType: 'Elegir un Nombre y Tipo de Función',
+                chooseFunctionName: 'Elige un nombre para la función',
                 newFunctionName: 'Función para {profileName}',
                 summary: 'Resumen',
                 aNewProfile: 'Un nuevo Perfil',
@@ -1246,15 +1146,53 @@ export default {
                 selectProfiles: 'Seleccionar Perfiles',
                 profilesTooltip: 'Seleccione uno o más Perfiles para aplicar esta Función.',
             },
-            customSensor: {
-                new: 'Nuevo Sensor Personalizado',
+            generate: {
+                title: 'Crear perfiles automáticamente',
+                assignIntro:
+                    'Asigne una función a cada ventilador. Deje un ventilador sin asignar para omitirlo.',
+                calibrateFirst:
+                    'Calibre primero los ventiladores para una mayor uniformidad (unos minutos)',
+                skip: 'Omitir',
+                noFans: 'No se detectaron ventiladores controlables.',
+                tempsIntro:
+                    'Elija las temperaturas que debe seguir su configuración. Deje una vacía para excluirla: un sistema con gráficos integrados no necesita temp. GPU, y elegirla es lo que hace participar a la GPU en las curvas del radiador AIO y de los ventiladores de la caja.',
+                cpuTemp: 'Temp. CPU',
+                gpuTemp: 'Temp. GPU',
+                liquidTemp: 'Temp. del líquido',
+                ambientTemp: 'Temp. ambiente (opcional)',
+                tempNone: 'Ninguna',
+                presetIntro: 'Elija con qué agresividad deben acelerar los ventiladores.',
+                perKindOverrides: 'Anulaciones por función (avanzado)',
+                cfmCaveat:
+                    'El sesgo de presión positiva se basa en el ciclo de trabajo (duty), no en el flujo de aire: con cantidades de ventiladores desiguales no puede garantizar presión positiva.',
+                previewIntro:
+                    'Revise lo que se creará y aplicará. No se guarda nada hasta que confirme.',
+                previewAssignments: 'Asignaciones de ventiladores',
+                reusedHeader: 'Ya existe',
+                reused: 'reutilizado',
+                willCreateHeader: 'Se creará',
+                startingPointNote:
+                    'Un punto de partida general para su configuración de ventiladores, pensado para ajustarse y no para dejarse tal cual.',
+                replaces: 'reemplaza {name}',
+                generated: '{count} perfiles generados.',
+                generateError: 'No se pudieron generar los perfiles.',
+                applyError: 'No se pudieron crear los perfiles.',
+                kind: {
+                    CpuCooler: 'Refrigerador de aire de CPU',
+                    GpuFan: 'Ventilador de GPU',
+                    AioRadiator: 'Radiador AIO',
+                    AioPump: 'Bomba AIO',
+                    CaseIntake: 'Entrada de la caja',
+                    CaseExhaust: 'Salida de la caja',
+                    LaptopFan: 'Ventilador de portátil',
+                },
             },
         },
         channelExtensionSettings: {
             title: 'Ajustes del canal del dispositivo',
             firmwareControlledProfile: 'Perfil controlado por firmware',
             firmwareControlledProfileDesc:
-                'Cuando está habilitado, el firmware del dispositivo gestiona el perfil del ventilador.\nÚtil para hardware que no responde bien a cambios de velocidad frecuentes realizados por software.\nSolo disponible para Perfiles de gráfico que utilizan sensores de temperatura internos del dispositivo.\nLos ajustes de Función no se aplican.',
+                'Cuando está habilitado, el firmware del dispositivo gestiona el perfil del ventilador.\nÚtil para hardware que no responde bien a cambios de velocidad frecuentes realizados por software.\nSolo disponible para Perfiles de gráfico que utilizan sensores de temperatura internos del dispositivo.\nLos ajustes de Función no se aplican.\nEn un canal calibrado, los puntos de la curva se convierten mediante la calibración, pero el impulso de arranque no se aplica.',
             saveError: 'Error al guardar los ajustes de la extensión del canal',
             firmwareControlDisabled:
                 'El control por firmware no está disponible con la configuración actual.\nUse un Perfil de gráfico para este dispositivo con un sensor de temperatura interno compatible.',
@@ -1263,6 +1201,10 @@ export default {
                 description:
                     'Recorra el ventilador para obtener su curva real de ciclo de trabajo a RPM y, a continuación, controle el canal como ciclo de trabajo real normalizado por RPM.\nElimina zonas muertas a ciclo bajo y la saturación a ciclo alto.\nEl impulso de arranque también se gestiona automáticamente cuando el ventilador está calibrado: un breve refuerzo inicial lo pone en marcha desde reposo antes de estabilizarlo en el ciclo objetivo.\nEl barrido suele tardar varios minutos y puede ser notablemente más largo en ventiladores de respuesta lenta. El canal se ajusta a 0 % al inicio.',
                 statusNotCalibrated: 'Sin calibrar',
+                blockedByAlert:
+                    "La calibración está bloqueada: la alerta '{name}' está activa en este ventilador.",
+                alertsPausedNote:
+                    'Las alertas que vigilan este ventilador se pausan durante el barrido.',
                 statusInProgress: 'Calibrando: {stage} ({percent} %)',
                 statusCompleted: 'Calibrado (curva continua, mapeo activo)',
                 statusCompletedStepped: 'Calibrado (curva escalonada, mapeo desactivado)',
@@ -1284,11 +1226,11 @@ export default {
                 buttonRecalibrate: 'Recalibrar',
                 buttonCancel: 'Cancelar',
                 buttonClear: 'Borrar',
+                clearConfirm:
+                    '¿Borrar la calibración de {channel}? Volver a ejecutarla tarda varios minutos.',
                 buttonViewCurve: 'Ver curva',
                 caveatsBanner:
                     'Calibrar varios ventiladores de refrigeración principales a la vez puede aumentar la temperatura del sistema.\nLos ventiladores push-pull de un radiador diagnosticados en paralelo pueden generar lecturas inexactas.\nMantenga el sistema inactivo durante la calibración.',
-                completedNotice:
-                    'Calibración activa. Las curvas de ventilador y los ciclos manuales de este canal ahora controlan el ciclo de trabajo real normalizado por RPM. Revise los valores de su perfil si es necesario.',
                 clearedNotice:
                     'Borrado. Las curvas de ventilador de este canal ahora controlan directamente el ciclo de trabajo del dispositivo.',
                 startError: 'No se pudo iniciar la calibración',
@@ -1326,9 +1268,6 @@ export default {
             axisRpm: 'RPM',
             legendUp: 'Barrido ascendente',
             legendDown: 'Barrido descendente',
-            markerStart: 'Inicio',
-            markerSustain: 'Sostenimiento',
-            markerSaturate: 'Cerca del plateau',
             markerStable: 'Piso estable',
             curveKindSmooth: 'Continua (mapeo activo)',
             curveKindStepped: 'Escalonada (mapeo desactivado)',
@@ -1406,12 +1345,6 @@ export default {
         setNewPassword: 'Introduzca Una Nueva Contraseña',
         changeDefaultPassword:
             'Por favor, establezca una contraseña para prevenir el acceso no autorizado. Esta es independiente de su cuenta del sistema.',
-        loginFailed: 'Inicio de Sesión Fallido',
-        invalidPassword: 'Contraseña Inválida',
-        passwordSetFailed: 'Establecer Contraseña Falló',
-        passwordSetSuccessfully: 'Nueva contraseña establecida correctamente',
-        logoutSuccessful: 'Ha cerrado sesión correctamente.',
-        unauthorizedAction: 'Necesita iniciar sesión para completar esta acción',
         accessTokens: 'Tokens de acceso',
         tokenLabel: 'Etiqueta (ej. cctv)',
         tokenExpiry: 'Fecha de expiración (opcional)',
@@ -1447,16 +1380,102 @@ export default {
             hasErrors: 'Tiene Errores',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '¿Cerrar a la bandeja del sistema?',
+            body: 'El demonio de CoolerControl sigue funcionando en segundo plano en cualquier caso, por lo que su configuración de refrigeración permanece activa. Mantenga la interfaz en la bandeja del sistema para un acceso rápido y notificaciones de escritorio, o ciérrela por completo.',
+            keepInTray: 'Mantener en la bandeja',
+            quit: 'Salir',
+            remember: 'Recordar mi elección',
+        },
+        tray: {
+            show: '&Mostrar',
+            hide: '&Ocultar',
+            daemonConnection: 'Conexión del &demonio…',
+            quit: '&Salir',
+            modes: 'Modos',
+            sensors: 'Sensores',
+            daemons: 'Demonios',
+        },
+        cert: {
+            title: 'Certificado del demonio no verificado',
+            changedTitle: 'El certificado ha cambiado',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 usa un certificado autofirmado que no se puede verificar automáticamente. Continúe solo si reconoce este demonio.',
+            changedBody:
+                'El certificado de %1 no es el que se aprobó anteriormente. Puede significar que el demonio se reinstaló o que algo está interceptando la conexión.',
+            fingerprint: 'Huella digital (SHA-256):',
+            trust: 'Confiar en este certificado',
+            cancel: 'Cancelar',
+        },
+        wizard: {
+            windowTitle: 'Error de conexión con el demonio',
+            windowTitleOk: 'Conexión del demonio',
+            apply: '&Aplicar',
+            retry: '&Reintentar',
+            quitApp: '&Salir',
+            introPurpose:
+                'Esta configuración controla cómo la aplicación de escritorio se conecta al demonio de CoolerControl.',
+            introFailed: 'No se pudo establecer una conexión con el demonio de CoolerControl.',
+            introCheckService:
+                'Asegúrese de que el servicio de systemd esté en ejecución y disponible.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Consulte el %1 para ver las instrucciones de instalación.',
+            introDocsLink: 'sitio de documentación',
+            introCommands:
+                'Algunos comandos útiles para activar y verificar el estado del demonio:',
+            introCustomAddress:
+                'Si ha configurado una dirección no estándar para conectarse al demonio, puede establecerla en los siguientes pasos:',
+            lastError: 'Último error:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'La dirección respondió, pero no como un demonio de CoolerControl (HTTP %1).',
+            errorCertUntrusted: 'No se confió en el certificado del demonio.',
+            errorCertInvalid:
+                'El certificado del demonio no es válido y la validación de certificados está activada.',
+            savedLabel: 'Conexión guardada:',
+            newConnection: 'Nueva conexión…',
+            removeConnection: 'Eliminar',
+            removeConnectionTooltip: 'Olvidar el demonio seleccionado.',
+            removeConnectionBody: '¿Dejar de ofrecer este demonio en la bandeja?',
+            nameLabel: 'Nombre:',
+            nameTooltip: 'Etiqueta opcional para este demonio. En blanco muestra host:puerto.',
+            addressTitle: 'Dirección del demonio - Aplicación de escritorio',
+            addressSubtitle: 'Ajuste los campos de dirección según sea necesario.',
+            hostLabel: 'Dirección del host:',
+            hostTooltip:
+                'La dirección IPv4, IPv6 o el nombre de host que se usará para comunicarse con el demonio.',
+            portLabel: 'Puerto:',
+            portTooltip: 'El número de puerto que se usará para comunicarse con el demonio.',
+            sslTooltip: 'Activar o desactivar SSL/TLS (HTTPS)',
+            strictTls: 'Validar certificado',
+            strictTlsTooltip:
+                'Exigir un certificado que se valide normalmente. Déjelo desactivado para usar el certificado autofirmado del demonio, que se aprueba en el primer uso para demonios remotos.',
+            defaults: 'Valores predeterminados',
+            defaultsTooltip: 'Restablecer la dirección del demonio a los valores predeterminados',
+            forgetCerts: 'Olvidar certificados de confianza',
+            forgetCertsTooltip:
+                'Elimina los certificados de demonios remotos en los que esta aplicación confía.',
+            forgetCertsBody:
+                'Actualmente se confía en estos certificados de demonio. Olvidarlos significa que se le pedirá confirmación la próxima vez que se conecte.',
+        },
+        versionMismatch: {
+            title: 'Versiones incompatibles',
+            text: 'La versión de la aplicación de escritorio (%1) no coincide con la versión del demonio (%2).',
+            informative:
+                'Reinicie la aplicación de escritorio para cargar la versión correcta de la interfaz.',
+            quitApp: '&Salir',
+            continueAnyway: 'Continuar de todos modos',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Sesión expirada',
             detail: 'Su sesión ha expirado. Recargando para iniciar sesión nuevamente.',
         },
         login: {
-            success: {
-                summary: 'Éxito',
-                detail: 'Inicio de sesión exitoso.',
-            },
             failed: {
                 summary: 'Inicio de Sesión Fallido',
                 detail: 'Contraseña Inválida',
@@ -1473,9 +1492,6 @@ export default {
             set_success: {
                 summary: 'Contraseña',
                 detail: 'Nueva contraseña establecida correctamente',
-            },
-            set_failed: {
-                summary: 'Establecer Contraseña Falló',
             },
         },
         asetek: {
@@ -1513,11 +1529,6 @@ export default {
                 mix: 'Mezcla',
                 overlay: 'Superposición',
             },
-            functionType: {
-                identity: 'Identidad',
-                standard: 'Estándar',
-                exponentialMovingAvg: 'Promedio Móvil Exponencial',
-            },
             mixFunctionType: {
                 min: 'Mínimo',
                 max: 'Máximo',
@@ -1549,6 +1560,10 @@ export default {
             highContrastDark: 'Oscuro de Alto Contraste',
             highContrastLight: 'Claro de Alto Contraste',
             custom: 'Tema Personalizado',
+        },
+        interfaceFont: {
+            bundled: 'Incluida (IBM Plex)',
+            system: 'Sistema',
         },
         channelViewType: {
             control: 'Control',
@@ -1593,7 +1608,6 @@ export default {
         },
         channelType: {
             lcd: 'LCD',
-            lighting: 'Iluminación',
         },
     },
 }

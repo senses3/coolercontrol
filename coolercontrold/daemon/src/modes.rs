@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -34,6 +19,7 @@ use crate::config::Config;
 use crate::device::{ChannelName, DeviceUID, UID};
 use crate::engine::main::Engine;
 use crate::paths;
+use crate::power_profile_listener::PowerProfiles;
 use crate::setting::{ProfileUID, Setting, SettingKind};
 use crate::{cc_fs, AllDevices};
 
@@ -47,6 +33,7 @@ pub struct ModeController {
     mode_order: RefCell<Vec<UID>>,
     active_modes: RefCell<ActiveModes>,
     mode_handle: RefCell<Option<ModeHandle>>,
+    power_profiles: PowerProfiles,
 }
 
 impl ModeController {
@@ -55,6 +42,7 @@ impl ModeController {
         config: Rc<Config>,
         all_devices: AllDevices,
         engine: Rc<Engine>,
+        power_profiles: PowerProfiles,
     ) -> Result<Self> {
         let mode_controller = Self {
             config,
@@ -64,6 +52,7 @@ impl ModeController {
             mode_order: RefCell::new(Vec::new()),
             active_modes: RefCell::new(ActiveModes::new()),
             mode_handle: RefCell::new(None),
+            power_profiles,
         };
         mode_controller.fill_data_from_mode_config_file().await?;
         Ok(mode_controller)
@@ -74,6 +63,15 @@ impl ModeController {
     /// The `ModeHandle` is used to broadcast notifications when a mode is activated.
     pub fn set_mode_handle(&self, mode_handle: ModeHandle) {
         self.mode_handle.replace(Some(mode_handle));
+    }
+
+    /// The `ModeHandle`, once the API has set it. `None` before `start_server` has run.
+    ///
+    /// The handle is `Send` while the controller is not, so this is how off-thread callers such
+    /// as the power profile listener activate a Mode through the actor rather than reaching into
+    /// the controller directly.
+    pub fn mode_handle(&self) -> Option<ModeHandle> {
+        self.mode_handle.borrow().clone()
     }
 
     /// Apply all saved device settings to the devices if the `apply_on_boot` setting is true
@@ -114,6 +112,16 @@ impl ModeController {
                     let successful = Rc::clone(&all_successful);
                     scope.spawn(async move {
                         for setting in &settings {
+                            if channel_is_available(&self.all_devices, uid, &setting.channel_name)
+                                .not()
+                            {
+                                info!(
+                                    "Skipping the saved setting for a channel the device no \
+                                    longer offers: {}",
+                                    self.engine.log_device_channel(uid, &setting.channel_name)
+                                );
+                                continue;
+                            }
                             if let Err(err) = self.engine.set_config_setting(uid, setting).await {
                                 error!("Error setting device setting: {err}");
                                 successful.set(false);
@@ -345,22 +353,16 @@ impl ModeController {
         mode_device_settings: &HashMap<ChannelName, Setting>,
         scope: &'s Scope<'s, 's, Result<()>>,
     ) {
-        let cc_device_settings = self
-            .config
-            .get_cc_settings_for_device(device_uid)
-            .unwrap_or_default();
         for (channel_name, setting) in mode_device_settings {
             if saved_device_settings_map.get(channel_name) == Some(setting) {
                 continue; // no need to apply if the setting is the same
             }
-            if let Some(cc_settings) = &cc_device_settings {
-                if cc_settings.get_disabled_channels().contains(channel_name) {
-                    warn!(
-                        "This Mode contains a Channel: {channel_name} that has been disabled. \
-                        Please update your Mode to remove this channel."
-                    );
-                    continue; // do not attempt to apply a setting for a disabled channel
-                }
+            if channel_is_available(&self.all_devices, device_uid, channel_name).not() {
+                warn!(
+                    "This Mode contains a Channel: {channel_name} that the device no longer \
+                    offers. Please update your Mode to remove this channel."
+                );
+                continue; // do not attempt to apply a setting for a channel that isn't there
             }
             let engine = Rc::clone(&self.engine);
             let config = Rc::clone(&self.config);
@@ -538,7 +540,33 @@ impl ModeController {
                 active_modes_lock.previous.as_ref(),
             );
         }
+        self.prune_power_profile_modes(mode_uid).await?;
         self.save_modes_data().await?;
+        Ok(())
+    }
+
+    /// Drops any power profile mapping that pointed at the deleted Mode.
+    ///
+    /// The API rejects a mapping to a Mode that does not exist, but that only holds at write
+    /// time. Without this, deleting a mapped Mode leaves an entry that silently does nothing the
+    /// next time the system switches to that profile.
+    async fn prune_power_profile_modes(&self, mode_uid: &UID) -> Result<()> {
+        let mut modes = self.config.get_power_profile_modes();
+        let before = modes.len();
+        modes.retain(|_, mapped_uid| mapped_uid != mode_uid);
+        if modes.len() == before {
+            return Ok(());
+        }
+        debug_assert!(
+            modes.values().all(|mapped_uid| mapped_uid != mode_uid),
+            "Every mapping to the deleted Mode must be gone"
+        );
+        debug_assert!(modes.len() < before, "Pruning must only remove entries");
+        self.config.set_power_profile_modes(&modes);
+        self.config.save_config_file().await?;
+        // Only after the write succeeds, so a failed save cannot leave the listener acting on a
+        // mapping that is still persisted.
+        self.power_profiles.set_modes(modes);
         Ok(())
     }
 
@@ -651,6 +679,21 @@ impl ModeController {
     }
 }
 
+/// Whether the device currently offers the channel.
+///
+/// A saved setting can name a channel that is not there: the user disabled it, their lm-sensors
+/// configuration ignores it, or the driver stopped reporting it. Such settings are kept in the
+/// config, since the channel can come back, but they cannot be applied while it is gone.
+fn channel_is_available(
+    all_devices: &AllDevices,
+    device_uid: &DeviceUID,
+    channel_name: &str,
+) -> bool {
+    all_devices
+        .get(device_uid)
+        .is_some_and(|device| device.borrow().info.channels.contains_key(channel_name))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mode {
     pub uid: UID,
@@ -708,5 +751,201 @@ impl ActiveModes {
     fn clear(&mut self) {
         self.current = None;
         self.previous = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::calibration::{CalibrationStore, FanStateMap};
+    use crate::device::{ChannelInfo, ChannelKind, Device, DeviceInfo, DeviceType, SpeedOptions};
+    use crate::overrides::OverridesController;
+    use crate::repositories::repository::Repositories;
+    use crate::setting::Setting;
+
+    /// One Hwmon device offering exactly `channel_name`.
+    fn devices_offering(channel_name: &str) -> (AllDevices, DeviceUID) {
+        let mut info = DeviceInfo::default();
+        info.channels.insert(
+            channel_name.to_string(),
+            ChannelInfo {
+                label: None,
+                kind: ChannelKind::Speed(SpeedOptions {
+                    fixed_enabled: true,
+                    ..Default::default()
+                }),
+            },
+        );
+        let device = Rc::new(RefCell::new(Device::new(
+            "Test Device".to_string(),
+            DeviceType::Hwmon,
+            0,
+            None,
+            info,
+            None,
+            1.0,
+        )));
+        let device_uid = device.borrow().uid.clone();
+        let mut devices = HashMap::new();
+        devices.insert(device_uid.clone(), device);
+        (Rc::new(devices), device_uid)
+    }
+
+    /// A controller with no repositories: every setting that is actually applied fails, which
+    /// is what makes a skipped setting distinguishable from an applied one.
+    fn mode_controller(all_devices: &AllDevices, config: &Rc<Config>) -> ModeController {
+        let engine = Rc::new(Engine::new(
+            Rc::clone(all_devices),
+            &Rc::new(Repositories::default()),
+            Rc::clone(config),
+            Rc::new(CalibrationStore::empty()),
+            Rc::new(FanStateMap::new()),
+            Rc::new(OverridesController::empty()),
+        ));
+        ModeController {
+            config: Rc::clone(config),
+            all_devices: Rc::clone(all_devices),
+            engine,
+            modes: RefCell::new(HashMap::new()),
+            mode_order: RefCell::new(Vec::new()),
+            active_modes: RefCell::new(ActiveModes::new()),
+            mode_handle: RefCell::new(None),
+            power_profiles: PowerProfiles::default(),
+        }
+    }
+
+    fn fixed_speed(channel_name: &str) -> Setting {
+        Setting {
+            channel_name: channel_name.to_string(),
+            kind: SettingKind::SpeedFixed { speed_fixed: 50 },
+        }
+    }
+
+    /// Goal: deleting a Mode must take its power profile mapping with it, in both the config
+    /// and the live map the listener reads, or the next switch to that profile would silently
+    /// do nothing.
+    /// Methodology: map two profiles, delete the Mode one of them points at, then read both the
+    /// persisted mapping and the shared one back.
+    #[test]
+    fn deleting_a_mode_prunes_its_power_profile_mapping() {
+        cc_fs::test_runtime(async {
+            let (all_devices, _) = devices_offering("fan1");
+            let config = Rc::new(Config::init_default_config().unwrap());
+            let controller = mode_controller(&all_devices, &config);
+            let deleted = "mode-to-delete".to_string();
+            let kept = "mode-to-keep".to_string();
+            for mode_uid in [&deleted, &kept] {
+                controller.modes.borrow_mut().insert(
+                    mode_uid.clone(),
+                    Mode {
+                        uid: mode_uid.clone(),
+                        name: mode_uid.clone(),
+                        all_device_settings: HashMap::new(),
+                    },
+                );
+                controller.mode_order.borrow_mut().push(mode_uid.clone());
+            }
+            let mapping = HashMap::from([
+                ("performance".to_string(), deleted.clone()),
+                ("balanced".to_string(), kept.clone()),
+            ]);
+            config.set_power_profile_modes(&mapping);
+            controller.power_profiles.set_modes(mapping);
+
+            controller.delete_mode(&deleted).await.unwrap();
+
+            let persisted = config.get_power_profile_modes();
+            assert_eq!(
+                persisted.get("performance"),
+                None,
+                "The mapping to the deleted Mode is gone"
+            );
+            assert_eq!(
+                persisted.get("balanced"),
+                Some(&kept),
+                "Mappings to surviving Modes are untouched"
+            );
+            assert_eq!(
+                controller.power_profiles.mode_for("performance"),
+                None,
+                "The listener must not act on the pruned mapping"
+            );
+            assert_eq!(controller.power_profiles.mode_for("balanced"), Some(kept));
+        });
+    }
+
+    /// Goal: deleting an unmapped Mode must leave the mapping alone, so an unrelated delete
+    /// never rewrites the config.
+    /// Methodology: delete a Mode no profile points at.
+    #[test]
+    fn deleting_an_unmapped_mode_leaves_the_mapping_alone() {
+        cc_fs::test_runtime(async {
+            let (all_devices, _) = devices_offering("fan1");
+            let config = Rc::new(Config::init_default_config().unwrap());
+            let controller = mode_controller(&all_devices, &config);
+            let unmapped = "unmapped-mode".to_string();
+            controller.modes.borrow_mut().insert(
+                unmapped.clone(),
+                Mode {
+                    uid: unmapped.clone(),
+                    name: unmapped.clone(),
+                    all_device_settings: HashMap::new(),
+                },
+            );
+            controller.mode_order.borrow_mut().push(unmapped.clone());
+            let mapping = HashMap::from([("balanced".to_string(), "another-mode".to_string())]);
+            config.set_power_profile_modes(&mapping);
+
+            controller.delete_mode(&unmapped).await.unwrap();
+
+            assert_eq!(config.get_power_profile_modes(), mapping);
+        });
+    }
+
+    #[test]
+    /// Goal: the availability check answers for the channel, not the device.
+    fn channel_availability_follows_the_device_info() {
+        let (all_devices, device_uid) = devices_offering("fan1");
+        assert!(channel_is_available(&all_devices, &device_uid, "fan1"));
+        assert!(channel_is_available(&all_devices, &device_uid, "fan8").not());
+        assert!(channel_is_available(&all_devices, &"unknown".to_string(), "fan1").not());
+    }
+
+    #[test]
+    /// Goal: a saved setting for a channel the device no longer offers (disabled, ignored by
+    /// the lm-sensors configuration, or gone) is skipped instead of failing, so that boot does
+    /// not log an error and does not clear the active modes.
+    fn saved_setting_for_a_missing_channel_is_skipped() {
+        cc_fs::test_runtime(async {
+            let (all_devices, device_uid) = devices_offering("fan1");
+            let config = Rc::new(Config::init_default_config().unwrap());
+            config.set_device_setting(&device_uid, &fixed_speed("fan8"));
+            let controller = mode_controller(&all_devices, &config);
+
+            let all_successful =
+                moro_local::async_scope!(|scope| controller.apply_all_saved_device_settings(scope))
+                    .await;
+
+            assert!(all_successful.get());
+        });
+    }
+
+    #[test]
+    /// Goal: the skip is limited to missing channels. An offered channel is still applied, and
+    /// its failure still marks the run unsuccessful.
+    fn saved_setting_for_an_offered_channel_is_still_applied() {
+        cc_fs::test_runtime(async {
+            let (all_devices, device_uid) = devices_offering("fan1");
+            let config = Rc::new(Config::init_default_config().unwrap());
+            config.set_device_setting(&device_uid, &fixed_speed("fan1"));
+            let controller = mode_controller(&all_devices, &config);
+
+            let all_successful =
+                moro_local::async_scope!(|scope| controller.apply_all_saved_device_settings(scope))
+                    .await;
+
+            // No repository is registered, so applying it fails.
+            assert!(all_successful.get().not());
+        });
     }
 }

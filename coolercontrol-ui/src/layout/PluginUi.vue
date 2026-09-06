@@ -1,30 +1,17 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiLinkVariant } from '@mdi/js'
+import { mdiContentCopy, mdiLinkVariant } from '@mdi/js'
 import { inject, Ref } from 'vue'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { PluginDto } from '@/models/Plugins.ts'
 
 const deviceStore = useDeviceStore()
@@ -127,8 +114,11 @@ const fallbackCopy = (text: string): void => {
                             <code class="ml-1 select-all"
                                 >journalctl -f -u cc-plugin-{{ plugin.id }}</code
                             >
-                            <i
-                                class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiContentCopy"
+                                :size="14"
+                                class="cursor-pointer opacity-60 hover:opacity-100"
                                 @click="copyCommand(`journalctl -f -u cc-plugin-${plugin.id}`)"
                             />
                         </div>
@@ -137,8 +127,11 @@ const fallbackCopy = (text: string): void => {
                             <code class="ml-1 select-all"
                                 >grep cc-plugin-{{ plugin.id }} /var/log/messages</code
                             >
-                            <i
-                                class="pi pi-copy text-xs cursor-pointer opacity-60 hover:opacity-100"
+                            <svg-icon
+                                type="mdi"
+                                :path="mdiContentCopy"
+                                :size="14"
+                                class="cursor-pointer opacity-60 hover:opacity-100"
                                 @click="
                                     copyCommand(`grep cc-plugin-${plugin.id} /var/log/messages`)
                                 "

@@ -1,23 +1,9 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::cc_fs;
 use crate::device::ChannelStatus;
+use crate::hardware_support::{self, ChannelDiagnosis, ChannelEvidence};
 use crate::repositories::hwmon::hwmon_repo::{
     AutoCurveInfo, HwmonChannelCapabilities, HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo,
 };
@@ -62,6 +48,62 @@ pub async fn init_fans(base_path: &Path, device_name: &str) -> Result<Vec<HwmonC
     Ok(fans)
 }
 
+/// Diagnoses why one fan channel is or is not controllable.
+///
+/// `firmware_override_observed` is reserved for the duty-response probe, which
+/// is the only thing that can establish it without adding reads to the write
+/// path. Passive callers pass `false`.
+pub fn diagnose_fan_channel(
+    hwmon_name: &str,
+    channel: &HwmonChannelInfo,
+    firmware_override_observed: bool,
+) -> ChannelDiagnosis {
+    debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
+    if channel.caps.has_pwm().not() && channel.caps.is_fan_controllable() {
+        // Apple SMC fans are driven through `fanN_output`, not `pwmN`, so the
+        // pwm-shaped evidence below would condemn a channel we are writing to.
+        // There is no pwm file to state facts about, so the diagnosis carries
+        // none rather than four misleading booleans.
+        return hardware_support::diagnose_driver_channel(true);
+    }
+    let evidence = ChannelEvidence {
+        has_pwm: channel.caps.has_pwm(),
+        pwm_writable: channel.caps.is_fan_controllable(),
+        has_rpm: channel.caps.has_rpm(),
+        // `pwm_enable_default` is `Some` exactly when the driver exposed a
+        // `pwmN_enable` file for this channel.
+        has_pwm_enable: channel.pwm_enable_default.is_some(),
+    };
+    hardware_support::diagnose_channel(evidence, hwmon_name, firmware_override_observed)
+}
+
+/// Logs the reason a channel cannot be driven, replacing the previous bare
+/// "uncontrollable fan found" line. Controllable channels stay silent,
+/// consistent with making no noise for working hardware.
+///
+/// Called from repository init only. `init_fans` is the wrong home for it: the
+/// hardware report calls that too, so every report request would re-log the
+/// same lines.
+pub fn log_uncontrollable_channel(
+    base_path: &Path,
+    channel: &HwmonChannelInfo,
+    diagnosis: &ChannelDiagnosis,
+) {
+    if diagnosis.verdict.is_controllable() {
+        return;
+    }
+    let evidence = diagnosis.evidence.clone().unwrap_or_default();
+    info!(
+        "Fan channel {} at {} is not controllable: {:?} (pwm: {}, writable: {}, rpm: {})",
+        channel.name,
+        base_path.display(),
+        diagnosis.verdict,
+        evidence.has_pwm,
+        evidence.pwm_writable,
+        evidence.has_rpm,
+    );
+}
+
 /// Detects if a fan has pwm capability and pwm-write capabilities.
 async fn detect_pwm(
     base_path: &Path,
@@ -79,9 +121,16 @@ async fn detect_pwm(
         .context("Number Group should exist")?
         .as_str()
         .parse()?;
-    if get_pwm_duty(base_path, &channel_number, None, true)
-        .await
-        .is_none()
+    // Detection reads each attribute once, so this cache closes with the probe.
+    if get_pwm_duty(
+        &cc_fs::SysfsFdCache::default(),
+        base_path,
+        &channel_number,
+        None,
+        true,
+    )
+    .await
+    .is_none()
     {
         return Ok(()); // skip if pwm file isn't readable
     }
@@ -111,9 +160,16 @@ pub async fn detect_rpm(
         .context("Number Group should exist")?
         .as_str()
         .parse()?;
-    if get_fan_rpm(base_path, &channel_number, None, true)
-        .await
-        .is_none()
+    // Detection reads each attribute once, so this cache closes with the probe.
+    if get_fan_rpm(
+        &cc_fs::SysfsFdCache::default(),
+        base_path,
+        &channel_number,
+        None,
+        true,
+    )
+    .await
+    .is_none()
     {
         return Ok(()); // skip if rpm file isn't readable
     }
@@ -132,18 +188,15 @@ async fn caps_to_hwmon_fans(
 ) -> Result<Vec<HwmonChannelInfo>> {
     let mut fans = vec![];
     for (channel_number, fan_cap) in fan_caps {
-        let current_pwm_enable = get_current_pwm_enable(base_path, &channel_number).await;
-        let pwm_enable_default = adjusted_pwm_default(current_pwm_enable, device_name);
+        let pwm_enable_at_init = current_pwm_enable(base_path, channel_number).await;
+        let pwm_enable_default = adjusted_pwm_default(pwm_enable_at_init, device_name);
         let channel_name = get_fan_channel_name(channel_number);
         let label = get_fan_channel_label(base_path, &channel_number).await;
         // deprecated setting:
         // determine_pwm_mode_support(base_path, &channel_number).await;
-        if fan_cap.is_non_controllable_rpm_fan() {
-            info!(
-                "Uncontrollable RPM-only fan found at {}/fan{channel_number}_input",
-                base_path.display()
-            );
-        }
+        // Uncontrollable channels are reported by `log_channel_verdicts` once
+        // the full channel is built, which can name a cause instead of a
+        // symptom.
         let pwm_path = if fan_cap.has_pwm() {
             Some(base_path.join(format_pwm!(channel_number)))
         } else {
@@ -211,6 +264,7 @@ pub async fn read_one_fan_status(
     debug_assert_eq!(channel.hwmon_type, HwmonChannelType::Fan);
     let fan_duty = if channel.caps.has_pwm() {
         get_pwm_duty(
+            &driver.fds,
             &driver.path,
             &channel.number,
             channel.pwm_path.as_ref(),
@@ -222,6 +276,7 @@ pub async fn read_one_fan_status(
     };
     let fan_rpm = if channel.caps.has_rpm() {
         get_fan_rpm(
+            &driver.fds,
             &driver.path,
             &channel.number,
             channel.rpm_path.as_ref(),
@@ -260,6 +315,7 @@ pub async fn read_one_fan_rpm_only(
         return Some(None);
     }
     let fan_rpm = get_fan_rpm(
+        &driver.fds,
         &driver.path,
         &channel.number,
         channel.rpm_path.as_ref(),
@@ -296,6 +352,7 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     let fan_rpm_task = channel_scope.spawn(async {
                         if channel.caps.has_rpm() {
                             get_fan_rpm(
+                                &driver.fds,
                                 &driver.path,
                                 &channel.number,
                                 channel.rpm_path.as_ref(),
@@ -309,6 +366,7 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     let fan_duty_task = channel_scope.spawn(async {
                         if channel.caps.has_pwm() {
                             get_pwm_duty(
+                                &driver.fds,
                                 &driver.path,
                                 &channel.number,
                                 channel.pwm_path.as_ref(),
@@ -321,7 +379,9 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
                     });
                     let fan_pwm_mode_task = channel_scope.spawn(async {
                         if channel.caps.has_pwm_mode() {
-                            cc_fs::read_sysfs(driver.path.join(format_pwm_mode!(channel.number)))
+                            driver
+                                .fds
+                                .read_value(&driver.path.join(format_pwm_mode!(channel.number)))
                                 .await
                                 .and_then(check_parsing_8)
                                 .ok()
@@ -349,6 +409,7 @@ pub async fn extract_fan_statuses_concurrently(driver: &HwmonDriverInfo) -> Vec<
 }
 
 async fn get_pwm_duty(
+    fds: &cc_fs::SysfsFdCache,
     base_path: &Path,
     channel_number: &u8,
     pwm_path: Option<&PathBuf>,
@@ -358,7 +419,8 @@ async fn get_pwm_duty(
         Some(path) => path,
         None => &base_path.join(format_pwm!(channel_number)),
     };
-    match cc_fs::read_sysfs(pwm_path)
+    match fds
+        .read_value(pwm_path)
         .await
         .and_then(check_parsing_8)
         .map(pwm_value_to_duty)
@@ -375,7 +437,7 @@ async fn get_pwm_duty(
                 io_err.raw_os_error().is_some() && io_err.kind() != ErrorKind::NotFound
             });
             if is_kernel_refusal {
-                if let Some(pwm_enable) = get_current_pwm_enable(base_path, channel_number).await {
+                if let Some(pwm_enable) = current_pwm_enable(base_path, *channel_number).await {
                     if pwm_enable >= PWM_ENABLE_AUTO_VALUE {
                         debug!(
                             "pwmX read refused by kernel driver in auto mode \
@@ -398,6 +460,7 @@ async fn get_pwm_duty(
 }
 
 pub async fn get_fan_rpm(
+    fds: &cc_fs::SysfsFdCache,
     base_path: &Path,
     channel_number: &u8,
     rpm_path: Option<&PathBuf>,
@@ -407,7 +470,7 @@ pub async fn get_fan_rpm(
         Some(path) => path,
         None => &base_path.join(format_fan_input!(channel_number)),
     };
-    cc_fs::read_sysfs(fan_input_path)
+    fds.read_value(fan_input_path)
         .await
         .and_then(check_parsing_32)
         // Edge case where on spin-up the output is max value until it begins moving
@@ -432,9 +495,11 @@ pub async fn get_fan_rpm(
 ///  - 3 : "Fan Speed Cruise" mode (?)
 ///  - 4 : "Smart Fan III" mode (NCT6775F only)
 ///  - 5 : "Smart Fan IV" mode (modern `MoBo`'s with build-in smart fan control probably use this)
-async fn get_current_pwm_enable(base_path: &Path, channel_number: &u8) -> Option<u8> {
+/// Reads `pwmN_enable`. `None` when the driver exposes no such file, which
+/// means there is no auto mode to hand control back to.
+async fn current_pwm_enable(base_path: &Path, channel_number: u8) -> Option<u8> {
     let pwm_enable_path = base_path.join(format_pwm_enable!(channel_number));
-    let current_pwm_enable = cc_fs::read_sysfs(&pwm_enable_path)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&pwm_enable_path)
         .await
         .and_then(check_parsing_8)
         .ok();
@@ -448,19 +513,13 @@ async fn get_current_pwm_enable(base_path: &Path, channel_number: &u8) -> Option
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn check_parsing_8(content: String) -> Result<u8> {
-    match content.trim().parse::<u8>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+pub fn check_parsing_8(value: cc_fs::SysfsValue) -> Result<u8> {
+    value.parse()
 }
 
 #[allow(clippy::needless_pass_by_value)]
-pub fn check_parsing_32(content: String) -> Result<u32> {
-    match content.trim().parse::<u32>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+pub fn check_parsing_32(value: cc_fs::SysfsValue) -> Result<u32> {
+    value.parse()
 }
 
 /// If a `HWMon` driver has not set the writable bit on the sysfs file, then that
@@ -559,7 +618,7 @@ pub async fn set_pwm_enable_to_default_or_auto(
         return Ok(());
     };
     let path_pwm_enable = base_path.join(format_pwm_enable!(channel_info.number));
-    let current_pwm_enable = cc_fs::read_sysfs(&path_pwm_enable)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&path_pwm_enable)
         .await
         .and_then(check_parsing_8)?;
     if current_pwm_enable < PWM_ENABLE_AUTO_VALUE && current_pwm_enable != default_value {
@@ -577,7 +636,7 @@ pub async fn set_pwm_enable_to_default_or_auto(
 
 /// This sets `pwm_enable` to the desired value. Unlike other operations,
 /// it will not check if it's already set to the desired value.
-/// See also `get_current_pwm_enable`.
+/// See also `current_pwm_enable`.
 pub async fn set_pwm_enable(
     pwm_enable_value: u8,
     base_path: &Path,
@@ -597,7 +656,7 @@ pub async fn set_pwm_enable(
 }
 
 /// This sets `pwm_enable` to the desired value if it's not already set to the desired value.
-/// See also `get_current_pwm_enable`.
+/// See also `current_pwm_enable`.
 pub async fn set_pwm_enable_if_not_already(
     pwm_enable_value: u8,
     base_path: &Path,
@@ -608,7 +667,7 @@ pub async fn set_pwm_enable_if_not_already(
         return Ok(());
     }
     let path_pwm_enable = base_path.join(format_pwm_enable!(channel_info.number));
-    let current_pwm_enable = cc_fs::read_sysfs(&path_pwm_enable)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&path_pwm_enable)
         .await
         .and_then(check_parsing_8)?;
     if current_pwm_enable == pwm_enable_value {
@@ -675,6 +734,7 @@ pub fn duty_to_pwm_value(speed_duty: u8) -> u8 {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
+    use crate::hardware_support::ChannelVerdict;
     use crate::repositories::hwmon::drivetemp;
     use serial_test::serial;
     use std::path::{Path, PathBuf};
@@ -1069,7 +1129,7 @@ mod tests {
             let result = set_pwm_duty(test_base_path, &channel_info, 50).await;
 
             // then:
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -1107,7 +1167,7 @@ mod tests {
             let result = set_pwm_duty(test_base_path, &channel_info, 50).await;
 
             // then:
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -1145,7 +1205,7 @@ mod tests {
             let result = set_pwm_duty(test_base_path, &channel_info, 50).await;
 
             // then:
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -1169,7 +1229,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, true).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                true,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1187,7 +1254,14 @@ mod tests {
             // given: no pwm1 file exists
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1208,7 +1282,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1232,7 +1313,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: normal read succeeds, no fallback needed
             teardown(&ctx).await;
@@ -1253,7 +1341,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: ENOENT is not a kernel refusal — must return None
             teardown(&ctx).await;
@@ -1270,7 +1365,14 @@ mod tests {
             // given: no pwm1 file, no pwm1_enable file
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then:
             teardown(&ctx).await;
@@ -1294,7 +1396,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: parse error has no raw_os_error — must return None
             teardown(&ctx).await;
@@ -1317,7 +1426,14 @@ mod tests {
                 .unwrap();
 
             // when:
-            let result = get_pwm_duty(&ctx.test_base_path, &1, None, false).await;
+            let result = get_pwm_duty(
+                &cc_fs::SysfsFdCache::default(),
+                &ctx.test_base_path,
+                &1,
+                None,
+                false,
+            )
+            .await;
 
             // then: parse error + manual mode = no fallback
             teardown(&ctx).await;
@@ -1336,6 +1452,7 @@ mod tests {
             channels,
             drivetemp: drivetemp::DrivetempState::default(),
             apple_smc: crate::repositories::hwmon::apple_mac_smc::AppleMacSMC::default(),
+            fds: cc_fs::SysfsFdCache::default(),
         }
     }
 
@@ -1602,5 +1719,48 @@ mod tests {
             assert!(any_failure.not());
             assert!(statuses.is_empty());
         });
+    }
+
+    /// Goal: an Apple SMC fan is driven through `fanN_output` and never has a
+    /// `pwmN`, so the pwm-shaped evidence must not condemn it. Method: build
+    /// the capability set `AppleMacSMC::detect_apple_smc_fans` produces and
+    /// check the verdict, which in a debug build also exercises the assertion
+    /// that a writable pwm implies a pwm.
+    #[test]
+    fn apple_smc_fan_without_pwm_is_controllable() {
+        let channel = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 1,
+            name: "fan1".to_string(),
+            caps: HwmonChannelCapabilities::APPLE_SMC
+                | HwmonChannelCapabilities::FAN_WRITABLE
+                | HwmonChannelCapabilities::RPM,
+            ..Default::default()
+        };
+
+        let diagnosis = diagnose_fan_channel("macsmc-hwmon", &channel, false);
+
+        assert_eq!(diagnosis.verdict, ChannelVerdict::Controllable);
+        // No pwm file means no pwm facts to report, not four false ones.
+        assert!(diagnosis.evidence.is_none());
+    }
+
+    /// Goal: the negative space of the case above. A fan that only reports
+    /// speed is still `NoPwm`, so the Apple branch cannot swallow a genuinely
+    /// uncontrollable channel.
+    #[test]
+    fn rpm_only_fan_is_still_condemned() {
+        let channel = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 9,
+            name: "fan9".to_string(),
+            caps: HwmonChannelCapabilities::RPM,
+            ..Default::default()
+        };
+
+        let diagnosis = diagnose_fan_channel("aquacomputer_d5next", &channel, false);
+
+        assert_eq!(diagnosis.verdict, ChannelVerdict::NoPwm);
+        assert!(diagnosis.evidence.is_some());
     }
 }

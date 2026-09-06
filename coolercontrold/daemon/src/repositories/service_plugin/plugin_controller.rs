@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::CCError;
 use crate::cc_fs;
@@ -24,8 +9,10 @@ use crate::repositories::service_plugin::service_management::manager::{
 };
 use crate::repositories::service_plugin::service_management::ServiceId;
 use crate::repositories::service_plugin::service_manifest::{ServiceManifest, ServiceType};
-use crate::repositories::service_plugin::service_plugin_repo::{ServicePluginRepo, CC_PLUGIN_USER};
-use crate::repositories::utils::{ShellCommand, ShellCommandResult};
+use crate::repositories::service_plugin::service_plugin_repo::{
+    ServicePluginRepo, CC_PLUGIN_USER, SERVICE_MANIFEST_FILE_NAME,
+};
+use crate::repositories::utils::{DirectCommand, ShellCommandResult};
 use anyhow::{anyhow, Context, Result};
 use log::{debug, error, info, warn};
 use std::collections::HashMap;
@@ -39,6 +26,11 @@ use std::time::Duration;
 pub const PLUGIN_CONFIG_FILE_NAME: &str = "config.json";
 const PLUGIN_UI_DIR_NAME: &str = "ui";
 const PLUGIN_CONFIG_FILE_PERMISSIONS: u32 = 0o600;
+/// The manifest is root-owned and not plugin-writable. See `secure_plugin_folder`.
+const PLUGIN_MANIFEST_PERMISSIONS: u32 = 0o644;
+const ROOT_USER: &str = "root";
+const CHOWN_BIN: &str = "chown";
+const CHOWN_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub struct PluginController {
     pub plugins: HashMap<ServiceId, ServiceManifest>,
@@ -69,7 +61,7 @@ impl PluginController {
     /// Used when the service plugin repo fails to initialize.
     pub fn new_disabled() -> Self {
         Self {
-            plugins: HashMap::with_capacity(0),
+            plugins: HashMap::new(),
             config: None,
             service_manager: Manager::Disabled,
             is_systemd: false,
@@ -197,17 +189,17 @@ impl PluginController {
             .with_context(|| format!("Stopping plugin service: {plugin_id}"))
     }
 
-    /// Restart a managed integration plugin's service (stop then start).
+    /// Restart a managed integration plugin's service.
+    ///
+    /// Handed to the init system as one operation. Doing it as a stop then a start leaves a
+    /// window where the old process has not gone yet, and starting into that window is what
+    /// leaves two of them running.
     pub async fn restart_plugin(&self, plugin_id: &str) -> Result<()> {
         let service_id = self.get_integration_service_id(plugin_id)?;
         self.service_manager
-            .stop(&service_id)
+            .restart(&service_id)
             .await
-            .with_context(|| format!("Stopping plugin service for restart: {plugin_id}"))?;
-        self.service_manager
-            .start(&service_id)
-            .await
-            .with_context(|| format!("Starting plugin service for restart: {plugin_id}"))
+            .with_context(|| format!("Restarting plugin service: {plugin_id}"))
     }
 
     /// Get the status of a plugin's service.
@@ -275,13 +267,41 @@ impl PluginController {
             config.set_disabled_plugins(&disabled);
             config.save_config_file().await?;
         }
-        // Start integration plugins immediately
-        if manifest.service_type == ServiceType::Integration && manifest.is_managed() {
-            if let Err(err) = self.start_plugin(plugin_id).await {
-                info!("Could not start plugin service on enable: {err}");
-            }
+        // Start integration plugins immediately.
+        if manifest.service_type != ServiceType::Integration {
+            return Ok(());
+        }
+        if manifest.is_managed().not() {
+            return Ok(());
+        }
+        if let Err(err) = self.install_and_restart(plugin_id, manifest).await {
+            info!("Could not start plugin service on enable: {err}");
         }
         Ok(())
+    }
+
+    /// Installs a plugin's service definition, then brings the service up.
+    ///
+    /// A plugin that was disabled when the daemon started was skipped during registration,
+    /// so nothing ever wrote its service definition and the init system does not know it
+    /// exists. Starting it in that state fails and the plugin stays `Unmanaged` until the
+    /// daemon is restarted. Installing first is what makes enabling take effect right away.
+    async fn install_and_restart(&self, plugin_id: &str, manifest: &ServiceManifest) -> Result<()> {
+        let service_id = self.get_integration_service_id(plugin_id)?;
+        let definition =
+            ServicePluginRepo::service_definition(&service_id, manifest).ok_or_else(|| {
+                CCError::UserError {
+                    msg: "Plugin manifest has no executable to manage".to_string(),
+                }
+            })?;
+        self.service_manager
+            .add(definition)
+            .await
+            .with_context(|| format!("Installing plugin service: {plugin_id}"))?;
+        self.service_manager
+            .restart(&service_id)
+            .await
+            .with_context(|| format!("Starting plugin service: {plugin_id}"))
     }
 
     /// Check if a plugin is disabled in config.
@@ -315,42 +335,293 @@ impl PluginController {
     }
 }
 
+/// Hands the plugin folder to `owner` so the plugin can manage its own runtime files, then takes
+/// `manifest.toml` back for root.
+///
+/// The manifest declares `privileged`, which decides whether the generated service unit omits
+/// `User=` and therefore runs the plugin as root. An unprivileged plugin that owned its own
+/// manifest could set that flag and gain root on the next daemon start, so ownership of that one
+/// file must not follow the rest of the folder. The plugin is not running while this executes
+/// (`initialize_service` secures the folder before starting the service), so the window in which
+/// the manifest is briefly plugin-owned is not reachable by the plugin.
 pub async fn secure_plugin_folder(path: &Path, owner: Option<&str>) -> Result<()> {
-    if let Some(owner) = owner {
-        // -R: recursive, -h: do not follow symlinks (set ownership on the link itself)
-        let command = format!("chown -Rh {owner}:{owner} {}", path.display());
-        match ShellCommand::new(&command, Duration::from_secs(5))
-            .run()
-            .await
-        {
-            ShellCommandResult::Success { .. } => {}
-            ShellCommandResult::Error(stderr) => return Err(anyhow!("chown -Rh failed: {stderr}")),
-        }
+    let Some(owner) = owner else {
+        return Ok(());
+    };
+    // Harden the manifest even when the handover fails: a previous run may have left it
+    // plugin-owned, which is the exact state this guards against.
+    let handover = chown(path, owner, true).await;
+    secure_manifest(path).await?;
+    handover
+}
+
+/// Returns `manifest.toml` to root and drops any group or world write bit left on it.
+async fn secure_manifest(plugin_dir: &Path) -> Result<()> {
+    let manifest_path = plugin_dir.join(SERVICE_MANIFEST_FILE_NAME);
+    if cc_fs::exists(&manifest_path).not() {
+        return Ok(());
     }
-    Ok(())
+    cc_fs::set_permissions(
+        &manifest_path,
+        Permissions::from_mode(PLUGIN_MANIFEST_PERMISSIONS),
+    )
+    .await?;
+    chown(&manifest_path, ROOT_USER, false).await
 }
 
 pub async fn secure_config_file(path: &Path, owner: Option<&str>) -> Result<()> {
     cc_fs::set_permissions(path, Permissions::from_mode(PLUGIN_CONFIG_FILE_PERMISSIONS)).await?;
-    if let Some(owner) = owner {
-        let command = format!("chown {owner}:{owner} {}", path.display());
-        match ShellCommand::new(&command, Duration::from_secs(5))
-            .run()
-            .await
-        {
-            ShellCommandResult::Success { .. } => {}
-            ShellCommandResult::Error(stderr) => return Err(anyhow!("chown failed: {stderr}")),
-        }
+    let Some(owner) = owner else {
+        return Ok(());
+    };
+    chown(path, owner, false).await
+}
+
+/// Builds the `chown` argument vector. Extracted from the I/O so the argument boundaries can be
+/// asserted directly: the path must stay a single argument no matter what characters it holds.
+fn chown_args(path: &str, owner: &str, recursive: bool) -> Vec<String> {
+    assert!(
+        path.is_empty().not(),
+        "chown must never be run against an empty path"
+    );
+    assert!(
+        owner.is_empty().not(),
+        "chown must never be run without an owner"
+    );
+    let mut args = Vec::with_capacity(3);
+    if recursive {
+        // -R: recursive, -h: do not follow symlinks (set ownership on the link itself)
+        args.push("-Rh".to_string());
     }
-    Ok(())
+    args.push(format!("{owner}:{owner}"));
+    args.push(path.to_string());
+    assert_eq!(args.len(), if recursive { 3 } else { 2 });
+    assert_eq!(
+        args.last().map(String::as_str),
+        Some(path),
+        "The path must stay one trailing argument, whatever characters it holds"
+    );
+    args
+}
+
+/// Runs `chown` as a direct binary, never through a shell.
+///
+/// The target path is passed as its own argument, so a plugin directory name containing shell
+/// metacharacters cannot inject a command into this root-run process. The path comes from a
+/// directory scan rather than the validated manifest `id`, so it is not otherwise constrained.
+async fn chown(path: &Path, owner: &str, recursive: bool) -> Result<()> {
+    let path_arg = path
+        .to_str()
+        .ok_or_else(|| anyhow!("plugin path is not valid UTF-8: {}", path.display()))?;
+    let mut command = DirectCommand::new(CHOWN_BIN, CHOWN_TIMEOUT);
+    for arg in chown_args(path_arg, owner, recursive) {
+        command = command.arg(arg);
+    }
+    match command.run().await {
+        ShellCommandResult::Success { .. } => Ok(()),
+        ShellCommandResult::Error(stderr) => Err(anyhow!("chown failed for {path_arg}: {stderr}")),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repositories::service_plugin::service_manifest::ConnectionType;
+    use std::os::unix::fs::MetadataExt;
 
     fn is_root() -> bool {
         nix::unistd::geteuid().is_root()
+    }
+
+    /// Goal: a plugin disabled when the daemon started is skipped during registration, so
+    /// nothing writes its service definition. Enabling it later has to install one before
+    /// it can start, and the definition has to be the same one registration would have
+    /// written. Method: build it from a manifest and pin the fields that matter.
+    #[test]
+    fn service_definition_is_built_from_the_manifest() {
+        let manifest = ServiceManifest {
+            id: "test-plugin".to_string(),
+            service_type: ServiceType::Integration,
+            description: None,
+            version: None,
+            url: None,
+            executable: Some(PathBuf::from("/usr/bin/test-plugin")),
+            args: vec!["--verbose".to_string()],
+            envs: vec![("MY_VAR".to_string(), "value".to_string())],
+            address: ConnectionType::None,
+            privileged: true,
+            proxy: None,
+            path: PathBuf::from("/etc/coolercontrol/plugins/test-plugin"),
+        };
+
+        let definition =
+            ServicePluginRepo::service_definition(&"test-plugin".to_string(), &manifest)
+                .expect("a manifest with an executable yields a definition");
+
+        assert_eq!(definition.executable, PathBuf::from("/usr/bin/test-plugin"));
+        assert_eq!(definition.args, vec!["--verbose".to_string()]);
+        // Privileged plugins run as root, so no user is set for the supervisor.
+        assert!(definition.username.is_none());
+        let envs = definition.envs.expect("log level is always passed through");
+        assert!(envs.contains(&("MY_VAR".to_string(), "value".to_string())));
+    }
+
+    /// Goal: a manifest without an executable has nothing for an init system to manage, and
+    /// must not produce a definition that would be installed as an empty service.
+    /// Method: drop the executable and require nothing back.
+    #[test]
+    fn service_definition_is_absent_without_an_executable() {
+        let manifest = ServiceManifest {
+            id: "test-plugin".to_string(),
+            service_type: ServiceType::Integration,
+            description: None,
+            version: None,
+            url: None,
+            executable: None,
+            args: Vec::new(),
+            envs: Vec::new(),
+            address: ConnectionType::None,
+            privileged: false,
+            proxy: None,
+            path: PathBuf::from("/etc/coolercontrol/plugins/test-plugin"),
+        };
+
+        assert!(
+            ServicePluginRepo::service_definition(&"test-plugin".to_string(), &manifest).is_none()
+        );
+    }
+
+    /// Goal: an unprivileged plugin must be supervised as the dedicated plugin user rather
+    /// than root. Method: flip `privileged` and check the user that comes back.
+    #[test]
+    fn unprivileged_plugins_run_as_the_plugin_user() {
+        let manifest = ServiceManifest {
+            id: "test-plugin".to_string(),
+            service_type: ServiceType::Integration,
+            description: None,
+            version: None,
+            url: None,
+            executable: Some(PathBuf::from("/usr/bin/test-plugin")),
+            args: Vec::new(),
+            envs: Vec::new(),
+            address: ConnectionType::None,
+            privileged: false,
+            proxy: None,
+            path: PathBuf::from("/etc/coolercontrol/plugins/test-plugin"),
+        };
+
+        let definition =
+            ServicePluginRepo::service_definition(&"test-plugin".to_string(), &manifest)
+                .expect("a manifest with an executable yields a definition");
+
+        assert_eq!(definition.username.as_deref(), Some(CC_PLUGIN_USER));
+    }
+
+    /// Goal: a plugin directory name containing shell metacharacters must reach `chown` as one
+    /// argument, so it can never be split into a command.
+    /// Methodology: assert the argument vector directly. A shell would have split on `;` and the
+    /// spaces; a direct exec cannot.
+    #[test]
+    fn chown_args_keep_a_hostile_path_as_one_argument() {
+        let hostile = "/var/lib/coolercontrol/plugins/x; touch /tmp/pwned";
+
+        let args = chown_args(hostile, ROOT_USER, true);
+
+        assert_eq!(args, vec!["-Rh", "root:root", hostile]);
+        assert_eq!(args.len(), 3, "The path must not be split into extra args");
+    }
+
+    /// Goal: the recursive flag is only present when asked for, since securing a single file must
+    /// not descend into anything.
+    /// Methodology: build both forms and compare.
+    #[test]
+    fn chown_args_omit_the_recursive_flag_for_a_single_file() {
+        let args = chown_args("/tmp/manifest.toml", CC_PLUGIN_USER, false);
+
+        assert_eq!(
+            args,
+            vec!["cc-plugin-user:cc-plugin-user", "/tmp/manifest.toml"]
+        );
+    }
+
+    /// Goal: the manifest must not stay group- or world-writable, since it declares `privileged`
+    /// and therefore decides whether the plugin runs as root.
+    /// Methodology: leave a 0666 manifest behind, secure the folder, and re-read the mode. This
+    /// half of `secure_plugin_folder` does not need root, unlike the ownership reset.
+    #[test]
+    fn secure_plugin_folder_resets_manifest_permissions() {
+        crate::sidecar::ensure_test_handle();
+        crate::rt::test_runtime(async {
+            let dir = tempfile::tempdir().unwrap();
+            let manifest_path = dir.path().join(SERVICE_MANIFEST_FILE_NAME);
+            std::fs::write(&manifest_path, "id = \"test\"\n").unwrap();
+            std::fs::set_permissions(&manifest_path, Permissions::from_mode(0o666)).unwrap();
+
+            let _ = secure_plugin_folder(dir.path(), Some(ROOT_USER)).await;
+
+            let mode = std::fs::metadata(&manifest_path)
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(
+                mode & 0o777,
+                PLUGIN_MANIFEST_PERMISSIONS,
+                "Manifest must be reset to 644 so the plugin cannot rewrite it"
+            );
+        });
+    }
+
+    /// Goal: a folder with no manifest is still secured without erroring.
+    /// Methodology: secure an empty directory as root and assert success, so plugins that have
+    /// not yet been given a manifest do not fail initialization.
+    #[test]
+    fn secure_plugin_folder_without_manifest_succeeds() {
+        crate::sidecar::ensure_test_handle();
+        crate::rt::test_runtime(async {
+            if is_root().not() {
+                // Skip: the recursive chown fails for a non-root user.
+                return;
+            }
+            let dir = tempfile::tempdir().unwrap();
+
+            let result = secure_plugin_folder(dir.path(), Some(ROOT_USER)).await;
+
+            assert!(result.is_ok(), "Missing manifest must not be an error");
+        });
+    }
+
+    /// Goal: the manifest stays root-owned even though the rest of the folder is handed to the
+    /// unprivileged plugin user, which is what stops a plugin from setting `privileged = true`.
+    /// Methodology: root-only. Secure a folder as `cc-plugin-user` and compare the manifest's uid
+    /// against the directory's.
+    #[test]
+    fn secure_plugin_folder_keeps_manifest_owned_by_root() {
+        crate::sidecar::ensure_test_handle();
+        crate::rt::test_runtime(async {
+            if is_root().not() {
+                // Skip: chown to another user requires root.
+                return;
+            }
+            let dir = tempfile::tempdir().unwrap();
+            let manifest_path = dir.path().join(SERVICE_MANIFEST_FILE_NAME);
+            std::fs::write(&manifest_path, "id = \"test\"\n").unwrap();
+            let nested = dir.path().join("data.txt");
+            std::fs::write(&nested, "x").unwrap();
+
+            let result = secure_plugin_folder(dir.path(), Some(CC_PLUGIN_USER)).await;
+            if result.is_err() {
+                // Skip: the plugin user does not exist on this machine.
+                return;
+            }
+
+            let manifest_uid = std::fs::metadata(&manifest_path).unwrap().uid();
+            let nested_uid = std::fs::metadata(&nested).unwrap().uid();
+            assert_eq!(manifest_uid, 0, "Manifest must remain owned by root");
+            assert_ne!(
+                nested_uid, manifest_uid,
+                "The rest of the folder must be handed to the plugin user"
+            );
+        });
     }
 
     #[test]

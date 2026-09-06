@@ -1,83 +1,48 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 export default {
     common: {
         save: '저장',
+        mouseActions: '마우스 동작',
+        moreInfo: '자세한 정보',
         cancel: '취소',
-        confirm: '확인',
-        delete: '삭제',
-        edit: '편집',
         add: '추가',
-        remove: '제거',
         yes: '예',
         no: '아니오',
         ok: '확인',
         error: '오류',
         success: '성공',
-        warning: '주의',
         loading: '로딩 중...',
-        restarting: '재시작 중...',
-        noData: '사용 가능한 데이터 없음',
+        restarting: '다시 시작하는 중...',
         retry: '재시도',
         saveAndRefresh: '저장 및 새로 고침',
         reset: '재설정',
-        back: '뒤로',
         sslTls: 'SSL/TLS',
         protocol: '프로토콜',
         address: '주소',
         port: '포트',
         search: '검색',
-        selected: '선택됨',
-        clear: '지우기',
         finish: '끝내기',
         next: '다음',
         previous: '이전',
-        apply: '적용',
-        defaults: '기본',
         unmanaged: '관리 안 됨',
-        readOnly: '읽기 전용',
-        rename: '이름 바꾸기',
         password: '비밀번호',
         currentPassword: '현재 비밀번호',
         newPassword: '새 비밀번호',
         confirmPassword: '비밀번호 확인',
-        passwordPrompt: '비밀번호를 입력하세요',
-        passwordWeak: '약함',
-        passwordMedium: '보통',
-        passwordStrong: '강함',
         savePassword: '비밀번호 저장',
-        editName: '이름 편집',
         state: '상태',
         name: '이름',
         message: '메세지',
         timestamp: '타임스탬프',
-        overview: '개요',
-        login: '로그인',
-        logout: '로그아웃',
         temperature: '온도',
         duty: '점유',
         offset: '오프셋',
         stay: '유지',
         discard: '폐기',
-        blankNameResetDefault: '이름을 비워두면 시스템 기본값으로 재설정됩니다.',
         copy: '(복사)',
-        minuteAbbr: '최소',
+        minuteAbbr: '분',
         rpmAbbr: 'rpm',
         mhzAbbr: 'MHz',
         ghzAbbr: 'GHz',
@@ -105,6 +70,211 @@ export default {
         },
     },
     layout: {
+        shell: {
+            search: {
+                hint: '장치, 센서, 설정, 작업 검색',
+                recent: '최근',
+                jumpTo: '이동',
+                noResults: '일치하는 항목이 없습니다.',
+                more: '{count}개 더',
+                kindFan: '팬',
+                kindSensor: '센서',
+                kindAction: '작업',
+                kindPage: '페이지',
+            },
+            home: '홈',
+            cooling: '냉각',
+            monitoring: '모니터링',
+            devices: '장치',
+            settings: '설정',
+            plugins: '플러그인',
+            modes: '모드',
+            manageModes: '모드 관리',
+            access: '액세스',
+            power: '전원',
+            noModes: '저장된 모드 없음',
+            supportWizards: {
+                summary: '지원 마법사 활성화!',
+                detail: '사용자의 하드웨어와 드라이버가 동작하도록 도와주는 자원봉사자들에게 감사드립니다.',
+            },
+            coolingPanel: {
+                pinned: '고정됨',
+                pin: '고정',
+                unpin: '고정 해제',
+                library: '프로파일 및 기능',
+                profiles: '프로파일',
+                functions: '기능',
+                addFolder: '폴더 추가',
+                newFolder: '새 폴더',
+                deleteFolder: '폴더 삭제',
+            },
+            monitoringPanel: {
+                newDashboard: '새 대시보드',
+                createAlert: '이 센서에 대한 알림 생성',
+                failAlert: '실패 알림 생성 (0 rpm에서 발생)',
+                failAlertSuffix: '실패',
+            },
+            devicesPanel: {
+                disabled: '비활성화됨',
+            },
+            sensorDest: {
+                monitoring: '모니터링',
+                cooling: '냉각',
+                lighting: '조명',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: '장치 및 센서 관리',
+                hint: '장치와 센서를 활성화하거나 비활성화합니다. 사용하지 않는 항목은 비활성화하는 것을 추천합니다.',
+                pendingChanges: '변경 없음 | {count}개 변경 | {count}개 변경',
+                applyRestart: '적용 및 재시작',
+                disabledDevices: '비활성화된 장치',
+                openButton: '장치 및 센서 관리',
+            },
+            toast: {
+                copy: '복사',
+                dismissAll: '모두 닫기',
+            },
+            homePanel: {
+                overview: '개요',
+                logs: '로그',
+            },
+            homePage: {
+                viewLogs: '로그 보기',
+                logsAll: '전체',
+                logsWarnings: '주의+',
+                logsErrors: '오류',
+                logsNoMatches: '일치하는 로그 줄이 없습니다.',
+                getStartedGroup: '시작하기',
+                learnGroup: '학습',
+                resourcesGroup: '리소스',
+                modeAndAlerts: '모드 및 알림',
+                noActiveMode: '활성 모드 없음',
+                setUpCooling: '냉각 설정',
+            },
+            devicesPage: {
+                landingHint: '장치를 선택하여 세부 정보와 설정을 확인하세요.',
+                temps: '온도',
+                fans: '팬',
+                lighting: '조명',
+                lcd: 'LCD',
+                deviceDisabled: '이 장치는 비활성화되어 있습니다.',
+                enableDevice: '장치 활성화',
+                disableUnusedSensors: '사용하지 않는 센서 비활성화… (추천)',
+                sensors: '센서',
+            },
+            hardwareHelp: {
+                missingDevice: '여기에 없는 하드웨어를 기대하셨나요?',
+            },
+            coolingPage: {
+                landingHint: '팬 또는 펌프를 선택하여 냉각을 확인하고 조정하세요.',
+                noChannels: '팬 또는 펌프 채널이 감지되지 않았습니다.',
+                noneControllable: '감지된 팬 또는 펌프 채널 중 제어할 수 있는 것이 없습니다.',
+                noticeBlockedByEnvironment:
+                    '하드웨어 탐지를 실행할 수 없어 일부 팬 및 펌프 채널이 누락되었을 수 있습니다.',
+                fullChart: '전체 차트',
+                guidedSetup: '가이드 설정',
+                setupMenu: {
+                    autoCreateThisFan: '이 팬 자동 생성',
+                    createProfile: '새 프로필 생성',
+                    calibrateThisFan: '이 팬 보정',
+                    autoCreateAllFans: '모든 팬 자동 생성',
+                    calibrateAllFans: '모든 팬 보정',
+                },
+                manualAt: '수동 {duty}%',
+                manualDuty: '수동 점유',
+                modeProfile: '프로파일',
+                modeManual: '수동',
+                modeUnmanaged: '관리 안 됨',
+                unmanagedHint:
+                    '장치 또는 펌웨어가 이 채널을 제어합니다. CoolerControl은 속도 명령을 전송하지 않습니다.',
+                apply: '적용',
+                saveAndApply: '저장 및 적용',
+                unsavedChanges: '이 채널에 적용되지 않은 변경 사항이 있습니다.',
+                unsavedChangesHeader: '저장하지 않은 변경 사항',
+                selectProfile: '프로파일 선택',
+                sharedWith: '다른 {count}개와 공유됨',
+                sharedTooltip: '이 프로파일은 다른 채널도 구동합니다.',
+                notShared: '이 팬만',
+                notSharedTooltip: '이 프로필은 이 채널만 제어합니다.',
+                forkForFan: '이 팬용으로 분기',
+                forkQualifier: '{channel} 복사',
+                fork: {
+                    confirmHeader: '이 팬용으로 분기',
+                    confirmMessage:
+                        "프로필 '{profile}'을(를) 새 프로필 '{copy}'(으)로 복사하고 {channel}에 할당합니다.\n\n원본은 그대로 유지되므로 여기서의 변경은 {channel}에만 적용됩니다.",
+                    accept: '사본 만들기',
+                },
+                convert: {
+                    button: '보정용으로 변환',
+                    tooltip:
+                        '이 팬은 보정되어 있어 저장된 속도가 이제 실제 속도로 해석되며 기록할 때마다 다시 매핑됩니다. 변환하면 보정 전과 동일하게 동작합니다.',
+                    confirmHeader: '보정된 팬에 맞게 변환',
+                    confirmProfile:
+                        "프로필 '{profile}'을(를) 새 프로필 '{copy}'(으)로 복사하고 속도를 변환하여 {channel}에 할당합니다.\n\n이 팬을 보정하기 전에 설정한 속도만 변환하세요. 두 번 변환하면 팬이 잘못된 속도로 동작합니다. 원본은 그대로 유지됩니다.",
+                    confirmManual:
+                        '{channel}의 수동 듀티를 변환하여 팬이 보정 전과 같은 속도를 유지하도록 합니다.\n\n이 팬을 보정하기 전에 설정한 값만 변환하세요. 두 번 변환하면 팬이 잘못된 속도로 동작합니다.',
+                    nameQualifier: '보정됨',
+                    accept: '변환',
+                    successProfile: "변환된 속도로 '{profile}'을(를) {channel}에 할당했습니다.",
+                    successManual: '수동 듀티를 {duty}%로 변환했습니다.',
+                    error: '이 팬의 속도를 변환하지 못했습니다.',
+                    floorHeading: '일부 지점이 0%로 변환되었습니다',
+                    floorNotice:
+                        '보정 후 {channel}에 설정할 수 있는 가장 낮은 속도보다 {count}개 지점이 아래에 있어 0%로 변환되었습니다. 사용하기 전에 새 곡선을 확인하세요.',
+                    modesHeading: '모드가 여전히 원본을 사용 중입니다',
+                    modesReminder:
+                        '다음 모드가 여전히 {channel}에 원본 프로필을 할당합니다: {modes}. 변환된 사본을 사용하도록 업데이트하세요.',
+                },
+                notControllable:
+                    '이 채널은 속도를 보고하지만 CoolerControl에서 제어할 수 없습니다.',
+                verdictFirmwareOverride:
+                    'CoolerControl이 이 채널을 수동 제어로 설정했지만 펌웨어가 되돌렸습니다.',
+                verdictFamilyMayNeedOutOfTree:
+                    '이 채널에 쓰기 가능한 팬 제어를 찾지 못했습니다. 이 칩 계열에서는 다른 커널 드라이버가 제공하기도 합니다.',
+                verdictNotSupportedByDriver:
+                    '사용 중인 드라이버는 이 채널의 팬 제어를 제공하지 않습니다.',
+                verdictNoPwm:
+                    '로드된 드라이버는 이 채널의 속도만 제공하고 팬 제어는 제공하지 않습니다.',
+                verdictPwmReadOnly:
+                    '로드된 드라이버가 이 채널의 팬 제어를 제공하지만 읽기 전용으로 표시합니다.',
+                verdictIgnoresDuty:
+                    '이 채널은 듀티 변경을 받아들였지만 측정된 속도는 전혀 반응하지 않았습니다.',
+                verdictUnverifiable:
+                    '이 채널에는 사용할 수 있는 회전 속도계가 없어 듀티 변경에 대한 반응을 확인할 수 없습니다.',
+                verdictEvidenceLabel: '이 컴퓨터에서 측정한 결과:',
+                evidenceNoPwmFile: '팬 제어 없음',
+                evidencePwmNotWritable: '팬 제어가 읽기 전용',
+                evidenceHasTachometer: '속도 읽기 가능',
+                evidenceNoTachometer: '속도 읽기 없음',
+                verdictLearnMore: '어떻게 해결할 수 있나요?',
+                verdictFoundSomethingThatWorks: '동작하는 방법을 찾으셨나요? 알려 주세요',
+                activeMode: '활성',
+                previousMode: '이전',
+                activate: '활성화',
+                noModes:
+                    '아직 저장된 모드가 없습니다. 모드는 빠른 전환을 위해 모든 채널 설정을 스냅샷합니다.',
+                powerProfiles: {
+                    title: '시스템 전원 프로필',
+                    description: '시스템 전원 프로필이 변경되면 모드를 자동으로 활성화합니다.',
+                    activeProfile: '현재 프로필: {profile}',
+                    noMode: '모드 없음',
+                    saveFailed: '전원 프로필 매핑을 저장하지 못했습니다.',
+                    profileNames: {
+                        'power-saver': '절전',
+                        balanced: '균형',
+                        performance: '성능',
+                    },
+                },
+                miniCurveHint:
+                    '할당된 프로파일 곡선입니다. 점은 현재 소스 온도에서의 목표 듀티를 나타내며, 채널의 기능이 실제 듀티를 결정합니다.',
+                chain: {
+                    tempSource: '온도 소스',
+                    profile: '프로파일',
+                    function: '기능',
+                },
+            },
+        },
         topbar: {
             login: '로그인',
             logout: '로그아웃',
@@ -118,75 +288,39 @@ export default {
             shutdownError:
                 '종료 신호를 보내는 동안 알 수 없는 오류가 발생했습니다. 자세한 내용은 로그를 참조하세요.',
             quitDesktopApp: '데스크톱 앱 종료',
-            applicationInfo: '정보 및 도구',
             back: '뒤로',
             expandMenu: '확장 메뉴',
             collapseMenu: '메뉴 접기',
-            controls: '제어',
             alerts: '알림',
             settings: '설정',
             openInBrowser: '브라우저에서 열기',
-            modes: '모드',
             loginSuccessful: '로그인 성공',
         },
         settings: {
             title: '설정',
-            userInterface: '사용자 인터페이스',
-            device: '장치',
-            daemon: '데몬',
             devices: {
-                devicesAndSensors: '장치 및 센서',
-                detectionIssues: '감지에 문제가 있나요?',
-                hardwareSupportDoc: '하드웨어 지원 문서를 참조하세요.',
                 toggleRequiresRestart:
                     '장치 또는 센서를 켜고 끄려면 데몬과 UI를 재시작해야 합니다. 지금 재시작할까요?',
                 enableDevices: '장치 활성화',
-                selectTooltip:
-                    '비활성화하거나 활성화할 장치 및 센서를 선택하세요.\n사용하지 않는 장치와 센서는 비활성화하는 것을 강력히 추천합니다.',
                 unknownError:
                     '모든 장치에 변경 사항을 적용하는 중 알 수 없는 오류가 발생했습니다. 자세한 내용은 로그를 참조하세요.',
             },
-            plugin: '플러그인 (베타)',
             plugins: {
-                device: '장치 서비스 플러그인',
-                integration: '통합 플러그인',
                 privileged: '권한 있는 접속',
                 pluginUrl: '홈페이지',
                 restricted: '제한적 접속',
                 settingsSaved: '플러그인 설정이 성공적으로 저장되었음',
                 settingsNotSaved: '플러그인 설정을 저장하는 데 실패함',
             },
-            profiles: '프로파일',
-            alerts: '알림',
-            dashboards: '대시보드',
-            modes: '모드',
             appearance: '디자인',
+            general: '일반',
             language: '언어',
             selectLanguage: '언어 선택',
-            english: '영어',
-            chinese: '중국어 (간체)',
-            japanese: '일본어',
-            chineseTrad: '중국어 (번체)',
-            russian: '러시아어',
-            german: '독일어',
-            french: '프랑스어',
-            spanish: '스페인어',
-            arabic: '아라비아어',
-            portuguese: '포르투갈어',
-            hindi: '힌디어',
-            theme: '테마',
-            themeLight: '밝음',
-            themeDark: '어두움',
-            themeSystem: '시스템',
-            themeCustom: '커스텀',
-            themeHighContrastDark: '고대비 어두움',
-            themeHighContrastLight: '고대비 밝음',
-            lineThickness: '선 두께',
+            systemLanguage: '시스템',
             fullScreen: '전체 화면',
-            menuBarAlwaysVisible: '메뉴 표시줄 항상 보이기',
-            hideMenuCollapseIcon: '메뉴 접기 아이콘 숨기기',
+            railToCollapse: '탐색 바로 접기',
             eyeCandy: '시각 효과',
-            showOnboarding: '시작 시 온보딩 투어 표시',
+            interfaceFont: '인터페이스 글꼴',
             introduction: '소개',
             startTour: '투어 시작',
             timeFormat: '시간 형식',
@@ -194,23 +328,24 @@ export default {
             time12h: '12시간',
             frequencyPrecision: '주파수 정밀도',
             startupPage: '시작 페이지',
-            sidebarToCollapse: '사이드바 접기',
-            entitiesBelowSensors: '센서 아래 개체',
             dashboardLineSize: '대시보드 선 크기',
             themeStyle: '테마 스타일',
-            themeMode: {
-                system: '시스템',
-                dark: '어두움',
-                light: '밝음',
-                highContrastDark: '고대비 어두움',
-                highContrastLight: '고대비 밝음',
-                custom: '커스텀',
+            themeGroups: {
+                builtIn: '기본 제공',
+                installed: '설치됨',
+                custom: '사용자 지정',
             },
             desktop: '데스크톱',
             startInTray: '트레이에서 시작',
             closeToTray: '트레이에서 닫기',
             zoom: '확대/축소',
             desktopStartupDelay: '데스크톱 시작 지연',
+            groups: {
+                startup: '시작',
+                performance: '성능',
+                devices: '장치 및 감지',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: '시작 시 설정 적용',
             deviceDelayAtStartup: '장치 시작 시 지연',
             pollingRate: '폴링 레이트',
@@ -220,15 +355,21 @@ export default {
             hideDuplicateDevices: '중복 장치 숨기기',
             drivePowerState: '드라이버 전원 상태',
             sensorsAutoDetect: '센서 자동 감지',
+            sensorsConfig: 'lm-sensors 구성',
             deviceListener: '장치 변경 리스너',
             customTheme: {
                 title: '커스텀 테마',
                 accent: '강조색',
+                accentGradientTo: '강조 그라데이션 끝',
                 bgOne: '메인 배경색',
                 bgTwo: '보조 배경색',
                 border: '테두리 색',
                 text: '문자 색',
                 textSecondary: '보조 문자 색',
+                success: '성공',
+                warning: '경고',
+                error: '오류',
+                info: '정보',
                 export: '테마 내보내기',
                 import: '테마 가져오기',
                 copyCode: '코드 복사',
@@ -238,15 +379,14 @@ export default {
                 invalidThemeCode: '잘못된 테마 코드',
             },
             tooltips: {
-                introduction: '애플리케이션 소개 투어를 시작합니다.',
                 timeFormat: '시간 형식: 12시간 (AM/PM) 또는 24시간',
                 frequencyPrecision: '표시되는 주파수 값의 정밀도를 조정하세요.',
                 startupPage: '애플리케이션 로드 후 표시되는 페이지입니다.',
+                railToCollapse: '탐색 바의 빈 영역으로도 메뉴를 펼치거나 접을 수 있습니다.',
                 eyeCandy:
                     '회전하는 팬 아이콘과 같은 시각적 애니메이션을 활성화합니다.\n이 기능은 추가적인 GPU 리소스를 사용합니다.',
-                sidebarCollapse:
-                    '사이드바에 메뉴 접기 아이콘을 표시할지,\n또는 빈 사이드바 영역을 활용하여 메인 메뉴를 펼치거나 접을지 결정합니다.',
-                entitiesBelowSensors: '메인 메뉴에서 장치 센서 아래에 개체를 표시할지 여부.',
+                interfaceFont:
+                    'CoolerControl에 포함된 글꼴 또는 시스템에 설정된 글꼴을 사용합니다.',
                 fullScreen: '전체 화면 모드 전환',
                 lineThickness: '대시보드의 차트 선 굵기를 조정',
                 startInTray:
@@ -255,6 +395,8 @@ export default {
                 zoom: 'UI 확대/축소 수준을 수동으로 설정합니다.',
                 desktopStartupDelay:
                     '데스크톱 애플리케이션 시작 전에 (몇 초 정도의) 지연 시간을 추가합니다.\n로그인 시 데스크톱 애플리케이션이 자동으로 시작되거나 너무 빨리 시작될 때\n발생하는 문제를 해결하는 데 도움이 됨',
+                unlockRange: '권장 범위를 벗어난 값 허용',
+                lockRange: '권장 범위로 제한',
                 applySettingsOnStartup:
                     '데몬 시작 시 및 절전 모드에서 깨어날 때 설정을 자동으로 적용함',
                 deviceDelayAtStartup:
@@ -272,81 +414,42 @@ export default {
                     '특히 SSD와 HDD는 회전을 멈추고 저전력 상태로 전환할 수 있습니다.\n이 옵션을 활성화하고 드라이브가 이를 지원하는 경우, 드라이브가 회전을 멈췄을 때\n드라이브 온도를 0°C로 보고하므로 팬 프로파일을 그에 맞게 조정할 수 있습니다.',
                 sensorsAutoDetect:
                     '시작 시 Super-I/O 하드웨어 센서를 자동으로 감지하고\n커널 모듈을 로드합니다. (x86_64 전용)',
+                sensorsConfig:
+                    'lm-sensors 구성 파일(/etc/sensors3.conf 및 /etc/sensors.d)의\n센서 이름과 숨겨진 센서를 사용합니다.\nCoolerControl에서 설정한 이름이 항상 우선합니다.',
                 deviceListener:
                     '장치 추가/제거 이벤트(예: USB 핫플러그)를 감지하고\n하드웨어 변경이 감지되면 알림을 보냅니다.',
-                daemonAddress:
-                    '연결을 설정할 데몬의 IP 주소 또는 도메인 이름입니다.\nIPv4, IPv6, DNS로 확인 가능한 호스트 이름을 지원합니다.',
-                daemonPort: '데몬과의 연결을 설정하는 데 사용되는 포트입니다.',
-                sslTls: 'SSL/TLS를 사용하여 데몬에 연결할지 여부.\n프록시 설정이 필요합니다.',
-                triggersRestart: '자동 재시작 트리거',
-                triggersUIRestart: 'UI 자동 재시작 트리거',
                 triggersDaemonRestart: '자동 데몬 재시작 트리거',
-                resetToDefaults: '기본 설정으로 재설정',
-                saveAndReload: 'UI를 저장하고 다시 로드',
                 copyThemeCode:
                     '현재 커스텀 테마를 나타내는 짧은 코드를 복사합니다.\n채팅이나 포럼에서 공유하세요.',
                 pasteThemeCode: '공유받은 코드 (cct1:...) 로 커스텀 테마를 적용합니다.',
-                exportThemeFile: '현재 커스텀 테마를 JSON 파일로 저장합니다.',
-                importThemeFile: '디스크의 JSON 파일에서 커스텀 테마를 불러옵니다.',
             },
             applySettingAndRestart:
                 '이 설정을 변경하려면 데몬과 UI를 다시 시작해야 합니다. 지금 다시 시작할까요?',
             restartHeader: '설정 적용 후 다시 시작',
-            restartSuccess: '지금 다시 시작',
             success: '성공',
             successDetail: '작업이 성공적으로 완료되었음',
-            settingsAppliedSuccess: '설정이 성공적으로 적용되었음',
-            restartRequestSuccess: '재시작 요청이 성공적으로 전송되었',
-            colorPickerDialogTitle: '색상 선택',
-            colorPickerConfirm: '확인',
-            colorPickerCancel: '취소',
             languageChangeConfirm: '언어를 변경할까요?',
             languageChangeConfirmMessage:
                 '계속할까요? 인터페이스 요소가 제대로 표시되지 않으면 페이지를 수동으로 새로 고침하세요.',
             languageChangeSuccess: '언어가 성공적으로 변경되었습니다.',
             languageChangeError: '언어 변경에 실패했습니다. 다시 시도해 주세요.',
             themeChangeSuccess: '테마가 성공적으로 변경되었습니다.',
-            entitiesBelowSensorsEnabledMessage: '이제 개체가 센서 아래에 표시됩니다.',
-            entitiesBelowSensorsDisabledMessage: '개체가 더 이상 센서 아래에 표시되지 않습니다',
         },
         menu: {
-            system: '시스템',
             dashboards: '대시보드',
-            profiles: '프로파일',
-            functions: '기능',
             customSensors: '커스텀 센서',
-            modes: '모드',
             alerts: '알림',
             pinned: '고정됨',
             tooltips: {
-                delete: '삭제',
                 createMode: '현재 설정에서 모드 생성',
                 addProfile: '프로파일 추가',
-                editName: '이름 편집',
                 addAlert: '알림 추가',
-                deleteFunction: '기능 삭제',
                 addDashboard: '대시보드 추가',
-                deleteDashboard: '대시보드 삭제',
                 duplicate: '복제',
-                setAsHome: '홈으로 설정',
-                save: '저장',
-                deleteMode: '모드 삭제',
-                updateWithCurrentSettings: '현재 설정 업데이트',
                 rename: '이름 바꾸기',
-                createModeFromCurrentSettings: '현재 설정에서 생성 모드',
                 addCustomSensor: '커스텀 센서 추가',
                 addFunction: '기능 추가',
                 chooseColor: '색상 선택',
-                deviceSettings: '고급 장치 설정',
-                options: '더 많은 옵션',
-                seeDeviceHealth: '전체 개요는 정보 및 도구에서 장치 상태를 확인하세요',
-                moveTop: '위로 이동',
-                moveBottom: '아래로 이동',
-                disable: '비활성',
-                pin: '위에 고정',
-                unpin: '핀 해제',
-                profileApply: '팬들에 프로파일 적용',
-                tags: '태그 관리',
             },
         },
         plugins: {
@@ -368,7 +471,7 @@ export default {
             overview: '플러그인 개요',
             gettingStarted:
                 '플러그인은 추가 장치 지원, 통합 및 자동화로 CoolerControl을 확장합니다. 새로운 장치 센서 및 제어를 제공하고, 외부 서비스에 연결하거나, 사용자 지정 UI 페이지를 추가할 수 있습니다.',
-            docsLink: '플러그인 문서',
+            findPlugins: '플러그인 찾기 및 설치',
             restartNote:
                 '최근에 새 플러그인을 추가했는데 여기에 표시되지 않으면 CoolerControl 데몬을 재시작하세요.',
             containerNote:
@@ -379,7 +482,6 @@ export default {
             description: '설명',
             enable: '활성화',
             disable: '비활성화',
-            disabled: '비활성화됨',
             pluginDisabled: '플러그인이 비활성화되었습니다.',
             pluginEnabled: '플러그인이 활성화되었습니다.',
             pluginDisabledRestart: '플러그인이 비활성화되었습니다. 적용하려면 데몬을 재시작하세요.',
@@ -390,11 +492,8 @@ export default {
             commandCopied: '명령이 클립보드에 복사됨',
         },
         add: {
-            dashboard: '대시보드',
-            mode: '모드',
             profile: '프로파일',
             function: '기능',
-            alert: '알림',
             customSensor: '커스텀 센서',
         },
     },
@@ -407,59 +506,18 @@ export default {
             daemonDisconnectedDetail: '데몬에 연결할 수 없습니다. 데몬이 실행 중인지 확인하세요.',
             connectionRestored: '연결 복원됨',
             connectionRestoredMessage: '데몬 연결이 복원되었습니다.',
-            thinkpadFanControl: 'ThinkPad 팬 제어',
-            pollRate: '폴링 레이트',
-            applySettingAndRestart: '설정 적용 및 다시 시작',
-            changeSetting:
-                '이 설정을 변경하려면 데몬과 UI를 다시 시작해야 합니다. 지금 다시 시작할까요?',
-            status: {
-                ok: '확인',
-                hasWarnings: '주의 발생',
-                hasErrors: '오류 발생',
-            },
-        },
-        devices: {
-            detectionIssues: '감지 문제가 발생했나요? 다음을 참조하세요',
-            hardwareSupportDocs: '하드웨어 지원 문서',
-            selectDevices:
-                '비활성화 또는 활성화할 장치 및 센서를 선택하세요.\n사용하지 않는 장치와 센서는 비활성화하는 것을\n강력히 추천합니다.',
-            devicesAndSensors: '장치 및 센서',
-            apply: '적용',
-            applySettingsAndReload: '설정 적용 후 다시 로드',
-            triggersAutoRestart: '자동 데몬 다시 시작 트리거',
-            restartPrompt:
-                '장치 또는 센서를 켜고 끄려면 데몬과 UI를 다시 시작해야 합니다. 지금 정말로 다시 시작할까요?',
-            enableDevices: '장치 활성화',
+            reconnecting: '다시 연결하는 중...',
+            disconnectedFor: '연결 끊김 {time} 경과',
         },
         speed: {
-            automatic: '자동',
-            manual: '수동',
-            unsavedChanges: '저장되지 않은 변경 사항',
-            unsavedChangesMessage: '이 제어 채널에 저장되지 않은 변경 사항이 있습니다.',
-            manualDuty: '수동 점유',
-            profileToApply: '적용할 프로파일',
-            controlModeAutomaticTooltip: '이 채널에 팬 프로파일 적용',
-            controlModeManualTooltip: '고정 듀티 백분율을 수동으로 설정',
-            controlModeUnmanagedTooltip:
-                '이 채널의 관리를 중지하고 장치의 하드웨어 또는 드라이버에 맡깁니다',
-            driverNoSupportControl:
-                '읽기 전용 채널입니다. 현재 드라이버는 이 채널의 속도 설정을 지원하지 않습니다.',
-            amdOverdriveNotEnabled:
-                'AMD GPU 오버드라이브가 활성화되지 않았습니다. 이 장치의 고급 설정에서 활성화하세요 (재부팅 필요).',
-            controlOrView: '제어 또는 보기',
             applySetting: '설성 적용',
-            defaultProfileInfo:
-                '"관리 안 됨"을 선택하면 CoolerControl이 이 팬의 제어를 중지하고<br/>제어 권한을 장치 드라이버에 다시 넘깁니다.<br/><br/><b>경고:</b> 많은 드라이버에는 자동 팬 제어 기능이 <i>없습니다</i>.<br/>해당 장치에서는 팬이 마지막으로 설정된 속도로 유지됩니다.',
         },
         customSensors: {
             missingSourcesNotice:
                 '다음 온도 소스는 더 이상 존재하지 않으며 저장 시 제거됩니다: {sources}',
-            newSensor: '새 센서',
             sensorType: '센서 유형',
-            type: '유형',
             mixFunction: '혼합 기능',
             howCalculateValue: '센서값을 계산하는 방법',
-            tempFileLocation: '온도 파일 위치',
             tempFile: '온도 파일',
             filePathTooltip:
                 '이 센서에 사용할 온도 파일의 절대 경로를 입력하세요.\n해당 파일은 sysfs 데이터 형식 표준을 사용해야 합니다:\n섭씨 밀리도 단위의 고정 소수점 숫자입니다.\n예: 80°C의 경우 80000입니다.\n파일은 제출 시 검증됩니다.',
@@ -485,61 +543,40 @@ export default {
                     '최근 측정값을 선호하는 가중 평균입니다. 동일한 윈도우의 시간 평균보다 매끄럽지만 지속적인 변화를 완전히 따르려면 윈도우 길이의 약 3배가 걸립니다. 지터 없이 실제 추세를 추적해야 하는 팬에 적합합니다.',
             },
             tempWeights: '온도 가중치',
-            tempWeightsTooltip: '선택된 각 온도 소스의 개별 가중치입니다.',
             tempName: '온도 이름',
             weight: '가중치',
-            saveSensor: '센서 저장',
             saveCustomSensor: '커스텀 센서 저장',
             unsavedChanges: '이 커스텀 센서에 저장되지 않은 변경 사항이 있습니다.',
             unsavedChangesHeader: '저장되지 않은 변경 사항',
-            stay: '유지',
-            discard: '폐기',
             selectCustomSensorFile: '커스텀 센서 파일 선택',
             deleteCustomSensor: '커스텀 센서 파일 삭제',
             deleteCustomSensorConfirm: '다음 커스텀 센서를 삭제합니다: "{name}" 맞나요?',
         },
         dashboard: {
             timeRange: '시간 범위',
-            minutes: '분',
             chartType: '챠트 유형',
-            dataType: '데이터 유형',
             filterSensors: '필터 센서',
-            showControls: '제어 표시',
             mouseActions:
-                '대시보드 마우스 동작:\n- 확대/축소하려면 강조 표시합니다.\n- 스크롤하여 확대/축소합니다.\n- 확대/축소 시 마우스 오른쪽 버튼을 클릭하여 화면 이동합니다.\n- 두 번 클릭하면 초기화되고 업데이트가 재개됩니다.\n- Ctrl+클릭 또는 가운데 버튼 클릭으로 모든 센서를 툴팁에 표시합니다.',
+                '대시보드 마우스 동작:\n- 확대/축소하려면 강조 표시합니다.\n- Ctrl+스크롤하여 확대/축소합니다.\n- 확대/축소 시 마우스 오른쪽 버튼을 클릭하여 화면 이동합니다.\n- 두 번 클릭하면 초기화되고 업데이트가 재개됩니다.\n- Ctrl+클릭 또는 가운데 버튼 클릭으로 모든 센서를 툴팁에 표시합니다.',
             fullPage: '전체 페이지',
             filterTags: '태그 필터',
             filterByTag: '태그별 필터링',
             filterBySensor: '센서별 필터링',
-            search: '검색',
             filterTypes: '필터 유형',
             filterByDataType: '데이터 유형별 필터링',
-            selectChartType: '차트 유형 선택',
             exitFullPage: '전체 페이지 나가기',
-            controls: '제어',
-            sensorValues: '센서 값',
-            selected: '선택됨',
-            clear: '지우기',
             deleteDashboard: '대시보드 삭제',
             deleteDashboardConfirm: '다음 대시보드를 삭제할까요: "{name}" 맞나요?',
-            dashboardDeleted: '대시보드 삭제됨',
             setAsHome: '홈으로 설정',
             duplicateDashboard: '대시보드 복제',
+            openCooling: '냉각 제어 열기',
         },
         appInfo: {
-            gettingStartedAutoCreate:
-                '{wizard}을(를) 사용하면 모든 팬의 기본 프로필을 한 번에 설정할 수 있습니다.',
-            gettingStartedAutoCreateLink: '프로필 자동 생성',
-            calibrateFans:
-                '일관된 제어를 위해 {wizard}. 그러면 특정 %가 모든 팬에서 비슷한 속도를 의미하게 됩니다.',
-            calibrateFansLink: '팬을 보정하세요',
-            title: '정보 및 도구',
             noWarranty: '이 프로그램에는 어떠한 보증도 제공되지 않습니다.',
             changeStartupPage: '설정에서 시작 페이지 변경',
             daemonStatus: '데몬 상태',
             acknowledgeIssues: '문제 인지',
             status: '상태',
-            processStatus: '프로세스 상태',
             host: '호스트',
             uptime: '가동 시간',
             version: '버전',
@@ -550,35 +587,56 @@ export default {
             disconnected: '연결 해제됨',
             helpfulLinks: '유용한 링크',
             uiTour: 'UI 투어',
-            uiTourDesc: '애플리케이션의 가이드 투어',
             gettingStarted: '시작하기',
-            gettingStartedGraphProfile: '그래프 프로파일',
-            gettingStartedControlsPage: '제어 페이지',
-            gettingStartedStep1: '팬 프로파일에서 {profile}을 만들고 팬 곡선을 조정하세요.',
-            gettingStartedStep2:
-                '{controls}(또는 팬의 자체 페이지)에서 할당하세요. 프로파일은 자동 적용되지 않습니다.',
-            gettingStartedStep3: '동일한 프로파일을 여러 팬에 재사용할 수 있습니다.',
             helpSettingUp: '팬 제어 설정 도움말',
+            gettingStartedStep1: '냉각을 열고 제어할 팬을 선택하세요.',
+            gettingStartedStep2: '가이드 설정에서 새 프로파일을 선택해 팬 곡선을 조정하세요.',
+            gettingStartedStep3: '그 프로파일을 원하는 만큼 다른 팬에도 재사용하세요.',
+            gettingStartedAutoCreate:
+                '{wizard}을(를) 사용하면 모든 팬의 기본 프로필을 한 번에 설정할 수 있습니다.',
+            gettingStartedAutoCreateLink: '프로필 자동 생성',
+            calibrateFansLink: '팬을 보정하세요',
             hardwareSupport: '하드웨어 지원',
-            hardwareSupportDesc: '지원되는 장치 및 드라이버 설치',
-            gitRepository: '깃 저장소',
-            gitRepositoryDesc: '문제 또는 기능 요청 제출',
-            discord: '디스코드',
-            discordDesc: '디스코드 커뮤니티 참여',
             whatsNew: '새로운 소식',
-            whatsNewDesc: '최신 릴리스 노트 보기',
             logsAndDiagnostics: '로그 및 진단',
             downloadCurrentLog: '현재 로그 다운로드',
             deviceHealth: '장치 상태',
-            deviceHealthTooltip:
-                '누락된 온도 소스는 해당 커스텀 센서, 프로파일 또는 LCD 설정을<br>다시 편집하고 저장하여 교체할 수 있습니다.',
             deviceHealthOk: '모든 센서와 채널이 정상입니다.',
+            detection: '칩 감지',
+            detectionDescription:
+                '데몬이 시작될 때 Super-I/O 칩 탐지가 찾아낸 결과입니다. 모듈은 시작 시 로드되므로 이 실행이 드라이버가 연결되지 않은 칩을 설명합니다.',
+            detectionButton: '칩 감지',
+            detectionNotRun:
+                '탐지를 실행하지 않아 이 컴퓨터의 Super-I/O 칩에 대해 알려진 것이 없습니다.',
+            detectionSecureBoot: '보안 부팅',
+            detectionContainer: '컨테이너',
+            detectionDevPort: '/dev/port 사용 가능',
+            detectionChips: '감지된 칩',
+            detectionNoChips: 'Super-I/O 칩이 감지되지 않았습니다.',
+            detectionBlacklisted: '차단 목록 드라이버',
+            hardwareSupportOk: '감지된 모든 하드웨어가 지원되며 제어할 수 있습니다.',
+            hardwareReport: '하드웨어 보고서',
+            hardwareReportDescription:
+                'CoolerControl이 이 컴퓨터에서 인식한 내용의 요약으로, 지원 채널에 바로 붙여넣을 수 있습니다. 일련번호와 식별자는 제외됩니다.',
+            hardwareReportFull: '전체 hwmon 트리 포함',
+            hardwareReportEmpty: '보고서를 생성할 수 없습니다.',
+            hardwareReportButton: '하드웨어 보고서',
+            hardwareReportCopy: '복사',
+            hardwareReportCopied: '복사됨',
+            findingNoDriverBound: '칩이 감지되었지만 이를 처리하는 로드된 드라이버가 없습니다.',
+            findingBlacklisted: '이 드라이버는 차단 목록에 있어 로드되지 않았습니다.',
+            findingBlockedByEnvironment: '이 환경에서는 하드웨어 탐지를 실행할 수 없습니다.',
+            findingBlockedBySecureBoot: '보안 부팅이 켜져 있어 하드웨어 탐지를 실행할 수 없습니다.',
+            findingBlockedByContainer: '컨테이너 안에서는 하드웨어 탐지를 실행할 수 없습니다.',
+            findingBlockedByNoDevPort:
+                '/dev/port를 사용할 수 없어 하드웨어 탐지를 실행할 수 없습니다.',
+            findingDetectionUnsupported: '이 아키텍처에서는 하드웨어 탐지가 지원되지 않습니다.',
             failsafeActive: '페일세이프 값 사용 중',
             missingTempSource: '온도 소스 누락',
             staleTempSource: '온도 소스가 페일세이프 값 사용 중',
             stressTest: '열 스트레스 테스트',
             stressTestTooltip:
-                '지속적인 열 부하를 생성하여<br>팬 곡선과 냉각 프로파일을 검증합니다.<br>결과는 하드웨어에 따라 다를 수 있습니다.<br>추가 백엔드를 위해 stress-ng를 설치하세요.',
+                '지속적인 열 부하를 생성하여\n팬 곡선과 냉각 프로파일을 검증합니다.\n결과는 하드웨어에 따라 다를 수 있습니다.\n추가 백엔드를 위해 stress-ng를 설치하세요.',
             cpuStress: 'CPU 스트레스',
             gpuStress: 'GPU 스트레스',
             gpuStressTooltip:
@@ -592,44 +650,69 @@ export default {
             backendTooltip:
                 '스트레스 테스트 백엔드를 선택하세요.<br>내장 백엔드는 외부 종속성 없이 작동합니다.<br>stress-ng (설치된 경우) 추가 스트레스 변형을 제공합니다.',
             selectDrive: '드라이브 선택',
-            threadCount: '스레드',
-            duration: '지속 시간 (초)',
+            selectGpu: 'GPU 선택',
+            allGpus: '모든 GPU',
             start: '시작',
             stop: '중지',
             stopAll: '모두 중지',
             active: '활성',
             inactive: '비활성',
-            allCores: '모든 코어',
             psuWarningHeader: '높은 전력 경고',
             psuWarningMessage:
                 'CPU와 GPU 스트레스 테스트를 동시에 실행하면 PSU에 상당한 부하가 걸립니다. 오버클럭 중이거나 저전력 PSU를 사용하는 경우 시스템 불안정이 발생할 수 있습니다. 계속하시겠습니까?',
             proceed: '계속',
         },
         alerts: {
-            createAlert: '경고 생성',
-            editAlert: '경고 편집',
+            triggersOutside: '{min} 미만 또는 {max}{unit} 초과 시 발생',
+            triggersAbove: '{max}{unit} 초과 시 발생',
+            stateSince: '{time}부터 {state}',
             deleteAlert: '경고 삭제',
-            noAlerts: '구성된 경고 없음',
+            duplicateAlert: '경고 복제',
             alertsOverview: '경고 개요',
             alertLogs: '경고 로그',
             alertTriggered: '경고 발생함',
             alertRecovered: '경고 복구됨',
+            alertError: '경고 오류',
+            alertSensorsReadable: '경고 센서 읽기 복구됨',
             deleteAlertConfirm: '다음을 삭제할까요: "{name}" 맞나요?',
             saveAlert: '경고 저장',
-            channelSource: '경고 채널 소스',
-            channelSourceTooltip: '경고에 사용할 채널 소스',
+            channelSources: '경고 채널 소스',
+            channelSourcesTooltip:
+                '이 경고가 감시하는 채널 소스입니다.\n경고당 센서 유형은 하나입니다. 첫 선택이 나머지를 필터링합니다.',
             triggerConditions: '발생 조건',
             maxValueTooltip: '이 값보다 크면 경고가 발생합니다.',
             minValueTooltip: '이 값보다 작으면 경고가 발생합니다.',
             warmupDurationTooltip:
                 '경고가 활성화되기 전에 특정 조건이 얼마나 오랫동안 지속되어야 하는지를 나타냅니다.\n이 값은 정기적인 폴링 간격으로만 확인되므로\n정확히 이 시간과 일치하지 않을 수 있습니다.',
+            cooldownDurationTooltip:
+                '경고가 복구되기 전에 값이 범위 내로 돌아와 유지되어야 하는 시간입니다.\n발생과 복구가 빠르게 반복되는 것을 방지합니다.',
+            cooldownLessThan: '조건 복구가 더 오래 지속됨',
+            repeatInterval: '알림 반복 간격',
+            repeatIntervalTooltip:
+                '경고가 활성 상태인 동안 이 간격으로 데스크톱 알림을 다시 보냅니다.\n0은 반복 알림을 비활성화합니다.',
+            enabled: '활성화됨',
+            enabledTooltip: '비활성화된 경고는 전혀 평가되지 않습니다.',
+            sectionGeneral: '일반',
+            sectionNotifications: '알림',
+            sectionActions: '동작',
+            silence: '무음',
+            silenceTooltip:
+                '무음: 알림과 시스템 종료를 잠시 중지합니다.\n경고는 계속 평가되며 상태도 표시됩니다.',
+            silence15m: '15분 동안 무음',
+            silence1h: '1시간 동안 무음',
+            silence8h: '8시간 동안 무음',
+            silence24h: '24시간 동안 무음',
+            unsilence: '지금 무음 해제',
+            enableAlert: '경고 활성화',
+            disableAlert: '경고 비활성화',
+            silencedUntil: '{time}까지 무음',
+            disabledLabel: '비활성화됨',
             greaterThan: '보다 큰',
             lessThan: '보다 작은',
             newAlert: '새 경고',
             warmupGreaterThan: '조건이 더 오래 지속됨',
             unsavedChanges: '이 경고에 저장되지 않은 변경 사항이 있습니다.',
             unsavedChangesHeader: '저장되지 않은 변경 사항',
-            createFailAlert: '경고 실패',
             desktopNotify: '데스크톱 알림',
             desktopNotifyTooltip: '경고가 발생될 때 데스크톱 알림을 활성화합니다.\n(지원되는 경우)',
             desktopNotifyRecovery: '복구 시 데스크톱 알림',
@@ -643,14 +726,14 @@ export default {
                 '경고가 발생하면 시스템을 종료합니다.\n시스템 종료는 경고 발생 후 1분 후에 시작되며,\n경고가 복구되면 취소됩니다.',
         },
         profiles: {
+            targetDuty: '목표',
+            actualDuty: '실제',
+            targetHint:
+                '목표는 채널의 기능이 적용되기 전, 현재 온도로부터 계산된 값입니다. 스무딩과 히스테리시스로 인해 실제 듀티는 다를 수 있습니다.',
             createProfile: '프로파일 생성',
-            editProfile: '프로파일 편집',
             deleteProfile: '프로파일 삭제',
-            noProfiles: '구성된 프로파일이 없음',
             profileType: '프로파일 유형',
             fixedDuty: '고정 팬 속도',
-            selectedPointDuty: '선택된 지점 점유',
-            selectedPointTemp: '선택된 지정 온도',
             tempSource: '온도 소스',
             memberProfiles: '멤버 프로파일',
             mixFunction: '혼합 기능',
@@ -660,10 +743,9 @@ export default {
             function: '기능',
             functionToApply: '적용할 기능',
             graphProfileMouseActions:
-                '그래프 프로파일 마우스 동작:\n- 스크롤하여 확대/축소합니다.\n- 선을 왼쪽 클릭하여 포인트를 추가합니다.\n- 해당 포인트를 마우스 오른쪽 클릭하여 제거합니다.\n- 포인트를 드래그하여 이동합니다.',
+                '그래프 프로파일 마우스 동작:\n- Ctrl+스크롤하여 확대/축소합니다.\n- 선을 왼쪽 클릭하여 포인트를 추가합니다.\n- 해당 포인트를 마우스 오른쪽 클릭하여 제거합니다.\n- 포인트를 드래그하여 이동합니다.',
             unsavedChanges: '이 프로파일에 저장되지 않은 변경 사항이 있습니다.',
             unsavedChangesHeader: '저장되지 않은 변경 사항',
-            appliedFunction: '적용된 기능',
             newProfile: '새 프로파일',
             tooltip: {
                 profileType:
@@ -671,6 +753,7 @@ export default {
             },
             profileDeleted: '프로파일 삭제됨',
             profileDuplicated: '프로파일 중복됨',
+            usedBy: '사용처',
             deleteProfileConfirm: '다음을 삭제할까요: "{name}" 맞나요?',
             deleteProfileWithChannelsConfirm:
                 '"{name}"은/는 현재 다음에서 사용 중입니다: {channels}.\n이 프로파일을 삭제하면 해당 채널들의 설정이 초기화됩니다.\n"{name}" 프로파일을 삭제할까요?',
@@ -686,8 +769,6 @@ export default {
             offsetTypeGraph: '그래프 오프셋',
             baseProfile: '기본 프로파일',
             baseProfileRequired: '오버레이 프로파일을 사용하려면 기본 프로파일이 필요합니다.',
-            selectedPointOutputDuty: '선택된 지점 프로파일 출력 점유',
-            selectedPointOffset: '선택된 지점 오프셋 점유',
             profileOutputDuty: '프로파일 출력 점유',
             offsetDuty: '오프셋 점유',
             points: '포인트',
@@ -698,43 +779,19 @@ export default {
             curveLimitedByAmdGpu: 'AMD GPU 하드웨어 팬 커브에 의해 커브가 {n}개 점으로 제한됩니다.',
             curveLimitedByFirmware: '장치 펌웨어 팬 커브에 의해 커브가 {n}개 점으로 제한됩니다.',
         },
-        controls: {
-            viewType: '보기 유형',
-            controlOrView: '제어 또는 보기',
-            title: '시스템 제어',
-            noControllableChannels: '제어 가능한 채널을 찾을 수 없습니다.',
-            noControlChain: '이 채널에 대한 제어 체인을 찾을 수 없습니다.',
-            controlFlow: '제어 흐름',
-            backToOverview: '제어 개요로 돌아가기',
-            switchProfile: '프로필 전환',
-            switchTempSource: '온도 소스 전환',
-            switchFunction: '함수 전환',
-            switchMembers: '멤버 프로필 전환',
-            switchBaseProfile: '기본 프로필 전환',
-            adjustFixedSpeed: '고정 속도 조정',
-            editSources: '소스 편집',
-        },
         modes: {
             createMode: '모드 생성',
             editMode: '모드 편집',
+            updateToCurrent: '현재 설정을 모드에 저장',
             deleteMode: '모드 삭제',
-            noModes: '구성된 모드 없음',
             deleteModeConfirm: '다음 모드를 삭제할까요: "{name}" 맞나요?',
             updateModeConfirm: '"{name}"을/를 현재 설정으로 덮어쓸까요?',
             duplicateMode: '중복 모드',
         },
         functions: {
             createFunction: '기능 생성',
-            editFunction: '기능 편집',
             deleteFunction: '기능 삭제',
-            noFunctions: '구성된 기능 없음',
             saveFunction: '기능 저장',
-            functionType: '기능 유형',
-            functionTypeTooltip:
-                '기능 유형:<br/>' +
-                '- <b>항등</b>: 단계 크기 제한을 적용하지만 그 외에는 프로파일 값을 변경하지 않고 그대로 전달합니다.<br/>' +
-                '- <b>기본</b>: 팬 응답 타이밍 및 안정성을 정밀하게 제어하기 위해 단계 크기 제한 및 이력 설정을 적용합니다.<br/>' +
-                '- <b지수 이동 평균</b>: 가중 평균을 사용하여 온도 변동을 완화합니다. 표준보다 간단하지만 정밀도는 떨어집니다.',
             stepSizeTitle: '단계 크기',
             fixedStepSize: '고정',
             fixedStepSizeTooltip:
@@ -769,13 +826,6 @@ export default {
             stepSizeMaxDecreasing: '최대 감소',
             stepSizeMaxDecreasingTooltip:
                 '팬 속도가 감소할 때의 최대 단계 크기입니다.\n업데이트당 팬 속도가 느려지는 속도를 제한합니다.',
-            windowSize: '창 크기',
-            windowSizeTooltip:
-                '지수 이동 평균 계산에 사용되는 창 온도 샘플 크기입니다.\n값이 작을수록 = 반응 속도가 빠르고 온도 급변에 더 민감하게 반응합니다.\n값이 클수록 = 반응 속도는 느리지만 팬 속도 전환이 더 부드러워집니다.\n팁: 응답 시간을 정밀하게 제어하려면 표준 함수를 사용하세요.',
-            emaCustomSensorAvailableNote:
-                'EMA는 사용자 지정 센서 유형으로도 사용할 수 있어 스무딩된 온도를 직접 그래프로 표시할 수 있습니다.',
-            emaDeprecatedWarning:
-                '함수 유형 EMA는 더 이상 사용되지 않습니다. EMA 사용자 지정 센서 유형으로 전환하세요.',
             hysteresis: '고급 이력 현상',
             hysteresisThreshold: '임계값',
             hysteresisThresholdTooltip:
@@ -785,11 +835,10 @@ export default {
                 '팬 속도 변경을 적용하기 전 응답 지연 시간(초)입니다.\n이 지연 시간 내의 일시적인 온도 급변은 무시되어 변동이 완화됩니다.',
             onlyDownward: '하향할 때만',
             onlyDownwardTooltip: '온도가 감소할 때만 이력 현상 설정을 적용합니다.',
-            general: '일반',
+            stepOverrides: '단계 재정의',
             thresholdHopping: '임계값 도약',
             thresholdHoppingTooltip:
                 '팬 속도가 30초 이상 변하지 않으면 최소 단계 크기 및 이력 현상 제한이 일시적으로 무시됩니다.\n이렇게 하면 보수적인 임계값 설정에서도 팬이 결국 목표 속도에 도달합니다. 최대 단계 크기는 항상 유지됩니다.',
-            stepOverrides: '단계 재정의',
             bypassMinAtExtremes: '항상 0% / 100% 적용',
             bypassMinAtExtremesTooltip:
                 '활성화되면 변경이 최소 단계 크기보다 작더라도 0% 또는 100%의 목표 듀티가 적용됩니다.\n팬이 완전히 멈추거나 최대 RPM에 도달하도록 보장하는 데 유용합니다. 기본적으로 비활성화됩니다.',
@@ -799,25 +848,15 @@ export default {
             newFunction: '새 기능',
             functionDeleted: '기능 삭제됨',
             functionDuplicated: '기능 중복됨',
+            usedBy: '사용처',
             deleteFunctionConfirm: '"{name}"을/를 삭제할까요?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}"은/는 현재 다음 프로파일에서 사용 중입니다: {profiles}.\n이 기능을 삭제하면 해당 프로파일 기능이 초기화됩니다.\n"{name}"을/를 삭제할까요?',
-            functionUpdated: '기능 업데이트됨',
-            functionUpdateError: '이 기능을 업데이트하는 동안 오류 발생',
         },
         error: {
             accessDenied: '접근 거부',
             accessDeniedMessage: '인증에 실패했습니다. 비밀번호를 확인하고 다시 시도해 주세요.',
             connectionError: 'CoolerControl 연결 오류',
-            connectionToast: '데몬에 연결할 수 없음',
-            connectionToastDetail:
-                '데몬에 연결할 수 없습니다. 서비스가 실행 중인지 확인하고 다시 연결해 보세요.',
-            connectionRetryFailure: '연결 실패 - 재시도 실패',
-            connectionRetryDetail: '여러 번 시도했지만 데몬에 연결할 수 없습니다.',
-            errorLoadingGraph: '그래프를 불러오는 중 오류 발생',
-            highCpuUsageWarning: 'CPU 사용량이 높게 감지됨',
-            highCpuUsageDetail:
-                '현재 CPU 사용량이 높습니다.\n시스템 영향을 줄이려면 다음을 고려하세요:\n1. 표시되는 차트 수 감소\n2. 모니터링 대상 센서 수 감소\n3. 폴링 간격 늘리기',
             pageNotFound: '페이지를 찾을 수 없음',
             returnToDashboard: '대시보드로 돌아가기',
             connectionErrorMessage: 'CoolerControl 데몬에 연결할 수 없습니다.',
@@ -833,13 +872,6 @@ export default {
             sslTooltip: 'SSL/TLS를 사용하여 데몬에 연결할지 여부입니다.',
             saveTooltip: '설정을 저장하고 UI를 다시 로드',
             resetTooltip: '기본 설정으로 재설정',
-        },
-        singleDashboard: {
-            minutes: '분',
-            chartMouseActions:
-                '대시보드 마우스 동작:\n- 확대/축소하려면 강조 표시합니다.\n- 스크롤하여 확대/축소합니다.\n- 확대/축소 시 마우스 오른쪽 버튼을 클릭하여 화면 이동합니다.\n- 두 번 클릭하면 초기화되고 업데이트가 다시 시작됩니다.',
-            timeRange: '시간 범위',
-            chartType: '차트 유형',
         },
         mode: {
             activateMode: '활성화 모드',
@@ -882,44 +914,20 @@ export default {
             unsavedChangesHeader: '저장되지 않은 변경 사항',
             imageTooLarge: '이미지가 너무 큽니다. 더 작은 이미지를 선택해 주세요.',
             notImageType: '이미지가 이미지 유형으로 등록되지 않았음',
+            gifNotSupported:
+                '이 화면의 펌웨어는 GIF를 표시할 수 없습니다. 정지 이미지를 선택하세요.',
         },
         shortcuts: {
+            browserHint:
+                '웹 브라우저에서는 대신 Ctrl+Alt+숫자를 사용하세요 (브라우저는 탭 전환에 Ctrl+숫자를 사용합니다).',
             shortcuts: '키보드 단축키',
             ctrl: 'Ctrl',
-            alt: 'Alt',
-            left: '왼쪽',
-            right: '오른쪽',
             comma: ',',
-            h: 'h',
-            a: 'a',
-            c: 'c',
-            i: 'i',
-            slash: '/',
-            one: '1',
-            two: '2',
-            three: '3',
-            four: '4',
-            f11: 'F11',
             viewShortcuts: '키보드 단축키',
-            home: '홈페이지',
             settings: '설정',
-            info: '애플리케이션 정보',
-            dashboardOne: '대시보드 1',
-            dashboardTwo: '대시보드 2',
-            dashboardThree: '대시보드 3',
-            dashboardFour: '대시보드 4',
-            alerts: '경고',
-            controls: '제어',
-            sideMenuCollapse: '사이드 메뉴 접기',
-            sideMenuExpand: '확장 사이드 메뉴',
-            fullScreen: '전체 화면',
         },
     },
     components: {
-        confirmation: {
-            title: '확인',
-            message: '확실한가요?',
-        },
         aseTek690: {
             sameDeviceID:
                 '기존 NZXT Kraken과 EVGA CLC는 장치 ID가 동일하여 CoolerControl이 어떤 장치가 연결되어 있는지 확인할 수 없습니다. 이는 장치 간 원활한 통신을 위해 필수적입니다.',
@@ -931,9 +939,6 @@ export default {
             rejectLabel: '아니요, EVGA CLC 장치입니다',
         },
         password: {
-            title: '비밀번호 입력',
-            newPasswordTitle: '새 비밀번호 입력',
-            invalidPassword: '잘못된 비밀번호',
             forgotPassword: '비밀번호를 잊으셨나요?',
             forgotPasswordHelpIntro:
                 '터미널에서 root 권한으로 이 명령어를 실행한 후 UI 다시 로드를 클릭하세요:',
@@ -946,49 +951,6 @@ export default {
         },
         notFound: {
             message: '완벽한 리눅스 🐧 배포판처럼,\n이 페이지는 존재하지 않습니다.',
-        },
-        helloWorld: {
-            message:
-                'Vite + Vue 3를 사용하여 프로젝트를 성공적으로 생성하였습니다. 다음 단계는 무엇인가요?',
-        },
-        dashboardInfo: {
-            description:
-                '대시보드를 사용하면 원하는 방식으로 시스템 센서 데이터를 확인할 수 있습니다. 시간 기반 차트 또는 표 기반 차트 중에서 선택할 수 있으며, 각 차트의 필터와 설정을 조정하여 보고 싶은 특정 데이터에 집중할 수 있습니다. 또한 필요에 따라 여러 개의 커스텀 대시보드를 생성할 수 있습니다.',
-        },
-        modeInfo: {
-            description:
-                "모드 기능을 사용하면 장치의 채널 설정을 저장하여 빠르고 쉽게 적용할 수 있습니다. 예를 들어 '게임' 모드와 '무음' 모드를 만들어 간편하게 전환할 수 있습니다.",
-            note: '모드에는 채널 구성만 포함되며 내부 프로파일 또는 기능 설정은 포함되지 않으므로 각 모드마다 별도의 팬 프로파일을 생성해야 할 수 있다는 점에 유의하세요.',
-        },
-        alertInfo: {
-            description:
-                '알림은 특정 조건이 발생했을 때 사용자에게 알려주는 데 사용됩니다. 온도와 팬 속도를 모니터링하여 시스템이 정상적으로 작동하는지 확인할 수 있습니다. 알림은 특정 센서 값 범위에 맞춰 설정되며, 값이 허용 가능한 임계값 범위를 초과하거나 다시 돌아올 때 알림을 보냅니다.',
-        },
-        customSensorInfo: {
-            title: '맞춤형 센서 개요',
-            description:
-                '커스텀 센서를 사용하면 기존 센서를 다양한 방식으로 조합하여 시스템 냉각에 대한 제어 및 효율성을 향상시킬 수 있습니다. 또한 파일 기반 데이터를 지원하므로 외부 센서 입력을 스크립트로 제어하여 유연성을 높일 수 있습니다.',
-            note: '참고: 혼합 프로파일을 사용하여 여러 커스텀 센서 출력을 결합할 수 있습니다.',
-        },
-        functionInfo: {
-            title: '기능 개요',
-            description:
-                '기능은 프로파일 출력에 적용되는 구성 가능한 알고리즘입니다. 이를 통해 팬 속도 변경 시점을 관리하고, 이력 현상 설정을 조정하고, 동적 온도에 이동 평균을 사용할 수 있습니다.',
-            identityFunction:
-                '항등 기능은 계산된 프로파일 출력값을 수정하지 않고 최소 및 최대 속도 변화 범위만 설정할 수 있으므로 가장 간단한 옵션입니다. 이는 특히 팬 속도의 지속적인 변동을 최소화하는 데 유용합니다.',
-        },
-        profileInfo: {
-            title: '프로파일 개요',
-            description:
-                '프로파일은 팬 속도 제어를 위한 커스텀 설정을 정의하며, 동일한 프로파일을 여러 팬에 사용할 수 있습니다. 프로파일 유형은 다음과 같습니다:',
-            type: {
-                fixed: '고정 속도',
-                fanCurve: '팬 곡선/그래프',
-                mix: '최소 프로파일',
-                default: '기본 장치 설정',
-            },
-            additionalInfo:
-                '프로파일은 팬 속도 제어의 기본이며, 더욱 고급 알고리즘 기능을 적용하여 성능을 향상시킬 수 있습니다.',
         },
         deviceInfo: {
             details: '장치 세부 정보',
@@ -1003,63 +965,41 @@ export default {
             locations: '위치',
         },
         onboarding: {
+            search: '검색',
+            searchDesc:
+                '여기에서 모든 장치, 센서, 설정, 작업을 찾을 수 있습니다. 앱 어디에서나 Ctrl+K를 누르세요.',
             welcome: 'CoolerControl에 오신 것을 환영합니다!',
             gettingStartedIntro:
-                '투어를 선택하여 둘러보세요. 빠른 투어는 몇 단계로 기본 사항을 다룹니다. 전체 투어는 모든 메뉴와 버튼을 안내합니다.',
-            startTourAgain: '정보 및 도구 페이지에서 언제든지 이 투어를 다시 시작할 수 있습니다.',
-            quickTour: '빠른 투어',
-            thoroughTour: '전체 투어',
+                '간단한 둘러보기로 앱을 익혀 보세요. 내비게이션 바와 앱의 주요 영역을 안내합니다.',
+            startTourAgain: '이 둘러보기는 설정에서 언제든지 다시 시작할 수 있습니다.',
+            startTour: '투어 시작',
             maybeLater: '나중에',
             openGettingStarted: '시작하기 문서 열기',
-            finishLater: '직접 해보기',
-            appInfo: '정보 및 도구',
-            appInfoDesc:
-                '앱 정보, 데몬 상태, 로그, 유용한 링크 및 스트레스 테스트 도구를 확인하세요. 로고에 표시되는 배지가 문제를 알려줍니다.',
-            controls: '제어',
-            controlsDesc:
-                '한 곳에서 팬 속도를 조절하고, 프로파일을 적용하고, 감지된 모든 채널을 관리할 수 있습니다.',
-            profiles: '프로파일',
-            profilesDesc:
-                '프로파일은 팬이 온도 변화에 어떻게 반응하는지 정의합니다. 그래프 프로파일을 사용하면 사용자 정의 팬 곡선을 그릴 수 있으며 여러 장치에서 재사용할 수 있습니다.',
-            functions: '기능',
-            functionsDesc:
-                '프로파일에 기능을 적용하여 팬 속도 전환을 부드럽게 하고 소음을 줄입니다.',
-            systemMenu: '시스템 메뉴',
-            systemMenuDesc:
-                '주 메뉴에는 이 시스템의 장치와 센서가 나열됩니다. 각 섹션을 확장하여 채널과 할당된 제어를 볼 수 있습니다.',
-            dashboards: '대시보드',
-            dashboardsDesc:
-                '대시보드를 사용하면 차트와 그래프를 포함한 커스텀 보기를 만들어 온도, 팬 속도, 기타 센서 데이터를 실시간으로 모니터링할 수 있습니다.',
-            modes: '모드',
-            modesDesc:
-                '모드는 저장된 설정 모음입니다. 한 번의 클릭으로 무음 및 성능과 같은 구성 사이를 전환할 수 있습니다.',
-            alerts: '알림',
-            alertsDesc:
-                '알림은 센서 값이 선택한 임계값을 초과할 때 알려주므로 문제가 커지기 전에 대응할 수 있습니다.',
-            customSensors: '사용자 정의 센서',
-            customSensorsDesc:
-                '사용자 정의 센서는 기존 센서 데이터를 다양한 방식으로 결합하거나, 자체 스크립트 출력을 온도 소스로 실행합니다.',
-            quickAdd: '빠른 추가',
-            quickAddDesc: '대시보드, 프로파일, 기능 등을 빠르게 생성하세요.',
-            dashboardQuick: '대시보드 빠른 메뉴',
-            dashboardQuickDesc:
-                '메인 메뉴가 접혀 있는 경우에도 모든 대시보드로 바로 이동할 수 있습니다.',
-            modesQuick: '모드 빠른 메뉴',
-            modesQuickDesc: '앱 어디에서나 저장된 모드 사이를 전환할 수 있습니다.',
-            alertsQuick: '알림 개요',
-            alertsQuickDesc: '모든 알림의 현재 상태를 확인하고 최근 활동을 점검하세요.',
-            pluginsQuick: '플러그인 개요',
-            pluginsQuickDesc:
-                '설치된 플러그인을 둘러보고 앱 어디에서나 원하는 플러그인으로 이동하세요.',
+            finishLater: '알겠습니다, 감사합니다',
+            home: '홈',
+            homeDesc:
+                '애플리케이션 홈 페이지: 데몬 상태와 장치 상태를 한눈에 보고, 로그, 앱 정보, 유용한 링크, 스트레스 테스트 도구도 이용할 수 있습니다.',
+            cooling: '냉각',
+            coolingDesc:
+                '팬 제어 허브: 팬 속도와 펌프를 조정하고 모든 채널에 프로파일과 기능을 적용합니다.',
+            monitoring: '모니터링',
+            monitoringDesc:
+                '대시보드를 만들고, 모든 센서를 관찰하고, 알림을 설정하여 시스템을 실시간으로 추적하세요.',
+            devices: '장치',
+            devicesDesc:
+                '감지된 하드웨어를 검토하고, RGB 조명이나 LCD 화면 같은 장치별 기능을 구성하고, 커스텀 센서를 만드세요.',
+            plugins: '플러그인',
+            pluginsDesc: 'CoolerControl을 확장하는 설치된 플러그인을 둘러보고 열어보세요.',
             settings: '설정',
             settingsDesc: 'UI 기본 설정, 데몬 옵션 및 시스템 동작을 구성합니다.',
             access: '액세스',
-            accessDesc: '비밀번호를 관리하고 현재 액세스 수준을 확인하세요.',
+            accessDesc:
+                '로그인과 로그아웃, 비밀번호 변경은 물론 도구와 플러그인에 API 접근을 부여하는 액세스 토큰을 관리합니다.',
             restartMenu: '메뉴 재시작',
             restartMenuDesc: '필요할 때 UI를 다시 로드하거나 시스템 데몬을 다시 시작하세요.',
-            collapseMenu: '메뉴 접기',
-            collapseMenuDesc:
-                '주 메뉴를 확장하거나 접어 앱의 나머지 부분에 더 많은 공간을 제공합니다.',
+            modes: '모드',
+            modesDesc:
+                '모드는 저장된 설정 모음입니다. 무음이나 성능 같은 구성을 여기에서 전환하거나 관리할 수 있습니다.',
             thatsIt: '그게 다입니다!',
             startNow:
                 '준비가 끝났습니다. 자세히 알아보려면 시작하기 문서를 열거나, 바로 장치 구성을 시작하세요.',
@@ -1078,8 +1018,6 @@ export default {
             device: '장치',
             channel: '채널',
             current: '현재',
-            min: '최소',
-            max: '최대',
             range: '범위',
             average: '평균',
             resetStats: '초기화',
@@ -1091,7 +1029,6 @@ export default {
         menuTagAssign: {
             title: '태그 할당',
             noTags: '아직 태그가 없습니다.',
-            newTag: '새 태그 만들기',
             tagName: '태그 이름',
             editTag: '태그 편집',
             deleteTag: '태그 삭제',
@@ -1099,12 +1036,17 @@ export default {
         wizards: {
             calibration: {
                 title: '팬 보정',
-                tooltip: '일관된 속도 제어를 위해 여러 팬을 보정합니다',
                 pickIntro:
-                    '보정할 팬을 선택하세요. 이미 보정된 팬은 기본적으로 선택 해제되어 있습니다.',
+                    '보정할 팬을 선택하세요. 이미 보정된 팬과 펌웨어 제어 팬은 기본적으로 선택 해제되어 있습니다.',
                 noFans: '제어 가능한 팬이 감지되지 않았습니다.',
                 selectAll: '모두 선택',
                 calibratedBadge: '보정됨',
+                firmwareControlledBadge: '펌웨어 제어',
+                firmwareControlledDesc:
+                    '이 채널의 프로파일은 펌웨어가 실행합니다. 보정은 계속 적용되며, 듀티 변환이 펌웨어에 전달되는 곡선에 반영됩니다. 다만 시동 부스트는 펌웨어 곡선으로 표현할 수 없어 적용되지 않습니다.',
+                blockedByAlert: "차단됨: 경고 '{name}'이(가) 활성 상태입니다",
+                alertsPausedNote:
+                    '{count}개의 경고가 선택한 팬을 감시하고 있으며 각 팬의 스윕 동안 일시 중지됩니다.',
                 idleNote:
                     '보정은 각 팬을 전체 범위에 걸쳐 가동합니다. 유휴 상태에서 실행하는 것이 가장 좋습니다. 소음이 크고 팬당 몇 분이 걸립니다.',
                 concurrencyLabel: '동시 보정 팬 수',
@@ -1125,49 +1067,6 @@ export default {
                 stageUpSweep: '상승 스윕',
                 stageDownSweep: '하강 스윕',
                 stageFinalizing: '마무리 중',
-            },
-            generate: {
-                title: '프로필 자동 생성',
-                tooltip: '몇 가지 선택만으로 팬용 프로필을 자동 생성합니다',
-                stepFans: '팬 할당',
-                stepTemps: '주요 온도',
-                stepPreset: '성능',
-                assignIntro: '각 팬에 역할을 할당하세요. 팬을 설정하지 않으면 건너뜁니다.',
-                skip: '건너뛰기',
-                noFans: '제어 가능한 팬이 감지되지 않았습니다.',
-                tempsIntro:
-                    '주요 온도를 확인하세요. 최선의 추정값으로 미리 채워져 있으니 확인해 주세요.',
-                cpuTemp: 'CPU 온도',
-                gpuTemp: 'GPU 온도',
-                liquidTemp: '액체 온도',
-                ambientTemp: '주변 온도(선택 사항)',
-                tempNone: '없음',
-                presetIntro: '팬을 얼마나 적극적으로 가속할지 선택하세요.',
-                perKindOverrides: '역할별 재정의(고급)',
-                cfmCaveat:
-                    '양압 편향은 공기 흐름이 아니라 듀티를 기준으로 합니다. 팬 수가 불균형하면 양압을 보장할 수 없습니다.',
-                generate: '생성',
-                preview: '미리 보기',
-                previewIntro:
-                    '생성 및 적용될 내용을 검토하세요. 확인하기 전에는 아무것도 저장되지 않습니다.',
-                previewAssignments: '팬 할당',
-                willCreateHeader: '생성될 항목',
-                startingPointNote:
-                    '처음부터 만드는 대신 간편한 출발점입니다. 모든 시스템에 완벽하지는 않으므로 생성 후 확인, 테스트, 조정하세요.',
-                replaces: '{name} 대체',
-                createApply: '생성 및 적용',
-                generated: '프로필 {count}개를 생성했습니다.',
-                generateError: '프로필을 생성할 수 없습니다.',
-                applyError: '프로필을 만들 수 없습니다.',
-                kind: {
-                    CpuCooler: 'CPU 공랭 쿨러',
-                    GpuFan: 'GPU 팬',
-                    AioRadiator: 'AIO 라디에이터',
-                    AioPump: 'AIO 펌프',
-                    CaseIntake: '케이스 흡기',
-                    CaseExhaust: '케이스 배기',
-                    LaptopFan: '노트북 팬',
-                },
             },
             fanControl: {
                 fanControlWizard: '팬 제어 마법사',
@@ -1194,7 +1093,7 @@ export default {
                 createNewFunction: '새 기능',
                 existingFunction: '기능 선택',
                 defaultFunction: '기본 기능',
-                chooseFunctionNameType: '기능과 유형 선택',
+                chooseFunctionName: '기능 이름 선택',
                 newFunctionName: '{profileName}용 기능',
                 summary: '요약',
                 aNewProfile: '새 프로파일',
@@ -1219,15 +1118,51 @@ export default {
                 selectProfiles: '프로파일 선택',
                 profilesTooltip: '이 기능을 적용할 프로파일을 하나 이상 선택하십시오.',
             },
-            customSensor: {
-                new: '새 커스텀 센서',
+            generate: {
+                title: '프로필 자동 생성',
+                assignIntro: '각 팬에 역할을 할당하세요. 팬을 설정하지 않으면 건너뜁니다.',
+                calibrateFirst: '최상의 일관성을 위해 먼저 팬을 보정하세요 (몇 분 소요)',
+                skip: '건너뛰기',
+                noFans: '제어 가능한 팬이 감지되지 않았습니다.',
+                tempsIntro:
+                    '설정이 따를 온도를 선택하세요. 사용하지 않을 온도는 비워 두면 됩니다. 내장 그래픽 시스템에는 GPU 온도가 필요 없으며, GPU 온도를 선택해야 AIO 라디에이터와 케이스 팬 곡선에 GPU가 반영됩니다.',
+                cpuTemp: 'CPU 온도',
+                gpuTemp: 'GPU 온도',
+                liquidTemp: '액체 온도',
+                ambientTemp: '주변 온도(선택 사항)',
+                tempNone: '없음',
+                presetIntro: '팬을 얼마나 적극적으로 가속할지 선택하세요.',
+                perKindOverrides: '역할별 재정의(고급)',
+                cfmCaveat:
+                    '양압 편향은 공기 흐름이 아니라 듀티를 기준으로 합니다. 팬 수가 불균형하면 양압을 보장할 수 없습니다.',
+                previewIntro:
+                    '생성 및 적용될 내용을 검토하세요. 확인하기 전에는 아무것도 저장되지 않습니다.',
+                previewAssignments: '팬 할당',
+                reusedHeader: '이미 있음',
+                reused: '재사용',
+                willCreateHeader: '생성될 항목',
+                startingPointNote:
+                    '팬 설정을 위한 일반적인 출발점이며, 그대로 두기보다 조정해서 사용하도록 만들어졌습니다.',
+                replaces: '{name} 대체',
+                generated: '프로필 {count}개를 생성했습니다.',
+                generateError: '프로필을 생성할 수 없습니다.',
+                applyError: '프로필을 만들 수 없습니다.',
+                kind: {
+                    CpuCooler: 'CPU 공랭 쿨러',
+                    GpuFan: 'GPU 팬',
+                    AioRadiator: 'AIO 라디에이터',
+                    AioPump: 'AIO 펌프',
+                    CaseIntake: '케이스 흡기',
+                    CaseExhaust: '케이스 배기',
+                    LaptopFan: '노트북 팬',
+                },
             },
         },
         channelExtensionSettings: {
             title: '장치 채널 설정',
             firmwareControlledProfile: '펌웨어 제어 프로파일',
             firmwareControlledProfileDesc:
-                '이 기능이 활성화되면 장치 펌웨어에서 팬 프로파일을 관리합니다.\n잦은 소프트웨어 속도 변경에 잘 반응하지 않는 하드웨어에 유용합니다.\n장치 내부 온도 센서를 사용하는 그래프 프로파일에서만 사용할 수 있습니다.\n기능 설정은 적용되지 않습니다.',
+                '이 기능이 활성화되면 장치 펌웨어에서 팬 프로파일을 관리합니다.\n잦은 소프트웨어 속도 변경에 잘 반응하지 않는 하드웨어에 유용합니다.\n장치 내부 온도 센서를 사용하는 그래프 프로파일에서만 사용할 수 있습니다.\n기능 설정은 적용되지 않습니다.\n보정된 채널에서는 곡선의 각 점이 보정을 통해 변환되지만 시동 부스트는 적용되지 않습니다.',
             saveError: '채널 확장 설정 저장에 실패함',
             firmwareControlDisabled:
                 '현재 설정으로는 펌웨어 제어가 불가능합니다.\n지원되는 내부 온도 센서가 있는 이 장치에는 그래프 프로파일을 사용하세요.',
@@ -1236,6 +1171,9 @@ export default {
                 description:
                     '팬의 실제 듀티 대 RPM 곡선을 학습하기 위해 팬을 스윕한 다음, 채널을 RPM 정규화된 실제 듀티로 제어합니다.\n낮은 듀티의 무효 구간과 높은 듀티의 포화 구간을 제거합니다.\n팬이 보정되면 시동 부스트도 자동으로 처리됩니다. 정지 상태에서 잠시 시동 부스트로 팬을 돌린 뒤 목표 듀티에서 안정시킵니다.\n스윕은 일반적으로 몇 분이 걸리며, 반응이 느린 팬에서는 상당히 더 오래 걸릴 수 있습니다. 시작 시 채널은 0 %로 설정됩니다.',
                 statusNotCalibrated: '보정되지 않음',
+                blockedByAlert:
+                    "보정이 차단되었습니다: 경고 '{name}'이(가) 이 팬에서 활성 상태입니다.",
+                alertsPausedNote: '이 팬을 감시하는 경고는 스윕 동안 일시 중지됩니다.',
                 statusInProgress: '보정 중: {stage} ({percent} %)',
                 statusCompleted: '보정됨 (매끄러움, 매핑 활성)',
                 statusCompletedStepped: '보정됨 (계단형 곡선, 매핑 비활성)',
@@ -1254,11 +1192,10 @@ export default {
                 buttonRecalibrate: '재보정',
                 buttonCancel: '취소',
                 buttonClear: '지우기',
+                clearConfirm: '{channel}의 보정을 지우시겠습니까? 다시 실행하면 몇 분이 걸립니다.',
                 buttonViewCurve: '곡선 보기',
                 caveatsBanner:
                     '주요 쿨링 팬 여러 개를 동시에 보정하면 시스템 온도가 올라갈 수 있습니다.\n푸시풀 라디에이터 팬을 병행 진단하면 부정확한 측정값이 나올 수 있습니다.\n보정 중에는 시스템을 유휴 상태로 유지하세요.',
-                completedNotice:
-                    '보정이 활성 상태입니다. 이 채널의 팬 곡선과 수동 듀티는 이제 RPM 정규화된 실제 듀티를 제어합니다. 필요하면 프로파일 값을 다시 확인하세요.',
                 clearedNotice:
                     '지워졌습니다. 이 채널의 팬 곡선이 다시 장치 듀티를 직접 제어합니다.',
                 startError: '보정을 시작할 수 없습니다',
@@ -1296,9 +1233,6 @@ export default {
             axisRpm: 'RPM',
             legendUp: '상승',
             legendDown: '하강',
-            markerStart: '시작',
-            markerSustain: '유지',
-            markerSaturate: '플래토 근접',
             markerStable: '안정 하한',
             curveKindSmooth: '매끄러움 (매핑 활성)',
             curveKindStepped: '계단형 (매핑 비활성)',
@@ -1347,7 +1281,7 @@ export default {
             title: '고급 장치 설정',
             directAccess: '직접 접속',
             directAccessDesc:
-                '이 옵션을 활성화하면 liquidctl 드라이버는 HWMon 커널 드라이버\낸드를 무시하고 장치와 직접 통신합니다.\n이는 두 드라이버를 모두 사용할 때 충돌이 발생하는 장치에 유용할 수 있습니다.',
+                '이 옵션을 활성화하면 liquidctl 드라이버는 HWMon 커널 드라이버낸드를 무시하고 장치와 직접 통신합니다.\n이는 두 드라이버를 모두 사용할 때 충돌이 발생하는 장치에 유용할 수 있습니다.',
             useHwmon: 'HWMon 드라이버 사용',
             useHwmonDesc:
                 '이 장치의 드라이버를 liquidctl에서 HWMon 커널 드라이버로 전환합니다.\n이렇게 하면 성능과 안정성이 향상될 수 있지만, 사용 가능한 기능이 제한될 수 있습니다.',
@@ -1376,12 +1310,6 @@ export default {
         setNewPassword: '새 비밀번호 입력',
         changeDefaultPassword:
             '무단 접근을 방지하기 위해 비밀번호를 설정해 주세요. 이것은 시스템 계정과 별개입니다.',
-        loginFailed: '로그인 실패함',
-        invalidPassword: '잘못된 비밀번호',
-        passwordSetFailed: '비밀번호 설정 실패',
-        passwordSetSuccessfully: '새 비밀번호가 성공적으로 설정됨',
-        logoutSuccessful: '로그아웃에 성공했습니다.',
-        unauthorizedAction: '이 작업을 완료하려면 로그인해야 함',
         accessTokens: '액세스 토큰',
         tokenLabel: '레이블 (예: cctv)',
         tokenExpiry: '만료일 (선택 사항)',
@@ -1417,16 +1345,95 @@ export default {
             hasErrors: '오류 발생',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: '트레이로 닫으시겠습니까?',
+            body: 'CoolerControl 데몬은 어느 쪽이든 백그라운드에서 계속 실행되므로 냉각 설정은 그대로 유지됩니다. 빠른 접근과 데스크톱 알림을 위해 UI를 트레이에 두거나, 완전히 종료할 수 있습니다.',
+            keepInTray: '트레이에 두기',
+            quit: '종료',
+            remember: '내 선택 기억하기',
+        },
+        tray: {
+            show: '표시(&S)',
+            hide: '숨기기(&H)',
+            daemonConnection: '데몬 연결(&D)…',
+            quit: '종료(&Q)',
+            modes: '모드',
+            sensors: '센서',
+            daemons: '데몬',
+        },
+        cert: {
+            title: '확인되지 않은 데몬 인증서',
+            changedTitle: '인증서가 변경됨',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1은(는) 자동으로 확인할 수 없는 자체 서명 인증서를 사용합니다. 이 데몬을 알고 있는 경우에만 계속하십시오.',
+            changedBody:
+                '%1의 인증서가 이전에 신뢰한 것과 다릅니다. 데몬이 다시 설치되었거나 연결이 가로채이고 있을 수 있습니다.',
+            fingerprint: '지문 (SHA-256):',
+            trust: '이 인증서 신뢰',
+            cancel: '취소',
+        },
+        wizard: {
+            windowTitle: '데몬 연결 오류',
+            windowTitleOk: '데몬 연결',
+            apply: '적용(&A)',
+            retry: '재시도(&R)',
+            quitApp: '앱 종료(&Q)',
+            introPurpose:
+                '이 설정은 데스크톱 앱이 CoolerControl 데몬에 연결하는 방식을 제어합니다.',
+            introFailed: 'CoolerControl 데몬에 연결할 수 없습니다.',
+            introCheckService: 'systemd 서비스가 실행 중이며 사용 가능한지 확인하십시오.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: '설치 방법은 %1를 참조하십시오.',
+            introDocsLink: '문서 사이트',
+            introCommands: '데몬을 활성화하고 상태를 확인하는 데 유용한 명령:',
+            introCustomAddress:
+                '데몬 연결에 기본이 아닌 주소를 설정한 경우 다음 단계에서 지정할 수 있습니다:',
+            lastError: '마지막 오류:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: '주소가 응답했지만 CoolerControl 데몬이 아닙니다 (HTTP %1).',
+            errorCertUntrusted: '데몬의 인증서를 신뢰하지 않았습니다.',
+            errorCertInvalid: '데몬의 인증서를 검증할 수 없으며 인증서 검증이 활성화되어 있습니다.',
+            savedLabel: '저장된 연결:',
+            newConnection: '새 연결…',
+            removeConnection: '제거',
+            removeConnectionTooltip: '선택한 데몬을 잊습니다.',
+            removeConnectionBody: '이 데몬을 트레이에 표시하지 않을까요?',
+            nameLabel: '이름:',
+            nameTooltip: '이 데몬의 선택적 레이블입니다. 비워 두면 호스트:포트가 표시됩니다.',
+            addressTitle: '데몬 주소 - 데스크톱 애플리케이션',
+            addressSubtitle: '필요에 따라 주소 항목을 조정하십시오.',
+            hostLabel: '호스트 주소:',
+            hostTooltip: '데몬과 통신하는 데 사용할 IPv4, IPv6 주소 또는 호스트 이름입니다.',
+            portLabel: '포트:',
+            portTooltip: '데몬과 통신하는 데 사용할 포트 번호입니다.',
+            sslTooltip: 'SSL/TLS (HTTPS) 사용 여부를 전환합니다',
+            strictTls: '인증서 검증',
+            strictTlsTooltip:
+                '정상적으로 검증되는 인증서를 요구합니다. 꺼두면 데몬의 자체 서명 인증서를 사용하며, 원격 데몬은 첫 연결 시 신뢰합니다.',
+            defaults: '기본값',
+            defaultsTooltip: '데몬 주소를 기본값으로 되돌립니다',
+            forgetCerts: '신뢰한 인증서 지우기',
+            forgetCertsTooltip: '이 앱이 신뢰하도록 설정된 원격 데몬 인증서를 제거합니다.',
+            forgetCertsBody:
+                '이 데몬 인증서들은 현재 신뢰되고 있습니다. 지우면 다음 연결 시 다시 확인을 요청합니다.',
+        },
+        versionMismatch: {
+            title: '버전 불일치',
+            text: '데스크톱 앱 버전(%1)이 데몬 버전(%2)과 일치하지 않습니다.',
+            informative: '올바른 인터페이스 버전을 불러오려면 데스크톱 앱을 다시 시작하십시오.',
+            quitApp: '앱 종료(&Q)',
+            continueAnyway: '무시하고 계속',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: '세션 만료됨',
             detail: '세션이 만료되었습니다. 다시 로그인하기 위해 다시 로드 중입니다.',
         },
         login: {
-            success: {
-                summary: '성공',
-                detail: '로그인에 성공하였습니다.',
-            },
             failed: {
                 summary: '로그인 실패함',
                 detail: '잘못된 비밀번호',
@@ -1443,9 +1450,6 @@ export default {
             set_success: {
                 summary: '비밀번호',
                 detail: '새 비밀번호가 성공적으로 설정되었음',
-            },
-            set_failed: {
-                summary: '비밀번호 설정 실패함',
             },
         },
         asetek: {
@@ -1482,11 +1486,6 @@ export default {
                 mix: '혼합',
                 overlay: '오버레이',
             },
-            functionType: {
-                identity: '항등',
-                standard: '표준',
-                exponentialMovingAvg: '지수 이동 평균',
-            },
             mixFunctionType: {
                 min: '최소',
                 max: '최대',
@@ -1518,6 +1517,10 @@ export default {
             highContrastDark: '고대비 어두움',
             highContrastLight: '고대비 밝음',
             custom: '커스텀 테마',
+        },
+        interfaceFont: {
+            bundled: '포함됨 (IBM Plex)',
+            system: '시스템',
         },
         channelViewType: {
             control: '제어',
@@ -1562,7 +1565,6 @@ export default {
         },
         channelType: {
             lcd: 'LCD',
-            lighting: '조명',
         },
     },
 }

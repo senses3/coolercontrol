@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Hardware stress testing for thermal validation.
 //!
@@ -32,10 +17,10 @@
 //! - **RAM**: Similar to CPU but uses non-temporal stores (AVX2) to
 //!   bypass cache and stream directly to DRAM, stressing DIMMs and the
 //!   memory controller.
-//! - **GPU**: Uses wgpu compute shaders with mixed FMA + sin/cos +
-//!   sqrt to stress both ALU and Special Function Units through a
-//!   ring of VRAM buffers. Values are kept bounded via `fract()` to
-//!   prevent inf/NaN fast-paths that would defeat the stress.
+//! - **GPU**: Uses wgpu compute shaders streaming through a ring of
+//!   VRAM buffers, with several independent FMA chains per element so
+//!   wide ALUs stay fed. Each adapter gets its own OS thread, because
+//!   the per-submission wait blocks.
 //! - **Drive**: Performs random 4 KiB `O_DIRECT` reads on a block
 //!   device with 16 I/O threads to maximize IOPS and drive controller
 //!   heat without write wear.
@@ -51,6 +36,8 @@
 //!   wrapper in the `nix` crate at the version we use.
 
 use std::alloc;
+use std::collections::HashMap;
+use std::ops::Not;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::io::AsRawFd;
 use std::time::{Duration, Instant};
@@ -92,11 +79,19 @@ const MEM_STRESS_BUF_INTEGRATED: u64 = 16 * 1024 * 1024;
 const MEM_STRESS_RING_SIZE: usize = 8;
 /// Workgroup size for the streaming shader.
 const MEM_STRESS_WORKGROUP: u32 = 256;
-/// PCI vendor IDs for GPU-specific tuning.
-const PCI_VENDOR_NVIDIA: u32 = 0x10DE;
-const PCI_VENDOR_AMD: u32 = 0x1002;
-/// Sleep between GPU submissions for desktop compositing (ms).
-const GPU_SUBMIT_SLEEP_MS: u64 = 0;
+/// Compute iterations per element in the streaming shader, which sets the
+/// shader's arithmetic intensity. Peak power sits where compute and memory
+/// traffic both stay saturated: too few iterations and the kernel is a pure
+/// bandwidth test, too many and memory traffic stops contributing heat.
+///
+/// Measured end to end on RDNA2 (RX 6750 XT, 230 W cap): 32 iterations drew
+/// 219 W, 48 drew 224 W, 64 drew 215 W, 96 drew 204 W. The curve is flat
+/// near the peak but falls off a cliff below it, so when in doubt err high.
+/// Wider cards need more compute per byte to stay clear of that cliff.
+const MEM_STRESS_COMPUTE_ITERS: u32 = 48;
+// Below the measured cliff the kernel degenerates into a pure bandwidth
+// test, which draws markedly less power.
+const _: () = assert!(MEM_STRESS_COMPUTE_ITERS >= 16);
 
 /// Per-read block size for drive stress (4 KiB). Small random reads
 /// maximize IOPS (I/O operations per second), which stresses the drive
@@ -730,69 +725,282 @@ fn drive_stress_thread(path: &str, thread_idx: u16, max_offset: u64, deadline: I
     std::hint::black_box(buf.as_slice()[0]);
 }
 
-/// Run GPU stress test using wgpu compute shaders for memory-bandwidth stress.
-/// Enumerates all available GPU adapters and stresses them in parallel.
+/// PCI vendor and device IDs identifying one GPU model, as printed in
+/// `/sys/.../uevent` `PCI_ID` and reported by `wgpu::AdapterInfo`. This is
+/// the only identity the two share: wgpu does not expose the PCI slot.
+///
+/// Held as `u32` because that is what wgpu reports. Real PCI IDs are 16-bit,
+/// but GL drivers report whatever they like and truncating would silently
+/// alias two different adapters onto one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GpuPciId {
+    pub vendor: u32,
+    pub device: u32,
+}
+
+impl GpuPciId {
+    fn matches(self, info: &wgpu::AdapterInfo) -> bool {
+        self.vendor == info.vendor && self.device == info.device
+    }
+}
+
+impl From<&wgpu::AdapterInfo> for GpuPciId {
+    fn from(info: &wgpu::AdapterInfo) -> Self {
+        Self {
+            vendor: info.vendor,
+            device: info.device,
+        }
+    }
+}
+
+/// Which enumerated GPU to stress. Identical cards share a PCI ID, so the
+/// position in `list_gpu_adapters` is what tells them apart; the ID rides
+/// along to catch a list that shifted between listing and starting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GpuSelection {
+    pub index: usize,
+    pub pci_id: GpuPciId,
+}
+
+impl std::str::FromStr for GpuPciId {
+    type Err = anyhow::Error;
+
+    /// Parses `vendor:device` in hex, e.g. `1002:73df`.
+    fn from_str(s: &str) -> Result<Self> {
+        let (vendor, device) = s
+            .split_once(':')
+            .ok_or_else(|| anyhow!("GPU PCI ID must be vendor:device in hex, got '{s}'"))?;
+        Ok(Self {
+            vendor: u32::from_str_radix(vendor.trim(), 16)
+                .map_err(|e| anyhow!("Invalid GPU vendor ID '{vendor}': {e}"))?,
+            device: u32::from_str_radix(device.trim(), 16)
+                .map_err(|e| anyhow!("Invalid GPU device ID '{device}': {e}"))?,
+        })
+    }
+}
+
+impl std::fmt::Display for GpuPciId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04x}:{:04x}", self.vendor, self.device)
+    }
+}
+
+/// One enumerated GPU, as the daemon needs to describe it to the user.
+#[derive(Debug, Clone)]
+pub struct GpuAdapterInfo {
+    pub pci_id: GpuPciId,
+    /// Driver-reported name, e.g. "AMD Radeon RX 6750 XT (RADV NAVI22)".
+    pub name: String,
+    /// Discrete cards are what users normally mean to stress; the iGPU
+    /// alongside them is incidental.
+    pub discrete: bool,
+}
+
+/// Backends considered for GPU stress. See `unique_gpu_adapters` for why
+/// Vulkan takes precedence over GL rather than joining it.
+fn gpu_backends() -> wgpu::Backends {
+    wgpu::Backends::VULKAN | wgpu::Backends::GL
+}
+
+/// List the GPUs available for stress testing, one per physical device.
+///
+/// This is the authoritative source for the daemon's GPU picker: it reports
+/// exactly the adapters `run_gpu_stress` can drive, and it is the only place
+/// discrete and integrated can be told apart reliably. sysfs cannot:
+/// `boot_vga` names the display GPU rather than the discrete one, and AMD
+/// APU iGPUs do not sit on PCI bus 0.
 ///
 /// # Errors
 ///
-/// Returns an error if no hardware GPU adapter is found, if all adapters
-/// fail to initialize, or if CPU affinity/nice level cannot be set.
-pub async fn run_gpu_stress(timeout_secs: u16) -> Result<()> {
-    reset_cpu_affinity()?;
-    set_nice_level()?;
+/// Returns an error if no hardware GPU adapter is found.
+pub fn list_gpu_adapters() -> Result<Vec<GpuAdapterInfo>> {
+    let adapters = unique_gpu_adapters(gpu_backends())?;
+    Ok(adapters
+        .iter()
+        .map(|adapter| {
+            let info = adapter.get_info();
+            GpuAdapterInfo {
+                pci_id: GpuPciId {
+                    vendor: info.vendor,
+                    device: info.device,
+                },
+                name: info.name.clone(),
+                discrete: info.device_type == wgpu::DeviceType::DiscreteGpu,
+            }
+        })
+        .collect())
+}
 
-    let duration = Duration::from_secs(u64::from(timeout_secs));
-    let backends = wgpu::Backends::VULKAN | wgpu::Backends::GL;
+/// Pick out the adapters that are distinct physical GPUs, as indices into
+/// `infos`, preserving enumeration order.
+///
+/// Three rules, in order:
+///
+/// 1. Software rasterizers are not hardware and cannot be stressed.
+/// 2. Vulkan wins outright when it is available at all, and GL is used only
+///    as a whole-system fallback. Deduplicating across the two is not
+///    possible: the same card enumerates under both with different device
+///    IDs and even different device types, so a single RX 6750 XT appeared
+///    as a discrete Vulkan GPU plus an "integrated" GL one and got stressed
+///    twice. Any GPU new enough to matter here has a Vulkan driver.
+/// 3. Within one PCI ID, keep the adapters of a single driver. Two installed
+///    ICDs (RADV alongside AMDVLK) report the same card twice, and the ICD
+///    name is what separates that from a rig with two of the same card,
+///    which reports one adapter per card all under the same ICD. The driver
+///    reporting the most adapters wins, so an ICD that only supports one of
+///    two identical cards cannot hide the other.
+fn distinct_adapter_indices(infos: &[wgpu::AdapterInfo]) -> Vec<usize> {
+    let has_vulkan = infos
+        .iter()
+        .any(|info| info.backend == wgpu::Backend::Vulkan);
+    let candidates: Vec<usize> = infos
+        .iter()
+        .enumerate()
+        .filter(|(_, info)| info.device_type != wgpu::DeviceType::Cpu)
+        .filter(|(_, info)| has_vulkan.not() || info.backend == wgpu::Backend::Vulkan)
+        .map(|(index, _)| index)
+        .collect();
 
+    let mut per_driver: HashMap<(u32, u32, &str), usize> = HashMap::new();
+    for &index in &candidates {
+        let info = &infos[index];
+        *per_driver
+            .entry((info.vendor, info.device, info.driver.as_str()))
+            .or_default() += 1;
+    }
+    let mut chosen: HashMap<(u32, u32), &str> = HashMap::new();
+    for &index in &candidates {
+        let info = &infos[index];
+        let count = per_driver[&(info.vendor, info.device, info.driver.as_str())];
+        let entry = chosen
+            .entry((info.vendor, info.device))
+            .or_insert(info.driver.as_str());
+        // Ties keep the driver seen first, so the result is deterministic.
+        if per_driver[&(info.vendor, info.device, *entry)] < count {
+            *entry = info.driver.as_str();
+        }
+    }
+    candidates
+        .into_iter()
+        .filter(|&index| {
+            let info = &infos[index];
+            chosen[&(info.vendor, info.device)] == info.driver
+        })
+        .collect()
+}
+
+/// Enumerate hardware GPU adapters, one per physical device.
+fn unique_gpu_adapters(backends: wgpu::Backends) -> Result<Vec<wgpu::Adapter>> {
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends,
         ..Default::default()
     });
+    let mut adapters: Vec<Option<wgpu::Adapter>> = instance
+        .enumerate_adapters(backends)
+        .into_iter()
+        .map(Some)
+        .collect();
+    let infos: Vec<wgpu::AdapterInfo> = adapters
+        .iter()
+        .map(|a| a.as_ref().expect("adapters are all present").get_info())
+        .collect();
 
-    let adapters = instance.enumerate_adapters(backends);
-    if adapters.is_empty() {
-        return Err(anyhow!(
-            "No GPU adapter found. \
-             Ensure Vulkan or OpenGL ES drivers are installed."
-        ));
-    }
-
-    // Deduplicate by device ID, preferring Vulkan over GL to avoid
-    // software-rendered GL backends consuming CPU instead of GPU.
-    let mut seen_devices = std::collections::HashSet::with_capacity(adapters.len());
-    let mut unique_adapters = Vec::with_capacity(adapters.len());
-    for adapter in adapters {
-        let info = adapter.get_info();
-        if info.device_type == wgpu::DeviceType::Cpu {
-            continue;
-        }
-        let device_key = (info.vendor, info.device);
-        if seen_devices.insert(device_key) {
-            unique_adapters.push(adapter);
-        }
-    }
-    if unique_adapters.is_empty() {
+    let unique: Vec<wgpu::Adapter> = distinct_adapter_indices(&infos)
+        .into_iter()
+        .map(|index| adapters[index].take().expect("each index is yielded once"))
+        .collect();
+    if unique.is_empty() {
         return Err(anyhow!(
             "No hardware GPU adapter found. \
              Ensure Vulkan or OpenGL ES drivers are installed."
         ));
     }
+    Ok(unique)
+}
 
-    let adapter_count = unique_adapters.len();
-    let mut handles = Vec::with_capacity(adapter_count);
-    for adapter in unique_adapters {
-        let info = adapter.get_info();
-        eprintln!("Stressing GPU: {} ({:?})", info.name, info.backend);
-        handles.push(tokio::spawn(stress_adapter(adapter, duration)));
+/// Narrow the enumerated adapters to the requested one, or keep them all
+/// when no selection is given.
+fn select_gpu_adapters(
+    mut adapters: Vec<wgpu::Adapter>,
+    selection: Option<GpuSelection>,
+) -> Result<Vec<wgpu::Adapter>> {
+    let Some(selection) = selection else {
+        return Ok(adapters);
+    };
+    let count = adapters.len();
+    if selection.index >= count {
+        return Err(anyhow!(
+            "Selected GPU {} is out of range; only {count} adapter(s) are present",
+            selection.index
+        ));
     }
+    let adapter = adapters.swap_remove(selection.index);
+    // Two identical cards are indistinguishable by PCI ID, so the index is
+    // what picks between them. The ID is the guard: if the enumeration
+    // shifted since the list was read, this catches it instead of quietly
+    // loading a different card.
+    if selection.pci_id.matches(&adapter.get_info()).not() {
+        return Err(anyhow!(
+            "The GPU list changed since it was read: expected {} at position {}, \
+             found {}. Reload and try again",
+            selection.pci_id,
+            selection.index,
+            GpuPciId::from(&adapter.get_info())
+        ));
+    }
+    Ok(vec![adapter])
+}
 
-    let mut errors = Vec::new();
-    for handle in handles {
-        if let Err(e) = handle.await? {
-            errors.push(e);
+/// Run GPU stress test using wgpu compute shaders. Stresses every available
+/// GPU adapter in parallel, one OS thread each, or only the selected adapter
+/// when a selection is given.
+///
+/// Synchronous by design, like the CPU, RAM, and drive entry points. An
+/// earlier version drove each adapter from a `tokio` task, which both
+/// required an ambient Tokio runtime the daemon's compio backend does not
+/// provide, and serialized the adapters: `device.poll(Wait)` blocks, so on a
+/// single-threaded runtime one adapter's wait stalled every other adapter.
+/// A machine with an iGPU alongside a dGPU therefore loaded neither fully.
+///
+/// # Errors
+///
+/// Returns an error if no hardware GPU adapter is found, if `selection` does
+/// not resolve to one of them, if all adapters fail to initialize, or if CPU
+/// affinity/nice level cannot be set.
+///
+/// # Panics
+///
+/// Panics if adapter bookkeeping is inconsistent, which would mean a bug
+/// here rather than a hardware or driver condition.
+pub fn run_gpu_stress(timeout_secs: u16, selection: Option<GpuSelection>) -> Result<()> {
+    reset_cpu_affinity()?;
+    set_nice_level()?;
+
+    let duration = Duration::from_secs(u64::from(timeout_secs));
+    let adapters = select_gpu_adapters(unique_gpu_adapters(gpu_backends())?, selection)?;
+    let adapter_count = adapters.len();
+    assert!(adapter_count > 0);
+
+    // Device creation is the only async step wgpu exposes, and it resolves
+    // without a reactor. A local runtime keeps that detail contained here
+    // rather than imposing a runtime on every caller.
+    let setup_rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|e| anyhow!("Failed to build GPU setup runtime: {e}"))?;
+
+    let mut resources = Vec::with_capacity(adapter_count);
+    let mut errors = Vec::with_capacity(adapter_count);
+    for adapter in adapters {
+        let info = adapter.get_info();
+        match setup_rt.block_on(create_gpu_stress_resources(adapter)) {
+            Ok(res) => {
+                eprintln!("Stressing GPU: {} ({:?})", info.name, info.backend);
+                resources.push(res);
+            }
+            Err(e) => errors.push(e),
         }
     }
-    if errors.len() == adapter_count {
+    if resources.is_empty() {
         return Err(anyhow!(
             "All GPU adapters failed: {}",
             errors
@@ -801,6 +1009,18 @@ pub async fn run_gpu_stress(timeout_secs: u16) -> Result<()> {
                 .collect::<Vec<_>>()
                 .join("; ")
         ));
+    }
+    assert_eq!(resources.len() + errors.len(), adapter_count);
+
+    // One thread per adapter: a blocking wait on one GPU must never keep
+    // another GPU idle.
+    let deadline = Instant::now() + duration;
+    let mut handles = Vec::with_capacity(resources.len());
+    for res in resources {
+        handles.push(std::thread::spawn(move || stress_adapter(&res, deadline)));
+    }
+    for handle in handles {
+        let _ = handle.join();
     }
 
     Ok(())
@@ -811,7 +1031,7 @@ pub async fn run_gpu_stress(timeout_secs: u16) -> Result<()> {
 const MAX_WORKGROUPS_PER_DIM: u32 = 65535;
 
 /// Holds all GPU objects needed for the stress loop. Kept as a struct so
-/// `stress_adapter` can reference them without passing 7 arguments.
+/// `stress_adapter` can reference them without passing 6 arguments.
 /// `_buffers` is kept alive to prevent deallocation while bind groups
 /// reference them.
 struct GpuStressResources {
@@ -821,7 +1041,6 @@ struct GpuStressResources {
     bind_groups: Vec<wgpu::BindGroup>,
     dispatch_x: u32,
     dispatch_y: u32,
-    ring_reps: u32,
     _buffers: Vec<wgpu::Buffer>,
 }
 
@@ -847,29 +1066,10 @@ fn storage_bgl_entry(binding: u32, read_only: bool) -> wgpu::BindGroupLayoutEntr
     }
 }
 
-/// Returns (`compute_iters`, `ring_reps`) tuned for the GPU vendor.
-///
-/// Different GPU architectures have different ALU-to-SFU ratios:
-/// - Tested basic `AMD` and `Nvidia`, good results with 64, 4
-/// - Others (Intel, etc.): Conservative defaults to avoid timeouts on
-///   less capable or less tested hardware.
-fn gpu_stress_tuning(vendor: u32) -> (u32, u32) {
-    match vendor {
-        PCI_VENDOR_NVIDIA | PCI_VENDOR_AMD => (64, 4),
-        _ => (32, 2),
-    }
-}
-
-/// Creates ring-buffer resources for memory-bandwidth GPU stress.
+/// Creates ring-buffer resources for GPU stress.
 async fn create_gpu_stress_resources(adapter: wgpu::Adapter) -> Result<GpuStressResources> {
     let info = adapter.get_info();
     let label = format!("{} ({:?})", info.name, info.backend);
-
-    let (compute_iters, ring_reps) = gpu_stress_tuning(info.vendor);
-    eprintln!(
-        "  Tuning: vendor 0x{:04X}, {compute_iters} iters, {ring_reps} ring reps",
-        info.vendor
-    );
 
     // Request the adapter's actual limits so large buffer bindings are allowed.
     let (device, queue) = adapter
@@ -911,7 +1111,8 @@ async fn create_gpu_stress_resources(adapter: wgpu::Adapter) -> Result<GpuStress
     let stride = dispatch_x * MEM_STRESS_WORKGROUP;
 
     let (pipeline, bind_groups) =
-        create_stress_pipeline_and_bindings(&device, &buffers, vec4_count, stride, compute_iters);
+        create_stress_pipeline_and_bindings(&device, &buffers, vec4_count, stride);
+    assert_eq!(bind_groups.len(), MEM_STRESS_RING_SIZE);
 
     Ok(GpuStressResources {
         device,
@@ -920,68 +1121,74 @@ async fn create_gpu_stress_resources(adapter: wgpu::Adapter) -> Result<GpuStress
         bind_groups,
         dispatch_x,
         dispatch_y,
-        ring_reps,
         _buffers: buffers,
     })
 }
 
-/// Creates the compute pipeline and ring bind groups for the streaming
-/// shader.
+/// The WGSL streaming shader: `MEM_STRESS_COMPUTE_ITERS` iterations over
+/// four independent FMA chains per element. Two properties matter, and an
+/// earlier shader that mixed sin/cos/exp/sqrt had neither:
 ///
-/// The WGSL shader runs N iterations per element using four different
-/// transcendental functions (sin, cos, exp, sqrt) all driven by the
-/// loop index, plus FMA and division on the accumulator. This engages
-/// both ALU (FMA, division) and all Special Function Unit hardware
-/// (sin, cos, exp, sqrt) simultaneously for maximum power draw.
-///
-/// The loop index drives all transcendentals (not the accumulator).
-/// Ring bind groups rotate src/dst so each submission reads what the
-/// previous one wrote, keeping the data "hot" in VRAM.
-fn create_stress_pipeline_and_bindings(
-    device: &wgpu::Device,
-    buffers: &[wgpu::Buffer],
-    vec4_count: u32,
-    stride: u32,
-    compute_iters: u32,
-) -> (wgpu::ComputePipeline, Vec<wgpu::BindGroup>) {
-    let shader_src = format!(
+/// 1. Every accumulator is seeded from memory. The previous version derived
+///    all transcendental arguments from the loop counter, so the shader
+///    compiler constant-folded the entire loop: the compiled RDNA2 ISA held
+///    256 plain FMAs and not one transcendental instruction.
+/// 2. The chains are independent of each other. A single dependent chain is
+///    latency-bound, which caps throughput no matter how wide the ALU is,
+///    and modern parts got wider rather than lower-latency.
+fn stress_shader_source(vec4_count: u32, stride: u32) -> String {
+    format!(
         r"
 @group(0) @binding(0) var<storage, read> src: array<vec4<f32>>;
 @group(0) @binding(1) var<storage, read_write> dst: array<vec4<f32>>;
 
 const N: u32 = {vec4_count}u;
 const STRIDE: u32 = {stride}u;
-const ITERS: u32 = {compute_iters}u;
+const ITERS: u32 = {MEM_STRESS_COMPUTE_ITERS}u;
 
 @compute @workgroup_size({MEM_STRESS_WORKGROUP})
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {{
     let idx = gid.y * STRIDE + gid.x;
     if idx >= N {{ return; }}
-    var a = src[idx] + vec4<f32>(0.01);
+    // Seed every chain from the loaded value. Constants alone would let the
+    // shader compiler fold the loop away entirely.
+    // Four chains, not one: each is a serial dependency, so four is the
+    // parallelism available to hide FMA latency on a wide ALU. Eight
+    // measured worse on RDNA2, where the extra registers cost occupancy.
+    let s = src[idx];
+    var a0 = s + vec4<f32>(0.01);
+    var a1 = s * 1.1 + vec4<f32>(0.30);
+    var a2 = s * 0.7 + vec4<f32>(0.90);
+    var a3 = s * 1.3 + vec4<f32>(0.50);
+    // Contracting map: every chain converges toward 1.0, so values stay
+    // normal for any iteration count. No denormals, no inf, no NaN, none of
+    // which the hardware runs at full rate.
+    let k = vec4<f32>(0.999);
+    let c = vec4<f32>(0.001);
     for (var i: u32 = 0u; i < ITERS; i = i + 1u) {{
-        // Loop index drives all transcendentals -- deterministic inputs
-        // ensure every iteration does real work with no degenerate
-        // convergence. Using sin+cos+exp+sqrt engages all SFU hardware.
-        let f = f32(i) + 1.0;
-        let sv = sin(vec4<f32>(f));
-        let cv = cos(vec4<f32>(f));
-        let ev = exp(vec4<f32>(f * 0.1));
-        let sq = sqrt(vec4<f32>(f));
-        // FMA exercises ALU multiply-add units.
-        a = fma(a, sv, cv);
-        // Division is ~4x the cost of multiply on most GPUs.
-        // clamp keeps divisor bounded and positive.
-        a = a / clamp(ev * sq, vec4<f32>(0.1), vec4<f32>(0.9));
+        a0 = fma(a0, k, c);
+        a1 = fma(a1, k, c);
+        a2 = fma(a2, k, c);
+        a3 = fma(a3, k, c);
     }}
-    // clamp prevents overflow across ring passes.
-    dst[idx] = clamp(a, vec4<f32>(-1.0), vec4<f32>(1.0));
+    dst[idx] = clamp(a0 + a1 + a2 + a3, vec4<f32>(-1.0), vec4<f32>(1.0));
 }}
 "
-    );
+    )
+}
 
+/// Creates the compute pipeline and ring bind groups for the streaming
+/// shader. Ring bind groups rotate src/dst so each submission reads what the
+/// previous one wrote, keeping the data "hot" in VRAM.
+fn create_stress_pipeline_and_bindings(
+    device: &wgpu::Device,
+    buffers: &[wgpu::Buffer],
+    vec4_count: u32,
+    stride: u32,
+) -> (wgpu::ComputePipeline, Vec<wgpu::BindGroup>) {
     let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("mem_stress_shader"),
-        source: wgpu::ShaderSource::Wgsl(shader_src.into()),
+        source: wgpu::ShaderSource::Wgsl(stress_shader_source(vec4_count, stride).into()),
     });
 
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -1028,44 +1235,43 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {{
     (pipeline, bind_groups)
 }
 
-/// Main GPU stress loop: submits ring traversals and syncs with
-/// `device.poll(Wait)` after each. Ring reps per submission are tuned
-/// per GPU vendor (see `gpu_stress_tuning`). The tight while loop
-/// keeps the GPU continuously busy by submitting the next batch
-/// immediately after the previous one completes.
-async fn stress_adapter(adapter: wgpu::Adapter, duration: Duration) -> Result<()> {
-    let res = create_gpu_stress_resources(adapter).await?;
-    let deadline = Instant::now() + duration;
-
+/// Main GPU stress loop: submits one ring traversal and syncs with
+/// `device.poll(Wait)` after each. The tight while loop keeps the GPU
+/// continuously busy by submitting the next batch immediately after the
+/// previous one completes.
+///
+/// One traversal per submission keeps each submission short (measured at
+/// roughly 14 ms on RDNA2), which leaves the desktop responsive. Batching
+/// several traversals lengthened submissions without raising power.
+///
+/// Runs synchronously on its own thread. The blocking `poll(Wait)` is
+/// precisely why this must not share a thread with another adapter.
+fn stress_adapter(res: &GpuStressResources, deadline: Instant) {
     while Instant::now() < deadline {
         let mut encoder = res
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        // Multiple ring traversals per submission increase sustained load.
         // Each ring step needs its own compute pass to avoid conflicting
         // buffer usage (a buffer is read-only src in one step and
         // read-write dst in the adjacent step).
-        for _ in 0..res.ring_reps {
-            for bg in &res.bind_groups {
-                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                    label: None,
-                    timestamp_writes: None,
-                });
-                pass.set_pipeline(&res.pipeline);
-                pass.set_bind_group(0, bg, &[]);
-                pass.dispatch_workgroups(res.dispatch_x, res.dispatch_y, 1);
-            }
+        for bg in &res.bind_groups {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: None,
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&res.pipeline);
+            pass.set_bind_group(0, bg, &[]);
+            pass.dispatch_workgroups(res.dispatch_x, res.dispatch_y, 1);
         }
         res.queue.submit(std::iter::once(encoder.finish()));
         res.device.poll(wgpu::Maintain::Wait);
-        tokio::time::sleep(Duration::from_millis(GPU_SUBMIT_SLEEP_MS)).await;
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Not;
+
     use super::*;
 
     #[test]
@@ -1168,5 +1374,242 @@ mod tests {
     fn drive_stress_rejects_nonexistent_device() {
         let result = run_drive_stress("/dev/nonexistent_drive_xyz", 1, 1);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn stress_shader_has_no_loop_invariant_transcendentals() {
+        // Regression guard for the defect that made this test suite necessary:
+        // a shader whose sin/cos/exp/sqrt arguments all derived from the loop
+        // counter, which every shader compiler constant-folds away. The
+        // compiled result did no transcendental work at all, so the GPU drew
+        // far less power than the code claimed. Any transcendental reintroduced
+        // here must take an argument that depends on loaded data; assert their
+        // absence rather than try to prove data-dependence from text.
+        let src = stress_shader_source(1024, 256);
+        for call in ["sin(", "cos(", "exp(", "sqrt(", "inverseSqrt("] {
+            assert!(
+                src.contains(call).not(),
+                "shader reintroduced {call}: verify it is not loop-invariant, \
+                 then update this test"
+            );
+        }
+    }
+
+    #[test]
+    fn stress_shader_chains_are_seeded_from_memory() {
+        // Each accumulator must derive from the loaded value. Seeding from
+        // constants alone lets the compiler fold the whole loop, which is how
+        // the previous shader lost its work.
+        let src = stress_shader_source(1024, 256);
+        assert!(src.contains("let s = src[idx];"));
+        for chain in ["a0", "a1", "a2", "a3"] {
+            assert!(src.contains(&format!("var {chain} = s")));
+            // And each chain must be advanced inside the loop.
+            assert!(src.contains(&format!("{chain} = fma({chain}, k, c);")));
+        }
+    }
+
+    #[test]
+    fn stress_shader_embeds_configured_dimensions() {
+        // The dispatch geometry and iteration count are baked into the source,
+        // so a mismatch here silently changes how much work each invocation
+        // does. Pin the substitution.
+        let src = stress_shader_source(4096, 512);
+        assert!(src.contains("const N: u32 = 4096u;"));
+        assert!(src.contains("const STRIDE: u32 = 512u;"));
+        assert!(src.contains(&format!("const ITERS: u32 = {MEM_STRESS_COMPUTE_ITERS}u;")));
+    }
+
+    #[test]
+    fn gpu_pci_id_parses_the_sysfs_spelling() {
+        // The daemon reads PCI_ID out of uevent ("1002:73DF") and hands it
+        // back on the command line, so both cases must parse and round-trip.
+        let id: GpuPciId = "1002:73df".parse().unwrap();
+        assert_eq!(id.vendor, 0x1002);
+        assert_eq!(id.device, 0x73df);
+        assert_eq!(id.to_string(), "1002:73df");
+        assert_eq!("1002:73DF".parse::<GpuPciId>().unwrap(), id);
+    }
+
+    #[test]
+    fn gpu_pci_id_rejects_malformed_input() {
+        // A bad ID must fail loudly at parse time. Falling back to "stress
+        // everything" would silently load the wrong card.
+        for bad in ["1002", "1002:", ":73df", "10g2:73df", "", "1002:73df:0"] {
+            assert!(bad.parse::<GpuPciId>().is_err(), "'{bad}' should not parse");
+        }
+    }
+
+    fn adapter_info(
+        vendor: u32,
+        device: u32,
+        driver: &str,
+        device_type: wgpu::DeviceType,
+        backend: wgpu::Backend,
+    ) -> wgpu::AdapterInfo {
+        wgpu::AdapterInfo {
+            name: format!("{vendor:04x}:{device:04x} via {driver}"),
+            vendor,
+            device,
+            device_type,
+            driver: driver.to_string(),
+            driver_info: String::new(),
+            backend,
+        }
+    }
+
+    fn vulkan_gpu(vendor: u32, device: u32, driver: &str) -> wgpu::AdapterInfo {
+        adapter_info(
+            vendor,
+            device,
+            driver,
+            wgpu::DeviceType::DiscreteGpu,
+            wgpu::Backend::Vulkan,
+        )
+    }
+
+    #[test]
+    fn gpu_pci_id_matches_only_its_own_adapter() {
+        // Selection compares against wgpu's report; both halves must agree.
+        let target = GpuPciId {
+            vendor: 0x1002,
+            device: 0x73df,
+        };
+        assert!(target.matches(&vulkan_gpu(0x1002, 0x73df, "radv")));
+        assert!(target.matches(&vulkan_gpu(0x1002, 0x744c, "radv")).not());
+        assert!(target.matches(&vulkan_gpu(0x10de, 0x73df, "radv")).not());
+    }
+
+    #[test]
+    fn distinct_adapters_keep_every_card_in_a_matched_pair() {
+        // Multi-GPU rigs usually run matching cards, which report identical
+        // PCI IDs under one ICD. Deduping by PCI ID hid the second card, so
+        // only one of them could ever be stressed.
+        let infos = [
+            vulkan_gpu(0x10de, 0x2684, "NVIDIA"),
+            vulkan_gpu(0x10de, 0x2684, "NVIDIA"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [0, 1]);
+    }
+
+    #[test]
+    fn distinct_adapters_collapse_one_card_seen_through_two_icds() {
+        // RADV alongside AMDVLK reports the same card twice. The ICD name is
+        // what separates this from the matched-pair case above; without it
+        // the card would be stressed by two contexts at once.
+        let infos = [
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            vulkan_gpu(0x1002, 0x73df, "AMD proprietary driver"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [0]);
+    }
+
+    #[test]
+    fn distinct_adapters_prefer_the_icd_that_sees_the_most_cards() {
+        // An ICD supporting only one of two identical cards must not hide
+        // the other, whichever order the ICDs enumerate in.
+        let infos = [
+            vulkan_gpu(0x1002, 0x73df, "AMD proprietary driver"),
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [1, 2]);
+    }
+
+    #[test]
+    fn distinct_adapters_keep_cards_from_different_vendors() {
+        // Different vendors mean different ICDs by necessity. Choosing one
+        // ICD globally would drop a whole card.
+        let infos = [
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            vulkan_gpu(0x10de, 0x2684, "NVIDIA"),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [0, 1]);
+    }
+
+    #[test]
+    fn distinct_adapters_drop_software_and_gl_duplicates() {
+        // llvmpipe is not hardware, and the same card enumerates under both
+        // Vulkan and GL with different IDs, so GL is only a fallback.
+        let infos = [
+            adapter_info(
+                0x1002,
+                0x73df,
+                "radv",
+                wgpu::DeviceType::Cpu,
+                wgpu::Backend::Vulkan,
+            ),
+            vulkan_gpu(0x1002, 0x73df, "radv"),
+            adapter_info(
+                0x1002,
+                0x0000,
+                "AMD open-source",
+                wgpu::DeviceType::IntegratedGpu,
+                wgpu::Backend::Gl,
+            ),
+        ];
+        assert_eq!(distinct_adapter_indices(&infos), [1]);
+
+        // With no Vulkan adapter at all, GL carries the whole system.
+        let gl_only = [adapter_info(
+            0x1002,
+            0x0000,
+            "AMD open-source",
+            wgpu::DeviceType::IntegratedGpu,
+            wgpu::Backend::Gl,
+        )];
+        assert_eq!(distinct_adapter_indices(&gl_only), [0]);
+    }
+
+    #[test]
+    fn gpu_stress_runs_without_an_async_runtime() {
+        // The daemon's default compio backend provides no ambient Tokio
+        // runtime, and an earlier version panicked there because it called
+        // `tokio::spawn`. Calling from a plain test thread reproduces that
+        // environment. A zero timeout exercises setup and teardown without
+        // heating anything. Either outcome is fine on a machine with no GPU;
+        // what must not happen is a panic.
+        let result = run_gpu_stress(0, None);
+        if let Err(e) = result {
+            let msg = e.to_string();
+            assert!(
+                msg.contains("No hardware GPU adapter found") || msg.contains("All GPU adapters"),
+                "unexpected GPU stress error: {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn unique_gpu_adapters_returns_one_adapter_per_card() {
+        // Callers rely on a non-empty result, so absence of adapters must
+        // surface as an error instead. Duplicates of a single card must be
+        // gone, which on this machine means one ICD and one backend. Cards
+        // may legitimately repeat a PCI ID (a matched pair), so that is
+        // asserted in `distinct_adapter_indices` tests rather than here.
+        match unique_gpu_adapters(wgpu::Backends::VULKAN | wgpu::Backends::GL) {
+            Ok(adapters) => {
+                assert!(adapters.is_empty().not());
+                for adapter in &adapters {
+                    assert_ne!(adapter.get_info().device_type, wgpu::DeviceType::Cpu);
+                }
+                // Mixing backends, or two ICDs for one PCI ID, means the same
+                // card counted twice.
+                let backends: std::collections::HashSet<_> =
+                    adapters.iter().map(|a| a.get_info().backend).collect();
+                assert_eq!(backends.len(), 1, "adapters span multiple backends");
+                let mut drivers_per_device = std::collections::HashMap::new();
+                for adapter in &adapters {
+                    let info = adapter.get_info();
+                    drivers_per_device
+                        .entry((info.vendor, info.device))
+                        .or_insert_with(std::collections::HashSet::new)
+                        .insert(info.driver);
+                }
+                for (device, drivers) in drivers_per_device {
+                    assert_eq!(drivers.len(), 1, "{device:?} kept two ICDs");
+                }
+            }
+            Err(e) => assert!(e.to_string().contains("No hardware GPU adapter found")),
+        }
     }
 }

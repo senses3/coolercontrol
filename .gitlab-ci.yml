@@ -116,6 +116,16 @@ include:
 - template: Security/Dependency-Scanning.gitlab-ci.yml
 
 semgrep-sast:
+  variables:
+    # The BiDiTrojanSource rule reports the Arabic locale on the strength of its
+    # right-to-left script alone, and would report it again for the directional
+    # mark that locale needs to set an embedded Latin word off from the text
+    # around it. These are translation string tables, not logic, so scanning
+    # them buys nothing. `has no bidi formatting characters in locales` in the
+    # UI test suite enforces the invariant the rule was reaching for, precisely.
+    # The first four entries are the template defaults, repeated because setting
+    # this replaces them rather than adding to them.
+    SAST_EXCLUDED_PATHS: 'spec, test, tests, tmp, coolercontrol-ui/src/i18n/locales'
   rules:
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
@@ -139,6 +149,32 @@ gemnasium-python-dependency_scanning:
       when: never
     - if: $CI_COMMIT_TAG == null
 
+############################################## Copyright / licensing (REUSE)
+# Every file must declare copyright and license. Source files carry SPDX headers;
+# everything else is covered by REUSE.toml. Fix a failure with `make copyright-fix`.
+copyright:
+  stage: test
+  image: python:3-slim
+  tags:
+    - saas-linux-small-amd64
+  needs: []
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_TAG == null
+  before_script:
+    # make: copyright-check runs through it. git: reuse only honours .gitignore
+    # when it can find a git executable; without one it ignores nothing and
+    # scans the CI caches (.pip, .cargo) and build output as project files.
+    - apt-get update && apt-get install -y --no-install-recommends make git
+    # The charset-normalizer extra is required: reuse defaults to python-magic,
+    # which needs the libmagic C library that the slim image does not ship.
+    - pip install --quiet "reuse[charset-normalizer]"
+    - reuse --version
+    - git --version
+  script:
+    - make copyright-check
+
 ############################################## Tests
 test_all:
   stage: test
@@ -152,8 +188,18 @@ test_all:
       when: never
     - if: $CI_COMMIT_TAG == null
   needs: []
+  variables:
+    # this job is the only place a missing liquidctl fails instead of skipping the liqctld tests
+    LIQCTLD_TESTS_REQUIRED: '1'
   before_script:
     - python3 --version
+    # liqctld's tests call liquidctl's own implementations. Unpinned on purpose: a release that
+    # moves what they patch should turn this job red when it lands, not whenever someone gets
+    # around to bumping a pin. Full deps, not --no-deps: on Linux liquidctl imports smbus,
+    # hidapi and crcmod at module scope, so skipping them breaks `import liquidctl` outright.
+    # The image's build-essential and python3-dev are all the smbus sdist needs to build.
+    - pip3 install --upgrade liquidctl
+    - liquidctl --version
     - cargo --version
     - rustc --version
     - npm --version
@@ -406,36 +452,6 @@ build_deb_bookworm_arm64:
     paths:
       - coolercontrol*.deb
     expire_in: 5 days
-
-####################################### Debian Bookworm: daemon MSRV (Rust 1.85) compile check
-# Manual/optional. Confirms the daemon still compiles on Rust 1.85 via --no-default-features (the
-# tokio runtime, our minimum supported toolchain). Stock debian:bookworm + cargo-web pulls Rust 1.85.
-# RUSTFLAGS is cleared so this is a pure compile check, not a warnings gate. Remove this job once the
-# MSRV is officially raised to 1.88.
-build_daemon_msrv_bookworm:
-  image: debian:bookworm
-  stage: build
-  tags:
-    - saas-linux-xlarge-amd64
-  needs: []
-  variables:
-    RUSTFLAGS: ''
-  rules:
-    - if: $CI_PIPELINE_SOURCE
-      when: manual
-      allow_failure: true
-  before_script:
-    - apt-get update
-    - >
-      DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
-      cargo-web libdrm-dev build-essential ca-certificates
-    - cargo --version
-    - rustc --version
-  script:
-    # Daemon only (no UI build): daemon/resources/app ships a tracked .gitignore so the dir exists
-    # in a fresh checkout, which is all include_dir! needs to compile.
-    - cargo build --manifest-path coolercontrold/Cargo.toml -p coolercontrold --locked --no-default-features
-    - ./coolercontrold/target/debug/coolercontrold --version
 
 ####################################### Ubuntu: >= 22.04 (jammy) Base Package
 build_ubuntu:
@@ -1046,10 +1062,6 @@ upload_package_deb_bookworm_amd64:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/debian/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/debian/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/bookworm $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/bookworm $ARTIFACT_NAME_DEB
     - mv $ARTIFACT_NAME_DEB_D $ARTIFACT_NAME_DEB_BOOKWORM_D
     - mv $ARTIFACT_NAME_DEB $ARTIFACT_NAME_DEB_BOOKWORM
     - |
@@ -1091,10 +1103,6 @@ upload_package_deb_bookworm_arm64:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/debian/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/debian/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/bookworm $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/bookworm $ARTIFACT_NAME_DEB
     - mv $ARTIFACT_NAME_DEB_D $ARTIFACT_NAME_DEB_BOOKWORM_D_ARM64
     - mv $ARTIFACT_NAME_DEB $ARTIFACT_NAME_DEB_BOOKWORM_ARM64
     - |
@@ -1134,21 +1142,6 @@ upload_package_ubuntu:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    # Ubuntu 22.04 (LTS) based packages, used for any:
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/ubuntu/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/ubuntu/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/pop/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/pop/any-version $ARTIFACT_NAME_DEB
-    # not yet available on CloudSmith:
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/elementaryos/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/elementaryos/any-version $ARTIFACT_NAME_DEB
-    # Kali has removed liquidctl from their repositories:
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/kali/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/kali/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/otherdeb/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/otherdeb/any-version $ARTIFACT_NAME_DEB
     - mv $ARTIFACT_NAME_DEB_D $ARTIFACT_NAME_UBUNTU_D
     - mv $ARTIFACT_NAME_DEB $ARTIFACT_NAME_UBUNTU
     - |
@@ -1169,19 +1162,6 @@ upload_package_ubuntu_arm64:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    # Same Ubuntu family buckets as upload_package_ubuntu, aarch64 this time:
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/ubuntu/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/ubuntu/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/pop/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/pop/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/linuxmint/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/elementaryos/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/elementaryos/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/kali/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/kali/any-version $ARTIFACT_NAME_DEB
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/otherdeb/any-version $ARTIFACT_NAME_DEB_D
-    - cloudsmith push deb $CLOUDSMITH_REPOSITORY/otherdeb/any-version $ARTIFACT_NAME_DEB
     - mv $ARTIFACT_NAME_DEB_D $ARTIFACT_NAME_UBUNTU_D_ARM64
     - mv $ARTIFACT_NAME_DEB $ARTIFACT_NAME_UBUNTU_ARM64
     - |
@@ -1220,6 +1200,11 @@ upload_package_ubuntu_beta:
 upload_package_r2_debian:
   stage: upload_packages
   image: registry.gitlab.com/coolercontrol/coolercontrol/apt-publish:${IMAGE_VERSION}
+  variables:
+    # setup.sh and the keys belong to this project, so publish them from the tagged commit
+    # rather than from whatever copies the image happens to carry. Only this job and its ubuntu
+    # twin pass --refresh-root; the sibling package repositories publish packages only.
+    APT_REPO_SHARE: $CI_PROJECT_DIR/packaging/apt-repo
   dependencies:
     - build_deb_bookworm_amd64
     - build_deb_bookworm_arm64
@@ -1232,11 +1217,13 @@ upload_package_r2_debian:
     - if: $CI_COMMIT_TAG
   script:
     - ls -lah ./*.deb
-    - apt-repo-publish --repo debian ./*.deb
+    - apt-repo-publish --repo debian --refresh-root ./*.deb
 
 upload_package_r2_ubuntu:
   stage: upload_packages
   image: registry.gitlab.com/coolercontrol/coolercontrol/apt-publish:${IMAGE_VERSION}
+  variables:
+    APT_REPO_SHARE: $CI_PROJECT_DIR/packaging/apt-repo
   dependencies:
     - build_ubuntu
     - build_ubuntu_arm64
@@ -1250,7 +1237,7 @@ upload_package_r2_ubuntu:
     - if: $CI_COMMIT_TAG
   script:
     - ls -lah ./*.deb
-    - apt-repo-publish --repo ubuntu ./*.deb
+    - apt-repo-publish --repo ubuntu --refresh-root ./*.deb
 
 create_release:
   stage: release
@@ -1279,7 +1266,17 @@ create_release:
     - if: $CI_COMMIT_TAG
   script:
     - echo "running release job for v${CI_COMMIT_TAG:?}"
-    - awk -v ver="${CI_COMMIT_TAG:?}" '/^#+ \[/ { if (p) { exit }; if ($2 == "["ver"]") { p=1; next} } p && NF' ./CHANGELOG.md > ./description.txt
+    # The repo holds the feature presentations. When this tag has one, link it at the top of the
+    # release, pinned to the tag. Release descriptions do not resolve repo-relative links.
+    - |
+      NOTES=".gitlab/release-notes/${CI_COMMIT_TAG:?}.md"
+      if [ -f "${NOTES}" ]; then
+        printf '[Feature Presentation](%s/-/blob/%s/%s)\n\n## Full Changelog\n\n' \
+          "${CI_PROJECT_URL:?}" "${CI_COMMIT_TAG:?}" "${NOTES}" > ./description.txt
+      else
+        : > ./description.txt
+      fi
+    - awk -v ver="${CI_COMMIT_TAG:?}" '/^#+ \[/ { if (p) { exit }; if ($2 == "["ver"]") { p=1; next} } p && NF' ./CHANGELOG.md >> ./description.txt
   release:
     name: 'CoolerControl v${CI_COMMIT_TAG}'
     description: ./description.txt

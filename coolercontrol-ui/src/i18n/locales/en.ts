@@ -1,81 +1,46 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 export default {
     common: {
         save: 'Save',
+        mouseActions: 'Mouse actions',
+        moreInfo: 'More information',
         cancel: 'Cancel',
-        confirm: 'Confirm',
-        delete: 'Delete',
-        edit: 'Edit',
         add: 'Add',
-        remove: 'Remove',
         yes: 'Yes',
         no: 'No',
         ok: 'OK',
         error: 'Error',
         success: 'Success',
-        warning: 'Warning',
         loading: 'Loading...',
         restarting: 'Restarting...',
-        noData: 'No data available',
         retry: 'Retry',
         saveAndRefresh: 'Save and Refresh',
         reset: 'Reset',
-        back: 'Back',
         sslTls: 'SSL/TLS',
         protocol: 'Protocol',
         address: 'Address',
         port: 'Port',
         search: 'Search',
-        selected: 'Selected',
-        clear: 'Clear',
         finish: 'Finish',
         next: 'Next',
         previous: 'Previous',
-        apply: 'Apply',
-        defaults: 'Defaults',
         unmanaged: 'Unmanaged',
-        readOnly: 'Read-only',
-        rename: 'Rename',
         password: 'Password',
         currentPassword: 'Current Password',
         newPassword: 'New Password',
         confirmPassword: 'Confirm Password',
-        passwordPrompt: 'Enter a password',
-        passwordWeak: 'Weak',
-        passwordMedium: 'Medium',
-        passwordStrong: 'Strong',
         savePassword: 'Save Password',
-        editName: 'Edit Name',
         state: 'State',
         name: 'Name',
         message: 'Message',
         timestamp: 'Timestamp',
-        overview: 'Overview',
-        login: 'Login',
-        logout: 'Logout',
         temperature: 'Temp',
         duty: 'Duty',
         offset: 'Offset',
         stay: 'Stay',
         discard: 'Discard',
-        blankNameResetDefault: 'A blank name will reset it to the system default.',
         copy: '(copy)',
         minuteAbbr: 'min',
         rpmAbbr: 'rpm',
@@ -105,6 +70,212 @@ export default {
         },
     },
     layout: {
+        shell: {
+            search: {
+                hint: 'Search devices, sensors, settings and actions',
+                recent: 'Recent',
+                jumpTo: 'Jump to',
+                noResults: 'No matches found.',
+                more: '{count} more',
+                kindFan: 'Fans',
+                kindSensor: 'Sensors',
+                kindAction: 'Actions',
+                kindPage: 'Pages',
+            },
+            home: 'Home',
+            cooling: 'Cooling',
+            monitoring: 'Monitoring',
+            devices: 'Devices',
+            settings: 'Settings',
+            plugins: 'Plugins',
+            modes: 'Modes',
+            manageModes: 'Manage modes',
+            access: 'Access',
+            power: 'Power',
+            noModes: 'No modes saved',
+            supportWizards: {
+                summary: 'Support Wizards Activated!',
+                detail: 'With thanks to the volunteers who help our users get their hardware and drivers working.',
+            },
+            coolingPanel: {
+                pinned: 'Pinned',
+                pin: 'Pin',
+                unpin: 'Unpin',
+                library: 'Profiles & Functions',
+                profiles: 'Profiles',
+                functions: 'Functions',
+                addFolder: 'Add Folder',
+                newFolder: 'New Folder',
+                deleteFolder: 'Delete Folder',
+            },
+            monitoringPanel: {
+                newDashboard: 'New Dashboard',
+                createAlert: 'Create alert for this sensor',
+                failAlert: 'Create a fail alert (triggers at 0 rpm)',
+                failAlertSuffix: 'Fail',
+            },
+            devicesPanel: {
+                disabled: 'Disabled',
+            },
+            sensorDest: {
+                monitoring: 'Monitoring',
+                cooling: 'Cooling',
+                lighting: 'Lighting',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'Manage Devices and Sensors',
+                hint: 'Enable or disable devices and sensors. Disabling unused ones is recommended.',
+                pendingChanges: 'No changes | {count} change | {count} changes',
+                applyRestart: 'Apply & Restart',
+                disabledDevices: 'Disabled Devices',
+                openButton: 'Manage Devices and Sensors',
+            },
+            toast: {
+                copy: 'Copy',
+                dismissAll: 'Dismiss all',
+            },
+            homePanel: {
+                overview: 'Overview',
+                logs: 'Logs',
+            },
+            homePage: {
+                viewLogs: 'View Logs',
+                logsAll: 'All',
+                logsWarnings: 'Warnings+',
+                logsErrors: 'Errors',
+                logsNoMatches: 'No matching log lines.',
+                getStartedGroup: 'Get Started',
+                learnGroup: 'Learn',
+                resourcesGroup: 'Resources',
+                modeAndAlerts: 'Mode & Alerts',
+                noActiveMode: 'No active mode',
+                setUpCooling: 'Set up cooling',
+            },
+            devicesPage: {
+                landingHint: 'Select a device to view its details and settings.',
+                temps: 'temps',
+                fans: 'fans',
+                lighting: 'lighting',
+                lcd: 'LCD',
+                deviceDisabled: 'This device is disabled.',
+                enableDevice: 'Enable Device',
+                disableUnusedSensors: 'Disable unused sensors… (recommended)',
+                sensors: 'Sensors',
+            },
+            hardwareHelp: {
+                missingDevice: "Expected hardware that isn't listed here?",
+            },
+            coolingPage: {
+                landingHint: 'Select a fan or pump to view and adjust its cooling.',
+                noChannels: 'No fan or pump channels were detected.',
+                noneControllable: 'None of the detected fan or pump channels can be controlled.',
+                noticeBlockedByEnvironment:
+                    'Hardware detection could not run, so fan and pump channels may be missing.',
+                fullChart: 'Full chart',
+                guidedSetup: 'Guided Setup',
+                setupMenu: {
+                    autoCreateThisFan: 'Auto-Create for This Fan',
+                    createProfile: 'Create a New Profile',
+                    calibrateThisFan: 'Calibrate This Fan',
+                    autoCreateAllFans: 'Auto-Create All Fans',
+                    calibrateAllFans: 'Calibrate All Fans',
+                },
+                manualAt: 'Manual {duty}%',
+                manualDuty: 'Manual duty',
+                modeProfile: 'Profile',
+                modeManual: 'Manual',
+                modeUnmanaged: 'Unmanaged',
+                unmanagedHint:
+                    'The device or its firmware controls this channel. CoolerControl will not send any speed commands.',
+                apply: 'Apply',
+                saveAndApply: 'Save & Apply',
+                unsavedChanges: 'There are changes to this channel that have not been applied.',
+                unsavedChangesHeader: 'Unsaved Changes',
+                selectProfile: 'Select a profile',
+                sharedWith: 'Shared with {count} more',
+                sharedTooltip: 'This profile also drives other channels.',
+                notShared: 'Only this fan',
+                notSharedTooltip: 'This profile drives only this channel.',
+                forkForFan: 'Fork for this fan',
+                forkQualifier: '{channel} copy',
+                fork: {
+                    confirmHeader: 'Fork for this fan',
+                    confirmMessage:
+                        "Copy the profile '{profile}' to a new profile '{copy}' and assign it to {channel}.\n\nThe original is left untouched, so changes here only affect {channel}.",
+                    accept: 'Create copy',
+                },
+                convert: {
+                    button: 'Convert for calibration',
+                    tooltip:
+                        'This fan is calibrated, so its stored speeds are now read as true speeds and remapped on every write. Convert them so the fan behaves as it did before calibration.',
+                    confirmHeader: 'Convert for the calibrated fan',
+                    confirmProfile:
+                        "Copy the profile '{profile}' to a new profile '{copy}', convert its speeds, and assign it to {channel}.\n\nOnly convert speeds you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed. The original is left untouched.",
+                    confirmManual:
+                        'Convert the manual duty for {channel} so the fan holds the speed it did before calibration.\n\nOnly convert a duty you set before this fan was calibrated. Converting twice makes the fan run at the wrong speed.',
+                    nameQualifier: 'calibrated',
+                    accept: 'Convert',
+                    successProfile: "Assigned '{profile}' to {channel} with converted speeds.",
+                    successManual: 'Manual duty converted to {duty}%.',
+                    error: 'Could not convert the speeds for this fan.',
+                    floorHeading: 'Some points converted to 0%',
+                    floorNotice:
+                        '{count} point(s) sat below the slowest speed {channel} can be set to once calibrated, so they converted to 0%. Check the new curve before relying on it.',
+                    modesHeading: 'Modes still use the original',
+                    modesReminder:
+                        'These modes still assign the original profile to {channel}: {modes}. Update them to use the converted copy.',
+                },
+                notControllable:
+                    'This channel reports its speed but cannot be controlled by CoolerControl.',
+                verdictFirmwareOverride:
+                    'CoolerControl set this channel to manual control, but the firmware changed it back.',
+                verdictFamilyMayNeedOutOfTree:
+                    'No writable fan control was found for this channel. On this chip family, a different kernel driver sometimes provides it.',
+                verdictNotSupportedByDriver:
+                    'The driver in use does not expose fan control for this channel.',
+                verdictNoPwm:
+                    'The loaded driver exposes no fan control for this channel, only its speed.',
+                verdictPwmReadOnly:
+                    'The loaded driver exposes a fan control for this channel but marks it read-only.',
+                verdictIgnoresDuty:
+                    'This channel accepted duty changes, but its measured speed never responded.',
+                verdictUnverifiable:
+                    'This channel has no usable tachometer, so its response to duty changes cannot be verified.',
+                verdictEvidenceLabel: 'Measured on this machine:',
+                evidenceNoPwmFile: 'no fan control exposed',
+                evidencePwmNotWritable: 'fan control is read-only',
+                evidenceHasTachometer: 'speed reading available',
+                evidenceNoTachometer: 'no speed reading',
+                verdictLearnMore: 'What can I do about this?',
+                verdictFoundSomethingThatWorks: 'Found something that works? Tell us',
+                activeMode: 'Active',
+                previousMode: 'Previous',
+                activate: 'Activate',
+                noModes:
+                    'No modes saved yet. Modes snapshot all channel settings for quick switching.',
+                powerProfiles: {
+                    title: 'System Power Profile',
+                    description:
+                        'Activate a mode automatically when the system power profile changes.',
+                    activeProfile: 'Current profile: {profile}',
+                    noMode: 'No mode',
+                    saveFailed: 'The power profile mapping could not be saved.',
+                    profileNames: {
+                        'power-saver': 'Power Saver',
+                        balanced: 'Balanced',
+                        performance: 'Performance',
+                    },
+                },
+                miniCurveHint:
+                    "Assigned profile curve. The dot marks the target duty at the current source temperature; the channel's Function shapes the actual duty.",
+                chain: {
+                    tempSource: 'Temperature source',
+                    profile: 'Profile',
+                    function: 'Function',
+                },
+            },
+        },
         topbar: {
             login: 'Login',
             logout: 'Logout',
@@ -117,76 +288,39 @@ export default {
             shutdownSuccess: 'Daemon shutdown signal accepted',
             shutdownError: 'Unknown error sending shutdown signal. See logs for details.',
             quitDesktopApp: 'Quit Desktop App',
-            applicationInfo: 'Info & Tools',
             back: 'Back',
             expandMenu: 'Expand Menu',
             collapseMenu: 'Collapse Menu',
-            controls: 'Controls',
             alerts: 'Alerts',
-            plugins: 'Plugins',
             settings: 'Settings',
             openInBrowser: 'Open in Browser',
-            modes: 'Modes',
             loginSuccessful: 'Login successful',
         },
         settings: {
             title: 'Settings',
-            userInterface: 'User Interface',
-            device: 'Devices',
-            daemon: 'Daemon',
             devices: {
-                devicesAndSensors: 'Devices and Sensors',
-                detectionIssues: 'Detection Issues? See the',
-                hardwareSupportDoc: 'Hardware Support Documentation.',
                 toggleRequiresRestart:
                     'Toggling devices or sensors requires a daemon and UI restart. Are you sure want to do this now?',
                 enableDevices: 'Enable Devices',
-                selectTooltip:
-                    'Select devices and sensors to disable or enable.\nDisabling unused devices and sensors is highly\nrecommended.',
                 unknownError:
                     'Unknown error trying to apply changes to all devices. See logs for details.',
             },
-            plugin: 'Plugins (beta)',
             plugins: {
-                device: 'Device Service Plugin',
-                integration: 'Integration Plugin',
                 privileged: 'Privileged Access',
                 pluginUrl: 'Homepage',
                 restricted: 'Restricted Access',
                 settingsSaved: 'Plugin settings successfully saved',
                 settingsNotSaved: 'Failed to save plugin settings',
             },
-            profiles: 'Profiles',
-            alerts: 'Alerts',
-            dashboards: 'Dashboards',
-            modes: 'Modes',
             appearance: 'Appearance',
+            general: 'General',
             language: 'Language',
             selectLanguage: 'Select Language',
-            english: 'English',
-            chinese: 'Chinese (Simplified)',
-            japanese: 'Japanese',
-            chineseTrad: 'Chinese (Traditional)',
-            russian: 'Russian',
-            german: 'German',
-            french: 'French',
-            spanish: 'Spanish',
-            arabic: 'Arabic',
-            portuguese: 'Portuguese',
-            hindi: 'Hindi',
-            theme: 'Theme',
-            themeLight: 'Light',
-            themeDark: 'Dark',
-            themeSystem: 'System',
-            themeCustom: 'Custom',
-            themeHighContrastDark: 'High Contrast Dark',
-            themeHighContrastLight: 'High Contrast Light',
-            lineThickness: 'Line Thickness',
+            systemLanguage: 'System',
             fullScreen: 'Full Screen',
-            menuBarAlwaysVisible: 'Menu Bar Always Visible',
-            hideMenuCollapseIcon: 'Hide Menu Collapse Icon',
+            railToCollapse: 'Rail to Collapse',
             eyeCandy: 'Eye Candy',
-            showOnboarding: 'Show Onboarding Tour on Startup',
+            interfaceFont: 'Interface Font',
             introduction: 'Introduction',
             startTour: 'Start Tour',
             timeFormat: 'Time Format',
@@ -194,16 +328,11 @@ export default {
             time12h: '12hr',
             frequencyPrecision: 'Frequency Precision',
             startupPage: 'Startup Page',
-            sidebarToCollapse: 'Sidebar to Collapse',
-            entitiesBelowSensors: 'Entities below Sensors',
             dashboardLineSize: 'Dashboard Line Size',
             themeStyle: 'Theme Style',
-            themeMode: {
-                system: 'System',
-                dark: 'Dark',
-                light: 'Light',
-                highContrastDark: 'High Contrast Dark',
-                highContrastLight: 'High Contrast Light',
+            themeGroups: {
+                builtIn: 'Built-in',
+                installed: 'Installed',
                 custom: 'Custom',
             },
             desktop: 'Desktop',
@@ -211,6 +340,12 @@ export default {
             closeToTray: 'Close to Tray',
             zoom: 'Zoom',
             desktopStartupDelay: 'Desktop Startup Delay',
+            groups: {
+                startup: 'Startup',
+                performance: 'Performance',
+                devices: 'Devices & Detection',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'Apply Settings on Startup',
             deviceDelayAtStartup: 'Device Delay at Startup',
             pollingRate: 'Polling Rate',
@@ -220,15 +355,21 @@ export default {
             hideDuplicateDevices: 'Hide Duplicate Devices',
             drivePowerState: 'Drive Power State',
             sensorsAutoDetect: 'Sensors Auto-Detect',
+            sensorsConfig: 'lm-sensors Configuration',
             deviceListener: 'Device Change Listener',
             customTheme: {
                 title: 'Custom Theme',
                 accent: 'Accent Color',
+                accentGradientTo: 'Accent Gradient End',
                 bgOne: 'Background Primary',
                 bgTwo: 'Background Secondary',
                 border: 'Border Color',
                 text: 'Text Color',
                 textSecondary: 'Secondary Text Color',
+                success: 'Success',
+                warning: 'Warning',
+                error: 'Error',
+                info: 'Info',
                 export: 'Export Theme',
                 import: 'Import Theme',
                 copyCode: 'Copy Code',
@@ -238,16 +379,15 @@ export default {
                 invalidThemeCode: 'Invalid theme code',
             },
             tooltips: {
-                introduction: 'Start the application introduction tour.',
                 timeFormat: 'Time format: 12-hour (AM/PM) or 24-hour',
                 frequencyPrecision: 'Adjust the precision of displayed frequency values.',
                 startupPage: 'The page shown after the application loads.',
+                railToCollapse:
+                    'Also use the empty space in the navigation rail to expand or collapse the menu.',
                 eyeCandy:
                     'Enable visual animations like spinning fan icons.\nThis will use some additional GPU resources.',
-                sidebarCollapse:
-                    'Whether to display a Menu Collapse Icon in the Sidebar,\nor use the empty sidebar area to expand or collapse the main menu.',
-                entitiesBelowSensors:
-                    'Whether to display entities below device sensors in the main menu.',
+                interfaceFont:
+                    'Use the fonts bundled with CoolerControl, or the fonts configured on your system.',
                 fullScreen: 'Toggles full-screen mode',
                 lineThickness: 'Adjust the line thickness of charts on the dashboard',
                 startInTray:
@@ -261,6 +401,8 @@ export default {
                     'Automatically apply settings on daemon startup and when waking from sleep',
                 deviceDelayAtStartup:
                     'Delay before starting device communication (in seconds).\nHelps with devices that take time to initialize or are intermittently detected',
+                unlockRange: 'Allow values outside the recommended range',
+                lockRange: 'Restrict to the recommended range',
                 pollingRate:
                     'The rate at which sensor data is polled (in seconds).\nA higher poll rate will reduce resource usage, and a lower will increase responsiveness.\nA rate of less than 1.0 should be used with caution.',
                 compressApiPayload: 'Enable API payload compression',
@@ -274,83 +416,42 @@ export default {
                     'SSDs and HDDs in particular can spin down and enter a low power state.\nThis option, when enabled and the drive supports it, will report drive temperatures\nas 0°C when spun down so that fan Profiles can be adjusted accordingly.',
                 sensorsAutoDetect:
                     'Automatically detect Super-I/O hardware sensors and load\nkernel modules at startup. (x86_64 only)',
+                sensorsConfig:
+                    'Use the sensor names and hidden sensors from the lm-sensors\nconfiguration files (/etc/sensors3.conf and /etc/sensors.d).\nNames set in CoolerControl always take precedence.',
                 deviceListener:
                     'Listen for device add/remove events (e.g. USB hotplug)\nand notify when hardware changes are detected.',
-                daemonAddress:
-                    'The IP address or domain name of the daemon to establish a connection with.\nSupports IPv4, IPv6, and DNS-resolvable hostnames.',
-                daemonPort: 'The port used to establish a connection with the daemon.',
-                sslTls: 'Whether to connect to the daemon using SSL/TLS.\nA proxy setup is required.',
-                triggersRestart: 'Triggers an automatic restart',
-                triggersUIRestart: 'Triggers an automatic UI restart',
                 triggersDaemonRestart: 'Triggers an automatic daemon restart',
-                resetToDefaults: 'Reset to default settings',
-                saveAndReload: 'Save and reload the UI',
                 copyThemeCode:
                     'Copy a compact code representing your current custom theme.\nShare it by pasting into chat or forums.',
                 pasteThemeCode: 'Apply a custom theme from a code (cct1:...) shared with you.',
-                exportThemeFile:
-                    'Save the current custom theme to a JSON file you can keep or share.',
-                importThemeFile: 'Load a custom theme from a JSON file on disk.',
             },
             applySettingAndRestart:
                 'Changing this setting requires a daemon and UI restart. Are you sure want to do this now?',
             restartHeader: 'Apply Setting and Restart',
-            restartSuccess: 'Restarting now',
             success: 'Success',
             successDetail: 'Operation completed successfully',
-            settingsAppliedSuccess: 'Settings applied successfully',
-            restartRequestSuccess: 'Restart request sent successfully',
-            colorPickerDialogTitle: 'Select Color',
-            colorPickerConfirm: 'Confirm',
-            colorPickerCancel: 'Cancel',
             languageChangeConfirm: 'Change language?',
             languageChangeConfirmMessage:
                 'Are you sure you want to continue? If some interface elements are not displayed correctly, please refresh the page manually.',
             languageChangeSuccess: 'Language switched successfully.',
             languageChangeError: 'Failed to change language. Please try again.',
             themeChangeSuccess: 'Theme switched successfully.',
-            entitiesBelowSensorsEnabledMessage: 'Entities will now be displayed below sensors.',
-            entitiesBelowSensorsDisabledMessage:
-                'Entities will no longer be displayed below sensors.',
         },
         menu: {
-            system: 'System',
             dashboards: 'Dashboards',
-            profiles: 'Profiles',
-            functions: 'Functions',
             customSensors: 'Custom Sensors',
-            modes: 'Modes',
             alerts: 'Alerts',
             pinned: 'Pinned',
             tooltips: {
-                delete: 'Delete',
                 createMode: 'Create Mode from Current Settings',
                 addProfile: 'Add Profile',
-                editName: 'Edit Name',
                 addAlert: 'Add Alert',
-                deleteFunction: 'Delete Function',
                 addDashboard: 'Add Dashboard',
-                deleteDashboard: 'Delete Dashboard',
                 duplicate: 'Duplicate',
-                setAsHome: 'Set as Home',
-                save: 'Save',
-                deleteMode: 'Delete Mode',
-                updateWithCurrentSettings: 'Update with Current Settings',
                 rename: 'Rename',
-                createModeFromCurrentSettings: 'Create Mode from Current Settings',
                 addCustomSensor: 'Add Custom Sensor',
                 addFunction: 'Add Function',
                 chooseColor: 'Choose Color',
-                deviceSettings: 'Advanced Device Settings',
-                options: 'More Options',
-                seeDeviceHealth: 'For an overview see Device Health in Info & Tools',
-                moveTop: 'Move to Top',
-                moveBottom: 'Move to Bottom',
-                disable: 'Disable',
-                pin: 'Pin to Top',
-                unpin: 'Unpin',
-                profileApply: 'Apply Profile to fans',
-                tags: 'Manage Tags',
             },
         },
         plugins: {
@@ -372,7 +473,7 @@ export default {
             overview: 'Plugins Overview',
             gettingStarted:
                 'Plugins extend CoolerControl with additional device support, integrations, and automation. They can provide new device sensors and controls, connect to external services, or add custom UI pages.',
-            docsLink: 'Plugin Documentation',
+            findPlugins: 'Find and install Plugins',
             restartNote:
                 'If you have recently added a new plugin and it does not appear here, restart the CoolerControl daemon.',
             containerNote:
@@ -383,7 +484,6 @@ export default {
             description: 'Description',
             enable: 'Enable',
             disable: 'Disable',
-            disabled: 'Disabled',
             pluginDisabled: 'Plugin disabled.',
             pluginEnabled: 'Plugin enabled.',
             pluginDisabledRestart: 'Plugin disabled. Restart the daemon to apply.',
@@ -394,11 +494,8 @@ export default {
             commandCopied: 'Command copied to clipboard',
         },
         add: {
-            dashboard: 'Dashboard',
-            mode: 'Mode',
             profile: 'Profile',
             function: 'Function',
-            alert: 'Alert',
             customSensor: 'Custom Sensor',
         },
     },
@@ -412,59 +509,18 @@ export default {
                 'Unable to connect to the daemon. Please check if the daemon is running.',
             connectionRestored: 'Connection Restored',
             connectionRestoredMessage: 'Connection to the daemon has been restored.',
-            thinkpadFanControl: 'ThinkPad Fan Control',
-            pollRate: 'Polling Rate',
-            applySettingAndRestart: 'Apply Setting and Restart',
-            changeSetting:
-                'Changing this setting requires a daemon and UI restart. Are you sure want to do this now?',
-            status: {
-                ok: 'Ok',
-                hasWarnings: 'Has Warnings',
-                hasErrors: 'Has Errors',
-            },
-        },
-        devices: {
-            detectionIssues: 'Detection Issues? See the',
-            hardwareSupportDocs: 'Hardware Support Documentation',
-            selectDevices:
-                'Select devices and sensors to disable or enable.\nDisabling unused devices and sensors is highly\nrecommended.',
-            devicesAndSensors: 'Devices and Sensors',
-            apply: 'Apply',
-            applySettingsAndReload: 'Apply settings and reload',
-            triggersAutoRestart: 'Triggers auto daemon restart',
-            restartPrompt:
-                'Toggling devices or sensors requires a daemon and UI restart. Are you sure want to do this now?',
-            enableDevices: 'Enable Devices',
+            reconnecting: 'Reconnecting...',
+            disconnectedFor: 'Disconnected for {time}',
         },
         speed: {
-            automatic: 'Automatic',
-            manual: 'Manual',
-            unsavedChanges: 'Unsaved Changes',
-            unsavedChangesMessage: 'There are unsaved changes made to this control channel.',
-            manualDuty: 'Manual Duty',
-            profileToApply: 'Profile to apply',
-            controlModeAutomaticTooltip: 'Apply a fan Profile to control this channel',
-            controlModeManualTooltip: 'Set a fixed duty percentage manually',
-            controlModeUnmanagedTooltip:
-                "Stop managing this channel, letting the device's hardware or driver decide",
-            driverNoSupportControl:
-                "Read-only channel. The current driver does not support setting this channel's speed.",
-            amdOverdriveNotEnabled:
-                "AMD GPU overdrive is not enabled. Enable it in this device's Advanced Settings (requires reboot).",
-            controlOrView: 'Control or View',
             applySetting: 'Apply Setting',
-            defaultProfileInfo:
-                "Selecting Unmanaged tells CoolerControl to stop controlling this fan<br/>and hand it back to the device's driver.<br/><br/><b>Warning:</b> Many drivers do <i>not</i> have automatic fan control.<br/>On those devices, the fan will stay at its last set speed.",
         },
         customSensors: {
             missingSourcesNotice:
                 'The following temp sources are no longer present and will be removed when saving: {sources}',
-            newSensor: 'New Sensor',
             sensorType: 'Sensor Type',
-            type: 'Type',
             mixFunction: 'Mix Function',
             howCalculateValue: 'How to calculate the resulting sensor value',
-            tempFileLocation: 'Temp File Location',
             tempFile: 'Temperature File',
             filePathTooltip:
                 'Enter the absolute path to the temperature file to use for this sensor.\nThe file must use the sysfs data format standard:\nA fixed point number in millidegrees Celsius.\ne.g. 80000 for 80°C.\nThe file is verified upon submission.',
@@ -490,15 +546,11 @@ export default {
                     'Weighted average favoring recent readings. Smoother than Time Average for the same window, but takes roughly 3x the window length to fully follow a sustained change. For fans that should track real trends without jitter.',
             },
             tempWeights: 'Temp Weights',
-            tempWeightsTooltip: 'The individual weight of each selected temperature source.',
             tempName: 'Temp Name',
             weight: 'Weight',
-            saveSensor: 'Save Sensor',
             saveCustomSensor: 'Save Custom Sensor',
             unsavedChanges: 'There are unsaved changes made to this Custom Sensor.',
             unsavedChangesHeader: 'Unsaved Changes',
-            stay: 'Stay',
-            discard: 'Discard',
             selectCustomSensorFile: 'Select Custom Sensor File',
             deleteCustomSensor: 'Delete Custom Sensor',
             deleteCustomSensorConfirm:
@@ -506,40 +558,29 @@ export default {
         },
         dashboard: {
             timeRange: 'Time Range',
-            minutes: 'min',
             chartType: 'Chart Type',
-            dataType: 'Data Type',
             filterSensors: 'Filter Sensors',
-            showControls: 'Show Controls',
             mouseActions:
-                'Dashboard Mouse actions:\n- Highlight selection to zoom.\n- Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.\n- Ctrl+click or middle-click to show all sensors in tooltip.',
+                'Dashboard Mouse actions:\n- Highlight selection to zoom.\n- Ctrl+Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.\n- Ctrl+click or middle-click to show all sensors in tooltip.',
             fullPage: 'Full Page',
             filterTags: 'Filter Tags',
             filterByTag: 'Filter by Tag',
             filterBySensor: 'Filter by Sensor',
-            search: 'Search',
             filterTypes: 'Filter Types',
             filterByDataType: 'Filter by Data Type',
-            selectChartType: 'Select a Chart Type',
             exitFullPage: 'Exit Full Page',
-            controls: 'Controls',
-            sensorValues: 'Sensor Values',
-            selected: 'Selected',
-            clear: 'Clear',
             deleteDashboard: 'Delete Dashboard',
             deleteDashboardConfirm: 'Are you sure you want to delete the dashboard: "{name}"?',
-            dashboardDeleted: 'Dashboard Deleted',
             setAsHome: 'Set as Home',
             duplicateDashboard: 'Duplicate Dashboard',
+            openCooling: 'Open cooling controls',
         },
         appInfo: {
-            title: 'Info & Tools',
             noWarranty: 'This program comes with absolutely no warranty.',
             changeStartupPage: 'Change the startup page in Settings',
             daemonStatus: 'Daemon Status',
             acknowledgeIssues: 'Acknowledge Issues',
             status: 'Status',
-            processStatus: 'Process Status',
             host: 'Host',
             uptime: 'Uptime',
             version: 'Version',
@@ -550,41 +591,58 @@ export default {
             disconnected: 'Disconnected',
             helpfulLinks: 'Helpful Links',
             uiTour: 'UI Tour',
-            uiTourDesc: 'Take a guided tour of the application',
             gettingStarted: 'Getting Started',
             helpSettingUp: 'Help setting up fan control',
-            gettingStartedGraphProfile: 'Graph Profile',
-            gettingStartedControlsPage: 'Controls Page',
-            gettingStartedStep1: 'Create a {profile} in Fan Profiles and shape your fan curve.',
-            gettingStartedStep2:
-                "Assign it on the {controls} (or the fan's own page). Profiles are not auto-applied.",
-            gettingStartedStep3: 'Reuse the same Profile on as many fans as you want.',
+            gettingStartedStep1: 'Open Cooling and pick the fan you want to control.',
+            gettingStartedStep2: 'Choose Guided Setup, then New Profile, to shape its fan curve.',
+            gettingStartedStep3: 'Reuse that Profile on as many fans as you like.',
             gettingStartedAutoCreate:
                 '{wizard} can be used to set up basic profiles for all your fans at once.',
             gettingStartedAutoCreateLink: 'Auto-Create Profiles',
-            calibrateFans:
-                'For consistent control, {wizard} so a given % means a similar speed for every fan.',
             calibrateFansLink: 'calibrate your fans',
             hardwareSupport: 'Hardware Support',
-            hardwareSupportDesc: 'Supported devices and driver installation',
-            gitRepository: 'Git Repository',
-            gitRepositoryDesc: 'Submit Issues or Feature Requests',
-            discord: 'Discord',
-            discordDesc: 'Join our Discord community',
             whatsNew: "What's New",
-            whatsNewDesc: 'See the latest release notes',
             logsAndDiagnostics: 'Logs and Diagnostics',
             downloadCurrentLog: 'Download Current Log',
             deviceHealth: 'Device Health',
-            deviceHealthTooltip:
-                'Missing temp sources can be replaced by editing and<br>saving the affected Custom Sensor, Profile, or LCD setting.',
             deviceHealthOk: 'All sensors and channels are healthy.',
+            detection: 'Chip Detection',
+            detectionDescription:
+                'What the Super-I/O chip probe found when the daemon started. Module loading happens at startup, so this is the run that explains an unbound chip.',
+            detectionButton: 'Chip Detection',
+            detectionNotRun:
+                'No detection was run, so nothing is known about Super-I/O chips on this machine.',
+            detectionSecureBoot: 'Secure Boot',
+            detectionContainer: 'Container',
+            detectionDevPort: '/dev/port available',
+            detectionChips: 'Detected chips',
+            detectionNoChips: 'No Super-I/O chips were detected.',
+            detectionBlacklisted: 'Blacklisted drivers',
+            hardwareSupportOk: 'All detected hardware is supported and controllable.',
+            hardwareReport: 'Hardware Report',
+            hardwareReportDescription:
+                'A summary of what CoolerControl can see on this machine, ready to paste into a support channel. Serial numbers and identifiers are excluded.',
+            hardwareReportFull: 'Include the full hwmon tree',
+            hardwareReportEmpty: 'The report could not be generated.',
+            hardwareReportButton: 'Hardware Report',
+            hardwareReportCopy: 'Copy',
+            hardwareReportCopied: 'Copied',
+            findingNoDriverBound: 'A chip was detected, but no loaded driver is serving it.',
+            findingBlacklisted: 'This driver is blacklisted and was not loaded.',
+            findingBlockedByEnvironment: 'Hardware detection could not run in this environment.',
+            findingBlockedBySecureBoot:
+                'Hardware detection could not run because Secure Boot is enabled.',
+            findingBlockedByContainer: 'Hardware detection could not run inside a container.',
+            findingBlockedByNoDevPort:
+                'Hardware detection could not run because /dev/port is not available.',
+            findingDetectionUnsupported:
+                'Hardware detection is not supported on this architecture.',
             failsafeActive: 'Failsafe values in use',
             missingTempSource: 'Missing temp source',
             staleTempSource: 'Temp source using failsafe values',
             stressTest: 'Thermal Stress Tests',
             stressTestTooltip:
-                'Generate sustained thermal load to validate<br>fan curves and cooling profiles.<br>Results may vary depending on hardware.<br>Install stress-ng for additional backends.',
+                'Generate sustained thermal load to validate\nfan curves and cooling profiles.\nResults may vary depending on hardware.\nInstall stress-ng for additional backends.',
             cpuStress: 'CPU Stress',
             gpuStress: 'GPU Stress',
             gpuStressTooltip:
@@ -598,67 +656,92 @@ export default {
             backendTooltip:
                 'Choose the stress-test backend.<br>Built-in works without external dependencies.<br>stress-ng (when installed) provides additional stressor variants.',
             selectDrive: 'Select drive',
-            threadCount: 'Threads',
-            duration: 'Duration (s)',
+            selectGpu: 'Select GPU',
+            allGpus: 'All GPUs',
 
             start: 'Start',
             stop: 'Stop',
             stopAll: 'Stop All',
             active: 'Active',
             inactive: 'Inactive',
-            allCores: 'All Cores',
             psuWarningHeader: 'High Power Warning',
             psuWarningMessage:
                 'Running both CPU and GPU stress tests simultaneously will put significant load on your PSU. If overclocking or using a low wattage PSU, system instability can occur. Are you sure you want to proceed?',
             proceed: 'Proceed',
         },
         alerts: {
-            createAlert: 'Create Alert',
-            editAlert: 'Edit Alert',
+            triggersOutside: 'triggers below {min} or above {max}{unit}',
+            triggersAbove: 'triggers above {max}{unit}',
+            stateSince: '{state} since {time}',
             deleteAlert: 'Delete Alert',
-            noAlerts: 'No alerts configured',
+            duplicateAlert: 'Duplicate Alert',
             alertsOverview: 'Alerts Overview',
             alertLogs: 'Alert Logs',
             alertTriggered: 'Alert Triggered',
             alertRecovered: 'Alert Recovered',
+            alertError: 'Alert Error',
+            alertSensorsReadable: 'Alert Sensors Readable',
             deleteAlertConfirm: 'Are you sure you want to delete: "{name}"?',
             saveAlert: 'Save Alert',
-            channelSource: 'Channel Source for Alert',
-            channelSourceTooltip: 'The Channel source to be used for the Alert',
+            channelSources: 'Channel Sources for Alert',
+            channelSourcesTooltip:
+                'The channel sources watched by this Alert.\nOne sensor type per Alert: the first pick filters the rest.',
             triggerConditions: 'Trigger Conditions',
             maxValueTooltip: 'Values above this will trigger the alert.',
             minValueTooltip: 'Values below this will trigger the alert.',
             warmupDurationTooltip:
                 'How long a condition must be active before the alert is considered active.\nIt is checked only at regular poll-rate intervals\nand so may not be exactly this length.',
-            greaterThan: 'greater than',
-            lessThan: 'less than',
+            cooldownDurationTooltip:
+                'How long the value must stay back in range before the alert recovers.\nPrevents rapid triggered and resolved flapping.',
+            cooldownLessThan: 'Condition Recovered Longer Than',
+            repeatInterval: 'Repeat Notification Every',
+            repeatIntervalTooltip:
+                'Re-send the desktop notification at this interval while the alert stays active.\n0 disables repeat notifications.',
+            enabled: 'Enabled',
+            enabledTooltip: 'A disabled alert is not evaluated at all.',
+            sectionGeneral: 'General',
+            sectionNotifications: 'Notifications',
+            sectionActions: 'Actions',
+            silence: 'Silence',
+            silenceTooltip:
+                'Silence: suppress notifications and shutdown for a while.\nThe alert still evaluates and shows its state.',
+            silence15m: 'Silence for 15 minutes',
+            silence1h: 'Silence for 1 hour',
+            silence8h: 'Silence for 8 hours',
+            silence24h: 'Silence for 24 hours',
+            unsilence: 'Unsilence now',
+            enableAlert: 'Enable Alert',
+            disableAlert: 'Disable Alert',
+            silencedUntil: 'Silenced until {time}',
+            disabledLabel: 'Disabled',
+            greaterThan: 'Greater Than',
+            lessThan: 'Less Than',
             newAlert: 'New Alert',
-            warmupGreaterThan: 'condition triggered longer than',
+            warmupGreaterThan: 'Condition Triggered Longer Than',
             unsavedChanges: 'There are unsaved changes made to this Alert.',
             unsavedChangesHeader: 'Unsaved Changes',
-            createFailAlert: 'Fail Alert',
-            desktopNotify: 'desktop notification',
+            desktopNotify: 'Desktop Notification',
             desktopNotifyTooltip:
                 'Enable desktop notifications when the alert is triggered.\n(If supported)',
-            desktopNotifyRecovery: 'desktop notification on recovery',
+            desktopNotifyRecovery: 'Desktop Notification on Recovery',
             desktopNotifyRecoveryTooltip:
                 'Enable desktop notifications when the alert recovers.\n(If supported)',
-            desktopNotifyAudio: 'desktop notification audio',
+            desktopNotifyAudio: 'Desktop Notification Audio',
             desktopNotifyAudioTooltip:
                 'Enable desktop notification audio when the alert is triggered.\n(If supported)',
-            shutdownOnActivation: 'shutdown on activation',
+            shutdownOnActivation: 'Shutdown on Activation',
             shutdownOnActivationTooltip:
                 'Enable system shutdown when the alert is triggered.\nSystem shutdown will commence one minute after the alert is triggered\nand will be cancelled if the alert recovers.',
         },
         profiles: {
+            targetDuty: 'Target',
+            actualDuty: 'Actual',
+            targetHint:
+                "Target is calculated from the current temperatures, before the channel's Function is applied. Smoothing and hysteresis can make the actual duty differ.",
             createProfile: 'Create Profile',
-            editProfile: 'Edit Profile',
             deleteProfile: 'Delete Profile',
-            noProfiles: 'No profiles configured',
             profileType: 'Profile Type',
             fixedDuty: 'Fixed Fan Speed',
-            selectedPointDuty: 'Selected Point Duty',
-            selectedPointTemp: 'Selected Point Temperature',
             tempSource: 'Temperature Source',
             memberProfiles: 'Member Profiles',
             mixFunction: 'Mix Function',
@@ -668,10 +751,9 @@ export default {
             function: 'Function',
             functionToApply: 'Function to apply',
             graphProfileMouseActions:
-                'Graph Profile Mouse actions:\n- Scroll to zoom.\n- Left-click on line to add point.\n- Right-click on point to remove.\n- Drag point to move.',
+                'Graph Profile Mouse actions:\n- Ctrl+Scroll to zoom.\n- Left-click on line to add point.\n- Right-click on point to remove.\n- Drag point to move.',
             unsavedChanges: 'There are unsaved changes made to this Profile.',
             unsavedChangesHeader: 'Unsaved Changes',
-            appliedFunction: 'Applied Function',
             newProfile: 'New Profile',
             tooltip: {
                 profileType:
@@ -679,6 +761,7 @@ export default {
             },
             profileDeleted: 'Profile Deleted',
             profileDuplicated: 'Profile Duplicated',
+            usedBy: 'Used by',
             deleteProfileConfirm: 'Are you sure you want to delete: "{name}"?',
             deleteProfileWithChannelsConfirm:
                 '"{name}" is currently being used by: {channels}.\nDeleting this Profile will reset those channels\' settings.\nAre you sure you want to delete "{name}"?',
@@ -694,8 +777,6 @@ export default {
             offsetTypeGraph: 'Graph Offset',
             baseProfile: 'Base Profile',
             baseProfileRequired: 'A Base Profile is required for an Overlay Profile.',
-            selectedPointOutputDuty: 'Selected Point Profile Output Duty',
-            selectedPointOffset: 'Selected Point Offset Duty',
             profileOutputDuty: 'Profile Output Duty',
             offsetDuty: 'Offset Duty',
             points: 'Points',
@@ -706,27 +787,11 @@ export default {
             curveLimitedByAmdGpu: 'Curve limited to {n} points by AMD GPU hardware fan curve.',
             curveLimitedByFirmware: 'Curve limited to {n} points by device firmware fan curve.',
         },
-        controls: {
-            viewType: 'View Type',
-            controlOrView: 'Control or View',
-            title: 'System Controls',
-            noControllableChannels: 'No controllable channels found.',
-            noControlChain: 'No control chain found for this channel.',
-            controlFlow: 'Control Flow',
-            backToOverview: 'Back to Controls Overview',
-            switchProfile: 'Switch Profile',
-            switchTempSource: 'Switch Temperature Source',
-            switchFunction: 'Switch Function',
-            switchMembers: 'Switch Member Profiles',
-            switchBaseProfile: 'Switch Base Profile',
-            adjustFixedSpeed: 'Adjust Fixed Speed',
-            editSources: 'Edit Sources',
-        },
         modes: {
             createMode: 'Create Mode',
             editMode: 'Edit Mode',
+            updateToCurrent: 'Save Current Settings to Mode',
             deleteMode: 'Delete Mode',
-            noModes: 'No modes configured',
             deleteModeConfirm: 'Are you sure you want to delete the Mode: "{name}"?',
             updateModeConfirm:
                 'Are you sure you want to overwrite "{name}" with the current configuration?',
@@ -734,16 +799,8 @@ export default {
         },
         functions: {
             createFunction: 'Create Function',
-            editFunction: 'Edit Function',
             deleteFunction: 'Delete Function',
-            noFunctions: 'No functions configured',
             saveFunction: 'Save Function',
-            functionType: 'Function Type',
-            functionTypeTooltip:
-                'Function types:<br/>' +
-                '- <b>Identity</b>: Applies step size limits but otherwise passes the profile value unchanged.<br/>' +
-                '- <b>Standard</b>: Applies step size limits and hysteresis settings for precise control over fan response timing and stability.<br/>' +
-                '- <b>Exponential Moving Average</b>: Smooths temperature fluctuations using a weighted average. Simpler but less precise than Standard.',
             stepSizeTitle: 'Step Size',
             fixedStepSize: 'Fixed',
             fixedStepSizeTooltip:
@@ -778,13 +835,6 @@ export default {
             stepSizeMaxDecreasing: 'Maximum Decreasing',
             stepSizeMaxDecreasingTooltip:
                 'Maximum step size when fan speed is decreasing.\nLimits how quickly fans can slow down per update.',
-            windowSize: 'Window Size',
-            windowSizeTooltip:
-                'Window temperature sample size used in the exponential moving average calculation.\nSmaller values = faster response, more reactive to temperature spikes.\nLarger values = slower response, smoother fan speed transitions.\nTip: Use a Standard Function for precise control over response timing.',
-            emaCustomSensorAvailableNote:
-                'EMA is also available as a Custom Sensor type, which lets you graph the smoothed temperature directly.',
-            emaDeprecatedWarning:
-                'The EMA Function type is deprecated. Please switch to the EMA Custom Sensor type.',
             hysteresis: 'Advanced Hysteresis',
             hysteresisThreshold: 'Threshold',
             hysteresisThresholdTooltip:
@@ -794,7 +844,6 @@ export default {
                 'Response delay (seconds) before applying fan speed changes.\nTemporary temperature spikes within this delay are ignored, smoothing out fluctuations.',
             onlyDownward: 'Only Downward',
             onlyDownwardTooltip: 'Only apply hysteresis settings when temperature is decreasing.',
-            general: 'General',
             stepOverrides: 'Step Overrides',
             thresholdHopping: 'Threshold Hopping',
             thresholdHoppingTooltip:
@@ -808,25 +857,15 @@ export default {
             newFunction: 'New Function',
             functionDeleted: 'Function Deleted',
             functionDuplicated: 'Function Duplicated',
+            usedBy: 'Used by',
             deleteFunctionConfirm: 'Are you sure you want to delete "{name}"?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" is currently being used by the Profiles: {profiles}.\nDeleting this Function will reset those Profiles\' Functions.\nAre you sure you want to delete "{name}"?',
-            functionUpdated: 'Function Updated',
-            functionUpdateError: 'There was an error attempting to update this Function',
         },
         error: {
             accessDenied: 'Access Denied',
             accessDeniedMessage: 'Authentication failed. Please check your password and try again.',
             connectionError: 'CoolerControl Connection Error',
-            connectionToast: 'Unable to connect to daemon',
-            connectionToastDetail:
-                'Unable to connect to the daemon. Please ensure the service is running and try reconnecting.',
-            connectionRetryFailure: 'Connection failed - retry failed',
-            connectionRetryDetail: 'Could not connect to daemon after multiple attempts.',
-            errorLoadingGraph: 'Error loading graph',
-            highCpuUsageWarning: 'High CPU usage detected',
-            highCpuUsageDetail:
-                'The current CPU usage is high.\nTo reduce system impact, consider:\n1. Reducing the number of displayed charts\n2. Reducing the number of monitored sensors\n3. Increasing the polling interval',
             pageNotFound: 'Page Not Found',
             returnToDashboard: 'Return to Dashboard',
             connectionErrorMessage: 'Could not connect to the CoolerControl Daemon.',
@@ -843,13 +882,6 @@ export default {
             sslTooltip: 'Whether to connect to the daemon using SSL/TLS.',
             saveTooltip: 'Save settings and reload the UI',
             resetTooltip: 'Reset to default settings',
-        },
-        singleDashboard: {
-            minutes: 'min',
-            chartMouseActions:
-                'Dashboard Mouse actions:\n- Highlight to zoom.\n- Scroll to zoom.\n- Right-click to pan when zoomed.\n- Double-click to reset and resume updating.',
-            timeRange: 'Time Range',
-            chartType: 'Chart Type',
         },
         mode: {
             activateMode: 'Activate Mode',
@@ -892,44 +924,19 @@ export default {
             unsavedChangesHeader: 'Unsaved Changes',
             imageTooLarge: 'Image is too large. Please choose a smaller one.',
             notImageType: 'Image does not register as an image type',
+            gifNotSupported: "This screen's firmware cannot display gifs. Choose a static image.",
         },
         shortcuts: {
+            browserHint:
+                'In a web browser, use Ctrl+Alt+number instead (browsers reserve Ctrl+number for tab switching).',
             shortcuts: 'Keyboard Shortcuts',
             ctrl: 'Ctrl',
-            alt: 'Alt',
-            left: 'Left',
-            right: 'Right',
             comma: ',',
-            h: 'h',
-            a: 'a',
-            c: 'c',
-            i: 'i',
-            slash: '/',
-            one: '1',
-            two: '2',
-            three: '3',
-            four: '4',
-            f11: 'F11',
             viewShortcuts: 'Keyboard Shortcuts',
-            home: 'Home Page',
             settings: 'Settings',
-            info: 'Application Info',
-            dashboardOne: 'Dashboard One',
-            dashboardTwo: 'Dashboard Two',
-            dashboardThree: 'Dashboard Three',
-            dashboardFour: 'Dashboard Four',
-            alerts: 'Alerts',
-            controls: 'Controls',
-            sideMenuCollapse: 'Collapse Side Menu',
-            sideMenuExpand: 'Expand Side Menu',
-            fullScreen: 'Full Screen',
         },
     },
     components: {
-        confirmation: {
-            title: 'Confirmation',
-            message: 'Are you sure?',
-        },
         aseTek690: {
             sameDeviceID:
                 'The legacy NZXT Krakens and the EVGA CLC happen to have the same device ID and CoolerControl can not determine which device is connected. This is required for proper device communication.',
@@ -941,9 +948,6 @@ export default {
             rejectLabel: "No, It's a EVGA CLC Device",
         },
         password: {
-            title: 'Enter Your Password',
-            newPasswordTitle: 'Enter A New Password',
-            invalidPassword: 'Invalid Password',
             forgotPassword: 'Forgot password?',
             forgotPasswordHelpIntro:
                 'Run this command in a terminal as root, then click Reload UI:',
@@ -956,48 +960,6 @@ export default {
         },
         notFound: {
             message: 'Just like the perfect Linux 🐧 distro,\nthis page does not exist.',
-        },
-        helloWorld: {
-            message: "You've successfully created a project with Vite + Vue 3. What's next?",
-        },
-        dashboardInfo: {
-            description:
-                "Dashboards enable you to view your system's sensor data according to your preferences. You can choose between time-based or table-based charts and adjust the filters and settings for each chart to focus on the specific data you want to view. Additionally, you can create multiple dashboards customized to suit your needs.",
-        },
-        modeInfo: {
-            description:
-                "Modes enable you to save device channel settings for quick and easy application. For example, you can create a 'Gaming' Mode and a 'Silent' Mode, allowing you to easily switch between them.",
-            note: 'Please note that creating different Fan Profiles may be necessary for each Mode, as Modes only include channel configurations and do not encompass internal Profile or Function settings.',
-        },
-        alertInfo: {
-            description:
-                'Alerts are used to notify you when specific conditions occur. They can monitor temperatures and fan speeds to ensure your system is running properly. Alerts are configured for specific sensor value ranges and send notifications when values exceed or return to acceptable threshold ranges.',
-        },
-        customSensorInfo: {
-            title: 'Custom Sensor Overview',
-            description:
-                'Custom sensors allow you to combine existing sensors in various ways, enhancing your control and efficiency over system cooling. Additionally, they support file-based data, enabling you to script external sensor inputs for greater flexibility.',
-            note: 'Note: You can use Mix Profiles to combine multiple Custom Sensor outputs.',
-        },
-        functionInfo: {
-            title: 'Function Overview',
-            description:
-                'Functions are configurable algorithms applied to profile outputs. They enable you to manage when fan speed changes occur, adjust hysteresis settings, and use moving averages for dynamic temperatures.',
-            identityFunction:
-                "The Identity function is the simplest option as it doesn't modify the computed profile output; it only allows you to set minimum and maximum speed change ranges. This is particularly beneficial for minimizing constant fan speed fluctuations.",
-        },
-        profileInfo: {
-            title: 'Profile Overview',
-            description:
-                'Profiles define customizable settings for controlling fan speeds, with the same profile being usable for multiple fans. Types include:',
-            type: {
-                fixed: 'Fixed Speed',
-                fanCurve: 'Fan Curve/Graph',
-                mix: 'Mix Profile',
-                default: 'Default Device Settings',
-            },
-            additionalInfo:
-                'Profiles are the foundation for controlling fan speeds and can be further enhanced by applying more advanced algorithm functions.',
         },
         deviceInfo: {
             details: 'Device Details',
@@ -1012,63 +974,41 @@ export default {
             locations: 'Locations',
         },
         onboarding: {
+            search: 'Search',
+            searchDesc:
+                'Find any device, sensor, setting or action from here. Press Ctrl+K from anywhere in the app.',
             welcome: 'Welcome to CoolerControl!',
             gettingStartedIntro:
-                'Pick a tour to get oriented. The Quick Tour covers the essentials in a few steps. The Thorough Tour walks through every menu and button.',
-            startTourAgain: 'You can start this tour again at any time from the Info & Tools page.',
-            quickTour: 'Quick Tour',
-            thoroughTour: 'Thorough Tour',
+                'Take a quick tour to get oriented. It walks through the navigation rail and the main areas of the app.',
+            startTourAgain: 'You can start this tour again at any time from Settings.',
+            startTour: 'Start Tour',
             maybeLater: 'Maybe Later',
             openGettingStarted: 'Open Getting Started Docs',
-            finishLater: "I'll Do It Myself",
-            appInfo: 'Info & Tools',
-            appInfoDesc:
-                'View app info, daemon status, logs, helpful links, and stress test tools. A badge on the logo alerts you to any issues.',
-            controls: 'Controls',
-            controlsDesc:
-                'Adjust fan speeds, apply Profiles, and manage every detected channel from one place.',
-            profiles: 'Profiles',
-            profilesDesc:
-                'Profiles define how a fan responds to temperature changes. Graph Profiles let you draw custom fan curves and can be reused across multiple devices.',
-            functions: 'Functions',
-            functionsDesc:
-                'Functions are applied to Profiles to smooth fan speed transitions and reduce noise.',
-            systemMenu: 'System Menu',
-            systemMenuDesc:
-                "The main menu lists this system's devices and sensors. Each section can be expanded to view its channels and assigned controls.",
-            dashboards: 'Dashboards',
-            dashboardsDesc:
-                'Dashboards let you create custom views with charts and graphs to monitor temperatures, fan speeds, and other sensor data in real time.',
-            modes: 'Modes',
-            modesDesc:
-                'Modes are saved collections of your settings. Switch between configurations like Silent and Performance with a single click.',
-            alerts: 'Alerts',
-            alertsDesc:
-                'Alerts notify you when sensor values exceed the thresholds you choose, so you can react before issues become problems.',
-            customSensors: 'Custom Sensors',
-            customSensorsDesc:
-                'Custom Sensors combine existing sensor data in different ways, or run your own scripted output as a temperature source.',
-            quickAdd: 'Quick Add',
-            quickAddDesc: 'Quickly create new Dashboards, Profiles, Functions, and more.',
-            dashboardQuick: 'Dashboard Quick Menu',
-            dashboardQuickDesc: 'Jump to any dashboard, even when the main menu is collapsed.',
-            modesQuick: 'Modes Quick Menu',
-            modesQuickDesc: 'Switch between your saved Modes from anywhere in the app.',
-            alertsQuick: 'Alerts Overview',
-            alertsQuickDesc:
-                'View the current status of every alert and inspect their recent activity.',
-            pluginsQuick: 'Plugins Overview',
-            pluginsQuickDesc:
-                'Browse installed plugins and jump to any of them from anywhere in the app.',
+            finishLater: 'Got It, Thanks',
+            home: 'Home',
+            homeDesc:
+                'The application home page: daemon status and device health at a glance, plus logs, app info, helpful links, and stress-test tools.',
+            cooling: 'Cooling',
+            coolingDesc:
+                'Your fan control hub: adjust fan speeds and pumps, and apply Profiles and Functions to any channel.',
+            monitoring: 'Monitoring',
+            monitoringDesc:
+                'Build Dashboards, watch every sensor, and set up Alerts to track your system in real time.',
+            devices: 'Devices',
+            devicesDesc:
+                'Review detected hardware, configure per-device features like RGB lighting and LCD screens, and create Custom Sensors.',
+            plugins: 'Plugins',
+            pluginsDesc: 'Browse and open installed plugins that extend CoolerControl.',
             settings: 'Settings',
             settingsDesc: 'Configure UI preferences, daemon options, and system behavior.',
             access: 'Access',
-            accessDesc: 'Manage your password and confirm your current access level.',
+            accessDesc:
+                'Log in or out and change your password, and manage Access Tokens that grant tools and plugins API access.',
             restartMenu: 'Restart Menu',
             restartMenuDesc: 'Reload the UI or restart the system daemon when needed.',
-            collapseMenu: 'Collapse Menu',
-            collapseMenuDesc:
-                'Expand or collapse the main menu to give the rest of the app more room.',
+            modes: 'Modes',
+            modesDesc:
+                'Modes are saved collections of your settings. Switch between configurations like Silent and Performance, or manage them, right here.',
             thatsIt: "That's it!",
             startNow:
                 "You're all set. Open the Getting Started docs to learn more, or jump in and start configuring your devices.",
@@ -1087,8 +1027,6 @@ export default {
             device: 'Device',
             channel: 'Channel',
             current: 'Current',
-            min: 'Min',
-            max: 'Max',
             range: 'Range',
             average: 'Average',
             resetStats: 'Reset',
@@ -1100,7 +1038,6 @@ export default {
         menuTagAssign: {
             title: 'Assign Tags',
             noTags: 'No tags yet.',
-            newTag: 'Create New Tag',
             tagName: 'Tag name',
             editTag: 'Edit tag',
             deleteTag: 'Delete tag',
@@ -1108,12 +1045,17 @@ export default {
         wizards: {
             calibration: {
                 title: 'Calibrate Fans',
-                tooltip: 'Calibrate multiple fans for consistent speed control',
                 pickIntro:
-                    'Select the fans to calibrate. Already-calibrated fans are unchecked by default.',
+                    'Select the fans to calibrate. Already-calibrated and firmware-controlled fans are unchecked by default.',
                 noFans: 'No controllable fans were detected.',
                 selectAll: 'Select all',
                 calibratedBadge: 'calibrated',
+                firmwareControlledBadge: 'firmware-controlled',
+                firmwareControlledDesc:
+                    "The firmware runs this channel's profile. A calibration still applies: its duty mapping is baked into the curve handed to the firmware. The startup kick is not, because a firmware curve cannot express it.",
+                blockedByAlert: "blocked: alert '{name}' is active",
+                alertsPausedNote:
+                    '{count} alert(s) watch the selected fans and are paused while each fan sweeps.',
                 idleNote:
                     'Calibration ramps each fan across its range. Best run at idle: it is noisy and takes a few minutes per fan.',
                 concurrencyLabel: 'Fans at a time',
@@ -1160,7 +1102,7 @@ export default {
                 createNewFunction: 'New Function',
                 existingFunction: 'Choose Function',
                 defaultFunction: 'Default Function',
-                chooseFunctionNameType: 'Choose a Function Name and Type',
+                chooseFunctionName: 'Choose a Function Name',
                 newFunctionName: 'Function for {profileName}',
                 summary: 'Summary',
                 aNewProfile: 'A new Profile',
@@ -1185,21 +1127,14 @@ export default {
                 selectProfiles: 'Select Profiles',
                 profilesTooltip: 'Select one or more Profiles to apply this Function to.',
             },
-            customSensor: {
-                new: 'New Custom Sensor',
-            },
             generate: {
                 title: 'Auto-Create Profiles',
-                tooltip: 'Auto-create profiles for your fans from a few choices',
-                stepFans: 'Assign Fans',
-                stepTemps: 'Key Temps',
-                stepPreset: 'Performance',
                 assignIntro: 'Assign each fan a role. Leave a fan unset to skip it.',
                 calibrateFirst: 'Calibrate fans first for best consistency (a few minutes)',
                 skip: 'Skip',
                 noFans: 'No controllable fans were detected.',
                 tempsIntro:
-                    'Confirm your key temperatures. These are pre-filled as a best guess: please verify them.',
+                    'Choose the temperatures your setup should follow. Leave one empty to keep it out: a system with integrated graphics needs no GPU temp, and picking one is what involves the GPU in radiator and case fan curves.',
                 cpuTemp: 'CPU temp',
                 gpuTemp: 'GPU temp',
                 liquidTemp: 'Liquid temp',
@@ -1209,16 +1144,15 @@ export default {
                 perKindOverrides: 'Per-role overrides (advanced)',
                 cfmCaveat:
                     'Positive-pressure bias is duty-based, not airflow-aware: with lopsided fan counts it cannot guarantee positive pressure.',
-                generate: 'Generate',
-                preview: 'Preview',
                 previewIntro:
                     'Review what will be created and applied. Nothing is saved until you confirm.',
                 previewAssignments: 'Fan assignments',
+                reusedHeader: 'Already exists',
+                reused: 'reused',
                 willCreateHeader: 'Will be created',
                 startingPointNote:
-                    "An easy starting point instead of building from scratch. These won't be perfect for every system, so verify, test, and tweak them after creating.",
+                    'A general starting point for your fan setup, meant to be tweaked rather than left as-is.',
                 replaces: 'replaces {name}',
-                createApply: 'Create & Apply',
                 generated: 'Generated {count} profiles.',
                 generateError: 'Could not generate profiles.',
                 applyError: 'Could not create the profiles.',
@@ -1237,7 +1171,7 @@ export default {
             title: 'Device Channel Settings',
             firmwareControlledProfile: 'Firmware-controlled Profile',
             firmwareControlledProfileDesc:
-                'When enabled, the device firmware manages the fan profile.\nUseful for hardware that does not respond well to frequent software speed changes.\nOnly available for Graph Profiles that use device-internal temperature sensors.\nFunction settings do not apply.',
+                'When enabled, the device firmware manages the fan profile.\nUseful for hardware that does not respond well to frequent software speed changes.\nOnly available for Graph Profiles that use device-internal temperature sensors.\nFunction settings do not apply.\nOn a calibrated channel the curve points are mapped through the calibration, but the startup kick does not apply.',
             saveError: 'Failed to save channel extension settings',
             firmwareControlDisabled:
                 'Firmware control is not available with the current settings.\nUse a Graph Profile for this device with a supported internal temperature sensor.',
@@ -1246,6 +1180,8 @@ export default {
                 description:
                     'Sweep the fan to learn its actual duty-to-RPM curve, then control the channel as RPM-normalized true-duty.\nRemoves dead zones at low duty and saturation at high duty.\nKick-in is also handled automatically when the fan is calibrated: a brief startup boost spins the fan up from rest before settling to the target duty.\nThe sweep typically takes several minutes, and can run noticeably longer for slow-to-respond fans. The channel is written to 0% at the start.',
                 statusNotCalibrated: 'Not calibrated',
+                blockedByAlert: "Calibration is blocked: alert '{name}' is active on this fan.",
+                alertsPausedNote: 'Alerts watching this fan are paused during the sweep.',
                 statusInProgress: 'Calibrating: {stage} ({percent}%)',
                 statusCompleted: 'Calibrated (smooth, mapping active)',
                 statusCompletedStepped: 'Calibrated (step-curve, mapping disabled)',
@@ -1264,11 +1200,11 @@ export default {
                 buttonRecalibrate: 'Re-calibrate',
                 buttonCancel: 'Cancel',
                 buttonClear: 'Clear',
+                clearConfirm:
+                    'Clear the calibration for {channel}? Running it again takes several minutes.',
                 buttonViewCurve: 'View Curve',
                 caveatsBanner:
                     'Calibrating several primary cooling fans at once can raise system temperature.\nPush-pull radiator fans diagnosed in parallel may produce inaccurate readings.\nKeep the system idle during calibration.',
-                completedNotice:
-                    'Calibration active. Fan curves and manual duties on this channel now control RPM-normalized true-duty. Revisit your profile values if needed.',
                 clearedNotice:
                     'Cleared. Fan curves on this channel now control device duty directly.',
                 startError: 'Failed to start calibration',
@@ -1306,9 +1242,6 @@ export default {
             axisRpm: 'RPM',
             legendUp: 'Up sweep',
             legendDown: 'Down sweep',
-            markerStart: 'Start',
-            markerSustain: 'Sustain',
-            markerSaturate: 'Near plateau',
             markerStable: 'Stable floor',
             curveKindSmooth: 'Smooth (mapping active)',
             curveKindStepped: 'Stepped (mapping disabled)',
@@ -1386,12 +1319,6 @@ export default {
         setNewPassword: 'Enter A New Password',
         changeDefaultPassword:
             'Please set a password to prevent unauthorized access. This is separate from your system account.',
-        loginFailed: 'Login Failed',
-        invalidPassword: 'Invalid Password',
-        passwordSetFailed: 'Set Password Failed',
-        passwordSetSuccessfully: 'New password set successfully',
-        logoutSuccessful: 'You have successfully logged out.',
-        unauthorizedAction: 'You need to be logged in to complete this action',
         accessTokens: 'Access Tokens',
         tokenLabel: 'Label (e.g. cctv)',
         tokenExpiry: 'Expiry Date (optional)',
@@ -1427,16 +1354,101 @@ export default {
             hasErrors: 'Has Errors',
         },
     },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'Close to System Tray?',
+            body: 'The CoolerControl daemon keeps running in the background either way, so your cooling settings stay active. Keep the UI in the system tray for quick access and desktop notifications, or quit it entirely.',
+            keepInTray: 'Keep in Tray',
+            quit: 'Quit',
+            remember: 'Remember my choice',
+        },
+        tray: {
+            show: '&Show',
+            hide: '&Hide',
+            daemonConnection: '&Daemon Connection…',
+            quit: '&Quit',
+            modes: 'Modes',
+            sensors: 'Sensors',
+            daemons: 'Daemons',
+        },
+        // Shown when the daemon cannot be reached, so the UI itself may never have
+        // loaded. Qt falls back to English until a successful run caches these.
+        cert: {
+            title: 'Unverified Daemon Certificate',
+            changedTitle: 'Certificate Changed',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 uses a self-signed certificate, which cannot be verified automatically. Continue only if you recognise this daemon.',
+            changedBody:
+                'The certificate for %1 is not the one previously trusted. This can mean the daemon was reinstalled, or that something is intercepting the connection.',
+            fingerprint: 'Fingerprint (SHA-256):',
+            trust: 'Trust This Certificate',
+            cancel: 'Cancel',
+        },
+        wizard: {
+            windowTitle: 'Daemon Connection Error',
+            windowTitleOk: 'Daemon Connection',
+            apply: '&Apply',
+            retry: '&Retry',
+            quitApp: '&Quit App',
+            introPurpose:
+                'These settings control how the desktop app connects to the CoolerControl daemon.',
+            introFailed: 'A connection to the CoolerControl Daemon could not be established.',
+            introCheckService:
+                'Please make sure that the systemd service is running and available.',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'Check the %1 for installation instructions.',
+            introDocsLink: 'docs website',
+            introCommands: 'Some helpful commands to enable and verify the daemon status:',
+            introCustomAddress:
+                'If you have configured a non-standard address to connect to the daemon, you can set it in the following steps:',
+            lastError: 'Last error:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon: 'The address answered, but not as a CoolerControl daemon (HTTP %1).',
+            errorCertUntrusted: "The daemon's certificate was not trusted.",
+            errorCertInvalid:
+                "The daemon's certificate does not validate, and certificate validation is enabled.",
+            savedLabel: 'Saved connection:',
+            newConnection: 'New connection…',
+            removeConnection: 'Remove',
+            removeConnectionTooltip: 'Forget the selected daemon.',
+            removeConnectionBody: 'Stop offering this daemon in the tray?',
+            nameLabel: 'Name:',
+            nameTooltip: 'Optional label for this daemon. Blank shows host:port.',
+            addressTitle: 'Daemon Address - Desktop Application',
+            addressSubtitle: 'Adjust the address fields as necessary.',
+            hostLabel: 'Host address:',
+            hostTooltip:
+                'The IPv4, IPv6 address or hostname to use to communicate with the daemon.',
+            portLabel: 'Port:',
+            portTooltip: 'The port number to use to communicate with the daemon.',
+            sslTooltip: 'Enable or disable SSL/TLS (HTTPS)',
+            strictTls: 'Validate certificate',
+            strictTlsTooltip:
+                "Require a certificate that validates normally. Leave off to use the daemon's self-signed certificate, which is trusted on first use for remote daemons.",
+            defaults: 'Defaults',
+            defaultsTooltip: 'Reset the daemon address to default values',
+            forgetCerts: 'Forget Trusted Certificates',
+            forgetCertsTooltip:
+                'Remove the remote daemon certificates this app has been told to trust.',
+            forgetCertsBody:
+                'These daemon certificates are currently trusted. Forgetting them means you will be asked to confirm the next time you connect.',
+        },
+        versionMismatch: {
+            title: 'Version Mismatch',
+            text: 'The desktop app version (%1) does not match the daemon version (%2).',
+            informative: 'Please restart the desktop app to load the correct interface version.',
+            quitApp: '&Quit App',
+            continueAnyway: 'Continue Anyway',
+        },
+    },
     device_store: {
         unauthorized: {
             summary: 'Session expired',
             detail: 'Your session has expired. Reloading to log in again.',
         },
         login: {
-            success: {
-                summary: 'Success',
-                detail: 'Login successful.',
-            },
             failed: {
                 summary: 'Login Failed',
                 detail: 'Invalid Password',
@@ -1453,9 +1465,6 @@ export default {
             set_success: {
                 summary: 'Password',
                 detail: 'New password set successfully',
-            },
-            set_failed: {
-                summary: 'Set Password Failed',
             },
         },
         asetek: {
@@ -1492,11 +1501,6 @@ export default {
                 mix: 'Mix',
                 overlay: 'Overlay',
             },
-            functionType: {
-                identity: 'Identity',
-                standard: 'Standard',
-                exponentialMovingAvg: 'Exponential Moving Average',
-            },
             mixFunctionType: {
                 min: 'Min',
                 max: 'Max',
@@ -1528,6 +1532,10 @@ export default {
             highContrastDark: 'High Contrast Dark',
             highContrastLight: 'High Contrast Light',
             custom: 'Custom Theme',
+        },
+        interfaceFont: {
+            bundled: 'Bundled (IBM Plex)',
+            system: 'System',
         },
         channelViewType: {
             control: 'Control',
@@ -1572,7 +1580,6 @@ export default {
         },
         channelType: {
             lcd: 'LCD',
-            lighting: 'Lighting',
         },
     },
 }

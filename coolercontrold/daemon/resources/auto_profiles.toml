@@ -1,0 +1,295 @@
+# Auto-create-profiles tuning data.
+#
+# This file holds the per-kind, per-preset "setups" the auto-create-profiles wizard uses to build
+# fan curves, functions, and smoothing sensors. It is compiled into the daemon (include_str!), so
+# editing it means opening a pull request; a unit test parses and validates this exact file, so a
+# malformed edit fails CI rather than reaching a running daemon.
+#
+# Contributors: this is the file to tweak. You can change any number here (curve shapes, function
+# deviance/response, EMA windows, the pump duty, the case pressure bias) and the wizard's output
+# changes accordingly. What you canNOT do here is add a new preset or fan kind, or change the
+# control flow (which temp each kind follows, when smoothing is applied, the minimum-duty floor):
+# those live in the Rust code because they carry safety invariants.
+#
+# Rules the validator enforces:
+#   - Every curve's temps strictly increase, its duties never decrease, and no duty exceeds 100.
+#   - Every curve needs at least 3 points spanning at least 20C. The UI draws the graph on an axis
+#     spanning the curve's own points, so fewer points or a narrower span render as a cliff across
+#     an empty chart. When a signal's usable range is narrower than 20C (the radiator Delta tops
+#     out near 15C), reach the top duty at the reachable knee and pad the rest of the span with
+#     repeated duties rather than stretching the ramp past what the sensor ever reads.
+#   - Every `function = "name"` must reference a table under [functions].
+#   - [scale] nominal_dead_zone_percent must be within 0..=99.
+#   - Every kind must define all three presets (silent, balanced, performance).
+#
+# Entry shapes:
+#   type = "graph"  -> { curve = [[temp, duty], ...], smoothing?, function = "name" }
+#   type = "fixed"  -> { duty = <0..100> }
+# `smoothing` omitted means the raw temp is followed; `smoothing = { ema_window_seconds = N }`
+# wraps the source in an N-second EMA custom sensor (skipped automatically if the system has no
+# custom-sensors device). Temps are decimals (45.0), duties are whole percents (25).
+
+# ---------------------------------------------------------------------------
+# The scale the curves below are written in, and how to leave it.
+#
+# Curves here are plain PWM percentages, which is what an uncontrolled channel writes straight to
+# the hardware. A calibrated channel reads a profile's duty as TRUE duty instead: the fraction of
+# the fan's usable RPM span above its floor, with the dead zone the fan cannot spin in already
+# taken out. The same number therefore means a much faster fan once calibrated, so the generator
+# converts each curve for calibrated channels with
+#
+#   true = (pwm - dead) / (100 - dead), floored at 1%
+#
+# Both ends are exact rather than modelled, because they are the same physical state on either
+# scale: 0 is a stopped fan and 100 is the fan flat out. Only what lies between them is an
+# approximation of the fan's response.
+#
+# `dead` is the PWM a typical fan starts turning at. Converting through each fan's own calibration
+# instead would be exact, but the curve would then be fan-specific and could no longer be shared by
+# the fans of a kind, so the generator uses this one nominal figure. Raise it if generated profiles
+# run calibrated fans too fast, lower it if too slow.
+# ---------------------------------------------------------------------------
+[scale]
+nominal_dead_zone_percent = 25
+
+# ---------------------------------------------------------------------------
+# Shared functions. Referenced by name from graph entries. A table with none of
+# deviance/only_downward/response_delay is a plain (Identity) function; any of them present makes it
+# a Standard hysteresis function. Silent presets lean on EMA smoothing instead of hysteresis, so
+# they use the plain function.
+# ---------------------------------------------------------------------------
+# `name` is the display name of the generated function entity. Optional step-size fields tune the
+# per-tick duty change and may be added to any function: step_size_min, step_size_max,
+# step_size_min_decreasing, step_size_max_decreasing. Omitting them (as below) keeps today's daemon
+# defaults (2 / 100 / 0 / 0); set them if you find better values.
+[functions.identity]
+name = "Auto Fan (Silent)"
+
+[functions.balanced]
+name = "Auto Fan (Balanced)"
+deviance = 2.0
+only_downward = true
+response_delay = 2
+
+[functions.performance]
+name = "Auto Fan (Performance)"
+deviance = 1.0
+only_downward = true
+response_delay = 1
+
+# The Silent pump holds shelves rather than tracking the temp: a pump gains little from constant
+# speed changes, so this function makes it climb a step at once and take a real 3C drop before
+# falling back, which stops it flapping across a riser.
+[functions.pump]
+name = "Auto Pump (Silent)"
+deviance = 3.0
+only_downward = true
+response_delay = 20
+
+# Laptops run hot and hold heat, so their functions use a larger deviance and a slower down-ramp
+# to avoid surging. Silent is the slowest.
+[functions.laptop_silent]
+name = "Auto Laptop (Silent)"
+deviance = 5.0
+only_downward = true
+response_delay = 5
+
+[functions.laptop_balanced]
+name = "Auto Laptop (Balanced)"
+deviance = 3.0
+only_downward = true
+response_delay = 3
+
+[functions.laptop_performance]
+name = "Auto Laptop (Performance)"
+deviance = 2.0
+only_downward = true
+response_delay = 1
+
+# ---------------------------------------------------------------------------
+# CPU air cooler. Follows the CPU temp. The curve floor is raised to the channel's minimum duty in
+# code, so a low Silent floor never stalls the fan.
+# ---------------------------------------------------------------------------
+[cpu_cooler.silent]
+type = "graph"
+curve = [[45.0, 20], [60.0, 40], [75.0, 70], [85.0, 100]]
+smoothing = { ema_window_seconds = 8 }
+function = "identity"
+
+[cpu_cooler.balanced]
+type = "graph"
+curve = [[35.0, 30], [55.0, 55], [75.0, 90], [85.0, 100]]
+function = "balanced"
+
+[cpu_cooler.performance]
+type = "graph"
+curve = [[30.0, 40], [50.0, 70], [65.0, 100]]
+function = "performance"
+
+# ---------------------------------------------------------------------------
+# GPU fan. Follows the GPU temp. The low-temp 0% entries preserve the card's zero-RPM idle, so the
+# floor is NOT clamped to the channel minimum in code. Silent and Balanced repeat that 0% right up
+# to the knee so the fans stay stopped until it: interpolating up from a single 0% point trickles
+# duty in well below the knee, which spins a card designed to sit still until it is under load, and
+# lands a card that has a minimum duty floor on that floor. Performance has no 0% entry and keeps
+# its fans turning from idle.
+#
+# These curves are also the GPU member of a radiator Mix, which is why the 0% opening matters
+# twice: as a Mix member the curve must be able to contribute nothing, or an idle card would hold
+# the radiator fans above the speed the loop curve asks for.
+# ---------------------------------------------------------------------------
+[gpu_fan.silent]
+type = "graph"
+curve = [[45.0, 0], [54.0, 0], [55.0, 30], [70.0, 60], [83.0, 90]]
+smoothing = { ema_window_seconds = 8 }
+function = "identity"
+
+[gpu_fan.balanced]
+type = "graph"
+curve = [[45.0, 0], [59.0, 0], [60.0, 40], [75.0, 80], [85.0, 100]]
+function = "balanced"
+
+[gpu_fan.performance]
+type = "graph"
+curve = [[40.0, 30], [55.0, 65], [70.0, 100]]
+function = "performance"
+
+# ---------------------------------------------------------------------------
+# AIO pump. Tracks the CPU temp (liquid as fallback) since it pulls heat off the die. A pump gains
+# little from continuous speed changes, so Silent is a 3-speed staircase (50% / 70% / 100%) with
+# flat shelves and short risers rather than a ramp, and Balanced and Performance skip the question
+# entirely by running a fixed 100% for maximum flow.
+# ---------------------------------------------------------------------------
+[aio_pump.silent]
+type = "graph"
+curve = [
+  [
+    45.0,
+    50,
+  ],
+  [
+    65.0,
+    50,
+  ],
+  [
+    67.0,
+    70,
+  ],
+  [
+    78.0,
+    70,
+  ],
+  [
+    80.0,
+    100,
+  ],
+  [
+    85.0,
+    100,
+  ],
+]
+smoothing = { ema_window_seconds = 8 }
+function = "pump"
+
+[aio_pump.balanced]
+type = "fixed"
+duty = 100
+
+[aio_pump.performance]
+type = "fixed"
+duty = 100
+
+# ---------------------------------------------------------------------------
+# AIO radiator. Follows the loop's thermal signal, preferring a liquid-minus-ambient Delta, then the
+# raw liquid temp, then the CPU temp as a fallback (the CPU-fallback curve reuses the cpu_cooler
+# curve in code). The liquid and Delta signals are slow-moving, so no EMA smoothing is applied.
+#
+# A loop's usable range is narrow at both bands, so each curve reaches its top duty where the
+# signal really tops out and then holds it flat out to the 20C span the UI needs. A running loop
+# sits between 24C and 35C, so the liquid curves are at full speed by 35C; Delta ends near 15C.
+#
+# Selecting a GPU temp mixes one in, reusing the [gpu_fan] curves above: radiator fans move the
+# case air the card heats even though the loop never carries that heat. Those curves open at 0%, so
+# an idle card leaves the loop curve in charge; a test pins that against every band here.
+# ---------------------------------------------------------------------------
+[aio_radiator.delta.silent]
+type = "graph"
+curve = [[4.0, 20], [10.0, 55], [16.0, 90], [24.0, 90]]
+function = "identity"
+
+[aio_radiator.delta.balanced]
+type = "graph"
+curve = [[3.0, 20], [9.0, 70], [15.0, 100], [23.0, 100]]
+function = "balanced"
+
+[aio_radiator.delta.performance]
+type = "graph"
+curve = [[2.0, 45], [8.0, 80], [13.0, 100], [22.0, 100]]
+function = "performance"
+
+[aio_radiator.liquid.silent]
+type = "graph"
+curve = [[26.0, 20], [31.0, 40], [36.0, 100], [46.0, 100]]
+function = "identity"
+
+[aio_radiator.liquid.balanced]
+type = "graph"
+curve = [[24.0, 20], [30.0, 50], [36.0, 100], [44.0, 100]]
+function = "balanced"
+
+[aio_radiator.liquid.performance]
+type = "graph"
+curve = [[24.0, 45], [29.0, 80], [36.0, 100], [44.0, 100]]
+function = "performance"
+
+# ---------------------------------------------------------------------------
+# Case fans. Both intake and exhaust share one base built from the member curve below (a Mix of the
+# CPU and GPU members when a GPU temp exists, else the CPU member alone). Intake is given that base
+# as it stands, since it is the airflow demand; only exhaust gets an overlay, a static
+# `exhaust_bias_percent` below the base for positive case pressure. A base below the bias stops the
+# exhaust fan, which the member curves keep well clear of.
+# ---------------------------------------------------------------------------
+[case.member.silent]
+type = "graph"
+curve = [[50.0, 20], [65.0, 40], [78.0, 70]]
+smoothing = { ema_window_seconds = 8 }
+function = "identity"
+
+[case.member.balanced]
+type = "graph"
+curve = [[45.0, 20], [65.0, 70], [78.0, 100]]
+function = "balanced"
+
+[case.member.performance]
+type = "graph"
+curve = [[40.0, 40], [60.0, 80], [72.0, 100]]
+function = "performance"
+
+[case.pressure]
+exhaust_bias_percent = 15
+
+# ---------------------------------------------------------------------------
+# Laptop fan. Follows an EMA of the CPU temp by default (the runtime strategy can override the
+# source). Laptop temps move in fast spikes, so the windows stay short; Performance takes the raw
+# temp so it can react at once. High knees keep the fan quiet until temps are genuinely high.
+#
+# Silent and Balanced open with a 0% entry so the fan idles off below the knee, and their floor is
+# NOT raised to the channel minimum in code. Performance has no 0% entry and keeps the clamp, so it
+# is always spinning.
+# ---------------------------------------------------------------------------
+[laptop.silent]
+type = "graph"
+curve = [[40.0, 0], [60.0, 20], [80.0, 40], [95.0, 100]]
+smoothing = { ema_window_seconds = 15 }
+function = "laptop_silent"
+
+[laptop.balanced]
+type = "graph"
+curve = [[40.0, 0], [55.0, 30], [75.0, 60], [90.0, 100]]
+smoothing = { ema_window_seconds = 5 }
+function = "laptop_balanced"
+
+[laptop.performance]
+type = "graph"
+curve = [[50.0, 40], [70.0, 80], [85.0, 100]]
+function = "laptop_performance"

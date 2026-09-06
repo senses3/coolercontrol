@@ -1,25 +1,29 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+/* SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors */
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 @tailwind variants;
+
+/* Control-surface elevation: a control's body must contrast with its parent
+   surface. Containers painted bg-one/bg-two flip the variable for their
+   subtree, so kit controls using .bg-control adapt to their placement:
+   raised (bg-two) on the page, inset (bg-one) inside cards and dialogs. */
+:root {
+    --control-bg: var(--colors-bg-two);
+}
+.bg-bg-two {
+    --control-bg: var(--colors-bg-one);
+}
+.bg-bg-one {
+    --control-bg: var(--colors-bg-two);
+}
+@layer components {
+    .bg-control {
+        background-color: rgb(var(--control-bg));
+    }
+}
 
 /* width */
 ::-webkit-scrollbar {
@@ -54,32 +58,77 @@
 /*height: 0.5rem;*/
 /*}*/
 
-/* There is some odd WebKit issue where backdrop-filter can't handle vars */
-/* see: https://github.com/tailwindlabs/tailwindcss/issues/13844 */
-.backdrop-blur {
-    --tw-backdrop-blur: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: var(--tw-backdrop-blur);
+/* IBM Plex, latin subsets, self-hosted: the Qt app has no network guarantee and
+   a font CDN would be a new runtime dependency. No unicode-range is declared,
+   so a character these files do not carry (CJK, Arabic, Devanagari) falls
+   through to the system stack per-character, as it does today. */
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./assets/fonts/ibm-plex-sans-latin-400.woff2') format('woff2');
 }
-
-.backdrop-blur-sm {
-    --tw-backdrop-blur: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: var(--tw-backdrop-blur);
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./assets/fonts/ibm-plex-sans-latin-500.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'IBM Plex Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./assets/fonts/ibm-plex-sans-latin-600.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('./assets/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('./assets/fonts/ibm-plex-mono-latin-500.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'IBM Plex Mono';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('./assets/fonts/ibm-plex-mono-latin-600.woff2') format('woff2');
 }
 
 @layer base {
     html {
-        font-family:
-            -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
-            'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+        font-family: var(--font-family);
         /*In general, 14px seems to be the modern standard and fits better with other apps*/
         font-size: 87.5%;
     }
 
+    /* Two font roles: prose and labels in --font-family, live values in
+       --font-numeric. The `system-fonts` class is set from the interface-font
+       setting and hands both roles back to the user's own fonts, which is the
+       only way a Qt app user can express a font preference: QtWebEngine has no
+       override UI, and fontconfig only reaches generic families we do not name.
+       The system stack is also the last fallback in both bundled roles, so a
+       font that fails to load degrades to exactly the old appearance. */
     :root {
-        --font-family:
+        --font-system:
             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif,
             'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+        --font-family: 'IBM Plex Sans', var(--font-system);
+        --font-numeric: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', monospace;
+    }
+
+    html.system-fonts {
+        --font-family: var(--font-system);
+        --font-numeric: var(--font-system);
     }
 }

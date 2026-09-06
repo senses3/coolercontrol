@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! `HWMon` repository: device discovery, status reads, and fan
 //! writes for sysfs-exposed sensors.
@@ -78,24 +63,29 @@ use crate::device::{
     TempInfo, TempName, TempStatus, TypeIndex, UID,
 };
 use crate::device_health::FailsafeRef;
+use crate::hardware_support::{ChannelExclusion, HardwareSupportController, HwmonExclusion};
 use crate::overrides::OverridesController;
 use crate::repositories::failsafe::{self, FailsafeStatusData, MISSING_STATUS_THRESHOLD};
 use crate::repositories::hwmon::apple_mac_smc::AppleMacSMC;
+use crate::repositories::hwmon::chip_name::ChipName;
 use crate::repositories::hwmon::devices::{DEVICE_NAMES_APPLE, HWMON_DEVICE_NAME_BLACKLIST};
 use crate::repositories::hwmon::drivetemp::DrivetempState;
-use crate::repositories::hwmon::{auto_curve, devices, drivetemp, fans, power, temps, thinkpad};
+use crate::repositories::hwmon::{
+    auto_curve, chip_name, devices, drivetemp, fans, power, temps, thinkpad,
+};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
 use crate::repositories::utils::apply_device_command_delay;
 use crate::rt;
 #[cfg(test)]
 use crate::rt::sleep;
-use crate::setting::{LcdSettings, LightingSettings, TempSource};
+use crate::setting::{CCDeviceSettings, LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use bitflags::bitflags;
 use heck::ToTitleCase;
 use log::{debug, error, info, log, trace, warn};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::mem;
@@ -303,6 +293,11 @@ pub struct HwmonDriverInfo {
     #[serde(flatten)]
     pub drivetemp: DrivetempState,
     pub apple_smc: AppleMacSMC,
+    /// Descriptors held open for this device's per-tick attributes. Lives here so it shares the
+    /// driver's lifetime: dropping the driver info closes them, and the channel set detected with
+    /// it bounds how many there can be.
+    #[serde(skip)]
+    pub fds: cc_fs::SysfsFdCache,
 }
 
 /// Sized to fit a typical hwmon fan-channel set (1-8) without growth.
@@ -346,6 +341,7 @@ const _: () = assert!(DUTY_CACHE_VERIFY_INTERVAL.as_secs() > 0);
 
 pub struct HwmonRepo {
     config: Rc<Config>,
+    /// Owns both the user's own name overrides and the lm-sensors labels under them.
     overrides: Rc<OverridesController>,
     devices: HashMap<DeviceUID, (DeviceLock, Rc<HwmonDriverInfo>)>,
     /// Per-tick channel + temp snapshot. Shared with the writer task
@@ -389,6 +385,10 @@ pub struct HwmonRepo {
     /// Liquidctl `HWMon` paths used to dedupe.
     lc_hwmon_paths: Vec<PathBuf>,
 
+    /// Registry the channel verdicts are published to. `None` in tests, which
+    /// simply skips publishing.
+    hardware_support: Option<Rc<HardwareSupportController>>,
+
     device_delays: HashMap<DeviceUID, u16>,
 
     /// Permit timeouts and init threshold are derived from
@@ -431,11 +431,24 @@ impl HwmonRepo {
                 .filter_map(|loc| cc_fs::canonicalize(loc).ok())
                 .collect(),
             device_delays: HashMap::new(),
+            hardware_support: None,
             device_read_permit_timeout,
             device_write_permit_timeout,
             slow_device_init_threshold,
             drivetemp_ioctl_timeout,
         }
+    }
+
+    /// Attaches the registry that channel verdicts are published to.
+    /// Follows the `OverridesController::with_sensors_conf` pattern so the
+    /// constructor stays unchanged for the many test call sites.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
     }
 
     fn load_device_delays(&mut self) {
@@ -473,11 +486,14 @@ impl HwmonRepo {
     async fn map_into_our_device_model(
         &mut self,
         hwmon_drivers: Vec<HwmonDriverInfo>,
+        chip_names: &HashMap<PathBuf, ChipName>,
         extract_timeout: Duration,
     ) -> Result<()> {
         debug_assert!(extract_timeout > Duration::ZERO);
         let poll_rate = self.config.get_settings()?.poll_rate;
+        let overrides = Rc::clone(&self.overrides);
         for (index, driver) in hwmon_drivers.into_iter().enumerate() {
+            let chip = chip_names.get(&driver.path);
             let temps = driver
                 .channels
                 .iter()
@@ -486,10 +502,7 @@ impl HwmonRepo {
                     (
                         channel.name.clone(),
                         TempInfo {
-                            label: channel.label.as_ref().map_or_else(
-                                || channel.name.to_title_case(),
-                                |l| l.to_title_case(),
-                            ),
+                            label: resolve_temp_label(&overrides, chip, channel),
                             number: channel.number,
                         },
                     )
@@ -529,7 +542,7 @@ impl HwmonRepo {
                             }
                         };
                         let channel_info = ChannelInfo {
-                            label: channel.label.clone(),
+                            label: resolve_channel_label(&overrides, chip, channel),
                             kind: ChannelKind::Speed(SpeedOptions {
                                 fixed_enabled: channel
                                     .caps
@@ -542,7 +555,7 @@ impl HwmonRepo {
                     }
                     HwmonChannelType::Power => {
                         let channel_info = ChannelInfo {
-                            label: channel.label.clone(),
+                            label: resolve_channel_label(&overrides, chip, channel),
                             kind: ChannelKind::InfoOnly,
                         };
                         channels.insert(channel.name.clone(), channel_info);
@@ -652,12 +665,55 @@ impl HwmonRepo {
             self.delay_logged.insert(type_index, Cell::new(0));
             self.preload_in_flight
                 .insert(type_index, Rc::new(Cell::new(false)));
-            self.devices.insert(
-                device.uid.clone(),
-                (Rc::new(RefCell::new(device)), Rc::new(driver)),
-            );
+            let driver = Rc::new(driver);
+            self.publish_channel_verdicts(&device.uid, &driver);
+            // Retained so the hardware report can describe this device without
+            // re-reading every file we just read.
+            if let Some(hardware_support) = self.hardware_support.as_ref() {
+                hardware_support.record_hwmon_driver(Rc::clone(&driver));
+            }
+            self.devices
+                .insert(device.uid.clone(), (Rc::new(RefCell::new(device)), driver));
         }
         Ok(())
+    }
+
+    /// Notes an hwmon device the daemon is dropping, so the report can say why
+    /// it is absent from the app rather than leaving the user to guess.
+    fn record_exclusion(&self, path: &Path, reason: HwmonExclusion) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_excluded_hwmon(path, reason);
+    }
+
+    /// The same, for a single channel of a device that is otherwise present.
+    fn record_excluded_channel(&self, path: &Path, channel_name: &str, reason: ChannelExclusion) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        hardware_support.record_excluded_channel(path, channel_name, reason);
+    }
+
+    /// Publishes the passive verdict for every fan channel on a device, and
+    /// logs the ones we cannot drive. Init only, so the log lines are written
+    /// once per boot rather than once per hardware report.
+    ///
+    /// `firmware_override_observed` is false here by construction: at init
+    /// nothing has attempted control yet, so there has been nothing to
+    /// reclaim. Nothing republishes a channel afterwards: only a duty-response
+    /// probe can observe a reclaim, and that is not part of this work.
+    fn publish_channel_verdicts(&self, device_uid: &UID, driver: &HwmonDriverInfo) {
+        for channel in &driver.channels {
+            if channel.hwmon_type != HwmonChannelType::Fan {
+                continue;
+            }
+            let diagnosis = fans::diagnose_fan_channel(&driver.name, channel, false);
+            fans::log_uncontrollable_channel(&driver.path, channel, &diagnosis);
+            if let Some(hardware_support) = self.hardware_support.as_ref() {
+                hardware_support.record_channel_diagnosis(device_uid, &channel.name, diagnosis);
+            }
+        }
     }
 
     /// Gets the info necessary to apply setting to the device channel
@@ -1299,6 +1355,92 @@ fn order_entries_by_starvation(
     entries.sort_by_key(|(name, _)| last_processed.get(name.as_str()).copied().unwrap_or(0));
 }
 
+/// Drops the channels the user's lm-sensors configuration ignores, and reports how many went.
+///
+/// An `ignore` statement is final: it is the user's own file saying to hide the sensor, so we
+/// respect it rather than offering a way around it. Each dropped channel is logged with the chip
+/// and the file that hid it, which is the file to edit to get it back.
+/// Returns the names of the channels it dropped, so the caller can both log a
+/// count and record which ones vanished for the hardware report.
+fn drop_ignored_channels(
+    overrides: &OverridesController,
+    chip: Option<&ChipName>,
+    channels: &mut Vec<HwmonChannelInfo>,
+) -> Vec<ChannelName> {
+    let mut dropped = Vec::new();
+    channels.retain(|channel| {
+        let feature = sensors_feature_name(channel);
+        let Some(source) = overrides.sensors_conf_ignore_source(chip, &feature) else {
+            return true;
+        };
+        // `chip` is Some here: without it there is no configuration to match against.
+        let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+        info!(
+            "Hiding channel {} of {chip_name}: ignored by {}",
+            channel.name,
+            source.display()
+        );
+        dropped.push(channel.name.clone());
+        false
+    });
+    dropped
+}
+
+/// The temp label to show: a label the user wrote in their lm-sensors configuration is used
+/// verbatim, the same as one of our own overrides. Only detected labels are title-cased, since
+/// they come from the driver and are not written for display.
+fn resolve_temp_label(
+    overrides: &OverridesController,
+    chip: Option<&ChipName>,
+    channel: &HwmonChannelInfo,
+) -> String {
+    if let Some((label, source)) = overrides.sensors_conf_label_source(chip, &channel.name) {
+        log_applied_label(chip, &channel.name, label, source);
+        return label.to_owned();
+    }
+    channel
+        .label
+        .as_ref()
+        .map_or_else(|| channel.name.to_title_case(), |l| l.to_title_case())
+}
+
+/// The same for channels that keep the driver's label as it is, where an absent label means the
+/// UI falls back to the channel name.
+fn resolve_channel_label(
+    overrides: &OverridesController,
+    chip: Option<&ChipName>,
+    channel: &HwmonChannelInfo,
+) -> Option<String> {
+    let feature = sensors_feature_name(channel);
+    if let Some((label, source)) = overrides.sensors_conf_label_source(chip, &feature) {
+        log_applied_label(chip, &feature, label, source);
+        return Some(label.to_owned());
+    }
+    channel.label.clone()
+}
+
+/// The libsensors feature name a sensors.conf statement matches against. Temps and fans
+/// already carry it as their channel name, but a power channel is named after the raw
+/// sysfs file it reads (`power1_average`, `power1_input`), whose feature name is `power1`.
+/// Matching on the file name meant the canonical `ignore power1` silently did nothing.
+fn sensors_feature_name(channel: &HwmonChannelInfo) -> Cow<'_, str> {
+    match channel.hwmon_type {
+        HwmonChannelType::Power => Cow::Owned(format!("power{}", channel.number)),
+        _ => Cow::Borrowed(&channel.name),
+    }
+}
+
+/// Reports a label applied from the user's lm-sensors configuration, naming the file that set it
+/// so it is the file to edit to change or drop the label, mirroring the log for a hidden channel.
+fn log_applied_label(chip: Option<&ChipName>, channel_name: &str, label: &str, source: &Path) {
+    // `chip` is Some here: without it there is no configuration to match against.
+    let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+    info!(
+        "Labeling channel {channel_name} of {chip_name} as \"{label}\": from {}",
+        source.display()
+    );
+}
+
 fn swap_pending_into(mailbox: &WriterMailbox, buffer: &mut HashMap<ChannelName, PendingWrite>) {
     mem::swap(&mut *mailbox.pending.borrow_mut(), buffer);
 }
@@ -1542,6 +1684,8 @@ impl Repository for HwmonRepo {
         }
         debug!("Detected HWMon device paths: {base_paths:?}");
         let mut hwmon_drivers: Vec<HwmonDriverInfo> = Vec::new();
+        // The libsensors chip identity per device, used for the labels and the summary log.
+        let mut chip_names = HashMap::with_capacity(base_paths.len());
         let settings = self.config.get_settings()?;
         // Guards against two devices resolving to the same UID (e.g. two drives whose firmware
         // reports the same wwid, or serial-less duplicates that both hash blank). Candidates are
@@ -1555,6 +1699,7 @@ impl Repository for HwmonRepo {
             let device_name = devices::get_device_name(&path).await;
             debug!("Detected Device Name: {device_name}");
             if HWMON_DEVICE_NAME_BLACKLIST.contains(&device_name.trim()) {
+                self.record_exclusion(&path, HwmonExclusion::ServedByGpuRepository);
                 continue;
             }
             if settings.hide_duplicate_devices && self.path_matches_liquidctl_device(&path) {
@@ -1562,6 +1707,7 @@ impl Repository for HwmonRepo {
                     "Skipping HWMon detected device: {device_name} due to an existing \
                     duplicate liquidctl device"
                 );
+                self.record_exclusion(&path, HwmonExclusion::DuplicateOfLiquidctl);
                 continue;
             }
             let raw_id = devices::get_device_unique_id(&path, &device_name).await;
@@ -1600,23 +1746,37 @@ impl Repository for HwmonRepo {
                 .flatten();
             if cc_device_setting.as_ref().is_some_and(|s| s.disable) {
                 info!("Skipping disabled device: {device_name} with UID: {device_uid}");
+                self.record_exclusion(&path, HwmonExclusion::UserDisabled);
                 continue;
             }
-            let disabled_channels =
-                cc_device_setting.map_or_else(Vec::new, |setting| setting.get_disabled_channels());
+            let disabled_channels = cc_device_setting
+                .as_ref()
+                .map_or_else(Vec::new, CCDeviceSettings::get_disabled_channels);
+            // The chip identity the lm-sensors configuration names, needed here to apply its
+            // `ignore` statements, and reused below for the labels and the summary log.
+            let chip = chip_name::derive(&path).await;
             let mut channels = vec![];
-            if DEVICE_NAMES_APPLE.contains(&device_name.as_str()) {
-                AppleMacSMC::init_fans(&path, &mut channels, &disabled_channels).await;
+            let fans = if DEVICE_NAMES_APPLE.contains(&device_name.as_str()) {
+                AppleMacSMC::init_fans(&path).await
             } else {
-                match fans::init_fans(&path, &device_name).await {
-                    Ok(fans) => channels.extend(
-                        fans.into_iter()
-                            .filter(|fan| disabled_channels.contains(&fan.name).not())
-                            .collect::<Vec<HwmonChannelInfo>>(),
-                    ),
-                    Err(err) => error!("Error initializing Hwmon Fans: {err}"),
+                fans::init_fans(&path, &device_name)
+                    .await
+                    .unwrap_or_else(|err| {
+                        error!("Error initializing Hwmon Fans: {err}");
+                        Vec::new()
+                    })
+            };
+            // Recorded for both branches, so the report's hidden count is not
+            // silently zero on Apple hardware the user has disabled fans on.
+            for fan in &fans {
+                if disabled_channels.contains(&fan.name) {
+                    self.record_excluded_channel(&path, &fan.name, ChannelExclusion::UserDisabled);
                 }
             }
+            channels.extend(
+                fans.into_iter()
+                    .filter(|fan| disabled_channels.contains(&fan.name).not()),
+            );
             match temps::init_temps(&path, &device_name).await {
                 Ok(temps) => channels.extend(
                     temps
@@ -1635,12 +1795,33 @@ impl Repository for HwmonRepo {
                 ),
                 Err(err) => error!("Error initializing Hwmon Power: {err}"),
             }
-            if channels.is_empty() {
-                debug!(
-                    "No fans, temps, or power detected under {}, skipping.",
-                    path.display()
+            let ignored_channels =
+                drop_ignored_channels(&self.overrides, chip.as_ref(), &mut channels);
+            let ignored_count = ignored_channels.len();
+            for channel_name in &ignored_channels {
+                self.record_excluded_channel(
+                    &path,
+                    channel_name,
+                    ChannelExclusion::IgnoredBySensorsConf,
                 );
+            }
+            if channels.is_empty() {
+                if ignored_count > 0 {
+                    info!(
+                        "Skipping {device_name}: the lm-sensors configuration ignores every one \
+                         of its {ignored_count} channel(s)"
+                    );
+                    self.record_exclusion(&path, HwmonExclusion::AllChannelsIgnored);
+                } else {
+                    debug!(
+                        "No fans, temps, or power detected under {}, skipping.",
+                        path.display()
+                    );
+                }
                 continue;
+            }
+            if let Some(chip) = chip {
+                chip_names.insert(path.clone(), chip);
             }
             let drivetemp = if device_name == DRIVETEMP && settings.drivetemp_suspend {
                 let block_dev_path = drivetemp::get_verified_block_device_path(&path)
@@ -1671,6 +1852,7 @@ impl Repository for HwmonRepo {
                 channels,
                 drivetemp,
                 apple_smc,
+                fds: cc_fs::SysfsFdCache::default(),
             };
             hwmon_drivers.push(hwmon_driver_info);
         }
@@ -1678,17 +1860,23 @@ impl Repository for HwmonRepo {
         // re-sorted by name to help keep some semblance of order after reboots & device changes.
         hwmon_drivers.sort_by(|d1, d2| d1.name.cmp(&d2.name));
 
-        self.map_into_our_device_model(hwmon_drivers, INIT_EXTRACT_TIMEOUT)
+        self.map_into_our_device_model(hwmon_drivers, &chip_names, INIT_EXTRACT_TIMEOUT)
             .await?;
         self.load_device_delays();
         self.spawn_writer_tasks();
 
         let mut init_devices = HashMap::new();
+        // The libsensors chip name, so that `sensors` output can be matched up with our devices.
+        // Our UIDs are stable across boots, the hwmon numbering in the paths is not.
+        let mut device_chips = HashMap::with_capacity(self.devices.len());
         for (uid, (device, hwmon_info)) in &self.devices {
             init_devices.insert(uid.clone(), (device.borrow().clone(), hwmon_info.clone()));
+            if let Some(chip_name) = chip_names.get(&hwmon_info.path) {
+                device_chips.insert(uid.clone(), chip_name.to_string());
+            }
         }
         if log::max_level() == log::LevelFilter::Debug {
-            info!("Initialized Hwmon Devices: {init_devices:?}");
+            info!("Initialized Hwmon Devices: {init_devices:?}, Chip Names: {device_chips:?}");
         } else {
             let device_map: HashMap<_, _> = init_devices
                 .iter()
@@ -1696,6 +1884,10 @@ impl Repository for HwmonRepo {
                     (
                         d.1 .0.name.clone(),
                         HashMap::from([
+                            (
+                                "chip",
+                                vec![device_chips.get(d.0).cloned().unwrap_or_default()],
+                            ),
                             (
                                 "driver name",
                                 vec![d.1 .0.info.driver_info.name.clone().unwrap_or_default()],
@@ -1909,8 +2101,15 @@ impl Repository for HwmonRepo {
             )
             .await
             .map_err(|err| {
+                // pwm_enable is the first write a ThinkPad with fan control
+                // off rejects, so the hint belongs here too.
+                let hint = if hwmon_driver.name == devices::DEVICE_NAME_THINK_PAD {
+                    thinkpad::FAN_CONTROL_HINT
+                } else {
+                    ""
+                };
                 anyhow!(
-                    "Error on {}:{channel_name} for Manual Control - {err}",
+                    "Error on {}:{channel_name} for Manual Control - {err}{hint}",
                     hwmon_driver.name
                 )
             })
@@ -2063,6 +2262,12 @@ impl Repository for HwmonRepo {
     }
 
     async fn prepare_for_sleep(&self) {
+        // Devices can be gone or renumbered on resume. A held descriptor would fail with ENODEV
+        // and recover on its own, but dropping them here means the first tick back never spends a
+        // read finding that out.
+        for (_device_lock, hwmon_driver) in self.devices.values() {
+            hwmon_driver.fds.clear();
+        }
         // Tight systemd-sleep window (1-3 s). No permit taken:
         // ThinkPad EC tolerates concurrent ops with preload, and
         // waiting could blow the suspend budget.
@@ -2186,6 +2391,7 @@ mod preload_tests {
             channels,
             drivetemp: DrivetempState::default(),
             apple_smc: AppleMacSMC::default(),
+            fds: cc_fs::SysfsFdCache::default(),
         })
     }
 
@@ -2324,9 +2530,13 @@ mod preload_tests {
             seed_failsafe(&repo, TEST_TYPE_INDEX, &[seed_status], &[]);
             repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
 
-            // when: remove pwm1 so every subsequent preload fails, and
+            // when: empty pwm1 so every subsequent preload fails, and
             // drive the counter above MISSING_STATUS_THRESHOLD.
-            cc_fs::remove_file(base.join("pwm1")).await.unwrap();
+            // Emptying rather than unlinking: an unlinked inode is still
+            // readable through the descriptor the fd cache holds, while a
+            // removed device is not (its kernfs node returns ENODEV). An
+            // unparsable value fails the read on both paths.
+            cc_fs::write(base.join("pwm1"), Vec::new()).await.unwrap();
             for _ in 0..=MISSING_STATUS_THRESHOLD {
                 repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
             }
@@ -2372,7 +2582,8 @@ mod preload_tests {
             };
             seed_failsafe(&repo, TEST_TYPE_INDEX, &[seed_status], &[]);
             repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
-            cc_fs::remove_file(base.join("pwm1")).await.unwrap();
+            // Emptied, not unlinked: see the note in the failsafe threshold test.
+            cc_fs::write(base.join("pwm1"), Vec::new()).await.unwrap();
             for _ in 0..=MISSING_STATUS_THRESHOLD {
                 repo.preload_device_statuses(TEST_TYPE_INDEX, &driver).await;
             }
@@ -2387,7 +2598,7 @@ mod preload_tests {
                 assert!(fan1_state.is_failsafed);
             }
 
-            // when: pwm1 comes back and preload succeeds.
+            // when: pwm1 reads a real value again and preload succeeds.
             cc_fs::write(base.join("pwm1"), b"200".to_vec())
                 .await
                 .unwrap();
@@ -5329,7 +5540,7 @@ mod init_timeout_tests {
 
             let mut repo = empty_repo();
             let result = repo
-                .map_into_our_device_model(vec![driver], Duration::from_secs(5))
+                .map_into_our_device_model(vec![driver], &HashMap::new(), Duration::from_secs(5))
                 .await;
 
             assert!(
@@ -5374,7 +5585,11 @@ mod init_timeout_tests {
             let mut repo = empty_repo();
             let start = Instant::now();
             let result = repo
-                .map_into_our_device_model(vec![driver], Duration::from_millis(200))
+                .map_into_our_device_model(
+                    vec![driver],
+                    &HashMap::new(),
+                    Duration::from_millis(200),
+                )
                 .await;
             let elapsed = start.elapsed();
 
@@ -5449,7 +5664,7 @@ mod init_timeout_tests {
 
             let mut repo = empty_repo();
             let result = repo
-                .map_into_our_device_model(vec![driver], Duration::from_secs(2))
+                .map_into_our_device_model(vec![driver], &HashMap::new(), Duration::from_secs(2))
                 .await;
             assert!(result.is_ok(), "map should succeed even if reads failed");
             assert_eq!(repo.devices.len(), 1, "device should be registered");
@@ -5470,6 +5685,291 @@ mod init_timeout_tests {
             }
 
             teardown_dir(&base).await;
+        });
+    }
+}
+
+#[cfg(test)]
+mod sensors_conf_tests {
+    use super::*;
+    use crate::repositories::hwmon::chip_name::Bus;
+    use crate::sensors_conf::SensorsConf;
+
+    /// A controller carrying the given lm-sensors configuration and no overrides of its own.
+    fn overrides_with(conf: SensorsConf) -> OverridesController {
+        OverridesController::empty().with_sensors_conf(Rc::new(conf))
+    }
+
+    fn nct6687() -> ChipName {
+        ChipName {
+            prefix: "nct6687".to_owned(),
+            bus: Bus::Isa { addr: 0x0a20 },
+        }
+    }
+
+    fn temp_channel(name: &str, label: Option<&str>) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Temp,
+            number: 1,
+            name: name.to_owned(),
+            label: label.map(ToOwned::to_owned),
+            ..Default::default()
+        }
+    }
+
+    /// Goal: a label the user wrote must reach the UI exactly as written. Title-casing it would
+    /// turn "CPU Coolant" into "Cpu Coolant", which is the whole reason this bypasses the
+    /// title-caser that driver labels go through.
+    #[test]
+    fn a_configured_label_is_used_verbatim() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label temp1 \"CPU Coolant\"\n",
+        ));
+        let channel = temp_channel("temp1", Some("SYSTIN"));
+
+        assert_eq!(
+            resolve_temp_label(&overrides, Some(&nct6687()), &channel),
+            "CPU Coolant"
+        );
+    }
+
+    /// Goal: nothing changes for the overwhelming majority of users, who have no lm-sensors
+    /// configuration at all. Method: the same channel with an empty configuration, and with one
+    /// that names a different chip or a different feature.
+    #[test]
+    fn without_a_matching_statement_the_driver_label_stands() {
+        let channel = temp_channel("temp1", Some("SYSTIN"));
+        let empty = overrides_with(SensorsConf::default());
+        assert_eq!(
+            resolve_temp_label(&empty, Some(&nct6687()), &channel),
+            "Systin"
+        );
+        // An unidentified chip cannot match anything.
+        assert_eq!(resolve_temp_label(&empty, None, &channel), "Systin");
+
+        let other_chip = overrides_with(SensorsConf::from_config_text(
+            "chip \"it8686-*\"\n label temp1 \"Elsewhere\"\n",
+        ));
+        assert_eq!(
+            resolve_temp_label(&other_chip, Some(&nct6687()), &channel),
+            "Systin"
+        );
+
+        let other_feature = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label temp2 \"Elsewhere\"\n",
+        ));
+        assert_eq!(
+            resolve_temp_label(&other_feature, Some(&nct6687()), &channel),
+            "Systin"
+        );
+    }
+
+    /// Goal: a temp with no driver label must keep falling back to its title-cased channel name.
+    #[test]
+    fn an_unlabelled_temp_still_falls_back_to_its_name() {
+        let channel = temp_channel("temp1", None);
+        assert_eq!(
+            resolve_temp_label(
+                &overrides_with(SensorsConf::default()),
+                Some(&nct6687()),
+                &channel
+            ),
+            "Temp1"
+        );
+    }
+
+    /// Goal: fan and power channels take the configured label too, and an absent label must stay
+    /// absent so the UI keeps its own fallback. Method: a fan channel with and without a match.
+    #[test]
+    fn channel_labels_follow_the_same_rule() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label fan2 \"Pump\"\n",
+        ));
+        let fan = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 2,
+            name: "fan2".to_owned(),
+            label: None,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            resolve_channel_label(&overrides, Some(&nct6687()), &fan),
+            Some("Pump".to_owned())
+        );
+        assert_eq!(
+            resolve_channel_label(
+                &overrides_with(SensorsConf::default()),
+                Some(&nct6687()),
+                &fan
+            ),
+            None
+        );
+    }
+
+    /// Goal: a pwm label must not be taken for the merged fan channel. We key a channel on its
+    /// fan feature, so `label pwm2` names something that does not exist for us, and acting on it
+    /// would relabel a channel the user was not talking about.
+    #[test]
+    fn a_pwm_label_does_not_name_our_fan_channel() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label pwm2 \"Pwm Two\"\n",
+        ));
+        let fan = HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 2,
+            name: "fan2".to_owned(),
+            label: Some("Chassis".to_owned()),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            resolve_channel_label(&overrides, Some(&nct6687()), &fan),
+            Some("Chassis".to_owned())
+        );
+    }
+
+    fn fan_channel(name: &str) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Fan,
+            number: 1,
+            name: name.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    /// A power channel is named after the sysfs file it reads, not its feature.
+    fn power_channel(number: u8, file_name: &str) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Power,
+            number,
+            name: file_name.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    /// Goal: `ignore power1` must drop the power channel. A power channel carries the raw
+    /// sysfs file name (`power1_average`), so matching the channel name against the feature
+    /// name never hit and the canonical statement silently did nothing, while the same
+    /// statement worked for fans and temps on the same chip.
+    #[test]
+    fn an_ignored_power_channel_is_dropped_by_its_feature_name() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n ignore power1\n",
+        ));
+        let mut channels = vec![
+            power_channel(1, "power1_average"),
+            power_channel(2, "power2_input"),
+            fan_channel("fan1"),
+        ];
+
+        let dropped = drop_ignored_channels(&overrides, Some(&nct6687()), &mut channels);
+
+        assert_eq!(dropped, vec!["power1_average".to_string()]);
+        let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["power2_input", "fan1"]);
+    }
+
+    /// Goal: the same feature-name resolution applies to labels, so a `label power1 "..."`
+    /// reaches the power channel it names.
+    #[test]
+    fn a_power_channel_label_resolves_by_its_feature_name() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n label power1 \"Package\"\n",
+        ));
+        let power = power_channel(1, "power1_average");
+
+        assert_eq!(
+            resolve_channel_label(&overrides, Some(&nct6687()), &power),
+            Some("Package".to_owned())
+        );
+    }
+
+    /// Goal: an `ignore` statement must remove exactly the channel it names, and say how many it
+    /// removed so the caller can tell an emptied device from one that never had channels.
+    #[test]
+    fn an_ignored_channel_is_dropped() {
+        let overrides = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n ignore fan2\n ignore temp5\n",
+        ));
+        let mut channels = vec![
+            fan_channel("fan1"),
+            fan_channel("fan2"),
+            temp_channel("temp5", None),
+        ];
+
+        let dropped = drop_ignored_channels(&overrides, Some(&nct6687()), &mut channels);
+
+        // Names, not just a count: the report says which channels went and why.
+        assert_eq!(dropped, vec!["fan2".to_string(), "temp5".to_string()]);
+        let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["fan1"]);
+    }
+
+    /// Goal: nothing is dropped when there is nothing to match against, which is the case for
+    /// every machine without an lm-sensors configuration and for chips we could not identify.
+    #[test]
+    fn nothing_is_dropped_without_a_match() {
+        let mut channels = vec![fan_channel("fan2")];
+        let empty = overrides_with(SensorsConf::default());
+        assert!(drop_ignored_channels(&empty, Some(&nct6687()), &mut channels).is_empty());
+
+        let ignoring = overrides_with(SensorsConf::from_config_text(
+            "chip \"nct6687-*\"\n ignore fan2\n",
+        ));
+        // An unidentified chip matches no statement, so the channel survives.
+        assert!(drop_ignored_channels(&ignoring, None, &mut channels).is_empty());
+        assert_eq!(channels.len(), 1);
+
+        // So does one whose chip the statement does not name.
+        let other_chip = ChipName {
+            prefix: "it8686".to_owned(),
+            bus: Bus::Isa { addr: 0x0a40 },
+        };
+        assert!(drop_ignored_channels(&ignoring, Some(&other_chip), &mut channels).is_empty());
+        assert_eq!(channels.len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod verdict_publish_tests {
+    use super::*;
+    use crate::hardware_support::{ChannelVerdict, HardwareSupportController};
+    use serial_test::serial;
+
+    /// Goal: prove the init-time publish path actually reaches the registry
+    /// the API serves from, for a fan channel that reports speed but exposes
+    /// no pwm. Method: attach a controller, publish one driver, read back the
+    /// partitioned verdicts the health snapshot is built from.
+    #[test]
+    #[serial]
+    fn publishes_a_verdict_for_a_pwmless_fan_channel() {
+        cc_fs::test_runtime(async {
+            let hardware_support = Rc::new(HardwareSupportController::init(None, true).await);
+            let repo = HwmonRepo::new(
+                Rc::new(Config::init_default_config().unwrap()),
+                vec![],
+                Rc::new(crate::overrides::OverridesController::empty()),
+            )
+            .with_hardware_support(Rc::clone(&hardware_support));
+            let driver = HwmonDriverInfo {
+                name: "aquacomputer_d5next".to_string(),
+                channels: vec![HwmonChannelInfo {
+                    hwmon_type: HwmonChannelType::Fan,
+                    number: 9,
+                    name: "fan9".to_string(),
+                    caps: HwmonChannelCapabilities::RPM,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            repo.publish_channel_verdicts(&"dev-uid".to_string(), &driver);
+            let (permanent, current) = hardware_support.partitioned_verdicts();
+            assert!(current.is_empty(), "unexpected current-state verdicts");
+            assert_eq!(permanent.len(), 1, "expected one published verdict");
+            assert_eq!(permanent[0].verdict, ChannelVerdict::NoPwm);
+            assert_eq!(permanent[0].channel_name, "fan9");
+            assert_eq!(permanent[0].device_uid, "dev-uid");
         });
     }
 }

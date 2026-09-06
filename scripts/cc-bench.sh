@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # cc-bench.sh - A/B idle-load comparison of coolercontrold: tokio (default) vs compio-rt.
 #
 # Builds each flavor, runs it under identical conditions for REPS repetitions, measures each run

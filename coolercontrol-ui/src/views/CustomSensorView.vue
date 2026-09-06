@@ -1,30 +1,19 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import {
     mdiAlertCircle,
+    mdiAlertOutline,
+    mdiChartLine,
     mdiContentSaveOutline,
     mdiFolderSearchOutline,
-    mdiMemory,
-    mdiRestart,
+    mdiMinusThick,
+    mdiTrashCanOutline,
 } from '@mdi/js'
 import {
     CustomSensor,
@@ -35,37 +24,32 @@ import {
     getCustomSensorTypeDisplayName,
     getCustomSensorMixFunctionTypeDisplayName,
 } from '@/models/CustomSensor.ts'
-import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
-import InputNumber from 'primevue/inputnumber'
-import { onMounted, ref, toRaw, type Ref, watch, computed, inject } from 'vue'
+import { onMounted, ref, toRaw, type Ref, watch, computed } from 'vue'
 import { $enum } from 'ts-enum-util'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { DeviceType, UID } from '@/models/Device.ts'
-import { ChannelViewType, getChannelViewTypeDisplayName } from '@/models/UISettings.ts'
-import Listbox, { ListboxChangeEvent } from 'primevue/listbox'
-import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'radix-vue'
-import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { useConfirm } from 'primevue/useconfirm'
-import Select from 'primevue/select'
-import { ChartType, Dashboard, DashboardDeviceChannel } from '@/models/Dashboard.ts'
-import TimeChart from '@/components/TimeChart.vue'
-import SensorTable from '@/components/SensorTable.vue'
-import AxisOptions from '@/components/AxisOptions.vue'
+import { ScrollAreaRoot, ScrollAreaScrollbar, ScrollAreaThumb, ScrollAreaViewport } from 'reka-ui'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, RouterLink } from 'vue-router'
+import { useConfirm } from '@/shell/confirm'
+import UiListbox from '@/shell/ui/UiListbox.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
+import UiTable from '@/shell/ui/UiTable.vue'
+import UiGroupedListbox from '@/shell/ui/UiGroupedListbox.vue'
+import { Dashboard, DashboardDeviceChannel } from '@/models/Dashboard.ts'
 import { v4 as uuidV4 } from 'uuid'
 import _ from 'lodash'
 import { useI18n } from 'vue-i18n'
 import EntityTitleRename from '@/components/EntityTitleRename.vue'
-import { Emitter, EventType } from 'mitt'
+import EntityPageHeader from '@/components/EntityPageHeader.vue'
 import HealthWarning from '@/components/HealthWarning.vue'
+import TimeChart from '@/components/TimeChart.vue'
 
 interface Props {
     customSensorID?: string
 }
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
 
 interface AvailableTemp {
     deviceUID: string // needed here as well for the dropdown selector
@@ -143,7 +127,9 @@ const currentName: Ref<string> = ref(
 const isUserName: boolean =
     settingsStore.nameOverrides.devices[customSensorsDeviceUID]?.channels?.[customSensor.id]
         ?.label != undefined
-const sensorName: Ref<string> = ref(isUserName ? currentName : '')
+// .value, not the ref: ref(existingRef) returns that same ref, which would alias
+// this to currentName and let saveNameFunction's second write undo its first.
+const sensorName: Ref<string> = ref(isUserName ? currentName.value : '')
 const selectedSensorType: Ref<CustomSensorType> = ref(customSensor.cs_type)
 const selectedMixFunction: Ref<CustomSensorMixFunctionType> = ref(customSensor.mix_function)
 const selectedOffset: Ref<number> = ref(customSensor.offset ?? 0)
@@ -185,11 +171,7 @@ const chosenTempSources: Ref<Array<AvailableTemp>> = ref([])
 const chosenOffsetTempSource: Ref<AvailableTemp | undefined> = ref(undefined)
 const chosenTimeAverageTempSource: Ref<AvailableTemp | undefined> = ref(undefined)
 const chosenEmaTempSource: Ref<AvailableTemp | undefined> = ref(undefined)
-const filePath: Ref<string | undefined> = ref(customSensor.file_path)
-const chosenViewType: Ref<ChannelViewType> = ref(
-    deviceSettings.sensorsAndChannels.get(customSensor.id)?.viewType ?? ChannelViewType.Control,
-)
-const viewTypeOptions = [...$enum(ChannelViewType).keys()]
+const filePath: Ref<string> = ref(customSensor.file_path ?? '')
 
 const tempSources: Ref<Array<AvailableTempSources>> = ref([])
 const fillTempSources = async (): Promise<void> => {
@@ -445,9 +427,14 @@ const saveSensor = async (): Promise<void> => {
         }
     }
 }
+const defaultLabel = computed(() =>
+    settingsStore.defaultChannelLabel(customSensorsDeviceUID, customSensor.id),
+)
 const saveNameFunction = async (newName: string): Promise<boolean> => {
-    // User names are persisted as daemon name overrides. An empty name
-    // removes the override and reloads the UI.
+    // User names are persisted as daemon name overrides. An empty name removes
+    // the override and falls back to the detected label, which has to be read
+    // before saving drops the override it is derived from.
+    const applied = newName.length > 0 ? newName : defaultLabel.value
     const success = await settingsStore.saveChannelName(
         customSensorsDeviceUID,
         customSensor.id,
@@ -456,16 +443,20 @@ const saveNameFunction = async (newName: string): Promise<boolean> => {
     if (!success) {
         return false
     }
-    if (newName.length > 0) {
-        sensorName.value = newName
-        currentName.value = newName
-        emitter.emit('device-sensor-name-update', {
-            deviceUID: customSensorsDeviceUID,
-            sensorId: customSensor.id,
-            name: newName,
-        })
-    }
+    sensorName.value = newName.length > 0 ? newName : ''
+    currentName.value = applied
     return true
+}
+const deleteSensor = (): void => {
+    confirm.require({
+        message: t('views.customSensors.deleteCustomSensorConfirm', { name: currentName.value }),
+        header: t('views.customSensors.deleteCustomSensor'),
+        icon: mdiAlertOutline,
+        accept: async () => {
+            contextIsDirty.value = false
+            await settingsStore.deleteCustomSensor(customSensorsDeviceUID, customSensor.id)
+        },
+    })
 }
 const updateTemps = () => {
     for (const tempDevice of tempSources.value) {
@@ -478,18 +469,56 @@ const updateTemps = () => {
     }
 }
 
-const changeSensorType = (event: ListboxChangeEvent): void => {
-    if (event.value === null) {
+const changeSensorType = (value: string | undefined): void => {
+    if (value == null) {
         return // do not update on unselect
     }
-    selectedSensorType.value = event.value
+    selectedSensorType.value = value as CustomSensorType
 }
-const changeMixFunction = (event: ListboxChangeEvent): void => {
-    if (event.value === null) {
+const changeMixFunction = (value: string | undefined): void => {
+    if (value == null) {
         return // do not update on unselect
     }
-    selectedMixFunction.value = event.value
+    selectedMixFunction.value = value as CustomSensorMixFunctionType
 }
+
+const tempKey = (temp: AvailableTemp): string => `${temp.deviceUID}/${temp.tempName}`
+const allTemps = computed(() => tempSources.value.flatMap((source) => source.temps))
+const tempGroups = computed(() =>
+    tempSources.value.map((source) => ({
+        label: source.deviceName,
+        options: source.temps.map((temp) => ({
+            label: temp.tempFrontendName,
+            value: tempKey(temp),
+            color: temp.lineColor,
+            rightText: `${temp.temp} ${t('common.tempUnit')}`,
+        })),
+    })),
+)
+const findTemp = (key: string | string[] | undefined): AvailableTemp | undefined =>
+    typeof key === 'string'
+        ? allTemps.value.find((candidate) => tempKey(candidate) === key)
+        : undefined
+const chosenTempSourceKeys = computed<string[] | string | undefined>({
+    get: () => chosenTempSources.value.map(tempKey),
+    set: (keys) => {
+        if (!Array.isArray(keys)) return
+        chosenTempSources.value = keys
+            .map((key) => findTemp(key))
+            .filter((temp): temp is AvailableTemp => temp != null)
+    },
+})
+const singleTempKeyModel = (source: Ref<AvailableTemp | undefined>) =>
+    computed<string | string[] | undefined>({
+        get: () => (source.value != null ? tempKey(source.value) : undefined),
+        set: (key) => {
+            const temp = findTemp(key)
+            if (temp != null) source.value = temp
+        },
+    })
+const chosenOffsetTempSourceKey = singleTempKeyModel(chosenOffsetTempSource)
+const chosenTimeAverageTempSourceKey = singleTempKeyModel(chosenTimeAverageTempSource)
+const chosenEmaTempSourceKey = singleTempKeyModel(chosenEmaTempSource)
 
 const createNewDashboard = (): Dashboard => {
     const dash = new Dashboard(customSensor.id)
@@ -506,7 +535,6 @@ const singleDashboard = ref(
     deviceSettings.sensorsAndChannels.get(customSensor.id)?.channelDashboard ??
         createNewDashboard(),
 )
-const chartTypes = [...$enum(ChartType).values()]
 const chartMinutesMin: number = 1
 const chartMinutesMax: number = 60
 const chartMinutes: Ref<number> = ref(singleDashboard.value.timeRangeSeconds / 60)
@@ -526,7 +554,12 @@ const chartMinutesChanged = (value: number): void => {
     singleDashboard.value.timeRangeSeconds = value * 60
 }
 const chartKey: Ref<string> = ref(uuidV4())
-const sensorTableRef = ref<InstanceType<typeof SensorTable> | null>(null)
+
+// The chart canvas consumes plain wheel events for zoom; stop them in the
+// capture phase so the page keeps scrolling. Ctrl+wheel still zooms.
+const onChartWheelCapture = (event: WheelEvent): void => {
+    if (!event.ctrlKey) event.stopPropagation()
+}
 // const inputArea = ref()
 // nextTick(async () => {
 //     const delay = () => new Promise((resolve) => setTimeout(resolve, 100))
@@ -542,7 +575,7 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         confirm.require({
             message: t('views.customSensors.unsavedChanges'),
             header: t('views.customSensors.unsavedChangesHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             rejectLabel: t('common.stay'),
             acceptLabel: t('common.discard'),
@@ -554,8 +587,6 @@ const checkForUnsavedChanges = (): boolean | Promise<boolean> => {
         })
     })
 }
-const viewTypeChanged = () =>
-    (deviceSettings.sensorsAndChannels.get(customSensor.id)!.viewType = chosenViewType.value)
 
 const fileBrowse = async (): Promise<void> => {
     // @ts-ignore
@@ -565,7 +596,6 @@ const fileBrowse = async (): Promise<void> => {
 
 const saveButtonDisabled = (): boolean => {
     return (
-        chosenViewType.value !== ChannelViewType.Control ||
         (selectedSensorType.value === CustomSensorType.Mix &&
             chosenTempSources.value.length === 0) ||
         (selectedSensorType.value === CustomSensorType.Offset &&
@@ -620,532 +650,331 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div class="flex border-b-4 border-border-one items-center justify-between">
-        <entity-title-rename :current-name="currentName" :save-name-function="saveNameFunction" />
-        <div class="flex flex-wrap gap-x-1 justify-end">
-            <div
-                v-if="
-                    chosenViewType === ChannelViewType.Dashboard &&
-                    singleDashboard.chartType == ChartType.TIME_CHART
-                "
-                class="p-2 flex flex-row"
-            >
-                <InputNumber
-                    :placeholder="t('views.dashboard.minutes')"
-                    input-id="chart-minutes"
-                    v-model="chartMinutes"
-                    class="h-[2.375rem] chart-minutes"
-                    :suffix="` ${t('common.minuteAbbr')}`"
-                    show-buttons
-                    :use-grouping="false"
-                    :step="1"
-                    :min="chartMinutesMin"
-                    :max="chartMinutesMax"
-                    button-layout="horizontal"
-                    :allow-empty="false"
-                    :input-style="{ width: '5rem' }"
-                    v-tooltip.top="t('views.dashboard.timeRange')"
-                >
-                    <template #incrementicon>
-                        <span class="pi pi-plus" />
-                    </template>
-                    <template #decrementicon>
-                        <span class="pi pi-minus" />
-                    </template>
-                </InputNumber>
-                <axis-options class="h-[2.375rem] ml-3" :dashboard="singleDashboard" />
-            </div>
-            <div
-                v-if="
-                    chosenViewType === ChannelViewType.Dashboard &&
-                    singleDashboard.chartType == ChartType.TABLE
-                "
-                class="p-2 pr-0 flex leading-none items-center"
-            >
-                <Button
-                    outlined
-                    class="h-[2.375rem] px-3"
-                    @click="sensorTableRef?.resetStats()"
-                    v-tooltip.top="t('components.sensorTable.resetStatsTooltip')"
-                >
-                    <svg-icon type="mdi" :path="mdiRestart" :size="deviceStore.getREMSize(1.1)" />
-                    <span class="ml-1">{{ t('components.sensorTable.resetStats') }}</span>
-                </Button>
-            </div>
-            <div v-if="chosenViewType === ChannelViewType.Dashboard" class="p-2">
-                <Select
-                    v-model="singleDashboard.chartType"
-                    :options="chartTypes"
-                    :placeholder="t('views.dashboard.selectChartType')"
-                    class="w-32 h-full"
-                    checkmark
-                    dropdown-icon="pi pi-chart-bar"
-                    scroll-height="400px"
-                    v-tooltip.top="t('views.dashboard.chartType')"
+    <div class="flex h-full flex-col">
+        <entity-page-header>
+            <template #title>
+                <entity-title-rename
+                    :current-name="currentName"
+                    :fallback-name="defaultLabel"
+                    :save-name-function="saveNameFunction"
                 />
-            </div>
-            <div v-if="!shouldCreateSensor" class="p-2">
-                <Select
-                    v-model="chosenViewType"
-                    class="w-32 h-[2.375rem]"
-                    :options="viewTypeOptions"
-                    :option-label="(viewType) => getChannelViewTypeDisplayName(viewType)"
-                    checkmark
-                    placeholder="View Type"
-                    dropdown-icon="pi pi-sliders-h"
-                    scroll-height="40rem"
-                    v-tooltip.top="t('views.controls.viewType')"
-                    @change="viewTypeChanged"
-                />
-            </div>
-            <div class="p-2">
-                <Button
-                    class="bg-accent/80 hover:!bg-accent w-32 h-[2.375rem]"
-                    :class="{ 'animate-pulse-fast': contextIsDirty }"
-                    :label="t('common.save')"
-                    v-tooltip.top="t('views.customSensors.saveCustomSensor')"
-                    :disabled="saveButtonDisabled()"
-                    @click="saveSensor"
+            </template>
+            <template #actions>
+                <UiButton
+                    v-if="!shouldCreateSensor"
+                    variant="ghost"
+                    size="icon"
+                    v-tooltip.top="t('views.customSensors.deleteCustomSensor')"
+                    @click="deleteSensor"
                 >
                     <svg-icon
-                        class="outline-0"
                         type="mdi"
-                        :path="mdiContentSaveOutline"
-                        :size="deviceStore.getREMSize(1.5)"
+                        :path="mdiTrashCanOutline"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
-                </Button>
-            </div>
-        </div>
-    </div>
-    <ScrollAreaRoot
-        v-if="chosenViewType === ChannelViewType.Control"
-        style="--scrollbar-size: 10px"
-    >
-        <ScrollAreaViewport class="p-4 pb-16 h-screen w-full">
-            <health-warning kind="custom-sensor" :entity-uid="props.customSensorID" class="mb-4" />
-            <div
-                v-if="droppedSources.length > 0"
-                class="mb-4 flex flex-row items-center gap-2 rounded-lg border border-warning bg-warning/10 p-3"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="text-warning min-w-6"
-                    :path="mdiAlertCircle"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-                <span>
-                    {{
-                        t('views.customSensors.missingSourcesNotice', {
-                            sources: droppedSources.join(', '),
-                        })
-                    }}
-                </span>
-            </div>
-            <div class="w-full flex flex-col lg:flex-row">
-                <div class="mt-0 mr-4 w-96">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.sensorType') }}
-                    </small>
-                    <Listbox
-                        :model-value="selectedSensorType"
-                        :options="sensorTypeOptions"
-                        class="w-full"
-                        checkmark
-                        :placeholder="t('views.customSensors.type')"
-                        list-style="max-height: 100%"
-                        @change="changeSensorType"
-                        option-label="label"
-                        option-value="value"
+                </UiButton>
+
+                <div class="p-2">
+                    <UiButton
+                        class="w-32"
+                        v-tooltip.top="t('views.customSensors.saveCustomSensor')"
+                        :disabled="saveButtonDisabled()"
+                        @click="saveSensor"
                     >
-                        <template #option="slotProps">
-                            <div
-                                class="w-full"
-                                v-tooltip.right="getSensorTypeHelpText(slotProps.option.value)"
-                            >
-                                {{ slotProps.option.label }}
-                            </div>
-                        </template>
-                    </Listbox>
+                        <svg-icon
+                            class="outline-0"
+                            type="mdi"
+                            :path="mdiContentSaveOutline"
+                            :size="deviceStore.getREMSize(1.5)"
+                        />
+                    </UiButton>
                 </div>
-                <div v-if="selectedSensorType === CustomSensorType.Mix" class="mt-0 w-96">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.mixFunction') }}
-                    </small>
-                    <Listbox
-                        :model-value="selectedMixFunction"
-                        :options="mixFunctionTypeOptions"
-                        checkmark
-                        :placeholder="t('views.customSensors.type')"
-                        class="w-full"
-                        list-style="max-height: 100%"
-                        v-tooltip.top="t('views.customSensors.howCalculateValue')"
-                        @change="changeMixFunction"
-                        option-label="label"
-                        option-value="value"
+            </template>
+        </entity-page-header>
+        <ScrollAreaRoot class="min-h-0 flex-1" style="--scrollbar-size: 10px">
+            <ScrollAreaViewport class="p-4 h-full w-full">
+                <health-warning
+                    kind="custom-sensor"
+                    :entity-uid="props.customSensorID"
+                    class="mb-4"
+                />
+                <div
+                    v-if="droppedSources.length > 0"
+                    class="mb-4 flex flex-row items-center gap-2 rounded-lg border border-warning bg-warning/10 p-3"
+                >
+                    <svg-icon
+                        type="mdi"
+                        class="text-warning min-w-6"
+                        :path="mdiAlertCircle"
+                        :size="deviceStore.getREMSize(1.25)"
                     />
+                    <span>
+                        {{
+                            t('views.customSensors.missingSourcesNotice', {
+                                sources: droppedSources.join(', '),
+                            })
+                        }}
+                    </span>
                 </div>
+                <div class="w-full flex flex-col lg:flex-row">
+                    <div class="mt-0 lg:mr-4 w-full max-w-96">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.sensorType') }}
+                        </small>
+                        <UiListbox
+                            :model-value="selectedSensorType"
+                            :options="sensorTypeOptions"
+                            class="w-full"
+                            @update:model-value="changeSensorType"
+                        >
+                            <template #option="{ option }">
+                                <div
+                                    class="w-full"
+                                    v-tooltip.right="
+                                        getSensorTypeHelpText(option.value as CustomSensorType)
+                                    "
+                                >
+                                    {{ option.label }}
+                                </div>
+                            </template>
+                        </UiListbox>
+                    </div>
+                    <div
+                        v-if="selectedSensorType === CustomSensorType.Mix"
+                        class="mt-4 lg:mt-0 w-full max-w-96"
+                    >
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.mixFunction') }}
+                        </small>
+                        <UiListbox
+                            :model-value="selectedMixFunction"
+                            :options="mixFunctionTypeOptions"
+                            class="w-full"
+                            v-tooltip.top="t('views.customSensors.howCalculateValue')"
+                            @update:model-value="changeMixFunction"
+                        />
+                    </div>
+                    <div
+                        v-if="selectedSensorType === CustomSensorType.Offset"
+                        class="flex flex-col mt-1 w-full max-w-96 mb-28"
+                    >
+                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.offset') }}
+                        </small>
+                        <div
+                            class="rounded-lg bg-bg-two p-3 flex justify-center"
+                            v-tooltip.top="{
+                                escape: false,
+                                value: t('views.customSensors.offsetTooltip'),
+                            }"
+                        >
+                            <UiNumberInput v-model="selectedOffset" :min="-100" :max="100" />
+                        </div>
+                    </div>
+                    <div
+                        v-if="
+                            selectedSensorType === CustomSensorType.TimeAverage ||
+                            selectedSensorType === CustomSensorType.ExponentialMovingAvg
+                        "
+                        class="flex flex-col mt-1 w-full max-w-96 mb-28"
+                    >
+                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.timeWindow') }}
+                        </small>
+                        <div
+                            class="rounded-lg bg-bg-two p-3 flex justify-center"
+                            v-tooltip.top="{
+                                escape: false,
+                                value: t('views.customSensors.timeWindowTooltip'),
+                            }"
+                        >
+                            <UiNumberInput
+                                v-model="selectedTimeWindowSeconds"
+                                :min="1"
+                                :max="300"
+                                :suffix="t('common.secondAbbr')"
+                            />
+                        </div>
+                    </div>
+                    <div
+                        v-else-if="selectedSensorType === CustomSensorType.File"
+                        class="flex flex-col w-full max-w-96 mt-1"
+                    >
+                        <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempFile') }}
+                        </small>
+                        <UiInput
+                            v-model="filePath"
+                            class="w-full"
+                            placeholder="/tmp/your_temp_file"
+                            :class="{ '!border-error': !filePath }"
+                            v-tooltip.top="t('views.customSensors.filePathTooltip')"
+                        />
+                        <div v-if="deviceStore.isQtApp()">
+                            <UiButton
+                                class="mt-2 w-full"
+                                v-tooltip.top="t('views.customSensors.browseCustomSensorFile')"
+                                @click="fileBrowse"
+                            >
+                                <svg-icon
+                                    class="outline-0 mt-[-0.25rem]"
+                                    type="mdi"
+                                    :path="mdiFolderSearchOutline"
+                                    :size="deviceStore.getREMSize(1.5)"
+                                />
+                                {{ t('views.customSensors.browse') }}
+                            </UiButton>
+                        </div>
+                    </div>
+                </div>
+                <div
+                    v-if="selectedSensorType === CustomSensorType.Mix"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
+                >
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSources') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenTempSourceKeys"
+                            class="w-full max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            multiple
+                            :invalid="chosenTempSources == null || chosenTempSources.length === 0"
+                            v-tooltip.top="{
+                                escape: false,
+                                value: t('views.customSensors.tempSourcesTooltip'),
+                            }"
+                        />
+                    </div>
+                    <div
+                        v-if="selectedMixFunction === CustomSensorMixFunctionType.WeightedAvg"
+                        class="w-full max-w-xl mt-4 lg:mt-0"
+                        v-tooltip.top="t('views.customSensors.tempWeights')"
+                    >
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempWeights') }}
+                        </small>
+                        <UiTable bordered>
+                            <template #head>
+                                <tr>
+                                    <th class="w-full">{{ t('views.customSensors.tempName') }}</th>
+                                    <th>{{ t('views.customSensors.weight') }}</th>
+                                </tr>
+                            </template>
+                            <tr
+                                v-for="source in chosenTempSources"
+                                :key="`${source.deviceUID}/${source.tempName}`"
+                            >
+                                <td>
+                                    <div class="flex items-center gap-2">
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiMinusThick"
+                                            :size="14"
+                                            class="shrink-0"
+                                            :style="{ color: source.lineColor }"
+                                        />
+                                        {{ source.tempFrontendName }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <UiNumberInput v-model="source.weight" :min="1" :max="254" />
+                                </td>
+                            </tr>
+                        </UiTable>
+                    </div>
+                </div>
+                <!--Need a separate model for single-selection temp source-->
                 <div
                     v-if="selectedSensorType === CustomSensorType.Offset"
-                    class="flex flex-col mt-1 w-96 mb-28"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
                 >
-                    <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.offset') }}
-                    </small>
-                    <div
-                        class="rounded-lg bg-bg-two p-3 flex justify-center"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.offsetTooltip'),
-                        }"
-                    >
-                        <InputNumber
-                            v-model="selectedOffset"
-                            show-buttons
-                            :min="-100"
-                            :max="100"
-                            button-layout="horizontal"
-                        >
-                            <template #incrementicon>
-                                <span class="pi pi-plus" />
-                            </template>
-                            <template #decrementicon>
-                                <span class="pi pi-minus" />
-                            </template>
-                        </InputNumber>
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSource') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenOffsetTempSourceKey"
+                            class="w-full mt-1 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenOffsetTempSource == null"
+                        />
                     </div>
                 </div>
                 <div
-                    v-if="
-                        selectedSensorType === CustomSensorType.TimeAverage ||
-                        selectedSensorType === CustomSensorType.ExponentialMovingAvg
-                    "
-                    class="flex flex-col mt-1 w-96 mb-28"
+                    v-if="selectedSensorType === CustomSensorType.TimeAverage"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
                 >
-                    <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.timeWindow') }}
-                    </small>
-                    <div
-                        class="rounded-lg bg-bg-two p-3 flex justify-center"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.timeWindowTooltip'),
-                        }"
-                    >
-                        <InputNumber
-                            v-model="selectedTimeWindowSeconds"
-                            show-buttons
-                            :min="1"
-                            :max="300"
-                            :suffix="' ' + t('common.secondAbbr')"
-                            button-layout="horizontal"
-                        >
-                            <template #incrementicon>
-                                <span class="pi pi-plus" />
-                            </template>
-                            <template #decrementicon>
-                                <span class="pi pi-minus" />
-                            </template>
-                        </InputNumber>
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSource') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenTimeAverageTempSourceKey"
+                            class="w-full mt-1 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenTimeAverageTempSource == null"
+                        />
                     </div>
                 </div>
                 <div
-                    v-else-if="selectedSensorType === CustomSensorType.File"
-                    class="flex flex-col w-96 mt-1"
+                    v-if="selectedSensorType === CustomSensorType.ExponentialMovingAvg"
+                    class="flex flex-col lg:flex-row mt-0 w-full"
                 >
-                    <small class="ml-3 mb-1 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempFile') }}
-                    </small>
-                    <InputText
-                        v-model="filePath"
-                        class="w-full h-12"
-                        :placeholder="'/tmp/your_temp_file'"
-                        :invalid="!filePath"
-                        v-tooltip.top="t('views.customSensors.filePathTooltip')"
-                    />
-                    <div v-if="deviceStore.isQtApp()">
-                        <Button
-                            class="mt-2 w-full h-12"
-                            :label="t('views.customSensors.browse')"
-                            v-tooltip.top="t('views.customSensors.browseCustomSensorFile')"
-                            @click="fileBrowse"
-                        >
-                            <svg-icon
-                                class="outline-0 mt-[-0.25rem]"
-                                type="mdi"
-                                :path="mdiFolderSearchOutline"
-                                :size="deviceStore.getREMSize(1.5)"
-                            />
-                            {{ t('views.customSensors.browse') }}
-                        </Button>
+                    <div class="w-full max-w-xl lg:mr-4">
+                        <small class="ml-3 font-light text-sm text-text-color-secondary">
+                            {{ t('views.customSensors.tempSource') }}
+                        </small>
+                        <UiGroupedListbox
+                            v-model="chosenEmaTempSourceKey"
+                            class="w-full mt-1 max-h-[28rem]"
+                            :groups="tempGroups"
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :invalid="chosenEmaTempSource == null"
+                        />
                     </div>
                 </div>
-            </div>
-            <div
-                v-if="selectedSensorType === CustomSensorType.Mix"
-                class="flex flex-col lg:flex-row mt-0 w-full"
-            >
-                <div class="w-96 mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSources') }}
-                    </small>
-                    <Listbox
-                        v-model="chosenTempSources"
-                        class="w-full mt-1"
-                        :options="tempSources"
-                        multiple
-                        filter
-                        checkmark
-                        option-label="tempFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="temps"
-                        :filter-placeholder="t('common.search')"
-                        list-style="max-height: 100%"
-                        :invalid="chosenTempSources == null || chosenTempSources.length === 0"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.tempSourcesTooltip'),
-                        }"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex items-center w-full justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.tempFrontendName }}
-                                </div>
-                                <div>{{ slotProps.option.temp }} {{ t('common.tempUnit') }}</div>
-                            </div>
-                        </template>
-                    </Listbox>
-                </div>
                 <div
-                    v-if="selectedMixFunction === CustomSensorMixFunctionType.WeightedAvg"
-                    class="mt-1 w-96"
-                    v-tooltip.top="t('views.customSensors.tempWeights')"
+                    v-if="!shouldCreateSensor"
+                    class="mt-6 shrink-0"
+                    style="--time-chart-height: 24rem"
+                    @wheel.capture="onChartWheelCapture"
                 >
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempWeights') }}
-                    </small>
-                    <DataTable :value="chosenTempSources">
-                        <Column
-                            field="tempFrontendName"
-                            :header="t('views.customSensors.tempName')"
-                            body-class="w-full"
+                    <div class="mb-1 flex justify-center">
+                        <RouterLink
+                            :to="{
+                                name: 'monitoring-sensor',
+                                params: {
+                                    deviceUID: customSensorsDeviceUID,
+                                    channelName: customSensor.id,
+                                },
+                            }"
+                            class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-text-color-secondary outline-none hover:bg-surface-hover hover:text-text-color focus-visible:ring-2 focus-visible:ring-accent"
                         >
-                            <template #body="slotProps">
-                                <span
-                                    class="pi pi-minus mr-2"
-                                    :style="{ color: slotProps.data.lineColor }"
-                                />{{ slotProps.data.tempFrontendName }}
-                            </template>
-                        </Column>
-                        <Column :header="t('views.customSensors.weight')">
-                            <template #body="slotProps">
-                                <InputNumber
-                                    v-model="slotProps.data.weight"
-                                    show-buttons
-                                    :min="1"
-                                    :max="254"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '3rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
-                            </template>
-                        </Column>
-                    </DataTable>
+                            <svg-icon type="mdi" :path="mdiChartLine" :size="16" />
+                            {{ t('layout.shell.coolingPage.fullChart') }}
+                        </RouterLink>
+                    </div>
+                    <TimeChart :key="chartKey" :dashboard="singleDashboard" />
                 </div>
-            </div>
-            <!--Need a separate model for single-selection temp source-->
-            <div
-                v-if="selectedSensorType === CustomSensorType.Offset"
-                class="flex flex-col lg:flex-row mt-0 w-full"
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar
+                class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
+                orientation="vertical"
             >
-                <div class="w-96 mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSource') }}
-                    </small>
-                    <Listbox
-                        v-model="chosenOffsetTempSource"
-                        class="w-full mt-1"
-                        :options="tempSources"
-                        filter
-                        checkmark
-                        option-label="tempFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="temps"
-                        :filter-placeholder="t('common.search')"
-                        list-style="max-height: 100%"
-                        :invalid="chosenOffsetTempSource == null"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.tempSourcesTooltip'),
-                        }"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex items-center w-full justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.tempFrontendName }}
-                                </div>
-                                <div>{{ slotProps.option.temp }} {{ t('common.tempUnit') }}</div>
-                            </div>
-                        </template>
-                    </Listbox>
-                </div>
-            </div>
-            <div
-                v-if="selectedSensorType === CustomSensorType.TimeAverage"
-                class="flex flex-col lg:flex-row mt-0 w-full"
-            >
-                <div class="w-96 mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSource') }}
-                    </small>
-                    <Listbox
-                        v-model="chosenTimeAverageTempSource"
-                        class="w-full mt-1"
-                        :options="tempSources"
-                        filter
-                        checkmark
-                        option-label="tempFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="temps"
-                        :filter-placeholder="t('common.search')"
-                        list-style="max-height: 100%"
-                        :invalid="chosenTimeAverageTempSource == null"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.tempSourcesTooltip'),
-                        }"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex items-center w-full justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.tempFrontendName }}
-                                </div>
-                                <div>{{ slotProps.option.temp }} {{ t('common.tempUnit') }}</div>
-                            </div>
-                        </template>
-                    </Listbox>
-                </div>
-            </div>
-            <div
-                v-if="selectedSensorType === CustomSensorType.ExponentialMovingAvg"
-                class="flex flex-col lg:flex-row mt-0 w-full"
-            >
-                <div class="w-96 mr-4">
-                    <small class="ml-3 font-light text-sm text-text-color-secondary">
-                        {{ t('views.customSensors.tempSource') }}
-                    </small>
-                    <Listbox
-                        v-model="chosenEmaTempSource"
-                        class="w-full mt-1"
-                        :options="tempSources"
-                        filter
-                        checkmark
-                        option-label="tempFrontendName"
-                        option-group-label="deviceName"
-                        option-group-children="temps"
-                        :filter-placeholder="t('common.search')"
-                        list-style="max-height: 100%"
-                        :invalid="chosenEmaTempSource == null"
-                        v-tooltip.top="{
-                            escape: false,
-                            value: t('views.customSensors.tempSourcesTooltip'),
-                        }"
-                    >
-                        <template #optiongroup="slotProps">
-                            <div class="flex items-center">
-                                <svg-icon
-                                    type="mdi"
-                                    :path="mdiMemory"
-                                    :size="deviceStore.getREMSize(1.3)"
-                                    class="mr-2"
-                                />
-                                <div>{{ slotProps.option.deviceName }}</div>
-                            </div>
-                        </template>
-                        <template #option="slotProps">
-                            <div class="flex items-center w-full justify-between">
-                                <div>
-                                    <span
-                                        class="pi pi-minus mr-2 ml-1"
-                                        :style="{ color: slotProps.option.lineColor }"
-                                    />{{ slotProps.option.tempFrontendName }}
-                                </div>
-                                <div>{{ slotProps.option.temp }} {{ t('common.tempUnit') }}</div>
-                            </div>
-                        </template>
-                    </Listbox>
-                </div>
-            </div>
-        </ScrollAreaViewport>
-        <ScrollAreaScrollbar
-            class="flex select-none touch-none p-0.5 bg-transparent transition-colors duration-[120ms] ease-out data-[orientation=vertical]:w-2.5"
-            orientation="vertical"
-        >
-            <ScrollAreaThumb
-                class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
-            />
-        </ScrollAreaScrollbar>
-    </ScrollAreaRoot>
-    <div v-else-if="chosenViewType === ChannelViewType.Dashboard">
-        <TimeChart
-            v-if="singleDashboard.chartType == ChartType.TIME_CHART"
-            :dashboard="singleDashboard"
-            :key="chartKey"
-        />
-        <SensorTable
-            v-else-if="singleDashboard.chartType == ChartType.TABLE"
-            ref="sensorTableRef"
-            :dashboard="singleDashboard"
-            :key="'table' + chartKey"
-        />
+                <ScrollAreaThumb
+                    class="flex-1 bg-border-one opacity-80 rounded-lg relative before:content-[''] before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:w-full before:h-full before:min-w-[44px] before:min-h-[44px]"
+                />
+            </ScrollAreaScrollbar>
+        </ScrollAreaRoot>
     </div>
 </template>
 

@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use axum::extract::State;
 use axum::Json;
@@ -36,6 +21,10 @@ pub struct DetectResponse {
     pub detected_chips: Vec<DetectedChipDto>,
     pub blacklisted: Vec<String>,
     pub environment: EnvironmentDto,
+    /// False when no probe was made at all, so an empty `detected_chips` means
+    /// "not looked for" rather than "none present". Detection can be switched
+    /// off by config or environment, and is unsupported off `x86_64`.
+    pub probed: bool,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -44,6 +33,9 @@ pub struct DetectedChipDto {
     pub driver: String,
     pub address: String,
     pub base_address: String,
+    /// The chip's own id register. Reported so a chip line in a pasted report
+    /// can be matched against a pasted log.
+    pub device_id: String,
     pub features: Vec<String>,
     pub module_status: String,
 }
@@ -66,6 +58,7 @@ impl From<cc_detect::DetectionResults> for DetectResponse {
                     driver: c.driver,
                     address: c.address,
                     base_address: c.base_address,
+                    device_id: c.device_id,
                     features: c.features,
                     module_status: c.module_status,
                 })
@@ -76,33 +69,77 @@ impl From<cc_detect::DetectionResults> for DetectResponse {
                 is_secure_boot: results.environment.is_secure_boot,
                 has_dev_port: results.environment.has_dev_port,
             },
+            probed: true,
         }
     }
 }
 
-/// GET /detect — Run detection and return results (no module loading).
+impl DetectResponse {
+    /// No probe was made. Everything empty, and `probed` false so a client
+    /// cannot mistake that for a clean scan.
+    fn not_probed() -> Self {
+        Self {
+            detected_chips: Vec::new(),
+            blacklisted: Vec::new(),
+            environment: EnvironmentDto {
+                is_container: false,
+                is_secure_boot: false,
+                has_dev_port: false,
+            },
+            probed: false,
+        }
+    }
+}
+
+/// GET /detect - Return what the startup probe found.
+///
+/// Deliberately does not re-probe. Startup is when module loading actually
+/// happens, so a fresh scan would answer a different question than the one
+/// being asked, and probing Super-I/O config registers on demand is real
+/// hardware access for what reads like a page load. `POST /detect` remains the
+/// explicit, user-initiated re-scan.
 pub async fn get_detect(
-    State(AppState { detect_handle, .. }): State<AppState>,
+    State(AppState {
+        hardware_report_handle,
+        ..
+    }): State<AppState>,
 ) -> Result<Json<DetectResponse>, CCError> {
-    detect_handle
-        .run(false)
+    hardware_report_handle
+        .retained_detection()
         .await
-        .map(|r| Json(DetectResponse::from(r)))
+        .map(|retained| {
+            Json(retained.map_or_else(DetectResponse::not_probed, DetectResponse::from))
+        })
         .map_err(|e| CCError::InternalError {
-            msg: format!("Detection failed: {e}"),
+            msg: format!("Could not read retained detection results: {e}"),
         })
 }
 
 /// POST /detect — Run detection and optionally load modules.
 pub async fn post_detect(
-    State(AppState { detect_handle, .. }): State<AppState>,
+    State(AppState {
+        detect_handle,
+        hardware_report_handle,
+        ..
+    }): State<AppState>,
     Json(request): Json<DetectRequest>,
 ) -> Result<Json<DetectResponse>, CCError> {
-    detect_handle
-        .run(request.load_modules)
+    let results =
+        detect_handle
+            .run(request.load_modules)
+            .await
+            .map_err(|e| CCError::InternalError {
+                msg: format!("Detection failed: {e}"),
+            })?;
+    // This scan is newer than the retained one and may have just loaded a
+    // module, so the health snapshot has to be brought along with it. A failed
+    // hand-off leaves the older results in place, which is stale but not wrong,
+    // so it does not fail the request the user actually made.
+    if let Err(err) = hardware_report_handle
+        .refresh_detection(results.clone())
         .await
-        .map(|r| Json(DetectResponse::from(r)))
-        .map_err(|e| CCError::InternalError {
-            msg: format!("Detection failed: {e}"),
-        })
+    {
+        log::warn!("Could not refresh the retained detection results: {err}");
+    }
+    Ok(Json(DetectResponse::from(results)))
 }

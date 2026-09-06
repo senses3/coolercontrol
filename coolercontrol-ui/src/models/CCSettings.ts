@@ -1,24 +1,9 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { UID } from '@/models/Device'
+import { ChannelExtensionNames } from '@/models/SpeedOptions.ts'
 import { plainToInstance, Transform, Type } from 'class-transformer'
-import { ChannelInfo } from '@/models/ChannelInfo.ts'
 
 /**
  * General settings specific to CoolerControl
@@ -35,6 +20,7 @@ export class CoolerControlSettingsDTO {
     drivetemp_suspend: boolean = false
     sensors_auto_detect: boolean = true
     device_listener_enabled: boolean = true
+    sensors_conf_enabled: boolean = true
 }
 
 /**
@@ -51,10 +37,10 @@ export class CoolerControlDeviceSettingsDTO {
     // We need a special transformer for this collection mapping to work
     @Transform(
         ({ value }) => {
-            const result: Map<string, ChannelInfo> = new Map()
+            const result: Map<string, CCChannelSettings> = new Map()
             const valueMap = new Map(Object.entries(value))
             for (const [k, v] of valueMap) {
-                result.set(k, plainToInstance(ChannelInfo, v))
+                result.set(k, plainToInstance(CCChannelSettings, v))
             }
             return result
         },
@@ -102,4 +88,21 @@ export class ChannelExtensions {
     // Whether to use the internal HW Curve feature, instead of setting regular
     // flat curves. Using this reduces functionality.
     hw_fan_curve_enabled?: boolean
+}
+
+// The channel must expose a firmware-curve extension AND carry the matching
+// toggle. Each extension has its own flag, so the pairing matters: a stale
+// flag from the other extension does not count.
+export function isFirmwareCurveEnabled(
+    extensionName: ChannelExtensionNames | undefined,
+    extensions: ChannelExtensions | undefined,
+): boolean {
+    switch (extensionName) {
+        case ChannelExtensionNames.AutoHWCurve:
+            return extensions?.auto_hw_curve_enabled === true
+        case ChannelExtensionNames.AmdRdnaGpu:
+            return extensions?.hw_fan_curve_enabled === true
+        default:
+            return false
+    }
 }

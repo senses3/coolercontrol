@@ -1,21 +1,7 @@
 #!/usr/bin/env bash
 
-# CoolerControl - monitor and control your cooling and other devices
-# Copyright (c) 2023  Guy Boldon
-# |
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-# |
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-# |
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
+# SPDX-FileCopyrightText: 2021 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 # VERSION bumping:
 ##################
@@ -25,8 +11,9 @@
 # Updates the source-of-truth versions (cargo, constants.h, package.json), then
 # propagates the new version + current UTC date to every version-stamped
 # packaging file: metainfo.xml, debian/changelog, fedora *.spec (regular and
-# rc1), OBS .dsc and include-binaries. Substitutions match by regex rather than
-# the previous version, so the script self-heals if files were out of sync.
+# rc1). Substitutions match by regex rather than the previous version, so the
+# script self-heals if files were out of sync.
+# The OpenAPI spec stamps the daemon version too, so it is regenerated last.
 
 set -euo pipefail
 
@@ -105,13 +92,9 @@ for spec in packaging/fedora/coolercontrol-rc1.spec packaging/fedora/coolercontr
     sed -i -E "s/^(Version:[[:space:]]+)[0-9]+\.[0-9]+\.[0-9]+~rc1\$/\1${NEW_RC_VER}/" "${spec}"
 done
 
-# OBS .dsc: Version: line + version-stamped tarball references
-dsc=packaging/obs/coolercontrol.dsc
-sed -i -E "s/^Version: [0-9]+\.[0-9]+\.[0-9]+\$/Version: ${NEW_VER}/" "${dsc}"
-sed -i -E "s|coolercontrold-vendor-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrold-vendor-${NEW_VER}.tar.gz|g" "${dsc}"
-sed -i -E "s|coolercontrol-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrol-${NEW_VER}.tar.gz|g" "${dsc}"
-
-# OBS include-binaries: vendor tarball name
-sed -i -E "s|coolercontrold-vendor-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrold-vendor-${NEW_VER}.tar.gz|g" packaging/obs/debian/source/include-binaries
+# OpenAPI spec: carries the daemon version in info.version, and a daemon test fails when the
+# checked-in file is stale. Regenerated last so a build failure here does not interrupt the
+# cheap file substitutions above. Needs no running daemon and no root.
+make -C "${REPO_ROOT}" openapi
 
 echo "New version successfully set: ${NEW_VER} (rc1 specs at ${NEW_RC_VER})"

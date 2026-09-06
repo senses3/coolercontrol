@@ -22,6 +22,7 @@ offline:
 
 test: build
 	@npm run test:unit
+	@npm run check-browser-floor
 
 # one-shot type-check + unit tests, no build, used by the root pr-check gate
 check:
@@ -31,6 +32,7 @@ check:
 
 ci-test: build
 	@npm run test:unit
+	@npm run check-browser-floor
 
 clean:
 	@-$(RM) -rf dist

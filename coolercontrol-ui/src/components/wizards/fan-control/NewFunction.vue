@@ -1,36 +1,20 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import Button from 'primevue/button'
-import { Function, FunctionType, getFunctionTypeDisplayName } from '@/models/Profile.ts'
+import UiButton from '@/shell/ui/UiButton.vue'
+import { Function, FunctionType } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { DEFAULT_NAME_STRING_LENGTH, useDeviceStore } from '@/stores/DeviceStore.ts'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
 import { computed, ref, type Ref } from 'vue'
-import InputText from 'primevue/inputtext'
-import Select from 'primevue/select'
-import { $enum } from 'ts-enum-util'
-import InputNumber from 'primevue/inputnumber'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
+import UiInput from '@/shell/ui/UiInput.vue'
+import UiNumberInput from '@/shell/ui/UiNumberInput.vue'
 
 interface Props {
     profileName?: string
@@ -50,8 +34,6 @@ const deviceStore = useDeviceStore()
 
 const dutyMin: number = 1
 const dutyMax: number = 100
-const windowSizeMin: number = 1
-const windowSizeMax: number = 16
 const devianceMin: number = 0
 const devianceMax: number = 100
 const delayMin: number = 0
@@ -65,37 +47,15 @@ const newFunction =
                         profileName: props.profileName,
                     })
                   : (props.functionName ?? ''),
-              FunctionType.Standard,
           )
         : props.newFunction
 const currentFunction: Ref<Function> = ref(newFunction)
 
-let startingWindowSize = 8 // 8 is the recommended default
-if (
-    currentFunction.value.sample_window != null &&
-    (currentFunction.value.sample_window > 0 || currentFunction.value.sample_window <= 16)
-) {
-    startingWindowSize = currentFunction.value.sample_window
-}
-let startingDelay = currentFunction.value.response_delay ?? 1
-let startingDeviance = currentFunction.value.deviance ?? 2
+// All-off hysteresis values (0/0/false) are the Identity type on the wire.
+let startingDelay = currentFunction.value.response_delay ?? 0
+let startingDeviance = currentFunction.value.deviance ?? 0
 let startingOnlyDownward = currentFunction.value.only_downward ?? false
 
-const selectedType: Ref<FunctionType> = ref(newFunction.f_type)
-const functionTypeOptions = computed(() => {
-    // EMA is deprecated in favor of the EMA custom-sensor type. Hide it when creating a function,
-    // but keep it selectable when editing one that already uses it.
-    return [...$enum(FunctionType).values()]
-        .filter(
-            (type) =>
-                type !== FunctionType.ExponentialMovingAvg ||
-                newFunction.f_type === FunctionType.ExponentialMovingAvg,
-        )
-        .map((type) => ({
-            value: type,
-            label: getFunctionTypeDisplayName(type),
-        }))
-})
 const nameInput: Ref<string> = ref(newFunction.name)
 const nameInvalid = computed(() => {
     return nameInput.value.length < 1 || nameInput.value.length > DEFAULT_NAME_STRING_LENGTH
@@ -106,7 +66,6 @@ const chosenStepDutyMinimum: Ref<number> = ref(currentFunction.value.duty_minimu
 const chosenStepDutyMaximum: Ref<number> = ref(currentFunction.value.duty_maximum)
 const chosenStepSizeMinDecreasing: Ref<number> = ref(currentFunction.value.step_size_min_decreasing)
 const chosenStepSizeMaxDecreasing: Ref<number> = ref(currentFunction.value.step_size_max_decreasing)
-const chosenWindowSize: Ref<number> = ref(startingWindowSize)
 const chosenDelay: Ref<number> = ref(startingDelay)
 const chosenDeviance: Ref<number> = ref(startingDeviance)
 const chosenOnlyDownward: Ref<boolean> = ref(startingOnlyDownward)
@@ -119,7 +78,6 @@ const nextStep = async (): Promise<void> => {
         return
     }
     currentFunction.value.name = nameInput.value
-    currentFunction.value.f_type = selectedType.value
     currentFunction.value.duty_minimum = chosenStepDutyMinimum.value
     currentFunction.value.duty_maximum = chosenStepDutyMaximum.value
     currentFunction.value.step_size_min_decreasing = chosenStepSizeMinDecreasing.value
@@ -134,16 +92,15 @@ const nextStep = async (): Promise<void> => {
         currentFunction.value.duty_maximum = 0
         currentFunction.value.step_size_max_decreasing = 0
     }
-    currentFunction.value.sample_window =
-        selectedType.value === FunctionType.ExponentialMovingAvg
-            ? chosenWindowSize.value
-            : undefined
-    currentFunction.value.response_delay =
-        selectedType.value === FunctionType.Standard ? chosenDelay.value : undefined
-    currentFunction.value.deviance =
-        selectedType.value === FunctionType.Standard ? chosenDeviance.value : undefined
-    currentFunction.value.only_downward =
-        selectedType.value === FunctionType.Standard ? chosenOnlyDownward.value : undefined
+    // All-off hysteresis maps to the Identity type (the engine's no-op fast
+    // path); anything else is Standard. The type is a wire encoding, the UI
+    // presents a single Function concept.
+    const hysteresisOff =
+        chosenDelay.value === 0 && chosenDeviance.value === 0 && !chosenOnlyDownward.value
+    currentFunction.value.f_type = hysteresisOff ? FunctionType.Identity : FunctionType.Standard
+    currentFunction.value.response_delay = hysteresisOff ? undefined : chosenDelay.value
+    currentFunction.value.deviance = hysteresisOff ? undefined : chosenDeviance.value
+    currentFunction.value.only_downward = hysteresisOff ? undefined : chosenOnlyDownward.value
     currentFunction.value.threshold_hopping = chosenThresholdHopping.value
     currentFunction.value.bypass_min_at_extremes = chosenBypassMinAtExtremes.value
 
@@ -175,53 +132,15 @@ const updateSymmetricStepSize = () => {
 <template>
     <div class="flex flex-col justify-between min-w-96 w-[40vw] min-h-max h-[40vh]">
         <div class="flex flex-col gap-y-4">
-            <div class="w-full">
-                {{ t('components.wizards.fanControl.chooseFunctionNameType') }}:
-            </div>
+            <div class="w-full">{{ t('components.wizards.fanControl.chooseFunctionName') }}:</div>
             <div class="mt-0 flex flex-col">
-                <InputText
+                <UiInput
                     v-model="nameInput"
-                    :placeholder="t('common.name')"
-                    ref="inputArea"
-                    id="property-name"
-                    class="w-full h-11"
-                    :invalid="nameInvalid"
-                    :input-style="{ background: 'rgb(var(--colors-bg-one))' }"
                     autofocus
+                    :placeholder="t('common.name')"
+                    class="w-full"
+                    :class="{ '!border-error': nameInvalid }"
                 />
-            </div>
-            <div class="mt-0 flex flex-col">
-                <small class="ml-2 mb-1 font-light text-sm">
-                    {{ t('views.functions.functionType') }}
-                </small>
-                <Select
-                    v-model="selectedType"
-                    :options="functionTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    :placeholder="t('views.functions.functionType')"
-                    class="w-full h-11 mr-3 bg-bg-one !justify-end"
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="400px"
-                    checkmark
-                />
-            </div>
-            <p>
-                <span
-                    v-html="
-                        t('views.functions.functionTypeTooltip') +
-                        '<br/>&nbsp;&nbsp;' +
-                        t('views.functions.emaCustomSensorAvailableNote')
-                    "
-                />
-            </p>
-            <!--
-                EMA migration placeholder. Stage 2 (active deprecation): set the
-                `v-if` below to `selectedType === FunctionType.ExponentialMovingAvg`
-                to surface the deprecation warning.
-            -->
-            <div v-if="false" class="rounded-lg border-2 border-accent bg-bg-two p-3 text-sm">
-                {{ t('views.functions.emaDeprecatedWarning') }}
             </div>
             <div class="pr-1 w-full border-border-one border-2 rounded-lg">
                 <table class="m-0.5 w-full bg-bg-two">
@@ -243,10 +162,9 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <el-switch
+                                <UiSwitch
                                     v-model="chosenFixedStepSize"
-                                    size="large"
-                                    @change="updateFixedStepSize"
+                                    @update:model-value="updateFixedStepSize"
                                 />
                             </td>
                         </tr>
@@ -259,10 +177,9 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <el-switch
+                                <UiSwitch
                                     v-model="chosenAsymmetric"
-                                    size="large"
-                                    @change="updateSymmetricStepSize"
+                                    @update:model-value="updateSymmetricStepSize"
                                 />
                             </td>
                         </tr>
@@ -293,23 +210,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepDutyMinimum"
-                                    class="min-duty-input"
-                                    show-buttons
                                     :min="dutyMin"
                                     :max="chosenFixedStepSize ? dutyMax : chosenStepDutyMaximum"
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr
@@ -332,23 +238,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepDutyMaximum"
-                                    class="max-duty-input"
-                                    show-buttons
                                     :min="chosenStepDutyMinimum"
                                     :max="dutyMax"
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
 
@@ -372,25 +267,14 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-b"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepSizeMinDecreasing"
-                                    class="step-min-decrease-input"
-                                    show-buttons
                                     :min="dutyMin"
                                     :max="
                                         chosenFixedStepSize ? dutyMax : chosenStepSizeMaxDecreasing
                                     "
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr
@@ -405,23 +289,12 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenStepSizeMaxDecreasing"
-                                    class="step-max-decrease-input"
-                                    show-buttons
                                     :min="Math.max(dutyMin, chosenStepSizeMinDecreasing)"
                                     :max="dutyMax"
                                     :suffix="` ${t('common.percentUnit')}`"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
                         <tr>
@@ -441,7 +314,7 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
                             >
-                                <el-switch v-model="chosenThresholdHopping" size="large" />
+                                <UiSwitch v-model="chosenThresholdHopping" />
                             </td>
                         </tr>
                         <tr v-tooltip.top="t('views.functions.bypassMinAtExtremesTooltip')">
@@ -453,10 +326,10 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <el-switch v-model="chosenBypassMinAtExtremes" size="large" />
+                                <UiSwitch v-model="chosenBypassMinAtExtremes" />
                             </td>
                         </tr>
-                        <tr v-if="selectedType === FunctionType.Standard">
+                        <tr>
                             <th
                                 colspan="2"
                                 class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
@@ -464,10 +337,7 @@ const updateSymmetricStepSize = () => {
                                 {{ t('views.functions.hysteresis') }}
                             </th>
                         </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.Standard"
-                            v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')"
-                        >
+                        <tr v-tooltip.top="t('views.functions.hysteresisThresholdTooltip')">
                             <td
                                 class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t-2"
                             >
@@ -476,32 +346,16 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenDeviance"
-                                    class="deviance-input"
-                                    show-buttons
                                     :suffix="` ${t('common.tempUnit')}`"
                                     :step="0.1"
                                     :min="devianceMin"
                                     :max="devianceMax"
-                                    :min-fraction-digits="1"
-                                    :max-fraction-digits="1"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.Standard"
-                            v-tooltip.top="t('views.functions.hysteresisDelayTooltip')"
-                        >
+                        <tr v-tooltip.top="t('views.functions.hysteresisDelayTooltip')">
                             <td
                                 class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t"
                             >
@@ -510,29 +364,15 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <InputNumber
+                                <UiNumberInput
                                     v-model="chosenDelay"
-                                    class="delay-input"
-                                    show-buttons
                                     :suffix="` ${t('common.secondAbbr')}`"
                                     :min="delayMin"
                                     :max="delayMax"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                />
                             </td>
                         </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.Standard"
-                            v-tooltip.top="t('views.functions.onlyDownwardTooltip')"
-                        >
+                        <tr v-tooltip.top="t('views.functions.onlyDownwardTooltip')">
                             <td
                                 class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t"
                             >
@@ -541,45 +381,7 @@ const updateSymmetricStepSize = () => {
                             <td
                                 class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t"
                             >
-                                <el-switch v-model="chosenOnlyDownward" size="large" />
-                            </td>
-                        </tr>
-                        <tr v-if="selectedType === FunctionType.ExponentialMovingAvg">
-                            <th
-                                colspan="2"
-                                class="pt-4 pb-2 px-4 w-48 text-center items-center border-border-one border-t-2"
-                            >
-                                {{ t('views.functions.general') }}
-                            </th>
-                        </tr>
-                        <tr
-                            v-if="selectedType === FunctionType.ExponentialMovingAvg"
-                            v-tooltip.top="t('views.functions.windowSizeTooltip')"
-                        >
-                            <td
-                                class="py-4 px-4 w-px whitespace-nowrap text-right items-center border-border-one border-r-2 border-t-2"
-                            >
-                                {{ t('views.functions.windowSize') }}
-                            </td>
-                            <td
-                                class="py-0 px-2 text-center items-center border-border-one border-l-2 border-t-2"
-                            >
-                                <InputNumber
-                                    v-model="chosenWindowSize"
-                                    class="window-size-input"
-                                    show-buttons
-                                    :min="windowSizeMin"
-                                    :max="windowSizeMax"
-                                    button-layout="horizontal"
-                                    :input-style="{ width: '5rem' }"
-                                >
-                                    <template #incrementicon>
-                                        <span class="pi pi-plus" />
-                                    </template>
-                                    <template #decrementicon>
-                                        <span class="pi pi-minus" />
-                                    </template>
-                                </InputNumber>
+                                <UiSwitch v-model="chosenOnlyDownward" />
                             </td>
                         </tr>
                     </tbody>
@@ -587,34 +389,32 @@ const updateSymmetricStepSize = () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button
+            <UiButton
                 v-if="props.profileName === undefined"
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.cancel')"
                 @click="emit('close')"
-            />
-            <Button v-else class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 10)">
+            >
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton v-else variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 10)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="currentFunction == null || nameInvalid"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>

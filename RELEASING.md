@@ -27,14 +27,6 @@ automatically. They are included here for reference:
       1. Use the 'next' patch version.
    3. Update `packaging/debian/changelog`
       1. Add a whole new section at the beginning with top version and changelog entry
-   4. Update `packaging/obs/coolercontrol.dsc` and `packaging/obs/debian/source/include-binaries`
-      1. Version near the top
-      2. Debtransform-Tar filename (to match gitlab release filename)
-      3. File size and checksums are ignored
-      4. If you need to generate a new .dsc file (eg new dependencies added to `debian/control`),
-         from the root of the tree:
-         - `dpkg-source -D"Debtransform-Tar: coolercontrol-$VERSION.tar.gz" -D"Debtransform-Files: coolercontrold-vendor-$VERSION.tar.gz" -D"Debtransform-Files-Tar: debian.tar.gz" -b .`
-         - `sed -i -E 's/native/quilt/' ../*.dsc`
 
 4. Create Release Tag and Commit and Build Release Artifacts
    1. Verify Milestone exists for the to-be-released version in GitLab
@@ -61,11 +53,11 @@ automatically. They are included here for reference:
    8. Merge any website changes to be made.
 
 5. Update OpenAPI specification
-   1. Build and start a locally running daemon in debug mode with:
-      `sudo systemctl stop coolercontrold && make dev-run`
-   2. Run `cd openapi;./update.sh`
-   3. Commit a new file to repo.
-   4. Update Website with new `openapi.spec` file.
+   1. Nothing to do: `make bump` regenerates `openapi/openapi.json` (the spec stamps the daemon
+      version) and `make release` commits it. A daemon test fails when the file is stale.
+   2. To regenerate it by hand at any time, run `make openapi`. It needs no running daemon and no
+      root, since the spec is generated from the daemon's route table.
+   3. Update Website with new `openapi.spec` file.
 
 6. NixOS Release
    1. You need Nix package manager setup on your system.

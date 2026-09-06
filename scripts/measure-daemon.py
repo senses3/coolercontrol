@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Measure CPU / wakeups / memory for the coolercontrold process (all threads).
 
 Pure stdlib; reads /proc directly so it works on an SBC without psutil. The most telling metric for
@@ -14,6 +17,7 @@ Usage:
 
 Run with sudo only if /proc is hidden (hidepid); CPU and ctxt-switch fields are normally readable.
 """
+
 import argparse
 import glob
 import os

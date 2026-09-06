@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Guy Boldon and contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # Publish debs into the CoolerControl apt repository.
 #
 #   apt-repo-publish --repo debian|ubuntu|both [--keep N] <deb>...
@@ -47,11 +50,15 @@ die() {
 
 usage() {
     cat <<EOF
-Usage: ${SCRIPT_NAME} --repo debian|ubuntu|both [--keep N] <deb>...
+Usage: ${SCRIPT_NAME} --repo debian|ubuntu|both [--keep N] [--refresh-root] <deb>...
 
 Options:
   --repo    which tree to publish into, or both for architecture independent packages
   --keep    versions of each package to keep installable (default ${DEFAULT_KEEP})
+  --refresh-root
+            also upload setup.sh and the keys from the share directory. Off by default: those
+            files belong to the coolercontrol project, and the sibling package repositories
+            publishing here must not overwrite them with whatever their image happens to hold.
 
 Environment:
   GPG_KEY               path to the armored signing key (GitLab file variable)
@@ -238,6 +245,7 @@ refresh_root_objects() {
 
 repo=
 keep=${DEFAULT_KEEP}
+refresh_root=0
 debs=()
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -250,6 +258,10 @@ while [[ $# -gt 0 ]]; do
         [[ $# -ge 2 ]] || die "--keep needs a value"
         keep=$2
         shift 2
+        ;;
+    --refresh-root)
+        refresh_root=1
+        shift
         ;;
     -h | --help)
         usage
@@ -291,7 +303,11 @@ for deb in "${debs[@]}"; do
 done
 
 require_env GPG_KEY GPG_PHRASE
-[[ -f "${SHARE_DIR}/keys/coolercontrol-archive-keyring.gpg" ]] || die "no keyring at ${SHARE_DIR}/keys"
+if [[ ${refresh_root} -eq 1 ]]; then
+    [[ -f "${SHARE_DIR}/setup.sh" ]] || die "no setup.sh at ${SHARE_DIR}"
+    [[ -f "${SHARE_DIR}/keys/coolercontrol-archive-keyring.gpg" ]] || die "no keyring at ${SHARE_DIR}/keys"
+    [[ -f "${SHARE_DIR}/keys/coolercontrol.asc" ]] || die "no armored key at ${SHARE_DIR}/keys"
+fi
 
 # A local destination stands in for the bucket, which keeps the whole script testable without
 # credentials. Upload headers only mean something on the S3 backend.
@@ -323,6 +339,8 @@ lock_acquire
 for tree in "${trees[@]}"; do
     publish_tree "${tree}" "${debs[@]}"
 done
-refresh_root_objects
+if [[ ${refresh_root} -eq 1 ]]; then
+    refresh_root_objects
+fi
 
 log "published to ${dest}"

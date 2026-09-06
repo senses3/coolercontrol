@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 mod cc_device_service;
 
@@ -38,8 +23,6 @@ pub mod device_service {
         #![allow(clippy::pedantic)]
         tonic::include_proto!("coolercontrol.device_service.v1");
     }
-    pub const FILE_DESCRIPTOR_SET: &[u8] =
-        tonic::include_file_descriptor_set!("device_service_descriptor");
 }
 
 pub async fn create_grpc_api_server(
@@ -54,12 +37,10 @@ pub async fn create_grpc_api_server(
     health_reporter
         .set_serving::<DeviceServiceServer<CCDeviceService>>()
         .await;
-    let reflection_service = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(device_service::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
-        .build_v1()?;
+    // Server reflection is deliberately not registered. This port is unauthenticated, and
+    // nothing in the project consumes reflection: the protos are published in the
+    // cc-plugins repository, which is where a plugin author gets the service definition.
     Server::builder()
-        .add_service(reflection_service)
         .add_service(health_service)
         .add_service(DeviceServiceServer::new(service))
         .serve_with_shutdown(addr, cancel_token.cancelled())

@@ -1,31 +1,19 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
-import Select from 'primevue/select'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { UID } from '@/models/Device.ts'
 import { Profile, getProfileDisplayName } from '@/models/Profile.ts'
-import { ref, Ref } from 'vue'
+import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { v4 as uuidV4 } from 'uuid'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
@@ -60,6 +48,18 @@ const selectedProfile: Ref<Profile> = ref(
     ) ?? getProfileOptions()[0],
 )
 
+const { profileGroups } = useLibraryGroups()
+const profileSelectGroups = profileGroups(() =>
+    getProfileOptions().map((p) => ({ uid: p.uid, name: getProfileDisplayName(p) })),
+)
+const selectedProfileUid = computed<string | undefined>({
+    get: () => selectedProfile.value?.uid,
+    set: (uid) => {
+        const found = getProfileOptions().find((p) => p.uid === uid)
+        if (found != null) selectedProfile.value = found
+    },
+})
+
 const saveSetting = async () => {
     const setting = new DeviceSettingWriteProfileDTO(selectedProfile.value.uid)
     await settingsStore.saveDaemonDeviceSettingProfile(props.deviceUID, props.channelName, setting)
@@ -81,47 +81,31 @@ const saveSetting = async () => {
                 <small class="ml-2 mb-1 text-sm">
                     {{ t('components.wizards.fanControl.existingProfile') }}:
                 </small>
-                <Select
-                    v-model="selectedProfile"
-                    :options="getProfileOptions()"
+                <UiGroupedSelect
+                    v-model="selectedProfileUid"
+                    :groups="profileSelectGroups"
                     placeholder="Profile"
-                    class="w-full mr-4 h-11 !justify-end"
-                    checkmark
-                    dropdown-icon="pi pi-chart-line"
-                    scroll-height="40rem"
-                >
-                    <template #value="{ value }">
-                        <span v-if="value">{{ getProfileDisplayName(value) }}</span>
-                        <span v-else>Profile</span>
-                    </template>
-                    <template #option="{ option }">
-                        {{ getProfileDisplayName(option) }}
-                    </template>
-                </Select>
+                    class="w-full"
+                />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 1)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 1)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                label="Apply"
-                v-tooltip.top="'Apply'"
-                @click="saveSetting"
-            >
+            </UiButton>
+            <UiButton variant="solid" class="w-32" v-tooltip.top="'Apply'" @click="saveSetting">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

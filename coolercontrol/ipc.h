@@ -1,18 +1,5 @@
-// CoolerControl - monitor and control your cooling and other devices
-// Copyright (c) 2021-2025  Guy Boldon and contributors
-//
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+// SPDX-FileCopyrightText: 2025 Guy Boldon and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #ifndef IPC_H
 #define IPC_H
@@ -50,6 +37,10 @@ class IPC final : public QObject {
 
   Q_INVOKABLE [[nodiscard]] QString directoryPathDialog(const QString& title) const;
 
+  // The desktop's own colors as JSON, or empty when it exposes none. Pulled once on
+  // load; later changes arrive through systemPaletteChanged.
+  Q_INVOKABLE [[nodiscard]] QString getSystemPalette() const;
+
   /*
       Slots are invoked from the JS client side and are processed on the server side.
   */
@@ -67,6 +58,16 @@ class IPC final : public QObject {
   void saveWindowGeometry(const QByteArray& geometry) const;
 
   void acknowledgeDaemonIssues() const;
+
+  void setAlertsActive(bool active) const;
+
+  // JSON map of the strings Qt renders itself, in the UI's active locale. Qt has no
+  // translation pipeline, and a discarded renderer cannot be asked, so these are cached.
+  void setTranslations(const QString& translationsJson) const;
+
+  // Identity and label of the sensors pinned in the UI. Values are not sent: Qt fetches
+  // them when the tray menu opens, since the renderer is gone while in the tray.
+  void setPinnedSensors(const QString& sensorsJson) const;
 
   void forceQuit() const;
 
@@ -89,6 +90,8 @@ class IPC final : public QObject {
   void forceWindowShow() const;
 
   void fullScreenToggled(bool fullScreen) const;
+
+  void systemPaletteChanged(const QString& paletteJson) const;
 
  private:
   QSettings* m_settings;

@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::fmt::Debug;
 use std::ops::Not;
@@ -527,6 +512,18 @@ pub struct DeviceInfo {
     pub driver_info: DriverInfo,
 }
 
+impl DeviceInfo {
+    /// The detected label for a channel, when the device reports one.
+    pub fn detected_channel_label(&self, channel_name: &str) -> Option<String> {
+        if let Some(temp_info) = self.temps.get(channel_name) {
+            return Some(temp_info.label.clone());
+        }
+        self.channels
+            .get(channel_name)
+            .and_then(|channel| channel.label.clone())
+    }
+}
+
 impl Default for DeviceInfo {
     fn default() -> Self {
         DeviceInfo {
@@ -767,6 +764,9 @@ pub struct LcdInfo {
     pub screen_width: u32,
     pub screen_height: u32,
     pub max_image_size_bytes: u32,
+    /// Whether this screen can show an animated gif. The Kraken 2023 on firmware 2.x
+    /// cannot, and liquidctl refuses outright, so the mode has to stop offering it.
+    pub gif_supported: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -1282,6 +1282,7 @@ mod tests {
                     screen_width: 320,
                     screen_height: 320,
                     max_image_size_bytes: 100_000,
+                    gif_supported: true,
                 }),
             },
         };

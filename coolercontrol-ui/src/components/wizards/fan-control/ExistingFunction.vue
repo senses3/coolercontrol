@@ -1,31 +1,19 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft } from '@mdi/js'
-import Select from 'primevue/select'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { UID } from '@/models/Device.ts'
 import { Function } from '@/models/Profile.ts'
-import { ref, Ref } from 'vue'
+import { computed, ref, Ref } from 'vue'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useI18n } from 'vue-i18n'
 
@@ -49,6 +37,18 @@ const selectedFunction: Ref<Function> = ref(
 
 const getFunctionOptions = (): any[] => settingsStore.functions
 
+const { functionGroups } = useLibraryGroups()
+const functionSelectGroups = functionGroups(() =>
+    getFunctionOptions().map((f) => ({ uid: f.uid, name: f.name })),
+)
+const selectedFunctionUidModel = computed<string | undefined>({
+    get: () => selectedFunction.value?.uid,
+    set: (uid) => {
+        const found = getFunctionOptions().find((f) => f.uid === uid)
+        if (found != null) selectedFunction.value = found
+    },
+})
+
 const nextStep = () => {
     if (selectedFunction.value == null) {
         return
@@ -65,33 +65,31 @@ const nextStep = () => {
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('components.wizards.fanControl.existingFunction') }}:
                 </small>
-                <Select
-                    v-model="selectedFunction"
-                    :options="getFunctionOptions()"
-                    option-label="name"
+                <UiGroupedSelect
+                    v-model="selectedFunctionUidModel"
+                    :groups="functionSelectGroups"
                     placeholder="Function"
-                    class="w-full mr-4 h-11 bg-bg-one !justify-end"
-                    checkmark
-                    dropdown-icon="pi pi-directions"
-                    scroll-height="40rem"
+                    class="w-full"
                 />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 10)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 10)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="selectedFunction == null"
                 @click="nextStep"
-            />
+            >
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>

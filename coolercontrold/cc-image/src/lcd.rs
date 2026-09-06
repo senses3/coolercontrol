@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use anyhow::{anyhow, Context, Result};
 use log::trace;
@@ -363,5 +348,26 @@ impl LcdImageGenerator {
             .with_position(160, 232)
             .with_segment(&TextSegment::new(font, temp_label, Rgba::white()).with_size(35.0))
             .draw(image);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Goal: reusing the returned template must produce byte-identical PNG output to a
+    /// from-scratch generation, since the template now round-trips through the daemon's
+    /// blocking pool between generations. Method: generate once without a template, again
+    /// with the returned one, and compare the encoded bytes.
+    #[test]
+    fn template_reuse_produces_identical_png() {
+        let generator = LcdImageGenerator::new();
+        let (png_fresh, template) = generator
+            .generate_single_temp_image(45.6, "CPU", None)
+            .unwrap();
+        let (png_reused, _) = generator
+            .generate_single_temp_image(45.6, "CPU", Some(template))
+            .unwrap();
+        assert_eq!(png_fresh, png_reused);
     }
 }

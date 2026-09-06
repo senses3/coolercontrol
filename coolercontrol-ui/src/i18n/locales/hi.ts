@@ -1,81 +1,46 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 export default {
     common: {
         save: 'सहेजें',
+        mouseActions: 'माउस क्रियाएं',
+        moreInfo: 'अधिक जानकारी',
         cancel: 'रद्द करें',
-        confirm: 'पुष्टि करें',
-        delete: 'हटाएं',
-        edit: 'संपादित करें',
         add: 'जोड़ें',
-        remove: 'हटाएं',
         yes: 'हां',
         no: 'नहीं',
         ok: 'ठीक है',
         error: 'त्रुटि',
         success: 'सफलता',
-        warning: 'चेतावनी',
         loading: 'लोड हो रहा है...',
-        restarting: 'पुनः आरंभ हो रहा है...',
-        noData: 'कोई डेटा उपलब्ध नहीं है',
+        restarting: 'पुनः आरंभ किया जा रहा है...',
         retry: 'पुनः प्रयास करें',
         saveAndRefresh: 'सहेजें और रिफ्रेश करें',
         reset: 'रीसेट करें',
-        back: 'वापस',
         sslTls: 'SSL/TLS',
         protocol: 'प्रोटोकॉल',
         address: 'पता',
         port: 'पोर्ट',
         search: 'खोज',
-        selected: 'चयनित',
-        clear: 'साफ़ करें',
         finish: 'समाप्त करें',
         next: 'अगला',
         previous: 'पिछला',
-        apply: 'लागू करें',
-        defaults: 'डिफ़ॉल्ट',
         unmanaged: 'अप्रबंधित',
-        readOnly: 'केवल पढ़ने योग्य',
-        rename: 'नाम बदलें',
         password: 'पासवर्ड',
         currentPassword: 'वर्तमान पासवर्ड',
         newPassword: 'नया पासवर्ड',
         confirmPassword: 'पासवर्ड की पुष्टि करें',
-        passwordPrompt: 'पासवर्ड दर्ज करें',
-        passwordWeak: 'कमज़ोर',
-        passwordMedium: 'मध्यम',
-        passwordStrong: 'मज़बूत',
         savePassword: 'पासवर्ड सहेजें',
-        editName: 'नाम संपादित करें',
         state: 'स्थिति',
         name: 'नाम',
         message: 'संदेश',
         timestamp: 'समय स्टैम्प',
-        overview: 'अवलोकन',
-        login: 'लॉगिन',
-        logout: 'लॉग आउट',
         temperature: 'तापमान',
         duty: 'कार्यभार',
         offset: 'ऑफ़सेट',
         stay: 'रहें',
         discard: 'त्यागें',
-        blankNameResetDefault: 'खाली नाम इसे सिस्टम डिफ़ॉल्ट पर रीसेट कर देगा।',
         copy: '(प्रतिलिपि)',
         minuteAbbr: 'मिनट',
         rpmAbbr: 'rpm',
@@ -106,6 +71,213 @@ export default {
         },
     },
     layout: {
+        shell: {
+            search: {
+                hint: 'डिवाइस, सेंसर, सेटिंग्स और क्रियाएँ खोजें',
+                recent: 'हाल ही में',
+                jumpTo: 'यहाँ जाएँ',
+                noResults: 'कोई मिलान नहीं मिला।',
+                more: '{count} और',
+                kindFan: 'पंखे',
+                kindSensor: 'सेंसर',
+                kindAction: 'क्रियाएँ',
+                kindPage: 'पृष्ठ',
+            },
+            home: 'होम',
+            cooling: 'कूलिंग',
+            monitoring: 'निगरानी',
+            devices: 'उपकरण',
+            settings: 'सेटिंग्स',
+            plugins: 'प्लगइन्स',
+            modes: 'मोड',
+            manageModes: 'मोड प्रबंधित करें',
+            access: 'पहुंच',
+            power: 'पावर',
+            noModes: 'कोई मोड सहेजा नहीं गया',
+            supportWizards: {
+                summary: 'सपोर्ट के जादूगर सक्रिय!',
+                detail: 'उन स्वयंसेवकों का धन्यवाद जो हमारे उपयोगकर्ताओं का हार्डवेयर और ड्राइवर चलाने में मदद करते हैं।',
+            },
+            coolingPanel: {
+                pinned: 'पिन किया गया',
+                pin: 'पिन करें',
+                unpin: 'अनपिन करें',
+                library: 'प्रोफ़ाइल और फ़ंक्शन',
+                profiles: 'प्रोफ़ाइल',
+                functions: 'फ़ंक्शन',
+                addFolder: 'फ़ोल्डर जोड़ें',
+                newFolder: 'नया फ़ोल्डर',
+                deleteFolder: 'फ़ोल्डर हटाएँ',
+            },
+            monitoringPanel: {
+                newDashboard: 'नया डैशबोर्ड',
+                createAlert: 'इस सेंसर के लिए अलर्ट बनाएं',
+                failAlert: 'खराबी अलर्ट बनाएं (0 rpm पर ट्रिगर होता है)',
+                failAlertSuffix: 'खराबी',
+            },
+            devicesPanel: {
+                disabled: 'अक्षम',
+            },
+            sensorDest: {
+                monitoring: 'निगरानी',
+                cooling: 'कूलिंग',
+                lighting: 'लाइटिंग',
+                lcd: 'LCD',
+            },
+            manageSensors: {
+                title: 'उपकरण और सेंसर प्रबंधित करें',
+                hint: 'उपकरण और सेंसर सक्षम या अक्षम करें। अप्रयुक्त को अक्षम करना अनुशंसित है।',
+                pendingChanges: 'कोई परिवर्तन नहीं | {count} परिवर्तन | {count} परिवर्तन',
+                applyRestart: 'लागू करें और पुनरारंभ करें',
+                disabledDevices: 'अक्षम उपकरण',
+                openButton: 'उपकरण और सेंसर प्रबंधित करें',
+            },
+            toast: {
+                copy: 'कॉपी करें',
+                dismissAll: 'सभी खारिज करें',
+            },
+            homePanel: {
+                overview: 'अवलोकन',
+                logs: 'लॉग',
+            },
+            homePage: {
+                viewLogs: 'लॉग देखें',
+                logsAll: 'सभी',
+                logsWarnings: 'चेतावनियां+',
+                logsErrors: 'त्रुटियां',
+                logsNoMatches: 'कोई मिलती-जुलती लॉग पंक्ति नहीं।',
+                getStartedGroup: 'शुरू करें',
+                learnGroup: 'सीखें',
+                resourcesGroup: 'संसाधन',
+                modeAndAlerts: 'मोड और अलर्ट',
+                noActiveMode: 'कोई सक्रिय मोड नहीं',
+                setUpCooling: 'कूलिंग सेट करें',
+            },
+            devicesPage: {
+                landingHint: 'विवरण और सेटिंग्स देखने के लिए एक डिवाइस चुनें।',
+                temps: 'तापमान',
+                fans: 'पंखे',
+                lighting: 'लाइटिंग',
+                lcd: 'LCD',
+                deviceDisabled: 'यह डिवाइस अक्षम है।',
+                enableDevice: 'डिवाइस सक्षम करें',
+                disableUnusedSensors: 'अप्रयुक्त सेंसर अक्षम करें… (अनुशंसित)',
+                sensors: 'सेंसर',
+            },
+            hardwareHelp: {
+                missingDevice: 'ऐसा हार्डवेयर अपेक्षित था जो यहाँ सूचीबद्ध नहीं है?',
+            },
+            coolingPage: {
+                landingHint: 'कूलिंग देखने और समायोजित करने के लिए एक पंखा या पंप चुनें।',
+                noChannels: 'कोई पंखा या पंप चैनल नहीं मिला।',
+                noneControllable:
+                    'मिले हुए पंखा या पंप चैनलों में से कोई भी नियंत्रित नहीं किया जा सकता।',
+                noticeBlockedByEnvironment:
+                    'हार्डवेयर पहचान नहीं चल सकी, इसलिए कुछ पंखा और पंप चैनल छूट सकते हैं।',
+                fullChart: 'पूरा चार्ट',
+                guidedSetup: 'निर्देशित सेटअप',
+                setupMenu: {
+                    autoCreateThisFan: 'इस पंखे के लिए स्वतः बनाएँ',
+                    createProfile: 'नई प्रोफ़ाइल बनाएँ',
+                    calibrateThisFan: 'इस पंखे को कैलिब्रेट करें',
+                    autoCreateAllFans: 'सभी पंखों के लिए स्वतः बनाएँ',
+                    calibrateAllFans: 'सभी पंखे कैलिब्रेट करें',
+                },
+                manualAt: 'मैनुअल {duty}%',
+                manualDuty: 'मैनुअल ड्यूटी',
+                modeProfile: 'प्रोफ़ाइल',
+                modeManual: 'मैनुअल',
+                modeUnmanaged: 'अप्रबंधित',
+                unmanagedHint:
+                    'यह चैनल डिवाइस या उसके फर्मवेयर द्वारा नियंत्रित होता है। CoolerControl कोई गति कमांड नहीं भेजेगा।',
+                apply: 'लागू करें',
+                saveAndApply: 'सहेजें और लागू करें',
+                unsavedChanges: 'इस चैनल में ऐसे परिवर्तन हैं जो लागू नहीं किए गए हैं।',
+                unsavedChangesHeader: 'सहेजे नहीं गए परिवर्तन',
+                selectProfile: 'एक प्रोफ़ाइल चुनें',
+                sharedWith: '{count} अन्य के साथ साझा',
+                sharedTooltip: 'यह प्रोफ़ाइल अन्य चैनलों को भी चलाती है।',
+                notShared: 'केवल यह फैन',
+                notSharedTooltip: 'यह प्रोफ़ाइल केवल इसी चैनल को नियंत्रित करती है।',
+                forkForFan: 'इस पंखे के लिए फोर्क करें',
+                forkQualifier: '{channel} प्रतिलिपि',
+                fork: {
+                    confirmHeader: 'इस पंखे के लिए फोर्क करें',
+                    confirmMessage:
+                        "प्रोफ़ाइल '{profile}' को नई प्रोफ़ाइल '{copy}' में कॉपी करें और {channel} को सौंपें।\n\nमूल अपरिवर्तित रहता है, इसलिए यहाँ किए गए बदलाव केवल {channel} को प्रभावित करेंगे।",
+                    accept: 'प्रति बनाएँ',
+                },
+                convert: {
+                    button: 'कैलिब्रेशन के लिए बदलें',
+                    tooltip:
+                        'यह फैन कैलिब्रेट है, इसलिए इसकी सहेजी गई गतियाँ अब वास्तविक गति के रूप में पढ़ी जाती हैं और हर बार लिखते समय दोबारा मैप होती हैं। इन्हें बदलें ताकि फैन कैलिब्रेशन से पहले जैसा व्यवहार करे।',
+                    confirmHeader: 'कैलिब्रेट किए गए फैन के लिए बदलें',
+                    confirmProfile:
+                        "प्रोफ़ाइल '{profile}' को नई प्रोफ़ाइल '{copy}' में कॉपी करें, उसकी गतियाँ बदलें और {channel} को सौंपें।\n\nकेवल वे गतियाँ बदलें जो आपने इस फैन के कैलिब्रेशन से पहले सेट की थीं। दो बार बदलने पर फैन गलत गति पर चलेगा। मूल अपरिवर्तित रहता है।",
+                    confirmManual:
+                        '{channel} की मैन्युअल ड्यूटी बदलें ताकि फैन वही गति बनाए रखे जो कैलिब्रेशन से पहले थी।\n\nकेवल वह मान बदलें जो आपने इस फैन के कैलिब्रेशन से पहले सेट किया था। दो बार बदलने पर फैन गलत गति पर चलेगा।',
+                    nameQualifier: 'कैलिब्रेटेड',
+                    accept: 'बदलें',
+                    successProfile: "'{profile}' को बदली हुई गतियों के साथ {channel} को सौंपा गया।",
+                    successManual: 'मैन्युअल ड्यूटी {duty}% में बदली गई।',
+                    error: 'इस फैन की गतियाँ नहीं बदली जा सकीं।',
+                    floorHeading: 'कुछ बिंदु 0% में बदल गए',
+                    floorNotice:
+                        'कैलिब्रेशन के बाद {channel} पर सेट की जा सकने वाली सबसे धीमी गति से {count} बिंदु नीचे थे, इसलिए वे 0% में बदल गए। नए वक्र पर भरोसा करने से पहले उसे जाँच लें।',
+                    modesHeading: 'मोड अब भी मूल प्रोफ़ाइल का उपयोग कर रहे हैं',
+                    modesReminder:
+                        'ये मोड अब भी {channel} को मूल प्रोफ़ाइल सौंपते हैं: {modes}। इन्हें बदली हुई प्रति का उपयोग करने के लिए अपडेट करें।',
+                },
+                notControllable:
+                    'यह चैनल अपनी गति रिपोर्ट करता है लेकिन CoolerControl द्वारा नियंत्रित नहीं किया जा सकता।',
+                verdictFirmwareOverride:
+                    'CoolerControl ने इस चैनल को मैनुअल नियंत्रण पर सेट किया, लेकिन फ़र्मवेयर ने उसे वापस बदल दिया।',
+                verdictFamilyMayNeedOutOfTree:
+                    'इस चैनल के लिए कोई लिखने योग्य फ़ैन नियंत्रण नहीं मिला। इस चिप श्रेणी पर कभी-कभी कोई अन्य कर्नेल ड्राइवर इसे उपलब्ध कराता है।',
+                verdictNotSupportedByDriver:
+                    'उपयोग में मौजूद ड्राइवर इस चैनल के लिए फ़ैन नियंत्रण उपलब्ध नहीं कराता।',
+                verdictNoPwm:
+                    'लोड किया गया ड्राइवर इस चैनल के लिए केवल गति दिखाता है, फ़ैन नियंत्रण नहीं।',
+                verdictPwmReadOnly:
+                    'लोड किया गया ड्राइवर इस चैनल के लिए फ़ैन नियंत्रण दिखाता है, पर उसे केवल-पढ़ने योग्य चिह्नित करता है।',
+                verdictIgnoresDuty:
+                    'इस चैनल ने ड्यूटी परिवर्तन स्वीकार किए, पर इसकी मापी गई गति ने कभी प्रतिक्रिया नहीं दी।',
+                verdictUnverifiable:
+                    'इस चैनल में कोई उपयोग योग्य टैकोमीटर नहीं है, इसलिए ड्यूटी परिवर्तनों पर इसकी प्रतिक्रिया सत्यापित नहीं की जा सकती।',
+                verdictEvidenceLabel: 'इस मशीन पर मापा गया:',
+                evidenceNoPwmFile: 'कोई फ़ैन नियंत्रण उपलब्ध नहीं',
+                evidencePwmNotWritable: 'फ़ैन नियंत्रण केवल-पढ़ने योग्य है',
+                evidenceHasTachometer: 'गति की रीडिंग उपलब्ध',
+                evidenceNoTachometer: 'गति की कोई रीडिंग नहीं',
+                verdictLearnMore: 'मैं इसके बारे में क्या कर सकता हूँ?',
+                verdictFoundSomethingThatWorks: 'कोई ऐसा तरीका मिला जो काम करता है? हमें बताएं',
+                activeMode: 'सक्रिय',
+                previousMode: 'पिछला',
+                activate: 'सक्रिय करें',
+                noModes:
+                    'अभी तक कोई मोड सहेजा नहीं गया। मोड त्वरित स्विचिंग के लिए सभी चैनल सेटिंग्स का स्नैपशॉट लेते हैं।',
+                powerProfiles: {
+                    title: 'सिस्टम पावर प्रोफ़ाइल',
+                    description:
+                        'सिस्टम पावर प्रोफ़ाइल बदलने पर स्वचालित रूप से एक मोड सक्रिय करें।',
+                    activeProfile: 'वर्तमान प्रोफ़ाइल: {profile}',
+                    noMode: 'कोई मोड नहीं',
+                    saveFailed: 'पावर प्रोफ़ाइल मैपिंग सहेजी नहीं जा सकी।',
+                    profileNames: {
+                        'power-saver': 'पावर सेवर',
+                        balanced: 'संतुलित',
+                        performance: 'प्रदर्शन',
+                    },
+                },
+                miniCurveHint:
+                    'असाइन किए गए प्रोफ़ाइल की कर्व। बिंदु वर्तमान स्रोत तापमान पर लक्ष्य ड्यूटी दिखाता है; चैनल का फ़ंक्शन वास्तविक ड्यूटी तय करता है।',
+                chain: {
+                    tempSource: 'तापमान स्रोत',
+                    profile: 'प्रोफ़ाइल',
+                    function: 'फ़ंक्शन',
+                },
+            },
+        },
         topbar: {
             login: 'लॉगिन',
             logout: 'लॉग आउट',
@@ -118,75 +290,39 @@ export default {
             shutdownSuccess: 'डेमॉन शटडाउन सिग्नल स्वीकार किया गया',
             shutdownError: 'शटडाउन सिग्नल भेजते समय अज्ञात त्रुटि। विवरण के लिए लॉग देखें।',
             quitDesktopApp: 'डेस्कटॉप ऐप से बाहर निकलें',
-            applicationInfo: 'जानकारी और उपकरण',
             back: 'वापस',
             expandMenu: 'मेनू विस्तृत करें',
             collapseMenu: 'मेनू संकुचित करें',
-            controls: 'कंट्रोल',
             alerts: 'अलर्ट',
             settings: 'सेटिंग्स',
             openInBrowser: 'ब्राउज़र में खोलें',
-            modes: 'मोड',
             loginSuccessful: 'लॉगिन सफल',
         },
         settings: {
             title: 'सेटिंग्स',
-            userInterface: 'यूज़र इंटरफ़ेस',
-            device: 'उपकरण और सेंसर',
-            daemon: 'डेमॉन',
             devices: {
-                devicesAndSensors: 'उपकरण और सेंसर',
-                detectionIssues: 'पहचान समस्याएं? देखें',
-                hardwareSupportDoc: 'हार्डवेयर समर्थन दस्तावेज',
                 toggleRequiresRestart:
                     'उपकरण या सेंसर को टॉगल करने के लिए डेमॉन और UI को पुनरारंभ करना आवश्यक है। क्या आप वाकई अभी यह करना चाहते हैं?',
                 enableDevices: 'उपकरण सक्षम करें',
-                selectTooltip:
-                    'अक्षम या सक्षम करने के लिए उपकरण और सेंसर चुनें।\nअप्रयुक्त उपकरणों और सेंसरों को अक्षम करना अत्यधिक\nअनुशंसित है।',
                 unknownError:
                     'सभी उपकरणों पर परिवर्तन लागू करने का प्रयास करते समय अज्ञात त्रुटि। विवरण के लिए लॉग देखें।',
             },
-            plugin: 'प्लगइन्स (बीटा)',
             plugins: {
-                device: 'डिवाइस सर्विस प्लगइन',
-                integration: 'इंटीग्रेशन प्लगइन',
                 privileged: 'विशेषाधिकार प्राप्त पहुँच',
                 pluginUrl: 'होमपेज',
                 restricted: 'प्रतिबंधित पहुँच',
                 settingsSaved: 'प्लगइन सेटिंग्स सफलतापूर्वक सहेजी गईं',
                 settingsNotSaved: 'प्लगइन सेटिंग्स सहेजने में विफल',
             },
-            profiles: 'प्रोफाइल',
-            alerts: 'अलर्ट',
-            dashboards: 'डैशबोर्ड',
-            modes: 'मोड',
             appearance: 'उपस्थिति',
+            general: 'सामान्य',
             language: 'भाषा',
             selectLanguage: 'भाषा चुनें',
-            english: 'अंग्रेज़ी',
-            chinese: 'चीनी (सरलीकृत)',
-            japanese: 'जापानी',
-            chineseTrad: 'चीनी (पारंपरिक)',
-            russian: 'रूसी',
-            german: 'जर्मन',
-            french: 'फ्रेंच',
-            spanish: 'स्पेनिश',
-            arabic: 'अरबी',
-            portuguese: 'पुर्तगाली',
-            hindi: 'हिंदी',
-            theme: 'थीम',
-            themeLight: 'लाइट',
-            themeDark: 'डार्क',
-            themeSystem: 'सिस्टम',
-            themeCustom: 'कस्टम',
-            themeHighContrastDark: 'हाई कंट्रास्ट डार्क',
-            themeHighContrastLight: 'हाई कंट्रास्ट लाइट',
-            lineThickness: 'रेखा मोटाई',
+            systemLanguage: 'सिस्टम',
             fullScreen: 'पूर्ण स्क्रीन',
-            menuBarAlwaysVisible: 'मेनू बार हमेशा दिखाई दे',
-            hideMenuCollapseIcon: 'मेनू संकुचन आइकन छिपाएं',
+            railToCollapse: 'संकुचित करने के लिए नेविगेशन बार',
             eyeCandy: 'विज़ुअल इफ़ेक्ट',
-            showOnboarding: 'स्टार्टअप पर ऑनबोर्डिंग टूर दिखाएं',
+            interfaceFont: 'इंटरफ़ेस फ़ॉन्ट',
             introduction: 'परिचय',
             startTour: 'टूर शुरू करें',
             timeFormat: 'समय प्रारूप',
@@ -194,16 +330,11 @@ export default {
             time12h: '12 घंटे',
             frequencyPrecision: 'आवृत्ति सटीकता',
             startupPage: 'स्टार्टअप पेज',
-            sidebarToCollapse: 'संकुचित करने के लिए साइडबार',
-            entitiesBelowSensors: 'सेंसर के नीचे एंटिटीज',
             dashboardLineSize: 'डैशबोर्ड रेखा आकार',
             themeStyle: 'थीम स्टाइल',
-            themeMode: {
-                system: 'सिस्टम',
-                dark: 'डार्क',
-                light: 'लाइट',
-                highContrastDark: 'हाई कंट्रास्ट डार्क',
-                highContrastLight: 'हाई कंट्रास्ट लाइट',
+            themeGroups: {
+                builtIn: 'अंतर्निहित',
+                installed: 'संस्थापित',
                 custom: 'कस्टम',
             },
             desktop: 'डेस्कटॉप',
@@ -211,6 +342,12 @@ export default {
             closeToTray: 'ट्रे में बंद करें',
             zoom: 'ज़ूम',
             desktopStartupDelay: 'डेस्कटॉप स्टार्टअप विलंब',
+            groups: {
+                startup: 'स्टार्टअप',
+                performance: 'प्रदर्शन',
+                devices: 'उपकरण और पहचान',
+                liquidctl: 'Liquidctl',
+            },
             applySettingsOnStartup: 'स्टार्टअप पर सेटिंग्स लागू करें',
             deviceDelayAtStartup: 'स्टार्टअप पर उपकरण विलंब',
             pollingRate: 'पोलिंग दर',
@@ -220,15 +357,21 @@ export default {
             hideDuplicateDevices: 'डुप्लिकेट उपकरण छिपाएं',
             drivePowerState: 'डिस्क ड्राइव पावर स्थिति',
             sensorsAutoDetect: 'सेंसर स्वतः पहचान',
+            sensorsConfig: 'lm-sensors कॉन्फ़िगरेशन',
             deviceListener: 'उपकरण परिवर्तन श्रोता',
             customTheme: {
                 title: 'कस्टम थीम',
                 accent: 'एक्सेंट रंग',
+                accentGradientTo: 'एक्सेंट ग्रेडिएंट अंत',
                 bgOne: 'प्राथमिक पृष्ठभूमि',
                 bgTwo: 'माध्यमिक पृष्ठभूमि',
                 border: 'बॉर्डर रंग',
                 text: 'पाठ रंग',
                 textSecondary: 'माध्यमिक पाठ रंग',
+                success: 'सफलता',
+                warning: 'चेतावनी',
+                error: 'त्रुटि',
+                info: 'जानकारी',
                 export: 'थीम निर्यात करें',
                 import: 'थीम आयात करें',
                 copyCode: 'कोड कॉपी करें',
@@ -237,45 +380,79 @@ export default {
                 themeApplied: 'थीम लागू किया गया',
                 invalidThemeCode: 'अमान्य थीम कोड',
             },
+            tooltips: {
+                timeFormat: 'समय प्रारूप: 12-घंटे (AM/PM) या 24-घंटे',
+                frequencyPrecision: 'प्रदर्शित आवृत्ति मानों की सटीकता समायोजित करें।',
+                startupPage: 'एप्लिकेशन लोड होने के बाद दिखाया जाने वाला पेज।',
+                railToCollapse:
+                    'मेनू को विस्तारित या संकुचित करने के लिए नेविगेशन बार के खाली क्षेत्र का भी उपयोग करें।',
+                eyeCandy:
+                    'घूमते पंखे के आइकन जैसे विज़ुअल एनिमेशन सक्षम करें।\nइससे कुछ अतिरिक्त GPU संसाधनों का उपयोग होगा।',
+                interfaceFont:
+                    'CoolerControl के साथ दिए गए फ़ॉन्ट या अपने सिस्टम पर कॉन्फ़िगर किए गए फ़ॉन्ट का उपयोग करें।',
+                fullScreen: 'पूर्ण स्क्रीन मोड टॉगल करें',
+                lineThickness: 'डैशबोर्ड पर चार्ट की रेखा की मोटाई समायोजित करें',
+                startInTray:
+                    'स्टार्टअप पर, मुख्य UI विंडो छिपी होगी और केवल\nसिस्टम ट्रे आइकन दिखाई देगा।',
+                closeToTray: 'एप्लिकेशन विंडो को बंद करने से ऐप सिस्टम ट्रे में चलता रहेगा',
+                zoom: 'UI ज़ूम स्तर को मैन्युअल रूप से सेट करें।',
+                desktopStartupDelay:
+                    'डेस्कटॉप एप्लिकेशन शुरू करने से पहले कुछ देरी जोड़ता है (सेकंड में)।\nलॉगिन पर स्वचालित रूप से शुरू होने या बहुत जल्दी शुरू होने से उत्पन्न होने वाली समस्याओं में मदद करता है',
+                unlockRange: 'अनुशंसित सीमा के बाहर के मान की अनुमति दें',
+                lockRange: 'अनुशंसित सीमा तक सीमित रखें',
+                applySettingsOnStartup:
+                    'डेमन स्टार्टअप पर और नींद से जागने पर स्वचालित रूप से सेटिंग्स लागू करें',
+                deviceDelayAtStartup:
+                    'डिवाइस संचार शुरू करने से पहले देरी (सेकंड में)।\nउन उपकरणों के साथ मदद करता है जिन्हें प्रारंभ करने में समय लगता है या जो रुक-रुक कर पता लगाए जाते हैं',
+                pollingRate:
+                    'सेंसर डेटा को पोल करने की दर (सेकंड में)।\nएक उच्च पोल दर संसाधन उपयोग को कम करेगी, और एक कम प्रतिक्रिया क्षमता को बढ़ाएगी।\n1.0 से कम की दर का उपयोग सावधानी के साथ किया जाना चाहिए।',
+                compressApiPayload: 'API पेलोड संपीड़न सक्षम करें',
+                liquidctlIntegration:
+                    'इसे अक्षम करने से Liquidctl एकीकरण पूरी तरह से निष्क्रिय हो जाएगा,\nचाहे coolercontrol-liqctld पैकेज की स्थापना स्थिति कुछ भी हो। यदि उपलब्ध हो, तो इसके बजाय HWMon ड्राइवरों का उपयोग किया जाएगा।',
+                liquidctlDeviceInit:
+                    'सावधानी: इसे केवल तभी अक्षम करें जब आप, या कोई अन्य प्रोग्राम,\nliquidctl डिवाइस प्रारंभिकरण को संभाल रहे हों। यह अन्य प्रोग्रामों के साथ संघर्ष से बचने में मदद कर सकता है।',
+                hideDuplicateDevices:
+                    'कुछ उपकरणों का समर्थन Liquidctl और HWMon ड्राइवरों दोनों द्वारा किया जाता है।\nLiquidctl को इसकी अतिरिक्त सुविधाओं के लिए डिफ़ॉल्ट रूप से उपयोग किया जाता है। इसके बजाय HWMon ड्राइवरों का उपयोग करने के लिए, इसे और liquidctl डिवाइस को अक्षम करें ताकि ड्राइवर संघर्ष से बचा जा सके।',
+                drivePowerState:
+                    'एसएसडी और एचडीडी विशेष रूप से स्पिन डाउन कर सकते हैं और एक कम पावर स्थिति में जा सकते हैं।\nयह विकल्प, जब सक्षम किया जाता है और ड्राइव इसका समर्थन करता है, ड्राइव के तापमान को 0°C के रूप में रिपोर्ट करेगा\nजब यह स्पिन डाउन होता है ताकि फैन प्रोफाइल को तदनुसार समायोजित किया जा सके।',
+                sensorsAutoDetect:
+                    'स्टार्टअप पर Super-I/O हार्डवेयर सेंसर को स्वचालित रूप से पहचानें\nऔर कर्नेल मॉड्यूल लोड करें। (केवल x86_64)',
+                sensorsConfig:
+                    'lm-sensors कॉन्फ़िगरेशन फ़ाइलों (/etc/sensors3.conf और /etc/sensors.d)\nके सेंसर नामों और छिपे हुए सेंसरों का उपयोग करें।\nCoolerControl में सेट किए गए नाम हमेशा प्राथमिकता लेते हैं।',
+                deviceListener:
+                    'उपकरण जोड़ने/हटाने की घटनाओं (जैसे USB हॉटप्लग) की निगरानी करें\nऔर हार्डवेयर परिवर्तन पाए जाने पर सूचित करें।',
+                triggersDaemonRestart: 'स्वचालित डेमन पुनरारंभ को ट्रिगर करता है',
+                copyThemeCode:
+                    'अपने वर्तमान कस्टम थीम का एक कॉम्पैक्ट कोड कॉपी करें।\nइसे चैट या फ़ोरम में साझा करें।',
+                pasteThemeCode: 'आपके साथ साझा किए गए कोड (cct1:...) से एक कस्टम थीम लागू करें।',
+            },
+            applySettingAndRestart:
+                'इस सेटिंग को बदलने के लिए डेमन और UI को पुनरारंभ करना आवश्यक है। क्या आप इसे अभी करना चाहते हैं?',
+            restartHeader: 'सेटिंग लागू करें और पुनरारंभ करें',
+            success: 'सफलता',
+            successDetail: 'ऑपरेशन सफलतापूर्वक पूरा हुआ',
+            languageChangeConfirm: 'भाषा बदलें?',
+            languageChangeConfirmMessage:
+                'क्या आप वाकई जारी रखना चाहते हैं? यदि कुछ इंटरफ़ेस तत्व सही ढंग से प्रदर्शित नहीं होते, तो कृपया पृष्ठ को मैन्युअल रूप से रिफ्रेश करें।',
+            languageChangeSuccess: 'भाषा सफलतापूर्वक बदली गई।',
+            languageChangeError: 'भाषा बदलने में विफल। कृपया फिर से प्रयास करें।',
+            themeChangeSuccess: 'थीम सफलतापूर्वक बदली गई।',
         },
         menu: {
-            system: 'सिस्टम',
             dashboards: 'डैशबोर्ड',
-            profiles: 'प्रोफाइल',
-            functions: 'फंक्शन',
             customSensors: 'कस्टम सेंसर',
-            modes: 'मोड',
             alerts: 'अलर्ट',
             pinned: 'पिन किया गया',
             tooltips: {
-                delete: 'हटाएं',
                 createMode: 'वर्तमान सेटिंग्स से मोड बनाएं',
                 addProfile: 'प्रोफाइल जोड़ें',
-                editName: 'नाम संपादित करें',
                 addAlert: 'अलर्ट जोड़ें',
-                deleteFunction: 'फंक्शन हटाएं',
                 addDashboard: 'डैशबोर्ड जोड़ें',
-                deleteDashboard: 'डैशबोर्ड हटाएं',
                 duplicate: 'डुप्लिकेट',
-                setAsHome: 'होम के रूप में सेट करें',
-                save: 'सहेजें',
-                deleteMode: 'मोड हटाएं',
-                updateWithCurrentSettings: 'वर्तमान सेटिंग्स के साथ अपडेट करें',
                 rename: 'नाम बदलें',
-                createModeFromCurrentSettings: 'वर्तमान सेटिंग्स से मोड बनाएं',
                 addCustomSensor: 'कस्टम सेंसर जोड़ें',
                 addFunction: 'फंक्शन जोड़ें',
                 chooseColor: 'रंग चुनें',
-                deviceSettings: 'उन्नत डिवाइस सेटिंग्स',
-                options: 'अधिक विकल्प',
-                seeDeviceHealth: 'अवलोकन के लिए जानकारी और उपकरण में डिवाइस स्वास्थ्य देखें',
-                moveTop: 'शीर्ष पर ले जाएं',
-                moveBottom: 'नीचे ले जाएं',
-                disable: 'अक्षम करें',
-                pin: 'शीर्ष पर पिन करें',
-                unpin: 'अनपिन करें',
-                profileApply: 'पंखों पर प्रोफाइल लागू करें',
-                tags: 'टैग प्रबंधित करें',
             },
         },
         plugins: {
@@ -297,7 +474,7 @@ export default {
             overview: 'प्लगइन्स अवलोकन',
             gettingStarted:
                 'प्लगइन्स CoolerControl को अतिरिक्त डिवाइस समर्थन, एकीकरण और स्वचालन के साथ विस्तारित करते हैं। वे नए डिवाइस सेंसर और नियंत्रण प्रदान कर सकते हैं, बाहरी सेवाओं से जुड़ सकते हैं, या कस्टम UI पृष्ठ जोड़ सकते हैं।',
-            docsLink: 'प्लगइन दस्तावेज़ीकरण',
+            findPlugins: 'प्लगइन्स खोजें और इंस्टॉल करें',
             restartNote:
                 'यदि आपने हाल ही में एक नया प्लगइन जोड़ा है और वह यहाँ दिखाई नहीं दे रहा, तो CoolerControl डेमॉन को पुनः आरंभ करें।',
             containerNote:
@@ -308,7 +485,6 @@ export default {
             description: 'विवरण',
             enable: 'सक्षम करें',
             disable: 'अक्षम करें',
-            disabled: 'अक्षम',
             pluginDisabled: 'प्लगइन अक्षम किया गया।',
             pluginEnabled: 'प्लगइन सक्षम किया गया।',
             pluginDisabledRestart: 'प्लगइन अक्षम किया गया। लागू करने के लिए डेमन पुनः आरंभ करें।',
@@ -319,356 +495,33 @@ export default {
             commandCopied: 'कमांड क्लिपबोर्ड पर कॉपी किया गया',
         },
         add: {
-            dashboard: 'डैशबोर्ड',
-            mode: 'मोड',
             profile: 'प्रोफाइल',
             function: 'फंक्शन',
-            alert: 'अलर्ट',
             customSensor: 'कस्टम सेंसर',
         },
     },
-    customTheme: {
-        title: 'कस्टम थीम',
-        accent: 'एक्सेंट रंग',
-        bgOne: 'प्राथमिक पृष्ठभूमि',
-        bgTwo: 'माध्यमिक पृष्ठभूमि',
-        border: 'बॉर्डर रंग',
-        text: 'पाठ रंग',
-        textSecondary: 'माध्यमिक पाठ रंग',
-    },
-    tooltips: {
-        introduction: 'एप्लिकेशन परिचय टूर शुरू करें।',
-        timeFormat: 'समय प्रारूप: 12-घंटे (AM/PM) या 24-घंटे',
-        frequencyPrecision: 'प्रदर्शित आवृत्ति मानों की सटीकता समायोजित करें।',
-        startupPage: 'एप्लिकेशन लोड होने के बाद दिखाया जाने वाला पेज।',
-        eyeCandy:
-            'घूमते पंखे के आइकन जैसे विज़ुअल एनिमेशन सक्षम करें।\nइससे कुछ अतिरिक्त GPU संसाधनों का उपयोग होगा।',
-        sidebarCollapse:
-            'साइडबार में एक मेनू कोलैप्स आइकन दिखाना है या नहीं,\nया मुख्य मेनू को विस्तारित या संकुचित करने के लिए खाली साइडबार क्षेत्र का उपयोग करें।',
-        entitiesBelowSensors: 'मुख्य मेनू में डिवाइस सेंसर के नीचे संस्थाओं को दिखाना है या नहीं।',
-        fullScreen: 'पूर्ण स्क्रीन मोड टॉगल करें',
-        lineThickness: 'डैशबोर्ड पर चार्ट की रेखा की मोटाई समायोजित करें',
-        startInTray: 'स्टार्टअप पर, मुख्य UI विंडो छिपी होगी और केवल\nसिस्टम ट्रे आइकन दिखाई देगा।',
-        closeToTray: 'एप्लिकेशन विंडो को बंद करने से ऐप सिस्टम ट्रे में चलता रहेगा',
-        zoom: 'UI ज़ूम स्तर को मैन्युअल रूप से सेट करें।',
-        desktopStartupDelay:
-            'डेस्कटॉप एप्लिकेशन शुरू करने से पहले कुछ देरी जोड़ता है (सेकंड में)।\nलॉगिन पर स्वचालित रूप से शुरू होने या बहुत जल्दी शुरू होने से उत्पन्न होने वाली समस्याओं में मदद करता है',
-        applySettingsOnStartup:
-            'डेमन स्टार्टअप पर और नींद से जागने पर स्वचालित रूप से सेटिंग्स लागू करें',
-        deviceDelayAtStartup:
-            'डिवाइस संचार शुरू करने से पहले देरी (सेकंड में)।\nउन उपकरणों के साथ मदद करता है जिन्हें प्रारंभ करने में समय लगता है या जो रुक-रुक कर पता लगाए जाते हैं',
-        pollingRate:
-            'सेंसर डेटा को पोल करने की दर (सेकंड में)।\nएक उच्च पोल दर संसाधन उपयोग को कम करेगी, और एक कम प्रतिक्रिया क्षमता को बढ़ाएगी।\n1.0 से कम की दर का उपयोग सावधानी के साथ किया जाना चाहिए।',
-        compressApiPayload: 'API पेलोड संपीड़न सक्षम करें',
-        liquidctlIntegration:
-            'इसे अक्षम करने से Liquidctl एकीकरण पूरी तरह से निष्क्रिय हो जाएगा,\nचाहे coolercontrol-liqctld पैकेज की स्थापना स्थिति कुछ भी हो। यदि उपलब्ध हो, तो इसके बजाय HWMon ड्राइवरों का उपयोग किया जाएगा।',
-        liquidctlDeviceInit:
-            'सावधानी: इसे केवल तभी अक्षम करें जब आप, या कोई अन्य प्रोग्राम,\nliquidctl डिवाइस प्रारंभिकरण को संभाल रहे हों। यह अन्य प्रोग्रामों के साथ संघर्ष से बचने में मदद कर सकता है।',
-        hideDuplicateDevices:
-            'कुछ उपकरणों का समर्थन Liquidctl और HWMon ड्राइवरों दोनों द्वारा किया जाता है।\nLiquidctl को इसकी अतिरिक्त सुविधाओं के लिए डिफ़ॉल्ट रूप से उपयोग किया जाता है। इसके बजाय HWMon ड्राइवरों का उपयोग करने के लिए, इसे और liquidctl डिवाइस को अक्षम करें ताकि ड्राइवर संघर्ष से बचा जा सके।',
-        drivePowerState:
-            'एसएसडी और एचडीडी विशेष रूप से स्पिन डाउन कर सकते हैं और एक कम पावर स्थिति में जा सकते हैं।\nयह विकल्प, जब सक्षम किया जाता है और ड्राइव इसका समर्थन करता है, ड्राइव के तापमान को 0°C के रूप में रिपोर्ट करेगा\nजब यह स्पिन डाउन होता है ताकि फैन प्रोफाइल को तदनुसार समायोजित किया जा सके।',
-        sensorsAutoDetect:
-            'स्टार्टअप पर Super-I/O हार्डवेयर सेंसर को स्वचालित रूप से पहचानें\nऔर कर्नेल मॉड्यूल लोड करें। (केवल x86_64)',
-        deviceListener:
-            'उपकरण जोड़ने/हटाने की घटनाओं (जैसे USB हॉटप्लग) की निगरानी करें\nऔर हार्डवेयर परिवर्तन पाए जाने पर सूचित करें।',
-        daemonAddress:
-            'कनेक्शन स्थापित करने के लिए डेमन का IP पता या डोमेन नाम।\nIPv4, IPv6, और DNS-समाधान योग्य होस्टनाम का समर्थन करता है।',
-        daemonPort: 'डेमन के साथ कनेक्शन स्थापित करने के लिए उपयोग किया जाने वाला पोर्ट।',
-        sslTls: 'SSL/TLS का उपयोग करके डेमन से कनेक्ट करना है या नहीं।\nएक प्रॉक्सी सेटअप की आवश्यकता है।',
-        triggersRestart: 'स्वचालित पुनरारंभ को ट्रिगर करता है',
-        triggersUIRestart: 'स्वचालित UI पुनरारंभ को ट्रिगर करता है',
-        triggersDaemonRestart: 'स्वचालित डेमन पुनरारंभ को ट्रिगर करता है',
-        resetToDefaults: 'डिफ़ॉल्ट सेटिंग्स पर रीसेट करें',
-        saveAndReload: 'UI को सहेजें और पुनः लोड करें',
-        copyThemeCode:
-            'अपने वर्तमान कस्टम थीम का एक कॉम्पैक्ट कोड कॉपी करें।\nइसे चैट या फ़ोरम में साझा करें।',
-        pasteThemeCode: 'आपके साथ साझा किए गए कोड (cct1:...) से एक कस्टम थीम लागू करें।',
-        exportThemeFile: 'वर्तमान कस्टम थीम को JSON फ़ाइल में सहेजें।',
-        importThemeFile: 'डिस्क पर एक JSON फ़ाइल से कस्टम थीम लोड करें।',
-    },
-    applySettingAndRestart:
-        'इस सेटिंग को बदलने के लिए डेमन और UI को पुनरारंभ करना आवश्यक है। क्या आप इसे अभी करना चाहते हैं?',
-    restartHeader: 'सेटिंग लागू करें और पुनरारंभ करें',
-    restartSuccess: 'अभी पुनरारंभ हो रहा है',
-    success: 'सफलता',
-    successDetail: 'ऑपरेशन सफलतापूर्वक पूरा हुआ',
-    settingsAppliedSuccess: 'सेटिंग्स सफलतापूर्वक लागू की गईं',
-    restartRequestSuccess: 'पुनरारंभ अनुरोध सफलतापूर्वक भेजा गया',
-    colorPickerDialogTitle: 'रंग चुनें',
-    colorPickerConfirm: 'पुष्टि करें',
-    colorPickerCancel: 'रद्द करें',
-    languageChangeConfirm: 'भाषा बदलें?',
-    languageChangeConfirmMessage: 'भाषा बदलने के लिए पृष्ठ को ताज़ा करना आवश्यक है। जारी रखें?',
-    languageChangeSuccess: 'भाषा सफलतापूर्वक बदली गई।',
-    languageChangeError: 'भाषा बदलने में विफल। कृपया फिर से प्रयास करें।',
-    themeChangeSuccess: 'थीम सफलतापूर्वक बदली गई।',
-    entitiesBelowSensorsEnabledMessage: 'अब संत्ताएँ सेंसर के नीचे प्रदर्शित होंगी।',
-    entitiesBelowSensorsDisabledMessage: 'अब संत्ताएँ सेंसर के नीचे प्रदर्शित नहीं होंगी।',
-    daemon: {
-        status: {
-            ok: 'ठीक है',
-            hasWarnings: 'चेतावनियां हैं',
-            hasErrors: 'त्रुटियां हैं',
-        },
-        title: 'डेमॉन',
-        daemonErrors: 'डेमॉन त्रुटियां',
-        daemonErrorsDetail: 'डेमॉन ने त्रुटियों की सूचना दी है। विवरण के लिए लॉग देखें।',
-        daemonDisconnected: 'डेमॉन डिस्कनेक्ट हो गया',
-        daemonDisconnectedDetail:
-            'डेमॉन से कनेक्ट करने में असमर्थ। कृपया जांचें कि डेमॉन चल रहा है या नहीं।',
-        connectionRestored: 'कनेक्शन पुनर्स्थापित',
-        connectionRestoredMessage: 'डेमॉन से कनेक्ट करने में पुनर्स्थापित किया गया है।',
-        thinkpadFanControl: 'थिंकपैड पंखा नियंत्रण',
-        pollRate: 'पोलिंग दर',
-        applySettingAndRestart: 'सेटिंग लागू करें और पुनरारंभ करें',
-        changeSetting:
-            'इस सेटिंग को बदलने के लिए डेमॉन और UI पुनरारंभ करना आवश्यक है। क्या आप इसे अभी करना चाहते हैं?',
-    },
     views: {
-        dashboard: {
-            timeRange: 'समय सीमा',
-            minutes: 'मिनट',
-            chartType: 'चार्ट प्रकार',
-            dataType: 'डेटा प्रकार',
-            filterSensors: 'फ़िल्टर सेंसर',
-            showControls: 'कंट्रोल दिखाएं',
-            mouseActions:
-                'डैशबोर्ड माउस एक्शन्स:\n- ज़ूम करने के लिए हाइलाइट सिलेक्शन करें।\n- ज़ूम करने के लिए स्क्रॉल करें।\n- ज़ूम करने पर राइट-क्लिक करें और पैन करें।\n- डबल-क्लिक करें और अपडेट करना शुरू करें।\n- सभी सेंसर्स के टूलटिप्स को दिखाने के लिए Ctrl+क्लिक या मिडिल-क्लिक करें।',
-            fullPage: 'पूर्ण पेज',
-            filterTags: 'टैग फ़िल्टर करें',
-            filterByTag: 'टैग द्वारा फ़िल्टर करें',
-            filterBySensor: 'सेंसर द्वारा फ़िल्टर करें',
-            search: 'खोज',
-            filterTypes: 'फ़िल्टर प्रकार',
-            filterByDataType: 'डेटा प्रकार द्वारा फ़िल्टर करें',
-            selectChartType: 'चार्ट प्रकार चुनें',
-            exitFullPage: 'पूर्ण पेज से बाहर निकलें',
-            controls: 'कंट्रोल',
-            sensorValues: 'सेंसर मान',
-            selected: 'चयनित',
-            clear: 'साफ़ करें',
-            deleteDashboard: 'डैशबोर्ड हटाएं',
-            deleteDashboardConfirm: 'क्या आप वाकई डैशबोर्ड हटाना चाहते हैं: "{name}"?',
-            dashboardDeleted: 'डैशबोर्ड हटा दिया गया',
-            setAsHome: 'होम के रूप में सेट करें',
-            duplicateDashboard: 'डैशबोर्ड डुप्लिकेट करें',
-        },
-        appInfo: {
-            gettingStartedAutoCreate:
-                '{wizard} का उपयोग एक ही बार में आपके सभी पंखों के लिए बुनियादी प्रोफ़ाइल सेट करने के लिए किया जा सकता है।',
-            gettingStartedAutoCreateLink: 'प्रोफ़ाइल स्वतः बनाएँ',
-            calibrateFans:
-                'एक समान नियंत्रण के लिए, {wizard} ताकि एक निश्चित % हर पंखे पर समान गति का अर्थ हो।',
-            calibrateFansLink: 'अपने पंखों को कैलिब्रेट करें',
-            title: 'जानकारी और उपकरण',
-            noWarranty: 'इस प्रोग्राम के साथ बिल्कुल कोई वारंटी नहीं है।',
-            changeStartupPage: 'सेटिंग्स में स्टार्टअप पेज बदलें',
-            daemonStatus: 'डेमॉन स्थिति',
-            acknowledgeIssues: 'समस्याओं को स्वीकार करें',
-            status: 'स्थिति',
-            processStatus: 'प्रोसेस स्थिति',
-            host: 'होस्ट',
-            uptime: 'अपटाइम',
-            version: 'वर्जन',
-            processId: 'प्रोसेस आईडी',
-            memoryUsage: 'मेमोरी उपयोग',
-            liquidctl: 'Liquidctl',
-            connected: 'कनेक्टेड',
-            disconnected: 'डिस्कनेक्टेड',
-            helpfulLinks: 'उपयोगी लिंक',
-            uiTour: 'UI टूर',
-            uiTourDesc: 'एप्लिकेशन का निर्देशित दौरा करें',
-            gettingStarted: 'शुरू करना',
-            gettingStartedGraphProfile: 'ग्राफ़ प्रोफ़ाइल',
-            gettingStartedControlsPage: 'कंट्रोल पेज',
-            gettingStartedStep1: 'फैन प्रोफ़ाइल में एक {profile} बनाएं और फैन कर्व को आकार दें।',
-            gettingStartedStep2:
-                '{controls} पर (या फैन के अपने पेज पर) इसे असाइन करें। प्रोफ़ाइल अपने आप लागू नहीं होतीं।',
-            gettingStartedStep3: 'एक ही प्रोफ़ाइल का उपयोग जितने चाहें उतने फैन पर कर सकते हैं।',
-            helpSettingUp: 'पंखा नियंत्रण सेट करने में सहायता',
-            hardwareSupport: 'हार्डवेयर समर्थन',
-            hardwareSupportDesc: 'समर्थित उपकरण और ड्राइवर स्थापना',
-            gitRepository: 'Git रिपॉजिटरी',
-            gitRepositoryDesc: 'समस्याएं या सुविधा अनुरोध सबमिट करें',
-            discord: 'Discord',
-            discordDesc: 'हमारे Discord समुदाय से जुड़ें',
-            whatsNew: 'नया क्या है',
-            whatsNewDesc: 'नवीनतम रिलीज़ नोट्स देखें',
-            logsAndDiagnostics: 'लॉग और डायग्नोस्टिक्स',
-            downloadCurrentLog: 'वर्तमान लॉग डाउनलोड करें',
-            deviceHealth: 'डिवाइस स्वास्थ्य',
-            deviceHealthTooltip:
-                'गायब तापमान स्रोतों को बदलने के लिए प्रभावित कस्टम सेंसर,<br>प्रोफाइल या LCD सेटिंग को फिर से संपादित करके सहेजें।',
-            deviceHealthOk: 'सभी सेंसर और चैनल सही स्थिति में हैं।',
-            failsafeActive: 'फेलसेफ मान उपयोग में हैं',
-            missingTempSource: 'तापमान स्रोत गायब है',
-            staleTempSource: 'तापमान स्रोत फेलसेफ मान उपयोग कर रहा है',
-            stressTest: 'थर्मल स्ट्रेस टेस्ट',
-            stressTestTooltip:
-                'फैन कर्व और कूलिंग प्रोफाइल को सत्यापित करने के लिए<br>निरंतर थर्मल लोड उत्पन्न करता है।<br>परिणाम हार्डवेयर के अनुसार भिन्न हो सकते हैं।<br>अतिरिक्त बैकएंड के लिए stress-ng इंस्टॉल करें।',
-            cpuStress: 'CPU स्ट्रेस',
-            gpuStress: 'GPU स्ट्रेस',
-            gpuStressTooltip:
-                'बिल्ट-इन बैकएंड उपयोग करते समय<br>Vulkan या OpenGL ES ड्राइवर आवश्यक हो सकते हैं।',
-            ramStress: 'RAM स्ट्रेस',
-            driveStress: 'ड्राइव स्ट्रेस',
-            driveStressTooltip:
-                'ड्राइव कंट्रोलर पर गर्मी उत्पन्न करने के लिए<br>ब्लॉक डिवाइस पर I/O स्ट्रेस।<br>stress-ng के लिए डिवाइस का माउंट होना आवश्यक है।',
-            builtInBackend: 'बिल्ट-इन',
-            stressNgBackend: 'stress-ng',
-            backendTooltip:
-                'स्ट्रेस-टेस्ट बैकएंड चुनें।<br>बिल्ट-इन बाहरी निर्भरताओं के बिना काम करता है।<br>stress-ng (जब इंस्टॉल हो) अतिरिक्त स्ट्रेसर वेरिएंट प्रदान करता है।',
-            selectDrive: 'ड्राइव चुनें',
-            threadCount: 'थ्रेड्स',
-            duration: 'अवधि (सेकंड)',
-            start: 'शुरू करें',
-            stop: 'रोकें',
-            stopAll: 'सभी रोकें',
-            active: 'सक्रिय',
-            inactive: 'निष्क्रिय',
-            allCores: 'सभी कोर',
-            psuWarningHeader: 'उच्च बिजली चेतावनी',
-            psuWarningMessage:
-                'CPU और GPU स्ट्रेस टेस्ट एक साथ चलाने से PSU पर काफी भार पड़ेगा। ओवरक्लॉकिंग या कम वॉटेज PSU के साथ सिस्टम अस्थिरता हो सकती है। क्या आप आगे बढ़ना चाहते हैं?',
-            proceed: 'आगे बढ़ें',
-        },
-        alerts: {
-            createAlert: 'अलर्ट बनाएं',
-            editAlert: 'अलर्ट संपादित करें',
-            deleteAlert: 'अलर्ट हटाएं',
-            noAlerts: 'कोई अलर्ट कॉन्फ़िगर नहीं है',
-            alertsOverview: 'अलर्ट अवलोकन',
-            alertLogs: 'अलर्ट लॉग',
-            alertTriggered: 'अलर्ट ट्रिगर हुआ',
-            alertRecovered: 'अलर्ट रिकवर हुआ',
-            deleteAlertConfirm: 'क्या आप वाकई हटाना चाहते हैं: "{name}"?',
-            saveAlert: 'अलर्ट सहेजें',
-            channelSource: 'अलर्ट के लिए चैनल स्रोत',
-            channelSourceTooltip: 'अलर्ट के लिए उपयोग किया जाने वाला चैनल स्रोत',
-            triggerConditions: 'ट्रिगर शर्तें',
-            maxValueTooltip: 'इससे अधिक मान अलर्ट को ट्रिगर करेंगे।',
-            minValueTooltip: 'इससे कम मान अलर्ट को ट्रिगर करेंगे।',
-            warmupDurationTooltip:
-                'अलर्ट को सक्रिय माने जाने से पहले किसी शर्त को कितनी देर तक सक्रिय रहना चाहिए।\nइसकी जाँच केवल नियमित पोल-रेट अंतराल पर की जाती है,\nइसलिए इसकी अवधि बिल्कुल इतनी नहीं हो सकती।',
-            greaterThan: 'से अधिक',
-            lessThan: 'से कम',
-            newAlert: 'नया अलर्ट',
-            warmupGreaterThan: 'स्थिति लंबे समय तक ट्रिगर होती है',
-            unsavedChanges: 'इस अलर्ट में असहेजे परिवर्तन हैं।',
-            unsavedChangesHeader: 'असहेजे परिवर्तन',
-            createFailAlert: 'खराबी अलर्ट',
-            desktopNotify: 'डेस्कटॉप सूचना',
-            desktopNotifyTooltip:
-                'अलर्ट ट्रिगर होने पर डेस्कटॉप सूचनाएं सक्षम करें।\n(यदि समर्थित हो)',
-            desktopNotifyRecovery: 'रिकवरी पर डेस्कटॉप सूचना',
-            desktopNotifyRecoveryTooltip:
-                'अलर्ट रिकवर होने पर डेस्कटॉप सूचनाएं सक्षम करें।\n(यदि समर्थित हो)',
-            desktopNotifyAudio: 'डेस्कटॉप सूचना ऑडियो',
-            desktopNotifyAudioTooltip:
-                'अलर्ट ट्रिगर होने पर डेस्कटॉप सूचना ऑडियो सक्षम करें।\n(यदि समर्थित हो)',
-            shutdownOnActivation: 'सक्रियण पर शटडाउन',
-            shutdownOnActivationTooltip:
-                'अलर्ट ट्रिगर होने पर सिस्टम शटडाउन सक्षम करें।\nसिस्टम शटडाउन अलर्ट ट्रिगर होने के एक मिनट बाद शुरू होगा\nऔर अलर्ट रिकवर होने पर रद्द हो जाएगा।',
-        },
-        profiles: {
-            createProfile: 'प्रोफ़ाइल बनाएँ',
-            editProfile: 'प्रोफ़ाइल संपादित करें',
-            deleteProfile: 'प्रोफ़ाइल हटाएँ',
-            noProfiles: 'कोई प्रोफ़ाइल कॉन्फ़िगर नहीं की गई',
-            profileType: 'प्रोफ़ाइल प्रकार',
-            fixedDuty: 'निश्चित पंखा गति',
-            selectedPointDuty: 'चयनित बिंदु ड्यूटी',
-            selectedPointTemp: 'चयनित बिंदु तापमान',
-            tempSource: 'तापमान स्रोत',
-            memberProfiles: 'सदस्य प्रोफ़ाइल',
-            mixFunction: 'मिक्स फ़ंक्शन',
-            applyMixFunction: 'चयनित प्रोफ़ाइल पर मिक्स फ़ंक्शन लागू करें',
-            profilesToMix: 'मिश्रण करने के लिए प्रोफ़ाइल',
-            saveProfile: 'प्रोफ़ाइल सहेजें',
-            function: 'फ़ंक्शन',
-            functionToApply: 'लागू करने के लिए फ़ंक्शन',
-            graphProfileMouseActions:
-                'ग्राफ़ प्रोफ़ाइल माउस क्रियाएँ:\n- ज़ूम करने के लिए स्क्रॉल करें।\n- बिंदु जोड़ने के लिए लाइन पर बायाँ-क्लिक करें।\n- बिंदु हटाने के लिए बिंदु पर दायाँ-क्लिक करें।\n- बिंदु को स्थानांतरित करने के लिए खींचें।',
-            unsavedChanges: 'इस प्रोफ़ाइल में असहेजे बदलाव किए गए हैं।',
-            unsavedChangesHeader: 'असहेजे बदलाव',
-            appliedFunction: 'लागू किया गया फ़ंक्शन',
-            newProfile: 'नई प्रोफ़ाइल',
-            tooltip: {
-                profileType:
-                    'प्रोफ़ाइल प्रकार:<br/>- डिफ़ॉल्ट: अप्रबंधित, नियंत्रण डिवाइस के ड्राइवर को वापस सौंपता है<br/>- फिक्स्ड: स्थिर गति सेट करता है<br/>- ग्राफ़: अनुकूलन योग्य फ़ैन कर्व<br/>- मिक्स: कई प्रोफ़ाइलों को संयोजित करता है<br/>- ओवरले: मौजूदा प्रोफ़ाइल के आउटपुट पर ऑफ़सेट लागू करता है',
-            },
-            profileDeleted: 'प्रोफ़ाइल हटाई गई',
-            profileDuplicated: 'प्रोफ़ाइल डुप्लिकेट की गई',
-            deleteProfileConfirm: 'क्या आप वाकई हटाना चाहते हैं: "{name}"?',
-            deleteProfileWithChannelsConfirm:
-                '"{name}" वर्तमान में इनके द्वारा उपयोग किया जा रहा है: {channels}।\nइस प्रोफ़ाइल को हटाने से उन चैनलों की सेटिंग्स रीसेट हो जाएंगी।\nक्या आप वाकई "{name}" को हटाना चाहते हैं?',
-            profileUpdated: 'प्रोफ़ाइल सफलतापूर्वक अपडेट की गई',
-            profileUpdateError: 'इस प्रोफ़ाइल को अपडेट करने का प्रयास करते समय एक त्रुटि हुई',
-            tempSourceRequired: 'ग्राफ़ प्रोफ़ाइल के लिए एक तापमान स्रोत आवश्यक है।',
-            memberProfilesRequired: 'मिक्स प्रोफ़ाइल के लिए कम से कम 2 सदस्य प्रोफ़ाइल आवश्यक हैं।',
-            minProfileTemp: 'न्यूनतम प्रोफ़ाइल तापमान',
-            maxProfileTemp: 'अधिकतम प्रोफ़ाइल तापमान',
-            staticOffset: 'स्थिर ऑफ़सेट',
-            offsetType: 'ऑफ़सेट प्रकार',
-            offsetTypeStatic: 'स्थिर ऑफ़सेट',
-            offsetTypeGraph: 'ग्राफ़ ऑफ़सेट',
-            baseProfile: 'आधार प्रोफ़ाइल',
-            baseProfileRequired: 'ओवरले प्रोफ़ाइल के लिए एक आधार प्रोफ़ाइल आवश्यक है।',
-            selectedPointOutputDuty: 'चयनित बिंदु पर प्रोफ़ाइल आउटपुट कार्यभार',
-            selectedPointOffset: 'चयनित बिंदु ऑफ़सेट कार्यभार',
-            profileOutputDuty: 'प्रोफ़ाइल आउटपुट कार्यभार',
-            offsetDuty: 'ऑफ़सेट कार्यभार',
-            points: 'बिंदु',
-            moveTable: 'दूसरे कोने में ले जाएं',
-            addPointAfter: 'बाद में बिंदु जोड़ें',
-            removePoint: 'बिंदु हटाएं',
-            curvePointLimitBadge: 'अधिकतम {n} अंक',
-            curveLimitedByAmdGpu: 'वक्र AMD GPU हार्डवेयर फैन वक्र द्वारा {n} बिंदुओं तक सीमित है।',
-            curveLimitedByFirmware: 'वक्र डिवाइस फर्मवेयर फैन वक्र द्वारा {n} बिंदुओं तक सीमित है।',
-        },
-        devices: {
-            detectionIssues: 'पहचान समस्याएं? देखें',
-            hardwareSupportDocs: 'हार्डवेयर समर्थन दस्तावेज़ीकरण',
-            selectDevices:
-                'अक्षम या सक्षम करने के लिए उपकरण और सेंसर चुनें।\nअप्रयुक्त उपकरणों और सेंसरों को अक्षम करना अत्यधिक\nअनुशंसित है।',
-            devicesAndSensors: 'उपकरण और सेंसर',
-            apply: 'लागू करें',
-            applySettingsAndReload: 'सेटिंग्स लागू करें और रीलोड करें',
-            triggersAutoRestart: 'स्वचालित डेमॉन पुनरारंभ ट्रिगर करता है',
-            restartPrompt:
-                'उपकरण या सेंसर को टॉगल करने के लिए डेमॉन और UI को पुनरारंभ करना आवश्यक है। क्या आप इसे अभी करना चाहते हैं?',
-            enableDevices: 'उपकरण सक्षम करें',
+        daemon: {
+            title: 'डेमॉन',
+            daemonErrors: 'डेमॉन त्रुटियां',
+            daemonErrorsDetail: 'डेमॉन ने त्रुटियों की सूचना दी है। विवरण के लिए लॉग देखें।',
+            daemonDisconnected: 'डेमॉन डिस्कनेक्ट हो गया',
+            daemonDisconnectedDetail:
+                'डेमॉन से कनेक्ट करने में असमर्थ। कृपया जांचें कि डेमॉन चल रहा है या नहीं।',
+            connectionRestored: 'कनेक्शन पुनर्स्थापित',
+            connectionRestoredMessage: 'डेमॉन से कनेक्शन पुनर्स्थापित कर दिया गया है।',
+            reconnecting: 'पुनः कनेक्ट किया जा रहा है...',
+            disconnectedFor: '{time} से डिस्कनेक्ट है',
         },
         speed: {
-            automatic: 'स्वचालित',
-            manual: 'मैनुअल',
-            unsavedChanges: 'असहेजे परिवर्तन',
-            unsavedChangesMessage: 'इस नियंत्रण चैनल में असहेजे परिवर्तन किए गए हैं।',
-            manualDuty: 'मैनुअल ड्यूटी',
-            profileToApply: 'लागू करने के लिए प्रोफाइल',
-            controlModeAutomaticTooltip: 'इस चैनल पर फैन प्रोफ़ाइल लागू करें',
-            controlModeManualTooltip: 'एक निश्चित ड्यूटी प्रतिशत मैन्युअल रूप से सेट करें',
-            controlModeUnmanagedTooltip:
-                'इस चैनल का प्रबंधन बंद करें, डिवाइस के हार्डवेयर या ड्राइवर को तय करने दें',
-            driverNoSupportControl:
-                'केवल पढ़ने योग्य चैनल। वर्तमान ड्राइवर इस चैनल की गति सेट करने का समर्थन नहीं करता।',
-            amdOverdriveNotEnabled:
-                'AMD GPU ओवरड्राइव सक्षम नहीं है। इसे इस डिवाइस की उन्नत सेटिंग्स में सक्षम करें (रीबूट आवश्यक)।',
-            controlOrView: 'नियंत्रण या देखें',
             applySetting: 'सेटिंग लागू करें',
-            defaultProfileInfo:
-                '"अप्रबंधित" चुनना CoolerControl को इस पंखे का नियंत्रण बंद करने<br/>और नियंत्रण डिवाइस के ड्राइवर को वापस सौंपने का निर्देश देता है।<br/><br/><b>चेतावनी:</b> कई ड्राइवरों में स्वचालित पंखा नियंत्रण <i>नहीं</i> होता।<br/>ऐसे उपकरणों पर, पंखा अपनी अंतिम निर्धारित गति पर बना रहेगा।',
         },
         customSensors: {
             missingSourcesNotice:
                 'निम्नलिखित तापमान स्रोत अब मौजूद नहीं हैं और सेव करने पर हटा दिए जाएंगे: {sources}',
-            newSensor: 'नया सेंसर',
             sensorType: 'सेंसर प्रकार',
-            type: 'प्रकार',
             mixFunction: 'मिक्स फ़ंक्शन',
             howCalculateValue: 'परिणामी सेंसर मान की गणना कैसे करें',
-            tempFileLocation: 'तापमान फ़ाइल स्थान',
             tempFile: 'तापमान फ़ाइल',
             filePathTooltip:
                 'इस सेंसर के लिए उपयोग करने के लिए तापमान फ़ाइल का पूर्ण पथ दर्ज करें।\nफ़ाइल को sysfs डेटा फॉर्मेट मानक का उपयोग करना चाहिए:\nमिलीडिग्री सेल्सियस में एक निश्चित बिंदु संख्या।\nउदाहरण के लिए 80°C के लिए 80000।\nफ़ाइल सबमिशन पर सत्यापित की जाती है।',
@@ -694,40 +547,250 @@ export default {
                     'हाल की रीडिंग को प्राथमिकता देने वाला भारित औसत। समान विंडो के लिए समय औसत से अधिक सुचारू, लेकिन एक स्थायी परिवर्तन का पूर्ण रूप से अनुसरण करने में लगभग 3 गुना विंडो की लंबाई लगती है। बिना झटके के वास्तविक रुझानों को ट्रैक करने वाले पंखों के लिए।',
             },
             tempWeights: 'तापमान वेट',
-            tempWeightsTooltip: 'प्रत्येक चयनित तापमान स्रोत का व्यक्तिगत वेट।',
             tempName: 'तापमान नाम',
             weight: 'वेट',
-            saveSensor: 'सेंसर सहेजें',
             saveCustomSensor: 'कस्टम सेंसर सहेजें',
             unsavedChanges: 'इस कस्टम सेंसर में असहेजे परिवर्तन हैं।',
             unsavedChangesHeader: 'असहेजे परिवर्तन',
-            stay: 'रहें',
-            discard: 'त्यागें',
             selectCustomSensorFile: 'कस्टम सेंसर फ़ाइल चुनें',
             deleteCustomSensor: 'कस्टम सेंसर हटाएं',
             deleteCustomSensorConfirm: 'क्या आप वाकई कस्टम सेंसर हटाना चाहते हैं: "{name}"?',
         },
-        controls: {
-            viewType: 'दृश्य प्रकार',
-            controlOrView: 'नियंत्रण या दृश्य',
-            title: 'सिस्टम नियंत्रण',
-            noControllableChannels: 'कोई नियंत्रणीय चैनल नहीं मिला।',
-            noControlChain: 'इस चैनल के लिए कोई नियंत्रण श्रृंखला नहीं मिली।',
-            controlFlow: 'नियंत्रण प्रवाह',
-            backToOverview: 'नियंत्रण अवलोकन पर वापस जाएं',
-            switchProfile: 'प्रोफ़ाइल बदलें',
-            switchTempSource: 'तापमान स्रोत बदलें',
-            switchFunction: 'फ़ंक्शन बदलें',
-            switchMembers: 'सदस्य प्रोफ़ाइल बदलें',
-            switchBaseProfile: 'आधार प्रोफ़ाइल बदलें',
-            adjustFixedSpeed: 'निश्चित गति समायोजित करें',
-            editSources: 'स्रोत संपादित करें',
+        dashboard: {
+            timeRange: 'समय सीमा',
+            chartType: 'चार्ट प्रकार',
+            filterSensors: 'फ़िल्टर सेंसर',
+            mouseActions:
+                'डैशबोर्ड माउस एक्शन्स:\n- ज़ूम करने के लिए हाइलाइट सिलेक्शन करें।\n- ज़ूम करने के लिए Ctrl+स्क्रॉल करें।\n- ज़ूम करने पर राइट-क्लिक करें और पैन करें।\n- डबल-क्लिक करें और अपडेट करना शुरू करें।\n- सभी सेंसर्स के टूलटिप्स को दिखाने के लिए Ctrl+क्लिक या मिडिल-क्लिक करें।',
+            fullPage: 'पूर्ण पेज',
+            filterTags: 'टैग फ़िल्टर करें',
+            filterByTag: 'टैग द्वारा फ़िल्टर करें',
+            filterBySensor: 'सेंसर द्वारा फ़िल्टर करें',
+            filterTypes: 'फ़िल्टर प्रकार',
+            filterByDataType: 'डेटा प्रकार द्वारा फ़िल्टर करें',
+            exitFullPage: 'पूर्ण पेज से बाहर निकलें',
+            deleteDashboard: 'डैशबोर्ड हटाएं',
+            deleteDashboardConfirm: 'क्या आप वाकई डैशबोर्ड हटाना चाहते हैं: "{name}"?',
+            setAsHome: 'होम के रूप में सेट करें',
+            duplicateDashboard: 'डैशबोर्ड डुप्लिकेट करें',
+            openCooling: 'कूलिंग नियंत्रण खोलें',
+        },
+        appInfo: {
+            noWarranty: 'इस प्रोग्राम के साथ बिल्कुल कोई वारंटी नहीं है।',
+            changeStartupPage: 'सेटिंग्स में स्टार्टअप पेज बदलें',
+            daemonStatus: 'डेमॉन स्थिति',
+            acknowledgeIssues: 'समस्याओं को स्वीकार करें',
+            status: 'स्थिति',
+            host: 'होस्ट',
+            uptime: 'अपटाइम',
+            version: 'वर्जन',
+            processId: 'प्रोसेस आईडी',
+            memoryUsage: 'मेमोरी उपयोग',
+            liquidctl: 'Liquidctl',
+            connected: 'कनेक्टेड',
+            disconnected: 'डिस्कनेक्टेड',
+            helpfulLinks: 'उपयोगी लिंक',
+            uiTour: 'UI टूर',
+            gettingStarted: 'शुरू करना',
+            helpSettingUp: 'पंखा नियंत्रण सेट करने में सहायता',
+            gettingStartedStep1: 'कूलिंग खोलें और वह फैन चुनें जिसे आप नियंत्रित करना चाहते हैं।',
+            gettingStartedStep2:
+                'निर्देशित सेटअप चुनें, फिर नई प्रोफ़ाइल, ताकि उसका फैन कर्व बनाया जा सके।',
+            gettingStartedStep3: 'उस प्रोफ़ाइल का उपयोग जितने चाहें उतने फैन पर करें।',
+            gettingStartedAutoCreate:
+                '{wizard} का उपयोग एक ही बार में आपके सभी पंखों के लिए बुनियादी प्रोफ़ाइल सेट करने के लिए किया जा सकता है।',
+            gettingStartedAutoCreateLink: 'प्रोफ़ाइल स्वतः बनाएँ',
+            calibrateFansLink: 'अपने पंखों को कैलिब्रेट करें',
+            hardwareSupport: 'हार्डवेयर समर्थन',
+            whatsNew: 'नया क्या है',
+            logsAndDiagnostics: 'लॉग और डायग्नोस्टिक्स',
+            downloadCurrentLog: 'वर्तमान लॉग डाउनलोड करें',
+            deviceHealth: 'डिवाइस स्वास्थ्य',
+            deviceHealthOk: 'सभी सेंसर और चैनल सही स्थिति में हैं।',
+            detection: 'चिप पहचान',
+            detectionDescription:
+                'डेमन शुरू होने पर Super-I/O चिप जाँच ने क्या पाया। मॉड्यूल स्टार्टअप पर लोड होते हैं, इसलिए यही रन बताता है कि कोई चिप ड्राइवर से क्यों नहीं जुड़ी।',
+            detectionButton: 'चिप पहचान',
+            detectionNotRun:
+                'कोई पहचान नहीं चलाई गई, इसलिए इस मशीन के Super-I/O चिप्स के बारे में कुछ ज्ञात नहीं है।',
+            detectionSecureBoot: 'सिक्योर बूट',
+            detectionContainer: 'कंटेनर',
+            detectionDevPort: '/dev/port उपलब्ध',
+            detectionChips: 'पहचाने गए चिप्स',
+            detectionNoChips: 'कोई Super-I/O चिप नहीं मिली।',
+            detectionBlacklisted: 'ब्लैकलिस्ट किए गए ड्राइवर',
+            hardwareSupportOk: 'पहचाना गया सारा हार्डवेयर समर्थित और नियंत्रण योग्य है।',
+            hardwareReport: 'हार्डवेयर रिपोर्ट',
+            hardwareReportDescription:
+                'इस मशीन पर CoolerControl को जो दिखता है उसका सारांश, सपोर्ट चैनल में चिपकाने के लिए तैयार। सीरियल नंबर और पहचानकर्ता शामिल नहीं हैं।',
+            hardwareReportFull: 'पूरा hwmon ट्री शामिल करें',
+            hardwareReportEmpty: 'रिपोर्ट तैयार नहीं की जा सकी।',
+            hardwareReportButton: 'हार्डवेयर रिपोर्ट',
+            hardwareReportCopy: 'कॉपी करें',
+            hardwareReportCopied: 'कॉपी हो गया',
+            findingNoDriverBound: 'एक चिप मिली, पर कोई लोड किया गया ड्राइवर उसे नहीं चला रहा।',
+            findingBlacklisted: 'यह ड्राइवर ब्लैकलिस्ट में है और लोड नहीं किया गया।',
+            findingBlockedByEnvironment: 'इस परिवेश में हार्डवेयर पहचान नहीं चल सकी।',
+            findingBlockedBySecureBoot:
+                'सिक्योर बूट सक्षम होने के कारण हार्डवेयर पहचान नहीं चल सकी।',
+            findingBlockedByContainer: 'कंटेनर के भीतर हार्डवेयर पहचान नहीं चल सकी।',
+            findingBlockedByNoDevPort:
+                '/dev/port उपलब्ध न होने के कारण हार्डवेयर पहचान नहीं चल सकी।',
+            findingDetectionUnsupported: 'इस आर्किटेक्चर पर हार्डवेयर पहचान समर्थित नहीं है।',
+            failsafeActive: 'फेलसेफ मान उपयोग में हैं',
+            missingTempSource: 'तापमान स्रोत गायब है',
+            staleTempSource: 'तापमान स्रोत फेलसेफ मान उपयोग कर रहा है',
+            stressTest: 'थर्मल स्ट्रेस टेस्ट',
+            stressTestTooltip:
+                'फैन कर्व और कूलिंग प्रोफाइल को सत्यापित करने के लिए\nनिरंतर थर्मल लोड उत्पन्न करता है।\nपरिणाम हार्डवेयर के अनुसार भिन्न हो सकते हैं।\nअतिरिक्त बैकएंड के लिए stress-ng इंस्टॉल करें।',
+            cpuStress: 'CPU स्ट्रेस',
+            gpuStress: 'GPU स्ट्रेस',
+            gpuStressTooltip:
+                'बिल्ट-इन बैकएंड उपयोग करते समय<br>Vulkan या OpenGL ES ड्राइवर आवश्यक हो सकते हैं।',
+            ramStress: 'RAM स्ट्रेस',
+            driveStress: 'ड्राइव स्ट्रेस',
+            driveStressTooltip:
+                'ड्राइव कंट्रोलर पर गर्मी उत्पन्न करने के लिए<br>ब्लॉक डिवाइस पर I/O स्ट्रेस।<br>stress-ng के लिए डिवाइस का माउंट होना आवश्यक है।',
+            builtInBackend: 'बिल्ट-इन',
+            stressNgBackend: 'stress-ng',
+            backendTooltip:
+                'स्ट्रेस-टेस्ट बैकएंड चुनें।<br>बिल्ट-इन बाहरी निर्भरताओं के बिना काम करता है।<br>stress-ng (जब इंस्टॉल हो) अतिरिक्त स्ट्रेसर वेरिएंट प्रदान करता है।',
+            selectDrive: 'ड्राइव चुनें',
+            selectGpu: 'GPU चुनें',
+            allGpus: 'सभी GPU',
+            start: 'शुरू करें',
+            stop: 'रोकें',
+            stopAll: 'सभी रोकें',
+            active: 'सक्रिय',
+            inactive: 'निष्क्रिय',
+            psuWarningHeader: 'उच्च बिजली चेतावनी',
+            psuWarningMessage:
+                'CPU और GPU स्ट्रेस टेस्ट एक साथ चलाने से PSU पर काफी भार पड़ेगा। ओवरक्लॉकिंग या कम वॉटेज PSU के साथ सिस्टम अस्थिरता हो सकती है। क्या आप आगे बढ़ना चाहते हैं?',
+            proceed: 'आगे बढ़ें',
+        },
+        alerts: {
+            triggersOutside: '{min} से नीचे या {max}{unit} से ऊपर ट्रिगर होता है',
+            triggersAbove: '{max}{unit} से ऊपर ट्रिगर होता है',
+            stateSince: '{time} से {state}',
+            deleteAlert: 'अलर्ट हटाएं',
+            duplicateAlert: 'अलर्ट डुप्लिकेट करें',
+            alertsOverview: 'अलर्ट अवलोकन',
+            alertLogs: 'अलर्ट लॉग',
+            alertTriggered: 'अलर्ट ट्रिगर हुआ',
+            alertRecovered: 'अलर्ट रिकवर हुआ',
+            alertError: 'अलर्ट त्रुटि',
+            alertSensorsReadable: 'अलर्ट सेंसर फिर से पठनीय',
+            deleteAlertConfirm: 'क्या आप वाकई हटाना चाहते हैं: "{name}"?',
+            saveAlert: 'अलर्ट सहेजें',
+            channelSources: 'अलर्ट के लिए चैनल स्रोत',
+            channelSourcesTooltip:
+                'इस अलर्ट द्वारा देखे जाने वाले चैनल स्रोत।\nप्रति अलर्ट एक सेंसर प्रकार: पहला चयन बाकी को फ़िल्टर करता है।',
+            triggerConditions: 'ट्रिगर शर्तें',
+            maxValueTooltip: 'इससे अधिक मान अलर्ट को ट्रिगर करेंगे।',
+            minValueTooltip: 'इससे कम मान अलर्ट को ट्रिगर करेंगे।',
+            warmupDurationTooltip:
+                'अलर्ट को सक्रिय माने जाने से पहले किसी शर्त को कितनी देर तक सक्रिय रहना चाहिए।\nइसकी जाँच केवल नियमित पोल-रेट अंतराल पर की जाती है,\nइसलिए इसकी अवधि बिल्कुल इतनी नहीं हो सकती।',
+            cooldownDurationTooltip:
+                'अलर्ट रिकवर होने से पहले मान को कितनी देर तक सीमा के भीतर रहना चाहिए।\nट्रिगर और रिकवर के बीच तेज़ उतार-चढ़ाव को रोकता है।',
+            cooldownLessThan: 'स्थिति लंबे समय तक रिकवर रहती है',
+            repeatInterval: 'सूचना दोहराने का अंतराल',
+            repeatIntervalTooltip:
+                'अलर्ट सक्रिय रहने के दौरान इस अंतराल पर डेस्कटॉप सूचना फिर से भेजें।\n0 दोहराई जाने वाली सूचनाएं बंद कर देता है।',
+            enabled: 'सक्षम',
+            enabledTooltip: 'अक्षम अलर्ट का मूल्यांकन बिल्कुल नहीं किया जाता।',
+            sectionGeneral: 'सामान्य',
+            sectionNotifications: 'सूचनाएं',
+            sectionActions: 'क्रियाएं',
+            silence: 'मौन करें',
+            silenceTooltip:
+                'मौन: कुछ समय के लिए सूचनाएं और शटडाउन दबा दें।\nअलर्ट का मूल्यांकन फिर भी होता रहता है और वह अपनी स्थिति दिखाता है।',
+            silence15m: '15 मिनट के लिए मौन करें',
+            silence1h: '1 घंटे के लिए मौन करें',
+            silence8h: '8 घंटे के लिए मौन करें',
+            silence24h: '24 घंटे के लिए मौन करें',
+            unsilence: 'अभी मौन हटाएं',
+            enableAlert: 'अलर्ट सक्षम करें',
+            disableAlert: 'अलर्ट अक्षम करें',
+            silencedUntil: '{time} तक मौन',
+            disabledLabel: 'अक्षम',
+            greaterThan: 'से अधिक',
+            lessThan: 'से कम',
+            newAlert: 'नया अलर्ट',
+            warmupGreaterThan: 'स्थिति लंबे समय तक ट्रिगर होती है',
+            unsavedChanges: 'इस अलर्ट में असहेजे परिवर्तन हैं।',
+            unsavedChangesHeader: 'असहेजे परिवर्तन',
+            desktopNotify: 'डेस्कटॉप सूचना',
+            desktopNotifyTooltip:
+                'अलर्ट ट्रिगर होने पर डेस्कटॉप सूचनाएं सक्षम करें।\n(यदि समर्थित हो)',
+            desktopNotifyRecovery: 'रिकवरी पर डेस्कटॉप सूचना',
+            desktopNotifyRecoveryTooltip:
+                'अलर्ट रिकवर होने पर डेस्कटॉप सूचनाएं सक्षम करें।\n(यदि समर्थित हो)',
+            desktopNotifyAudio: 'डेस्कटॉप सूचना ऑडियो',
+            desktopNotifyAudioTooltip:
+                'अलर्ट ट्रिगर होने पर डेस्कटॉप सूचना ऑडियो सक्षम करें।\n(यदि समर्थित हो)',
+            shutdownOnActivation: 'सक्रियण पर शटडाउन',
+            shutdownOnActivationTooltip:
+                'अलर्ट ट्रिगर होने पर सिस्टम शटडाउन सक्षम करें।\nसिस्टम शटडाउन अलर्ट ट्रिगर होने के एक मिनट बाद शुरू होगा\nऔर अलर्ट रिकवर होने पर रद्द हो जाएगा।',
+        },
+        profiles: {
+            targetDuty: 'लक्ष्य',
+            actualDuty: 'वास्तविक',
+            targetHint:
+                'लक्ष्य वर्तमान तापमान से गणना किया जाता है, चैनल का फ़ंक्शन लागू होने से पहले। स्मूदिंग और हिस्टैरिसीस के कारण वास्तविक ड्यूटी भिन्न हो सकती है।',
+            createProfile: 'प्रोफ़ाइल बनाएँ',
+            deleteProfile: 'प्रोफ़ाइल हटाएँ',
+            profileType: 'प्रोफ़ाइल प्रकार',
+            fixedDuty: 'निश्चित पंखा गति',
+            tempSource: 'तापमान स्रोत',
+            memberProfiles: 'सदस्य प्रोफ़ाइल',
+            mixFunction: 'मिक्स फ़ंक्शन',
+            applyMixFunction: 'चयनित प्रोफ़ाइल पर मिक्स फ़ंक्शन लागू करें',
+            profilesToMix: 'मिश्रण करने के लिए प्रोफ़ाइल',
+            saveProfile: 'प्रोफ़ाइल सहेजें',
+            function: 'फ़ंक्शन',
+            functionToApply: 'लागू करने के लिए फ़ंक्शन',
+            graphProfileMouseActions:
+                'ग्राफ़ प्रोफ़ाइल माउस क्रियाएँ:\n- ज़ूम करने के लिए Ctrl+स्क्रॉल करें।\n- बिंदु जोड़ने के लिए लाइन पर बायाँ-क्लिक करें।\n- बिंदु हटाने के लिए बिंदु पर दायाँ-क्लिक करें।\n- बिंदु को स्थानांतरित करने के लिए खींचें।',
+            unsavedChanges: 'इस प्रोफ़ाइल में असहेजे बदलाव किए गए हैं।',
+            unsavedChangesHeader: 'असहेजे बदलाव',
+            newProfile: 'नई प्रोफ़ाइल',
+            tooltip: {
+                profileType:
+                    'प्रोफ़ाइल प्रकार:<br/>- डिफ़ॉल्ट: अप्रबंधित, नियंत्रण डिवाइस के ड्राइवर को वापस सौंपता है<br/>- फिक्स्ड: स्थिर गति सेट करता है<br/>- ग्राफ़: अनुकूलन योग्य फ़ैन कर्व<br/>- मिक्स: कई प्रोफ़ाइलों को संयोजित करता है<br/>- ओवरले: मौजूदा प्रोफ़ाइल के आउटपुट पर ऑफ़सेट लागू करता है',
+            },
+            profileDeleted: 'प्रोफ़ाइल हटाई गई',
+            profileDuplicated: 'प्रोफ़ाइल डुप्लिकेट की गई',
+            usedBy: 'द्वारा उपयोग किया गया',
+            deleteProfileConfirm: 'क्या आप वाकई हटाना चाहते हैं: "{name}"?',
+            deleteProfileWithChannelsConfirm:
+                '"{name}" वर्तमान में इनके द्वारा उपयोग किया जा रहा है: {channels}।\nइस प्रोफ़ाइल को हटाने से उन चैनलों की सेटिंग्स रीसेट हो जाएंगी।\nक्या आप वाकई "{name}" को हटाना चाहते हैं?',
+            profileUpdated: 'प्रोफ़ाइल सफलतापूर्वक अपडेट की गई',
+            profileUpdateError: 'इस प्रोफ़ाइल को अपडेट करने का प्रयास करते समय एक त्रुटि हुई',
+            tempSourceRequired: 'ग्राफ़ प्रोफ़ाइल के लिए एक तापमान स्रोत आवश्यक है।',
+            memberProfilesRequired: 'मिक्स प्रोफ़ाइल के लिए कम से कम 2 सदस्य प्रोफ़ाइल आवश्यक हैं।',
+            minProfileTemp: 'न्यूनतम प्रोफ़ाइल तापमान',
+            maxProfileTemp: 'अधिकतम प्रोफ़ाइल तापमान',
+            staticOffset: 'स्थिर ऑफ़सेट',
+            offsetType: 'ऑफ़सेट प्रकार',
+            offsetTypeStatic: 'स्थिर ऑफ़सेट',
+            offsetTypeGraph: 'ग्राफ़ ऑफ़सेट',
+            baseProfile: 'आधार प्रोफ़ाइल',
+            baseProfileRequired: 'ओवरले प्रोफ़ाइल के लिए एक आधार प्रोफ़ाइल आवश्यक है।',
+            profileOutputDuty: 'प्रोफ़ाइल आउटपुट कार्यभार',
+            offsetDuty: 'ऑफ़सेट कार्यभार',
+            points: 'बिंदु',
+            moveTable: 'दूसरे कोने में ले जाएं',
+            addPointAfter: 'बाद में बिंदु जोड़ें',
+            removePoint: 'बिंदु हटाएं',
+            curvePointLimitBadge: 'अधिकतम {n} अंक',
+            curveLimitedByAmdGpu: 'वक्र AMD GPU हार्डवेयर फैन वक्र द्वारा {n} बिंदुओं तक सीमित है।',
+            curveLimitedByFirmware: 'वक्र डिवाइस फर्मवेयर फैन वक्र द्वारा {n} बिंदुओं तक सीमित है।',
         },
         modes: {
             createMode: 'मोड बनाएं',
             editMode: 'मोड संपादित करें',
+            updateToCurrent: 'वर्तमान सेटिंग्स को मोड में सहेजें',
             deleteMode: 'मोड हटाएं',
-            noModes: 'कोई मोड कॉन्फ़िगर नहीं है',
             deleteModeConfirm: 'क्या आप वाकई मोड हटाना चाहते हैं: "{name}"?',
             updateModeConfirm:
                 'क्या आप वाकई वर्तमान कॉन्फ़िगरेशन के साथ "{name}" को अधिलेखित करना चाहते हैं?',
@@ -735,16 +798,8 @@ export default {
         },
         functions: {
             createFunction: 'फ़ंक्शन बनाएं',
-            editFunction: 'फ़ंक्शन संपादित करें',
             deleteFunction: 'फ़ंक्शन हटाएं',
-            noFunctions: 'कोई फ़ंक्शन कॉन्फ़िगर नहीं है',
             saveFunction: 'फ़ंक्शन सहेजें',
-            functionType: 'फ़ंक्शन प्रकार',
-            functionTypeTooltip:
-                'फ़ंक्शन प्रकार:<br/>' +
-                '- <b>पहचान</b>: स्टेप साइज़ सीमाएं लागू करता है लेकिन अन्यथा प्रोफाइल मान को अपरिवर्तित पास करता है।<br/>' +
-                '- <b>मानक</b>: पंखा प्रतिक्रिया समय और स्थिरता पर सटीक नियंत्रण के लिए स्टेप साइज़ सीमाएं और हिस्टैरिसिस सेटिंग्स लागू करता है।<br/>' +
-                '- <b>एक्सपोनेंशियल मूविंग एवरेज</b>: भारित औसत का उपयोग करके तापमान उतार-चढ़ाव को सुचारू करता है। मानक से सरल लेकिन कम सटीक।',
             stepSizeTitle: 'स्टेप साइज़',
             fixedStepSize: 'स्थिर',
             fixedStepSizeTooltip:
@@ -779,13 +834,6 @@ export default {
             stepSizeMaxDecreasing: 'अधिकतम कमी',
             stepSizeMaxDecreasingTooltip:
                 'पंखा गति घटने पर अधिकतम स्टेप साइज़।\nप्रति अपडेट पंखे कितनी तेजी से धीमे हो सकते हैं इसे सीमित करता है।',
-            windowSize: 'विंडो आकार',
-            windowSizeTooltip:
-                'एक्सपोनेंशियल मूविंग एवरेज गणना में उपयोग किया जाने वाला विंडो तापमान सैंपल आकार।\nछोटे मान = तेज प्रतिक्रिया, तापमान स्पाइक्स के प्रति अधिक संवेदनशील।\nबड़े मान = धीमी प्रतिक्रिया, सुचारू पंखा गति संक्रमण।\nसुझाव: प्रतिक्रिया समय पर सटीक नियंत्रण के लिए मानक फ़ंक्शन का उपयोग करें।',
-            emaCustomSensorAvailableNote:
-                'EMA कस्टम सेंसर प्रकार के रूप में भी उपलब्ध है, जो आपको स्मूथ किए गए तापमान को सीधे ग्राफ़ करने देता है।',
-            emaDeprecatedWarning:
-                'EMA फ़ंक्शन प्रकार अप्रचलित है। कृपया EMA कस्टम सेंसर प्रकार पर स्विच करें।',
             hysteresis: 'उन्नत हिस्टैरिसिस',
             hysteresisThreshold: 'थ्रेशोल्ड',
             hysteresisThresholdTooltip:
@@ -795,11 +843,10 @@ export default {
                 'पंखा गति परिवर्तन लागू करने से पहले प्रतिक्रिया विलंब (सेकंड)।\nइस विलंब के भीतर अस्थायी तापमान स्पाइक्स को अनदेखा किया जाता है, उतार-चढ़ाव को सुचारू बनाता है।',
             onlyDownward: 'केवल नीचे की ओर',
             onlyDownwardTooltip: 'केवल तब हिस्टैरिसिस सेटिंग्स लागू करें जब तापमान घट रहा हो।',
-            general: 'सामान्य',
+            stepOverrides: 'स्टेप ओवरराइड्स',
             thresholdHopping: 'थ्रेशोल्ड हॉपिंग',
             thresholdHoppingTooltip:
                 'जब पंखा गति 30+ सेकंड तक अपरिवर्तित रहती है, न्यूनतम स्टेप साइज़ और हिस्टैरिसिस सीमाएं अस्थायी रूप से बाइपास हो जाती हैं।\nयह सुनिश्चित करता है कि पंखे अंततः अपनी लक्ष्य गति तक पहुंचें, यहां तक कि रूढ़िवादी थ्रेशोल्ड सेटिंग्स के साथ भी। अधिकतम स्टेप साइज़ हमेशा लागू रहता है।',
-            stepOverrides: 'स्टेप ओवरराइड्स',
             bypassMinAtExtremes: 'हमेशा 0% / 100% लागू करें',
             bypassMinAtExtremesTooltip:
                 'सक्षम होने पर, परिवर्तन न्यूनतम स्टेप साइज़ से छोटा होने पर भी 0% या 100% के लक्षित ड्यूटी लागू होते हैं।\nपंखों को पूरी तरह से रोकने या अधिकतम RPM तक पहुंचने को सुनिश्चित करने के लिए उपयोगी। डिफ़ॉल्ट रूप से अक्षम।',
@@ -809,25 +856,15 @@ export default {
             newFunction: 'नया फ़ंक्शन',
             functionDeleted: 'फ़ंक्शन हटा दिया गया',
             functionDuplicated: 'फ़ंक्शन डुप्लिकेट किया गया',
+            usedBy: 'द्वारा उपयोग किया गया',
             deleteFunctionConfirm: 'क्या आप वाकई "{name}" को हटाना चाहते हैं?',
             deleteFunctionWithProfilesConfirm:
                 '"{name}" वर्तमान में इन प्रोफाइलों द्वारा उपयोग किया जा रहा है: {profiles}।\nइस फ़ंक्शन को हटाने से उन प्रोफाइलों के फ़ंक्शन रीसेट हो जाएंगे।\nक्या आप वाकई "{name}" हटाना चाहते हैं?',
-            functionUpdated: 'फ़ंक्शन अपडेट किया गया',
-            functionUpdateError: 'इस फ़ंक्शन को अपडेट करने का प्रयास करते समय एक त्रुटि हुई',
         },
         error: {
             accessDenied: 'पहुँच अस्वीकृत',
             accessDeniedMessage: 'प्रमाणीकरण विफल। कृपया अपना पासवर्ड जाँचें और पुनः प्रयास करें।',
             connectionError: 'CoolerControl कनेक्शन त्रुटि',
-            connectionToast: 'डेमॉन से कनेक्ट करने में असमर्थ',
-            connectionToastDetail:
-                'डेमॉन से कनेक्ट करने में असमर्थ। कृपया सुनिश्चित करें कि सेवा चल रही है और पुनः कनेक्ट करने का प्रयास करें।',
-            connectionRetryFailure: 'कनेक्शन असफल - पुनः प्रयास असफल',
-            connectionRetryDetail: 'कई प्रयासों के बाद भी डेमॉन से कनेक्ट नहीं हो सका।',
-            errorLoadingGraph: 'ग्राफ लोड करने में त्रुटि',
-            highCpuUsageWarning: 'उच्च CPU उपयोग का पता चला',
-            highCpuUsageDetail:
-                'वर्तमान CPU उपयोग अधिक है।\nसिस्टम पर प्रभाव कम करने के लिए, विचार करें:\n1. प्रदर्शित चार्ट की संख्या कम करना\n2. निगरानी किए गए सेंसरों की संख्या कम करना\n3. पोलिंग अंतराल बढ़ाना',
             pageNotFound: 'पृष्ठ नहीं मिला',
             returnToDashboard: 'डैशबोर्ड पर वापस जाएं',
             connectionErrorMessage: 'CoolerControl डेमॉन से कनेक्ट नहीं हो सका।',
@@ -844,13 +881,6 @@ export default {
             sslTooltip: 'क्या SSL/TLS का उपयोग करके डेमॉन से कनेक्ट करना है।',
             saveTooltip: 'सेटिंग्स सहेजें और UI को पुनः लोड करें',
             resetTooltip: 'डिफ़ॉल्ट सेटिंग्स पर रीसेट करें',
-        },
-        singleDashboard: {
-            minutes: 'मिनट',
-            chartMouseActions:
-                'डैशबोर्ड माउस क्रियाएँ:\n- ज़ूम के लिए हाइलाइट करें।\n- ज़ूम के लिए स्क्रॉल करें।\n- ज़ूम होने पर पैन करने के लिए राइट-क्लिक करें।\n- रीसेट और अपडेट जारी रखने के लिए डबल-क्लिक करें।',
-            timeRange: 'समय सीमा',
-            chartType: 'चार्ट प्रकार',
         },
         mode: {
             activateMode: 'मोड सक्रिय करें',
@@ -893,44 +923,19 @@ export default {
             unsavedChangesHeader: 'असहेजे परिवर्तन',
             imageTooLarge: 'छवि बहुत बड़ी है। कृपया एक छोटी छवि चुनें।',
             notImageType: 'छवि एक छवि प्रकार के रूप में पंजीकृत नहीं होती है',
+            gifNotSupported: 'इस स्क्रीन का फ़र्मवेयर gif नहीं दिखा सकता। कोई स्थिर छवि चुनें।',
         },
         shortcuts: {
+            browserHint:
+                'वेब ब्राउज़र में इसके बजाय Ctrl+Alt+नंबर का उपयोग करें (ब्राउज़र Ctrl+नंबर को टैब स्विचिंग के लिए आरक्षित रखते हैं)।',
             shortcuts: 'कीबोर्ड शॉर्टकट्स',
             ctrl: 'Ctrl',
-            alt: 'Alt',
-            left: 'बायाँ',
-            right: 'दायाँ',
             comma: ',',
-            h: 'h',
-            a: 'a',
-            c: 'c',
-            i: 'i',
-            slash: '/',
-            one: '1',
-            two: '2',
-            three: '3',
-            four: '4',
-            f11: 'F11',
             viewShortcuts: 'कीबोर्ड शॉर्टकट्स',
-            home: 'मुखपृष्ठ',
             settings: 'सेटिंग्स',
-            info: 'एप्लिकेशन जानकारी',
-            dashboardOne: 'डैशबोर्ड 1',
-            dashboardTwo: 'डैशबोर्ड 2',
-            dashboardThree: 'डैशबोर्ड 3',
-            dashboardFour: 'डैशबोर्ड 4',
-            alerts: 'चेतावनियाँ',
-            controls: 'नियंत्रण',
-            sideMenuCollapse: 'साइड मेनू संकुचित करें',
-            sideMenuExpand: 'साइड मेनू विस्तारित करें',
-            fullScreen: 'पूर्ण स्क्रीन',
         },
     },
     components: {
-        confirmation: {
-            title: 'पुष्टि',
-            message: 'क्या आप निश्चित हैं?',
-        },
         aseTek690: {
             sameDeviceID:
                 'लेगेसी NZXT क्राकेन और EVGA CLC का संयोगवश एक ही डिवाइस आईडी होती है और CoolerControl यह निर्धारित नहीं कर सकता कि कौन सा डिवाइस कनेक्ट है। उचित डिवाइस संचार के लिए यह आवश्यक है।',
@@ -942,9 +947,6 @@ export default {
             rejectLabel: 'नहीं, यह एक EVGA CLC डिवाइस है',
         },
         password: {
-            title: 'अपना पासवर्ड दर्ज करें',
-            newPasswordTitle: 'एक नया पासवर्ड दर्ज करें',
-            invalidPassword: 'अमान्य पासवर्ड',
             forgotPassword: 'पासवर्ड भूल गए?',
             forgotPasswordHelpIntro:
                 'इस कमांड को टर्मिनल में रूट के रूप में चलाएं, फिर UI रीलोड पर क्लिक करें:',
@@ -957,48 +959,6 @@ export default {
         },
         notFound: {
             message: 'बिल्कुल परफेक्ट Linux 🐧 डिस्ट्रो की तरह,\nयह पृष्ठ मौजूद नहीं है।',
-        },
-        helloWorld: {
-            message: 'आपने सफलतापूर्वक Vite + Vue 3 के साथ एक प्रोजेक्ट बनाया है। अगला क्या है?',
-        },
-        dashboardInfo: {
-            description:
-                'डैशबोर्ड आपको अपनी प्राथमिकताओं के अनुसार अपने सिस्टम के सेंसर डेटा को देखने की सुविधा देते हैं। आप समय-आधारित या तालिका-आधारित चार्ट के बीच चयन कर सकते हैं और विशिष्ट डेटा पर ध्यान केंद्रित करने के लिए प्रत्येक चार्ट के फ़िल्टर और सेटिंग्स समायोजित कर सकते हैं जिसे आप देखना चाहते हैं। इसके अतिरिक्त, आप अपनी आवश्यकताओं के अनुरूप कई डैशबोर्ड बना सकते हैं।',
-        },
-        modeInfo: {
-            description:
-                "मोड आपको त्वरित और आसान अनुप्रयोग के लिए डिवाइस चैनल सेटिंग्स सहेजने की सुविधा देते हैं। उदाहरण के लिए, आप एक 'गेमिंग' मोड और एक 'साइलेंट' मोड बना सकते हैं, जिससे आप आसानी से उनके बीच स्विच कर सकें।",
-            note: 'कृपया ध्यान दें कि प्रत्येक मोड के लिए अलग-अलग पंखा प्रोफाइल बनाना आवश्यक हो सकता है, क्योंकि मोड में केवल चैनल कॉन्फ़िगरेशन शामिल हैं और इनमें आंतरिक प्रोफाइल या फंक्शन सेटिंग्स शामिल नहीं हैं।',
-        },
-        alertInfo: {
-            description:
-                'अलर्ट का उपयोग आपको सूचित करने के लिए किया जाता है जब विशिष्ट स्थितियां होती हैं। वे तापमान और पंखे की गति की निगरानी कर सकते हैं ताकि यह सुनिश्चित हो सके कि आपका सिस्टम ठीक से चल रहा है। अलर्ट विशिष्ट सेंसर मान रेंज के लिए कॉन्फ़िगर किए जाते हैं और जब मान स्वीकार्य सीमा रेंज से बाहर होते हैं या उसमें वापस आते हैं तो सूचनाएं भेजते हैं।',
-        },
-        customSensorInfo: {
-            title: 'कस्टम सेंसर अवलोकन',
-            description:
-                'कस्टम सेंसर आपको मौजूदा सेंसरों को विभिन्न तरीकों से जोड़ने की अनुमति देते हैं, जिससे सिस्टम कूलिंग पर आपका नियंत्रण और दक्षता बढ़ती है। इसके अतिरिक्त, वे फ़ाइल-आधारित डेटा का समर्थन करते हैं, जिससे आप अधिक लचीलेपन के लिए बाहरी सेंसर इनपुट को स्क्रिप्ट कर सकते हैं।',
-            note: 'नोट: आप कई कस्टम सेंसर आउटपुट को जोड़ने के लिए मिक्स प्रोफाइल का उपयोग कर सकते हैं।',
-        },
-        functionInfo: {
-            title: 'फंक्शन अवलोकन',
-            description:
-                'फंक्शन प्रोफाइल आउटपुट पर लागू होने वाले कॉन्फ़िगर किए जा सकने वाले एल्गोरिदम हैं। वे आपको पंखे की गति में बदलाव कब होता है, हिस्टैरिसिस सेटिंग्स समायोजित करने और गतिशील तापमान के लिए मूविंग एवरेज का उपयोग करने की अनुमति देते हैं।',
-            identityFunction:
-                'पहचान फंक्शन सबसे सरल विकल्प है क्योंकि यह कम्प्यूटेड प्रोफाइल आउटपुट को संशोधित नहीं करता है; यह केवल आपको न्यूनतम और अधिकतम गति परिवर्तन सीमा सेट करने की अनुमति देता है। यह विशेष रूप से पंखे की गति के लगातार उतार-चढ़ाव को कम करने के लिए फायदेमंद है।',
-        },
-        profileInfo: {
-            title: 'प्रोफाइल अवलोकन',
-            description:
-                'प्रोफाइल पंखों की गति को नियंत्रित करने के लिए अनुकूलन योग्य सेटिंग्स परिभाषित करती हैं, जिसमें एक ही प्रोफाइल कई पंखों के लिए उपयोग की जा सकती है। प्रकारों में शामिल हैं:',
-            type: {
-                fixed: 'निश्चित गति',
-                fanCurve: 'पंखा कर्व/ग्राफ',
-                mix: 'मिक्स प्रोफाइल',
-                default: 'डिफ़ॉल्ट डिवाइस सेटिंग्स',
-            },
-            additionalInfo:
-                'प्रोफाइल पंखों की गति को नियंत्रित करने की आधारशिला हैं और अधिक उन्नत एल्गोरिदम फंक्शन लागू करके इन्हें और बेहतर बनाया जा सकता है।',
         },
         deviceInfo: {
             details: 'डिवाइस विवरण',
@@ -1013,64 +973,42 @@ export default {
             locations: 'स्थान',
         },
         onboarding: {
+            search: 'खोज',
+            searchDesc:
+                'यहाँ से कोई भी डिवाइस, सेंसर, सेटिंग या क्रिया खोजें। ऐप में कहीं से भी Ctrl+K दबाएँ।',
             welcome: 'CoolerControl में आपका स्वागत है!',
             gettingStartedIntro:
-                'दिशा-निर्देश के लिए एक टूर चुनें। त्वरित टूर कुछ चरणों में मूल बातें कवर करता है। विस्तृत टूर आपको हर मेनू और बटन से परिचित कराता है।',
-            startTourAgain:
-                'आप इस टूर को जानकारी और उपकरण पेज से किसी भी समय फिर से शुरू कर सकते हैं।',
-            quickTour: 'त्वरित टूर',
-            thoroughTour: 'विस्तृत टूर',
+                'परिचय के लिए एक त्वरित टूर लें। यह नेविगेशन बार और ऐप के मुख्य क्षेत्रों से परिचित कराता है।',
+            startTourAgain: 'आप इस टूर को सेटिंग्स से कभी भी फिर से शुरू कर सकते हैं।',
+            startTour: 'टूर शुरू करें',
             maybeLater: 'बाद में',
             openGettingStarted: 'गेटिंग स्टार्टेड दस्तावेज़ खोलें',
-            finishLater: 'मैं स्वयं करूँगा',
-            appInfo: 'जानकारी और उपकरण',
-            appInfoDesc:
-                'एप जानकारी, डेमॉन स्टेटस, लॉग, उपयोगी लिंक और स्ट्रेस टेस्ट टूल्स देखें। लोगो पर एक बैज समस्याओं की सूचना देता है।',
-            controls: 'नियंत्रण',
-            controlsDesc:
-                'पंखे की गति समायोजित करें, प्रोफ़ाइल लागू करें और एक ही स्थान से प्रत्येक पता लगाए गए चैनल को प्रबंधित करें।',
-            profiles: 'प्रोफाइल',
-            profilesDesc:
-                'प्रोफ़ाइल यह परिभाषित करती हैं कि पंखा तापमान परिवर्तनों पर कैसे प्रतिक्रिया करता है। ग्राफ प्रोफ़ाइल आपको कस्टम पंखा कर्व बनाने देती हैं और कई डिवाइसों पर पुनः उपयोग की जा सकती हैं।',
-            functions: 'फंक्शन',
-            functionsDesc:
-                'फंक्शन प्रोफ़ाइल पर लागू होते हैं ताकि पंखे की गति का परिवर्तन सुचारू हो और शोर कम हो।',
-            systemMenu: 'सिस्टम मेनू',
-            systemMenuDesc:
-                'मुख्य मेनू इस सिस्टम के डिवाइस और सेंसर सूचीबद्ध करता है। प्रत्येक अनुभाग को इसके चैनल और सौंपे गए नियंत्रण देखने के लिए विस्तारित किया जा सकता है।',
-            dashboards: 'डैशबोर्ड',
-            dashboardsDesc:
-                'डैशबोर्ड आपको चार्ट के साथ कस्टम व्यू बनाने देते हैं जिससे आप तापमान, पंखे की गति और अन्य सेंसर डेटा को रियल टाइम में मॉनिटर कर सकते हैं।',
-            modes: 'मोड',
-            modesDesc:
-                'मोड आपकी सेटिंग्स के सहेजे गए संग्रह हैं। एक क्लिक से Silent और Performance जैसे कॉन्फ़िगरेशन के बीच स्विच करें।',
-            alerts: 'अलर्ट',
-            alertsDesc:
-                'अलर्ट तब आपको सूचित करते हैं जब सेंसर मान आपके चुने हुए थ्रेशोल्ड को पार करते हैं, ताकि आप समस्याओं के बढ़ने से पहले प्रतिक्रिया कर सकें।',
-            customSensors: 'कस्टम सेंसर',
-            customSensorsDesc:
-                'कस्टम सेंसर मौजूदा सेंसर डेटा को विभिन्न तरीकों से जोड़ते हैं, या तापमान स्रोत के रूप में आपके अपने स्क्रिप्ट आउटपुट को चलाते हैं।',
-            quickAdd: 'त्वरित जोड़',
-            quickAddDesc: 'नए डैशबोर्ड, प्रोफ़ाइल, फंक्शन और अधिक तेज़ी से बनाएं।',
-            dashboardQuick: 'डैशबोर्ड त्वरित मेनू',
-            dashboardQuickDesc: 'मुख्य मेनू संकुचित होने पर भी किसी भी डैशबोर्ड पर जाएं।',
-            modesQuick: 'मोड त्वरित मेनू',
-            modesQuickDesc: 'ऐप में कहीं से भी अपने सहेजे गए मोड के बीच स्विच करें।',
-            alertsQuick: 'अलर्ट अवलोकन',
-            alertsQuickDesc:
-                'प्रत्येक अलर्ट की वर्तमान स्थिति देखें और उनकी हाल की गतिविधि का निरीक्षण करें।',
-            pluginsQuick: 'प्लगइन्स अवलोकन',
-            pluginsQuickDesc:
-                'इंस्टॉल किए गए प्लगइन्स ब्राउज़ करें और ऐप में कहीं से भी किसी पर जाएं।',
+            finishLater: 'समझ गया, धन्यवाद',
+            home: 'होम',
+            homeDesc:
+                'एप्लिकेशन का होम पेज: डेमॉन स्थिति और डिवाइस हेल्थ एक नज़र में, साथ ही लॉग, ऐप जानकारी, उपयोगी लिंक और स्ट्रेस-टेस्ट टूल।',
+            cooling: 'कूलिंग',
+            coolingDesc:
+                'आपका पंखा नियंत्रण केंद्र: पंखे की गति और पंप समायोजित करें, और किसी भी चैनल पर प्रोफ़ाइल और फ़ंक्शन लागू करें।',
+            monitoring: 'निगरानी',
+            monitoringDesc:
+                'डैशबोर्ड बनाएं, हर सेंसर पर नज़र रखें, और अपने सिस्टम को रियल टाइम में ट्रैक करने के लिए अलर्ट सेट करें।',
+            devices: 'उपकरण',
+            devicesDesc:
+                'पता लगाए गए हार्डवेयर की समीक्षा करें, RGB लाइटिंग और LCD स्क्रीन जैसी प्रति-डिवाइस सुविधाएं कॉन्फ़िगर करें, और कस्टम सेंसर बनाएं।',
+            plugins: 'प्लगइन्स',
+            pluginsDesc:
+                'CoolerControl का विस्तार करने वाले इंस्टॉल किए गए प्लगइन्स ब्राउज़ करें और खोलें।',
             settings: 'सेटिंग्स',
             settingsDesc: 'UI प्राथमिकताएं, डेमॉन विकल्प और सिस्टम व्यवहार कॉन्फ़िगर करें।',
             access: 'पहुंच',
-            accessDesc: 'अपना पासवर्ड प्रबंधित करें और अपना वर्तमान पहुंच स्तर पुष्टि करें।',
+            accessDesc:
+                'लॉग इन या लॉग आउट करें, अपना पासवर्ड बदलें, और उन एक्सेस टोकन को प्रबंधित करें जो टूल और प्लगइन्स को API एक्सेस देते हैं।',
             restartMenu: 'पुनरारंभ मेनू',
             restartMenuDesc: 'जरूरत पड़ने पर UI रीलोड करें या सिस्टम डेमॉन पुनरारंभ करें।',
-            collapseMenu: 'मेनू संकुचित करें',
-            collapseMenuDesc:
-                'बाकी ऐप को अधिक जगह देने के लिए मुख्य मेनू को विस्तृत या संकुचित करें।',
+            modes: 'मोड',
+            modesDesc:
+                'मोड आपकी सेटिंग्स के सहेजे गए संग्रह हैं। यहीं से Silent और Performance जैसे कॉन्फ़िगरेशन के बीच स्विच करें या उन्हें प्रबंधित करें।',
             thatsIt: 'बस इतना ही!',
             startNow:
                 'आप तैयार हैं। अधिक जानने के लिए गेटिंग स्टार्टेड दस्तावेज़ खोलें, या सीधे अपने डिवाइस कॉन्फ़िगर करना शुरू करें।',
@@ -1089,8 +1027,6 @@ export default {
             device: 'डिवाइस',
             channel: 'चैनल',
             current: 'वर्तमान',
-            min: 'न्यूनतम',
-            max: 'अधिकतम',
             range: 'सीमा',
             average: 'औसत',
             resetStats: 'रीसेट',
@@ -1102,7 +1038,6 @@ export default {
         menuTagAssign: {
             title: 'टैग असाइन करें',
             noTags: 'अभी तक कोई टैग नहीं।',
-            newTag: 'नया टैग बनाएं',
             tagName: 'टैग का नाम',
             editTag: 'टैग संपादित करें',
             deleteTag: 'टैग हटाएं',
@@ -1110,12 +1045,17 @@ export default {
         wizards: {
             calibration: {
                 title: 'पंखे कैलिब्रेट करें',
-                tooltip: 'एक समान गति नियंत्रण के लिए कई पंखों को कैलिब्रेट करें',
                 pickIntro:
-                    'कैलिब्रेट करने के लिए पंखे चुनें। पहले से कैलिब्रेट किए गए पंखे डिफ़ॉल्ट रूप से अनचेक रहते हैं।',
+                    'कैलिब्रेट करने के लिए पंखे चुनें। पहले से कैलिब्रेट किए गए और फर्मवेयर-नियंत्रित पंखे डिफ़ॉल्ट रूप से अनचेक रहते हैं।',
                 noFans: 'कोई नियंत्रण योग्य पंखा नहीं मिला।',
                 selectAll: 'सभी चुनें',
                 calibratedBadge: 'कैलिब्रेटेड',
+                firmwareControlledBadge: 'फर्मवेयर-नियंत्रित',
+                firmwareControlledDesc:
+                    'इस चैनल की प्रोफ़ाइल फर्मवेयर चलाता है. कैलिब्रेशन फिर भी लागू रहता है: उसकी ड्यूटी मैपिंग फर्मवेयर को दिए जाने वाले कर्व में शामिल कर दी जाती है. स्टार्टअप किक शामिल नहीं होती, क्योंकि फर्मवेयर कर्व उसे व्यक्त नहीं कर सकता.',
+                blockedByAlert: "अवरुद्ध: अलर्ट '{name}' सक्रिय है",
+                alertsPausedNote:
+                    '{count} अलर्ट चयनित पंखों पर नज़र रखते हैं और प्रत्येक पंखे के स्वीप के दौरान रोक दिए जाते हैं।',
                 idleNote:
                     'कैलिब्रेशन प्रत्येक पंखे को उसकी पूरी रेंज में चलाता है। इसे निष्क्रिय अवस्था में चलाना सबसे अच्छा है: यह शोरगुल वाला होता है और प्रति पंखा कुछ मिनट लेता है।',
                 concurrencyLabel: 'एक बार में पंखे',
@@ -1136,50 +1076,6 @@ export default {
                 stageUpSweep: 'अप स्वीप',
                 stageDownSweep: 'डाउन स्वीप',
                 stageFinalizing: 'अंतिम रूप दिया जा रहा है',
-            },
-            generate: {
-                title: 'प्रोफ़ाइल स्वतः बनाएँ',
-                tooltip: 'कुछ विकल्पों से अपने पंखों के लिए प्रोफ़ाइल स्वतः बनाएँ',
-                stepFans: 'पंखे असाइन करें',
-                stepTemps: 'मुख्य तापमान',
-                stepPreset: 'प्रदर्शन',
-                assignIntro:
-                    'प्रत्येक पंखे को एक भूमिका असाइन करें। किसी पंखे को छोड़ने के लिए उसे अनसेट छोड़ दें।',
-                skip: 'छोड़ें',
-                noFans: 'कोई नियंत्रण योग्य पंखा नहीं मिला।',
-                tempsIntro:
-                    'अपने मुख्य तापमान की पुष्टि करें। ये सर्वोत्तम अनुमान के रूप में पहले से भरे गए हैं: कृपया इन्हें सत्यापित करें।',
-                cpuTemp: 'CPU तापमान',
-                gpuTemp: 'GPU तापमान',
-                liquidTemp: 'लिक्विड तापमान',
-                ambientTemp: 'परिवेश तापमान (वैकल्पिक)',
-                tempNone: 'कोई नहीं',
-                presetIntro: 'चुनें कि पंखों को कितनी तेज़ी से बढ़ना चाहिए।',
-                perKindOverrides: 'भूमिका के अनुसार ओवरराइड (उन्नत)',
-                cfmCaveat:
-                    'सकारात्मक-दबाव झुकाव ड्यूटी (duty) पर आधारित है, वायुप्रवाह पर नहीं: असमान पंखा संख्या के साथ यह सकारात्मक दबाव की गारंटी नहीं दे सकता।',
-                generate: 'बनाएँ',
-                preview: 'पूर्वावलोकन',
-                previewIntro:
-                    'समीक्षा करें कि क्या बनाया और लागू किया जाएगा। पुष्टि करने तक कुछ भी सहेजा नहीं जाता।',
-                previewAssignments: 'पंखा असाइनमेंट',
-                willCreateHeader: 'बनाया जाएगा',
-                startingPointNote:
-                    'शुरू से बनाने के बजाय एक आसान शुरुआती बिंदु। ये हर सिस्टम के लिए पूर्ण नहीं होंगे, इसलिए बनाने के बाद इन्हें सत्यापित करें, परखें और समायोजित करें।',
-                replaces: '{name} को बदलता है',
-                createApply: 'बनाएँ और लागू करें',
-                generated: '{count} प्रोफ़ाइल बनाई गईं।',
-                generateError: 'प्रोफ़ाइल नहीं बनाई जा सकीं।',
-                applyError: 'प्रोफ़ाइल नहीं बनाई जा सकीं।',
-                kind: {
-                    CpuCooler: 'CPU एयर कूलर',
-                    GpuFan: 'GPU पंखा',
-                    AioRadiator: 'AIO रेडिएटर',
-                    AioPump: 'AIO पंप',
-                    CaseIntake: 'केस इनटेक',
-                    CaseExhaust: 'केस एग्ज़ॉस्ट',
-                    LaptopFan: 'लैपटॉप पंखा',
-                },
             },
             fanControl: {
                 fanControlWizard: 'पंखा नियंत्रण विज़ार्ड',
@@ -1206,7 +1102,7 @@ export default {
                 createNewFunction: 'नया फ़ंक्शन',
                 existingFunction: 'फ़ंक्शन चुनें',
                 defaultFunction: 'डिफ़ॉल्ट फ़ंक्शन',
-                chooseFunctionNameType: 'फ़ंक्शन नाम और प्रकार चुनें',
+                chooseFunctionName: 'फ़ंक्शन का नाम चुनें',
                 newFunctionName: '{profileName} के लिए फ़ंक्शन',
                 summary: 'सारांश',
                 aNewProfile: 'एक नई प्रोफ़ाइल',
@@ -1231,15 +1127,52 @@ export default {
                 selectProfiles: 'प्रोफाइल चुनें',
                 profilesTooltip: 'इस फंक्शन को लागू करने के लिए एक या अधिक प्रोफाइल चुनें।',
             },
-            customSensor: {
-                new: 'नया कस्टम सेंसर',
+            generate: {
+                title: 'प्रोफ़ाइल स्वतः बनाएँ',
+                assignIntro:
+                    'प्रत्येक पंखे को एक भूमिका असाइन करें। किसी पंखे को छोड़ने के लिए उसे अनसेट छोड़ दें।',
+                calibrateFirst: 'सर्वोत्तम एकरूपता के लिए पहले पंखे कैलिब्रेट करें (कुछ मिनट)',
+                skip: 'छोड़ें',
+                noFans: 'कोई नियंत्रण योग्य पंखा नहीं मिला।',
+                tempsIntro:
+                    'वे तापमान चुनें जिनका आपका सेटअप अनुसरण करेगा। किसी को खाली छोड़ने पर वह शामिल नहीं होगा: एकीकृत ग्राफ़िक्स वाले सिस्टम को GPU तापमान की आवश्यकता नहीं होती, और उसे चुनना ही GPU को AIO रेडिएटर तथा केस फ़ैन कर्व में शामिल करता है।',
+                cpuTemp: 'CPU तापमान',
+                gpuTemp: 'GPU तापमान',
+                liquidTemp: 'लिक्विड तापमान',
+                ambientTemp: 'परिवेश तापमान (वैकल्पिक)',
+                tempNone: 'कोई नहीं',
+                presetIntro: 'चुनें कि पंखों को कितनी तेज़ी से बढ़ना चाहिए।',
+                perKindOverrides: 'भूमिका के अनुसार ओवरराइड (उन्नत)',
+                cfmCaveat:
+                    'सकारात्मक-दबाव झुकाव ड्यूटी (duty) पर आधारित है, वायुप्रवाह पर नहीं: असमान पंखा संख्या के साथ यह सकारात्मक दबाव की गारंटी नहीं दे सकता।',
+                previewIntro:
+                    'समीक्षा करें कि क्या बनाया और लागू किया जाएगा। पुष्टि करने तक कुछ भी सहेजा नहीं जाता।',
+                previewAssignments: 'पंखा असाइनमेंट',
+                reusedHeader: 'पहले से मौजूद',
+                reused: 'पुनः उपयोग',
+                willCreateHeader: 'बनाया जाएगा',
+                startingPointNote:
+                    'यह आपके फ़ैन सेटअप के लिए एक सामान्य शुरुआती बिंदु है, जिसे वैसा ही छोड़ने के बजाय समायोजित करना चाहिए।',
+                replaces: '{name} को बदलता है',
+                generated: '{count} प्रोफ़ाइल बनाई गईं।',
+                generateError: 'प्रोफ़ाइल नहीं बनाई जा सकीं।',
+                applyError: 'प्रोफ़ाइल नहीं बनाई जा सकीं।',
+                kind: {
+                    CpuCooler: 'CPU एयर कूलर',
+                    GpuFan: 'GPU पंखा',
+                    AioRadiator: 'AIO रेडिएटर',
+                    AioPump: 'AIO पंप',
+                    CaseIntake: 'केस इनटेक',
+                    CaseExhaust: 'केस एग्ज़ॉस्ट',
+                    LaptopFan: 'लैपटॉप पंखा',
+                },
             },
         },
         channelExtensionSettings: {
             title: 'डिवाइस चैनल सेटिंग्स',
             firmwareControlledProfile: 'फर्मवेयर-नियंत्रित प्रोफ़ाइल',
             firmwareControlledProfileDesc:
-                'सक्रिय करने पर, डिवाइस का फर्मवेयर फैन प्रोफ़ाइल को नियंत्रित करता है.\nसॉफ़्टवेयर द्वारा बार‑बार गति बदलने पर ठीक तरह प्रतिक्रिया न देने वाले हार्डवेयर के लिए उपयोगी.\nकेवल उन ग्राफ़ प्रोफ़ाइल के लिए उपलब्ध जो डिवाइस‑आंतरिक तापमान सेंसर का उपयोग करते हैं.\nफ़ंक्शन सेटिंग्स लागू नहीं होतीं.',
+                'सक्रिय करने पर, डिवाइस का फर्मवेयर फैन प्रोफ़ाइल को नियंत्रित करता है.\nसॉफ़्टवेयर द्वारा बार‑बार गति बदलने पर ठीक तरह प्रतिक्रिया न देने वाले हार्डवेयर के लिए उपयोगी.\nकेवल उन ग्राफ़ प्रोफ़ाइल के लिए उपलब्ध जो डिवाइस‑आंतरिक तापमान सेंसर का उपयोग करते हैं.\nफ़ंक्शन सेटिंग्स लागू नहीं होतीं.\nकैलिब्रेटेड चैनल में कर्व के बिंदु कैलिब्रेशन के ज़रिए बदले जाते हैं, लेकिन स्टार्टअप किक लागू नहीं होती.',
             saveError: 'चैनल एक्सटेंशन सेटिंग्स सहेजने में विफल',
             firmwareControlDisabled:
                 'वर्तमान सेटिंग्स के साथ फर्मवेयर नियंत्रण उपलब्ध नहीं है.\nइस डिवाइस के लिए समर्थित आंतरिक तापमान सेंसर वाले ग्राफ़ प्रोफ़ाइल का उपयोग करें.',
@@ -1248,6 +1181,9 @@ export default {
                 description:
                     'पंखे की वास्तविक ड्यूटी‑टू‑RPM कर्व जानने के लिए उसे पूरी रेंज में चलाएँ, फिर चैनल को RPM‑सामान्यीकृत वास्तविक ड्यूटी के रूप में नियंत्रित करें.\nकम ड्यूटी पर मृत क्षेत्रों और उच्च ड्यूटी पर संतृप्ति को हटाता है.\nपंखा कैलिब्रेट होने पर किक‑इन भी स्वचालित रूप से संभाला जाता है: एक संक्षिप्त स्टार्टअप बूस्ट पंखे को विश्राम से चालू करता है और फिर लक्षित ड्यूटी पर स्थिर हो जाता है.\nस्वीप आमतौर पर कई मिनट लेता है, और धीमी प्रतिक्रिया वाले पंखों में काफी अधिक समय ले सकता है. आरंभ में चैनल को 0 % पर सेट किया जाता है.',
                 statusNotCalibrated: 'कैलिब्रेट नहीं किया गया',
+                blockedByAlert: "कैलिब्रेशन अवरुद्ध है: अलर्ट '{name}' इस पंखे पर सक्रिय है.",
+                alertsPausedNote:
+                    'इस पंखे पर नज़र रखने वाले अलर्ट स्वीप के दौरान रोक दिए जाते हैं.',
                 statusInProgress: 'कैलिब्रेट हो रहा है: {stage} ({percent} %)',
                 statusCompleted: 'कैलिब्रेटेड (स्मूद, मैपिंग सक्रिय)',
                 statusCompletedStepped: 'कैलिब्रेटेड (स्टेप कर्व, मैपिंग बंद)',
@@ -1267,11 +1203,11 @@ export default {
                 buttonRecalibrate: 'पुनः कैलिब्रेट करें',
                 buttonCancel: 'रद्द करें',
                 buttonClear: 'साफ़ करें',
+                clearConfirm:
+                    '{channel} के लिए कैलिब्रेशन हटाएं? इसे दोबारा चलाने में कई मिनट लगते हैं।',
                 buttonViewCurve: 'कर्व देखें',
                 caveatsBanner:
                     'एक साथ कई मुख्य कूलिंग पंखों को कैलिब्रेट करने से सिस्टम का तापमान बढ़ सकता है.\nसमानांतर में परखे जा रहे पुश‑पुल रेडिएटर पंखों से अशुद्ध रीडिंग आ सकती हैं.\nकैलिब्रेशन के दौरान सिस्टम को निष्क्रिय रखें.',
-                completedNotice:
-                    'कैलिब्रेशन सक्रिय है. इस चैनल की पंखा कर्व और मैनुअल ड्यूटी अब RPM‑सामान्यीकृत वास्तविक ड्यूटी को नियंत्रित करती हैं. आवश्यक हो तो अपने प्रोफ़ाइल मानों की पुनः समीक्षा करें.',
                 clearedNotice:
                     'साफ़ कर दिया गया. इस चैनल की पंखा कर्व अब सीधे डिवाइस ड्यूटी को नियंत्रित करती हैं.',
                 startError: 'कैलिब्रेशन शुरू करने में विफल',
@@ -1309,9 +1245,6 @@ export default {
             axisRpm: 'RPM',
             legendUp: 'ऊपर का स्वीप',
             legendDown: 'नीचे का स्वीप',
-            markerStart: 'आरंभ',
-            markerSustain: 'बनाए रखना',
-            markerSaturate: 'पठार के समीप',
             markerStable: 'स्थिर निचली सीमा',
             curveKindSmooth: 'स्मूद (मैपिंग सक्रिय)',
             curveKindStepped: 'स्टेप्ड (मैपिंग बंद)',
@@ -1389,12 +1322,6 @@ export default {
         setNewPassword: 'एक नया पासवर्ड दर्ज करें',
         changeDefaultPassword:
             'कृपया अनधिकृत पहुंच को रोकने के लिए पासवर्ड सेट करें। यह आपके सिस्टम खाते से अलग है।',
-        loginFailed: 'लॉगिन विफल',
-        invalidPassword: 'अमान्य पासवर्ड',
-        passwordSetFailed: 'पासवर्ड सेट करना विफल',
-        passwordSetSuccessfully: 'नया पासवर्ड सफलतापूर्वक सेट किया गया',
-        logoutSuccessful: 'आप सफलतापूर्वक लॉग आउट हो गए हैं।',
-        unauthorizedAction: 'इस कार्रवाई को पूरा करने के लिए आपको लॉग इन होना आवश्यक है',
         accessTokens: 'एक्सेस टोकन',
         tokenLabel: 'लेबल (उदा. cctv)',
         tokenExpiry: 'समाप्ति तिथि (वैकल्पिक)',
@@ -1423,11 +1350,98 @@ export default {
         writeAccessTooltip:
             'सक्षम होने पर, यह टोकन परिवर्तन कर सकता है। अक्षम होने पर, टोकन केवल डेटा पढ़ सकता है।',
     },
-    device: {
-        processInterrupted: ' - प्रक्रिया बाधित हुई।',
-        modelSetSuccessfully: 'डिवाइस मॉडल प्रकार सफलतापूर्वक सेट किया गया।',
-        modelSetRestartInProgress:
-            'डिवाइस मॉडल प्रकार सफलतापूर्वक सेट किया गया। पुनरारंभ प्रगति पर है।',
+    daemon: {
+        status: {
+            ok: 'ठीक है',
+            hasWarnings: 'चेतावनियां हैं',
+            hasErrors: 'त्रुटियां हैं',
+        },
+    },
+    // Rendered by the Qt desktop app, which has no translation pipeline of its own.
+    // Pushed over IPC and cached there. See shell/qtStrings.ts.
+    desktop: {
+        closePrompt: {
+            title: 'सिस्टम ट्रे में बंद करें?',
+            body: 'CoolerControl डीमन दोनों ही स्थितियों में पृष्ठभूमि में चलता रहता है, इसलिए आपकी कूलिंग सेटिंग्स सक्रिय रहती हैं। त्वरित पहुँच और डेस्कटॉप सूचनाओं के लिए UI को सिस्टम ट्रे में रखें, या इसे पूरी तरह बंद करें।',
+            keepInTray: 'ट्रे में रखें',
+            quit: 'बंद करें',
+            remember: 'मेरा चयन याद रखें',
+        },
+        tray: {
+            show: 'दिखाएँ',
+            hide: 'छिपाएँ',
+            daemonConnection: 'डीमन कनेक्शन…',
+            quit: 'बंद करें',
+            modes: 'मोड',
+            sensors: 'सेंसर',
+            daemons: 'डीमन',
+        },
+        cert: {
+            title: 'असत्यापित डीमन प्रमाणपत्र',
+            changedTitle: 'प्रमाणपत्र बदल गया',
+            // %1 is the daemon host, substituted by Qt via QString::arg.
+            body: '%1 स्व-हस्ताक्षरित प्रमाणपत्र का उपयोग करता है, जिसे स्वतः सत्यापित नहीं किया जा सकता। केवल तभी जारी रखें जब आप इस डीमन को पहचानते हों।',
+            changedBody:
+                '%1 का प्रमाणपत्र पहले भरोसा किए गए प्रमाणपत्र से भिन्न है। इसका अर्थ हो सकता है कि डीमन पुनः स्थापित हुआ, या कनेक्शन को बीच में रोका जा रहा है।',
+            fingerprint: 'फ़िंगरप्रिंट (SHA-256):',
+            trust: 'इस प्रमाणपत्र पर भरोसा करें',
+            cancel: 'रद्द करें',
+        },
+        wizard: {
+            windowTitle: 'डीमन कनेक्शन त्रुटि',
+            windowTitleOk: 'डीमन कनेक्शन',
+            apply: 'लागू करें',
+            retry: 'पुनः प्रयास',
+            quitApp: 'ऐप बंद करें',
+            introPurpose:
+                'ये सेटिंग्स नियंत्रित करती हैं कि डेस्कटॉप ऐप CoolerControl डेमॉन से कैसे कनेक्ट होता है।',
+            introFailed: 'CoolerControl डीमन से कनेक्शन स्थापित नहीं हो सका।',
+            introCheckService: 'कृपया सुनिश्चित करें कि systemd सेवा चल रही है और उपलब्ध है।',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            introDocs: 'इंस्टॉलेशन निर्देशों के लिए %1 देखें।',
+            introDocsLink: 'दस्तावेज़ वेबसाइट',
+            introCommands: 'डीमन की स्थिति सक्षम करने और जाँचने के लिए कुछ उपयोगी कमांड:',
+            introCustomAddress:
+                'यदि आपने डीमन से कनेक्ट करने के लिए गैर-मानक पता कॉन्फ़िगर किया है, तो आप इसे निम्न चरणों में सेट कर सकते हैं:',
+            lastError: 'अंतिम त्रुटि:',
+            // %1 is substituted by Qt via QString::arg, not by vue-i18n.
+            errorNotDaemon:
+                'पते ने उत्तर दिया, लेकिन CoolerControl डेमॉन के रूप में नहीं (HTTP %1)।',
+            errorCertUntrusted: 'डेमॉन के प्रमाणपत्र पर भरोसा नहीं किया गया।',
+            errorCertInvalid:
+                'डेमॉन का प्रमाणपत्र सत्यापित नहीं होता, और प्रमाणपत्र सत्यापन सक्षम है।',
+            savedLabel: 'सहेजा गया कनेक्शन:',
+            newConnection: 'नया कनेक्शन…',
+            removeConnection: 'हटाएँ',
+            removeConnectionTooltip: 'चयनित डीमन को भूल जाएँ।',
+            removeConnectionBody: 'क्या इस डीमन को ट्रे में दिखाना बंद करें?',
+            nameLabel: 'नाम:',
+            nameTooltip: 'इस डीमन के लिए वैकल्पिक लेबल। खाली रहने पर होस्ट:पोर्ट दिखेगा।',
+            addressTitle: 'डीमन पता - डेस्कटॉप अनुप्रयोग',
+            addressSubtitle: 'आवश्यकतानुसार पता फ़ील्ड समायोजित करें।',
+            hostLabel: 'होस्ट पता:',
+            hostTooltip: 'डीमन से संचार के लिए उपयोग किया जाने वाला IPv4, IPv6 पता या होस्टनाम।',
+            portLabel: 'पोर्ट:',
+            portTooltip: 'डीमन से संचार के लिए उपयोग किया जाने वाला पोर्ट नंबर।',
+            sslTooltip: 'SSL/TLS (HTTPS) सक्षम या अक्षम करें',
+            strictTls: 'प्रमाणपत्र सत्यापित करें',
+            strictTlsTooltip:
+                'सामान्य रूप से सत्यापित होने वाला प्रमाणपत्र आवश्यक करें। बंद रखने पर डीमन के स्व-हस्ताक्षरित प्रमाणपत्र का उपयोग होगा, जिस पर दूरस्थ डीमन के लिए पहली बार भरोसा किया जाता है।',
+            defaults: 'डिफ़ॉल्ट',
+            defaultsTooltip: 'डीमन पते को डिफ़ॉल्ट मानों पर रीसेट करें',
+            forgetCerts: 'विश्वसनीय प्रमाणपत्र भूलें',
+            forgetCertsTooltip:
+                'दूरस्थ डीमन के उन प्रमाणपत्रों को हटाता है जिन पर यह ऐप भरोसा करता है।',
+            forgetCertsBody:
+                'इन डीमन प्रमाणपत्रों पर वर्तमान में भरोसा किया जाता है। इन्हें भूलने पर अगली बार कनेक्ट करते समय पुष्टि माँगी जाएगी।',
+        },
+        versionMismatch: {
+            title: 'संस्करण बेमेल',
+            text: 'डेस्कटॉप ऐप संस्करण (%1) डीमन संस्करण (%2) से मेल नहीं खाता।',
+            informative: 'सही इंटरफ़ेस संस्करण लोड करने के लिए कृपया डेस्कटॉप ऐप पुनः आरंभ करें।',
+            quitApp: 'ऐप बंद करें',
+            continueAnyway: 'फिर भी जारी रखें',
+        },
     },
     device_store: {
         unauthorized: {
@@ -1435,10 +1449,6 @@ export default {
             detail: 'आपका सत्र समाप्त हो गया है। फिर से लॉग इन करने के लिए रीलोड किया जा रहा है।',
         },
         login: {
-            success: {
-                summary: 'सफलता',
-                detail: 'लॉगिन सफल।',
-            },
             failed: {
                 summary: 'लॉगिन विफल',
                 detail: 'अमान्य पासवर्ड',
@@ -1455,9 +1465,6 @@ export default {
             set_success: {
                 summary: 'पासवर्ड',
                 detail: 'नया पासवर्ड सफलतापूर्वक सेट किया गया',
-            },
-            set_failed: {
-                summary: 'पासवर्ड सेट करना विफल',
             },
         },
         asetek: {
@@ -1495,11 +1502,6 @@ export default {
                 mix: 'मिक्स',
                 overlay: 'ओवरले',
             },
-            functionType: {
-                identity: 'पहचान',
-                standard: 'मानक',
-                exponentialMovingAvg: 'एक्सपोनेंशियल मूविंग एवरेज',
-            },
             mixFunctionType: {
                 min: 'न्यूनतम',
                 max: 'अधिकतम',
@@ -1531,6 +1533,10 @@ export default {
             highContrastDark: 'हाई कंट्रास्ट डार्क',
             highContrastLight: 'हाई कंट्रास्ट लाइट',
             custom: 'कस्टम थीम',
+        },
+        interfaceFont: {
+            bundled: 'शामिल (IBM Plex)',
+            system: 'सिस्टम',
         },
         channelViewType: {
             control: 'नियंत्रण',
@@ -1575,7 +1581,6 @@ export default {
         },
         channelType: {
             lcd: 'LCD',
-            lighting: 'लाइटिंग',
         },
     },
 }

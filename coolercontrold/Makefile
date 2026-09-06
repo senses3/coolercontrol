@@ -4,18 +4,14 @@ prefix := '/usr'
 executable := 'coolercontrold'
 release :=
 
-# Detect cargo or fallback
-CARGO := $(shell command -v cargo || command -v cargo-1.88 || command -v cargo-1.85 || command -v cargo-1.91)
+# Detect cargo or fallback (prefer newer)
+CARGO := $(shell command -v cargo || command -v cargo-1.91 || command -v cargo-1.88)
 
-# Default build uses the compio runtime (needs Rust 1.88). Older toolchains (>= 1.85) auto fall
-# back to the tokio runtime via --no-default-features, so each OBS/distro target builds the best
-# runtime its cargo supports.
-CARGO_VER := $(if $(CARGO),$(shell $(CARGO) --version | awk '{print $$2}'))
-# Empty (compio) when cargo >= 1.88, i.e. when [1.88, cargo version] is already in ascending
-# order. Any 1.88+ release (1.88.1, 1.96.0, ...) selects compio; 1.85.x/1.87.x select tokio.
-FEATURES := $(shell printf '1.88\n%s\n' "$(CARGO_VER)" | sort -V -C || echo --no-default-features)
+# Empty selects the default compio runtime. Override to build the tokio runtime instead:
+#   make build FEATURES=--no-default-features
+FEATURES :=
 
-.PHONY: build sync-app test clippy ci-test dev-run vendor clean clean-app install uninstall
+.PHONY: build sync-app test test-liqctld clippy ci-test dev-run openapi vendor clean clean-app install uninstall
 
 # Mirror the UI build into the embedded asset dir: include_dir! compiles the whole
 # directory in, so stale hashed assets must go first (the glob keeps .gitignore).
@@ -31,8 +27,31 @@ build: sync-app
 	@$(CARGO) build --locked $(release) $(FEATURES)
 
 test: release += --release
-test:
+test: test-liqctld
 	@$(CARGO) test --locked $(release) $(FEATURES)
+
+# liqctld's tests call liquidctl's own implementations, so they need it installed. This is a
+# Rust daemon and liquidctl is an optional runtime dep, so building it must never require a
+# python package: a missing one skips. Only the pipeline job that installs liquidctl sets
+# LIQCTLD_TESTS_REQUIRED, which turns that skip into the failure CI needs it to be.
+test-liqctld:
+	@if python3 -c 'import liquidctl, PIL' 2>/dev/null; then \
+		python3 -m unittest discover -s daemon/resources/liqctld -t daemon/resources/liqctld -p 'test_*.py'; \
+	elif [ -n "$(LIQCTLD_TESTS_REQUIRED)" ]; then \
+		echo "liqctld tests cannot run: liquidctl or Pillow is missing"; \
+		exit 1; \
+	else \
+		echo "skipping liqctld tests: liquidctl or Pillow is not installed"; \
+	fi
+
+# The spec comes from the route table, so no daemon, no port and no root are involved.
+# cargo writes its own noise to stderr, leaving stdout as clean JSON.
+# `--offline` not `--locked`: version_bump.sh calls this right after bumping the crate version,
+# and --locked refuses to refresh the lockfile, which would abort the bump partway through.
+openapi:
+	@$(CARGO) run --offline --quiet $(FEATURES) -- openapi > ../openapi/openapi.json
+	@echo "Wrote openapi/openapi.json"
+
 
 clippy: release += --release
 clippy:
@@ -41,7 +60,7 @@ clippy:
 # test execution is split from compilation so the timeout only bounds the run phase:
 # a hung test binary (wedged FIFO pairing class) otherwise burns the whole CI job budget.
 # JSON goes through a file so the junit report survives a kill and the exit status is kept.
-ci-test:
+ci-test: test-liqctld
 	@$(CARGO) build --locked $(release)
 	@./target/debug/$(executable) --version
 	@RUSTC_BOOTSTRAP=1 $(CARGO) test --locked --no-fail-fast --features gated-tests $(release) --no-run

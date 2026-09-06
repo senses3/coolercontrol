@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -28,11 +13,13 @@ use crate::device::{
     ChannelInfo, ChannelKind, ChannelStatus, Device, DeviceInfo, DeviceType, DriverInfo,
     DriverType, Mhz, Status, TempInfo, TempStatus, Watts, UID,
 };
+use crate::overrides::OverridesController;
 use crate::repositories::cpu_percent::CpuPercentCollector;
+use crate::repositories::hwmon::chip_name::{self, ChipName};
 use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType, HwmonDriverInfo};
 use crate::repositories::hwmon::{devices, power_cap, temps};
 use crate::repositories::repository::{DeviceList, DeviceLock, Repository};
-use crate::setting::{LcdSettings, LightingSettings, TempSource};
+use crate::setting::{CCDeviceSettings, LcdSettings, LightingSettings, TempSource};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use heck::ToTitleCase;
@@ -71,6 +58,8 @@ struct CpuFreqs {
 /// A CPU Repository for CPU status
 pub struct CpuRepo {
     config: Rc<Config>,
+    /// Owns the lm-sensors labels for the CPU chips, which the hwmon repo leaves to us.
+    overrides: Rc<OverridesController>,
     devices: HashMap<UID, (DeviceLock, Rc<HwmonDriverInfo>)>,
     cpu_infos: HashMap<PhysicalID, Cell<ProcessorCount>>,
     cpu_model_names: HashMap<PhysicalID, String>,
@@ -81,9 +70,10 @@ pub struct CpuRepo {
 }
 
 impl CpuRepo {
-    pub fn new(config: Rc<Config>) -> Result<Self> {
+    pub fn new(config: Rc<Config>, overrides: Rc<OverridesController>) -> Result<Self> {
         Ok(Self {
             config,
+            overrides,
             devices: HashMap::new(),
             cpu_infos: HashMap::new(),
             cpu_model_names: HashMap::new(),
@@ -92,6 +82,71 @@ impl CpuRepo {
             energy_counters: HashMap::new(),
             poll_rate: 0.,
         })
+    }
+
+    /// The temp label to show for a CPU sensor.
+    ///
+    /// A label from the user's lm-sensors configuration is used exactly as written, without the
+    /// title-casing or the `CPU Temp` prefix we add to driver labels: the user already said what
+    /// they want this sensor called, and it is shown under the CPU device either way.
+    fn resolve_temp_label(&self, chip: Option<&ChipName>, channel: &HwmonChannelInfo) -> String {
+        if let Some((label, source)) = self
+            .overrides
+            .sensors_conf_label_source(chip, &channel.name)
+        {
+            let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+            info!(
+                "Labeling CPU channel {} of {chip_name} as \"{label}\": from {}",
+                channel.name,
+                source.display()
+            );
+            return label.to_owned();
+        }
+        let label_base = channel
+            .label
+            .as_ref()
+            .map_or_else(|| channel.name.to_title_case(), |l| l.to_title_case());
+        format!("{CPU_TEMP_NAME} {label_base}")
+    }
+
+    /// Drops every channel the user hides: those disabled in `CoolerControl`, and those the
+    /// lm-sensors configuration ignores.
+    async fn retain_visible_channels(
+        &self,
+        channels: Vec<HwmonChannelInfo>,
+        cc_device_setting: Option<&CCDeviceSettings>,
+        path: &Path,
+    ) -> Vec<HwmonChannelInfo> {
+        let disabled_channels =
+            cc_device_setting.map_or_else(Vec::new, CCDeviceSettings::get_disabled_channels);
+        let mut channels = channels
+            .into_iter()
+            .filter(|channel| disabled_channels.contains(&channel.name).not())
+            .collect::<Vec<HwmonChannelInfo>>();
+        let chip = chip_name::derive(path).await;
+        self.drop_ignored_channels(chip.as_ref(), &mut channels);
+        channels
+    }
+
+    /// Drops the CPU channels the user's lm-sensors configuration ignores. Relabelling and hiding
+    /// `coretemp` sensors are both common things to do in that file, so the CPU repository
+    /// honours it exactly as the hwmon one does.
+    fn drop_ignored_channels(&self, chip: Option<&ChipName>, channels: &mut Vec<HwmonChannelInfo>) {
+        channels.retain(|channel| {
+            let Some(source) = self
+                .overrides
+                .sensors_conf_ignore_source(chip, &channel.name)
+            else {
+                return true;
+            };
+            let chip_name = chip.map(ToString::to_string).unwrap_or_default();
+            info!(
+                "Hiding CPU channel {} of {chip_name}: ignored by {}",
+                channel.name,
+                source.display()
+            );
+            false
+        });
     }
 
     async fn set_cpu_infos(&mut self, cpuinfo_path: &Path) -> Result<()> {
@@ -529,7 +584,7 @@ impl CpuRepo {
                     // so the next successful read's delta is not wildly
                     // skewed by a one-tick gap.
                     let Some(joule_count) =
-                        power_cap::extract_power_joule_counter(channel.number).await
+                        power_cap::extract_power_joule_counter(&driver.fds, channel.number).await
                     else {
                         continue;
                     };
@@ -679,8 +734,6 @@ impl CpuRepo {
                     info!("Skipping disabled device: {cpu_name} with UID: {device_uid}");
                     continue;
                 }
-                let disabled_channels = cc_device_setting
-                    .map_or_else(Vec::new, |setting| setting.get_disabled_channels());
                 match self.init_cpu_load(physical_id).await {
                     Ok(load) => channels.push(load),
                     Err(err) => {
@@ -708,10 +761,9 @@ impl CpuRepo {
                         debug!("Error finding power cap paths: {err}");
                     }
                 }
-                let channels = channels
-                    .into_iter()
-                    .filter(|channel| disabled_channels.contains(&channel.name).not())
-                    .collect::<Vec<HwmonChannelInfo>>();
+                let channels = self
+                    .retain_visible_channels(channels, cc_device_setting.as_ref(), path)
+                    .await;
                 let pci_device_names = devices::get_device_pci_names(path).await;
                 let model = devices::get_device_model_name(path).await.or_else(|| {
                     pci_device_names.and_then(|names| names.subdevice_name.or(names.device_name))
@@ -782,9 +834,10 @@ impl Repository for CpuRepo {
                 // Fill initial joule_count with a real count (needed before
                 // request_status). If the initial read fails, seed with 0 so the
                 // next successful read still produces a valid forward delta.
-                let joule_count = power_cap::extract_power_joule_counter(channel.number)
-                    .await
-                    .unwrap_or(0.0);
+                let joule_count =
+                    power_cap::extract_power_joule_counter(&driver.fds, channel.number)
+                        .await
+                        .unwrap_or(0.0);
                 self.energy_counters
                     .insert(physical_id, Cell::new(joule_count));
             }
@@ -796,19 +849,16 @@ impl Repository for CpuRepo {
                 .borrow_mut()
                 .insert(type_index, (channels.clone(), temps.clone()));
             let cpu_name = self.cpu_model_names.get(&physical_id).unwrap().clone();
+            let chip = chip_name::derive(&driver.path).await;
             let temp_infos = driver
                 .channels
                 .iter()
                 .filter(|channel| channel.hwmon_type == HwmonChannelType::Temp)
                 .map(|channel| {
-                    let label_base = channel
-                        .label
-                        .as_ref()
-                        .map_or_else(|| channel.name.to_title_case(), |l| l.to_title_case());
                     (
                         channel.name.clone(),
                         TempInfo {
-                            label: format!("{CPU_TEMP_NAME} {label_base}"),
+                            label: self.resolve_temp_label(chip.as_ref(), channel),
                             number: channel.number,
                         },
                     )
@@ -1053,6 +1103,7 @@ impl Repository for CpuRepo {
 mod tests {
     use crate::cc_fs;
     use crate::config::Config;
+    use crate::overrides::OverridesController;
     use crate::repositories::cpu_repo::{CpuFreqs, CpuRepo};
     use serial_test::serial;
     use std::rc::Rc;
@@ -1084,7 +1135,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1150,7 +1202,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1228,7 +1281,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1293,7 +1347,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1347,7 +1402,8 @@ mod tests {
             let test_cpuinfo = tempfile::NamedTempFile::new().unwrap().path().to_path_buf();
             cc_fs::write(&test_cpuinfo, vec![]).await.unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
 
             // when:
             let result = cpu_repo.set_cpu_infos(&test_cpuinfo).await;
@@ -1386,7 +1442,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1416,7 +1473,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count_0 = cpu_repo.cpu_infos.get(&0).unwrap().get();
             let initial_count_1 = cpu_repo.cpu_infos.get(&1).unwrap().get();
@@ -1452,7 +1510,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1482,7 +1541,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1512,7 +1572,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let cpu_repo = CpuRepo::new(test_config).unwrap();
+            let cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             // Note: set_cpu_infos NOT called
 
             // when:
@@ -1536,7 +1597,8 @@ mod tests {
                 .await
                 .unwrap();
             let test_config = Rc::new(Config::init_default_config().unwrap());
-            let mut cpu_repo = CpuRepo::new(test_config).unwrap();
+            let mut cpu_repo =
+                CpuRepo::new(test_config, Rc::new(OverridesController::empty())).unwrap();
             cpu_repo.set_cpu_infos(&test_cpuinfo).await.unwrap();
             let initial_count = cpu_repo.cpu_infos.get(&0).unwrap().get();
 
@@ -1558,5 +1620,104 @@ mod tests {
                 "processor count should remain unchanged when file is empty"
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod sensors_conf_tests {
+    use crate::config::Config;
+    use crate::overrides::OverridesController;
+    use crate::repositories::cpu_repo::CpuRepo;
+    use crate::repositories::hwmon::chip_name::{Bus, ChipName};
+    use crate::repositories::hwmon::hwmon_repo::{HwmonChannelInfo, HwmonChannelType};
+    use crate::sensors_conf::SensorsConf;
+    use std::rc::Rc;
+
+    fn k10temp() -> ChipName {
+        ChipName {
+            prefix: "k10temp".to_owned(),
+            bus: Bus::Pci { addr: 0x00c3 },
+        }
+    }
+
+    fn repo_with(conf: SensorsConf) -> CpuRepo {
+        let config = Rc::new(Config::init_default_config().unwrap());
+        let overrides = OverridesController::empty().with_sensors_conf(Rc::new(conf));
+        CpuRepo::new(config, Rc::new(overrides)).unwrap()
+    }
+
+    fn temp_channel_named(name: &str) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Temp,
+            number: 1,
+            name: name.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    fn temp_channel(label: Option<&str>) -> HwmonChannelInfo {
+        HwmonChannelInfo {
+            hwmon_type: HwmonChannelType::Temp,
+            number: 1,
+            name: "temp1".to_owned(),
+            label: label.map(ToOwned::to_owned),
+            ..Default::default()
+        }
+    }
+
+    /// Goal: a configured label must replace the whole displayed name, prefix included. We add
+    /// "CPU Temp" to driver labels to say what they are, which is not our business to do to a
+    /// name the user chose.
+    #[test]
+    fn a_configured_label_replaces_the_prefixed_name() {
+        let repo = repo_with(SensorsConf::from_config_text(
+            "chip \"k10temp-*\"\n label temp1 \"Package\"\n",
+        ));
+
+        assert_eq!(
+            repo.resolve_temp_label(Some(&k10temp()), &temp_channel(Some("Tctl"))),
+            "Package"
+        );
+    }
+
+    /// Goal: without a statement, CPU temps keep the prefixed and title-cased name they have had
+    /// all along. Method: an empty configuration, an unidentified chip, and a temp with no
+    /// driver label at all.
+    #[test]
+    fn without_a_statement_the_prefixed_name_stands() {
+        let repo = repo_with(SensorsConf::default());
+
+        assert_eq!(
+            repo.resolve_temp_label(Some(&k10temp()), &temp_channel(Some("Tctl"))),
+            "CPU Temp Tctl"
+        );
+        assert_eq!(
+            repo.resolve_temp_label(None, &temp_channel(Some("Tctl"))),
+            "CPU Temp Tctl"
+        );
+        assert_eq!(
+            repo.resolve_temp_label(Some(&k10temp()), &temp_channel(None)),
+            "CPU Temp Temp1"
+        );
+    }
+
+    /// Goal: hiding a CPU sensor from the lm-sensors configuration must work the same as hiding
+    /// any other, since `ignore` on `coretemp` is a common thing to write. Method: two ignored
+    /// temps and one that nothing names.
+    #[test]
+    fn ignored_cpu_channels_are_dropped() {
+        let repo = repo_with(SensorsConf::from_config_text(
+            "chip \"k10temp-*\"\n ignore temp1\n ignore temp2\n",
+        ));
+        let mut channels = vec![
+            temp_channel_named("temp1"),
+            temp_channel_named("temp2"),
+            temp_channel_named("temp3"),
+        ];
+
+        repo.drop_ignored_channels(Some(&k10temp()), &mut channels);
+
+        let names: Vec<&str> = channels.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(names, vec!["temp3"]);
     }
 }

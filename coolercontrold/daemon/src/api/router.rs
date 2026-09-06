@@ -1,25 +1,10 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::{
-    alerts, auth, base, calibration, custom_sensors, detect, device_health, functions, metrics,
-    modes, plugins, profile_generation, profiles, settings, sse, stats, status, stress_test,
-    tokens,
+    alerts, auth, auth_throttle, base, calibration, custom_sensors, detect, device_health,
+    functions, hardware_report, metrics, modes, plugins, power_profiles, profile_generation,
+    profiles, settings, sse, stats, status, stress_test, tokens,
 };
 use crate::api::{devices, AppState};
 #[cfg(debug_assertions)]
@@ -32,7 +17,27 @@ use axum::Extension;
 
 pub fn init(app_state: AppState) -> ApiRouter {
     let token_handle = app_state.token_handle.clone();
-    let router = base_routes()
+    let router = documented_routes();
+    // Only add API doc route for debug builds (safer for production)
+    #[cfg(debug_assertions)]
+    let router = router.route("/api.json", get(base::serve_api_doc));
+
+    router
+        .fallback_service(base::web_app_service())
+        .with_state(app_state)
+        // need an extension here for middleware::from_fn to work and not pass app_state everywhere.
+        .layer(Extension(token_handle))
+        // Outermost, so a throttled peer is turned away before any credential work runs.
+        .layer(axum::middleware::from_fn(
+            auth_throttle::throttle_middleware,
+        ))
+}
+
+/// Every route carrying `OpenAPI` metadata, before state, the fallback and the doc route are
+/// attached. None of those three contribute operations, so generating the spec from this alone
+/// yields exactly what `/api.json` serves, with no `AppState` and no running server.
+pub fn documented_routes() -> ApiRouter<AppState> {
+    base_routes()
         .merge(auth_routes())
         .merge(token_routes())
         .merge(device_routes())
@@ -43,24 +48,18 @@ pub fn init(app_state: AppState) -> ApiRouter {
         .merge(function_routes())
         .merge(custom_sensor_routes())
         .merge(mode_routes())
+        .merge(power_profile_routes())
         .merge(settings_routes())
         .merge(plugins_routes())
         .merge(alert_routes())
         .merge(calibration_routes())
         .merge(calibration_batch_routes())
+        .merge(calibration_map_routes())
         .merge(detect_routes())
+        .merge(hardware_report_routes())
         .merge(stress_test_routes())
         .merge(metrics_routes())
-        .merge(sse_routes());
-    // Only add API doc route for debug builds (safer for production)
-    #[cfg(debug_assertions)]
-    let router = router.route("/api.json", get(base::serve_api_doc));
-
-    router
-        .fallback_service(base::web_app_service())
-        .with_state(app_state)
-        // need an extension here for middleware::from_fn to work and not pass app_state everywhere.
-        .layer(Extension(token_handle))
+        .merge(sse_routes())
 }
 
 fn base_routes() -> ApiRouter<AppState> {
@@ -129,7 +128,13 @@ fn auth_routes() -> ApiRouter<AppState> {
                     .description("The endpoint used to create a login session.")
                     .tag("auth")
                     .security_requirement("BasicAuth")
-            }),
+            })
+            // The only unauthenticated route that adjudicates credentials in its handler,
+            // so it reports its own verdict to the throttle rather than being read off a
+            // status code the throttle cannot attribute.
+            .layer(axum::middleware::from_fn(
+                auth_throttle::credential_route_middleware,
+            )),
         )
         .api_route(
             "/verify-session",
@@ -672,6 +677,41 @@ fn custom_sensor_routes() -> ApiRouter<AppState> {
                 o.summary("Save Custom Sensor Order")
                     .description("Saves the order of the Custom Sensors as given.")
                     .tag("custom-sensor")
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
+        )
+}
+
+/// The system power profile integration: what the system offers, and which Mode each profile
+/// activates. Reads need only read access; changing the mapping is a write.
+fn power_profile_routes() -> ApiRouter<AppState> {
+    ApiRouter::new()
+        .api_route(
+            "/power-profiles",
+            get_with(power_profiles::get, |o| {
+                o.summary("Retrieve Power Profile State")
+                    .description(
+                        "Returns the power profiles the system offers, the active one, and the \
+                         profile to Mode mapping. An empty `available` list means no power \
+                         profile daemon is reachable over D-Bus.",
+                    )
+                    .tag("power-profile")
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_middleware)),
+        )
+        .api_route(
+            "/power-profiles/modes",
+            put_with(power_profiles::update_modes, |o| {
+                o.summary("Set Power Profile Mode Mapping")
+                    .description(
+                        "Replaces the mapping of system power profile to Mode. Every referenced \
+                         Mode must exist. Profiles left out are unmapped.",
+                    )
+                    .tag("power-profile")
                     .security_requirement("CookieAuth")
                     .security_requirement("BearerAuth")
             })
@@ -1298,6 +1338,35 @@ fn calibration_routes() -> ApiRouter<AppState> {
         )
 }
 
+/// The calibration duty map. Split from `calibration_routes` so neither
+/// registration function exceeds the line budget.
+fn calibration_map_routes() -> ApiRouter<AppState> {
+    ApiRouter::new().api_route(
+        "/calibrations/{device_uid}/channels/{channel_name}/map",
+        // Read auth: this computes and stores nothing, and exposes no
+        // more than GET on the same calibration already does.
+        post_with(calibration::map_duties, |o| {
+            o.summary("Map device duties to true duties")
+                .description(
+                    "Runs each device duty through the calibration's stable inverse and \
+                     returns the true duties that reproduce it, in the same order. A \
+                     calibrated channel reinterprets stored duties as true-duty, so a \
+                     curve authored before calibration behaves differently; feeding its \
+                     points through here yields values that restore the old behavior. \
+                     Computes nothing else and stores nothing. Returns 404 when the \
+                     channel has no stored calibration, and 409 for a stepped \
+                     calibration, which is written through unmapped and so has nothing \
+                     to convert. Rejects an empty list, more than 256 entries, or any \
+                     duty over 100.",
+                )
+                .tag("calibration")
+                .security_requirement("CookieAuth")
+                .security_requirement("BearerAuth")
+        })
+        .layer(axum::middleware::from_fn(auth::auth_middleware)),
+    )
+}
+
 fn detect_routes() -> ApiRouter<AppState> {
     ApiRouter::new()
         .api_route(
@@ -1305,7 +1374,9 @@ fn detect_routes() -> ApiRouter<AppState> {
             get_with(detect::get_detect, |o| {
                 o.summary("Detect Hardware")
                     .description(
-                        "Run Super-I/O hardware detection and return results without loading modules.",
+                        "Return what the startup Super-I/O detection found, retained rather than \
+                         re-probed. `probed` is false when no detection ran at all, so an empty \
+                         chip list means \"not looked for\" rather than \"none present\".",
                     )
                     .tag("detect")
                     .security_requirement("CookieAuth")
@@ -1326,6 +1397,25 @@ fn detect_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_write_middleware)),
         )
+}
+
+fn hardware_report_routes() -> ApiRouter<AppState> {
+    ApiRouter::new().api_route(
+        "/hardware-report",
+        get_with(hardware_report::get_hardware_report, |o| {
+            o.summary("Hardware Support Report")
+                .description(
+                    "Returns a paste-ready hardware support report as plain text. `full` adds \
+                     the whole hwmon tree; the compact default is trimmed to stay pasteable. \
+                     Includes liquidctl devices, which only the running daemon can enumerate \
+                     without touching hardware.",
+                )
+                .tag("devices")
+                .security_requirement("CookieAuth")
+                .security_requirement("BearerAuth")
+        })
+        .layer(axum::middleware::from_fn(auth::auth_middleware)),
+    )
 }
 
 #[allow(clippy::too_many_lines)] // Declarative route registration; splitting hurts readability.
@@ -1364,6 +1454,19 @@ fn stress_test_routes() -> ApiRouter<AppState> {
             .delete_with(stress_test::stop_gpu, |o| {
                 o.summary("Stop GPU Stress Test")
                     .description("Stops the running GPU stress test.")
+                    .tag("stress-test")
+                    .security_requirement("CookieAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::session_auth_middleware)),
+        )
+        .api_route(
+            "/stress-test/gpus",
+            get_with(stress_test::list_gpus, |o| {
+                o.summary("List Available GPUs")
+                    .description(
+                        "Returns the GPUs available for stress testing, discrete first. \
+                         Enumerated out of process on first use, then cached.",
+                    )
                     .tag("stress-test")
                     .security_requirement("CookieAuth")
             })
@@ -1454,10 +1557,39 @@ fn metrics_routes() -> ApiRouter<AppState> {
 fn sse_routes() -> ApiRouter<AppState> {
     ApiRouter::new()
         .api_route(
+            "/sse",
+            get_with(sse::combined, |o| {
+                o.summary("Server Sent Events")
+                    .description(
+                        "Subscribes to every event stream on one connection. Optional \
+                         `events` query parameter narrows the subscription to a \
+                         comma-separated subset of: status, health, logs, modes, alerts, \
+                         notifications, system. Prefer this over the per-stream endpoints: \
+                         browsers cap concurrent connections per origin over HTTP/1.1.",
+                    )
+                    .tag("sse")
+                    .response::<200, sse::SseStream>()
+                    .security_requirement("CookieAuth")
+                    .security_requirement("BearerAuth")
+            })
+            .layer(axum::middleware::from_fn(auth::auth_middleware)),
+        )
+        .merge(legacy_sse_routes())
+}
+
+/// The per-stream endpoints `/sse` replaced. Split out so neither registration function
+/// exceeds the line budget, and so the deprecated set is removable as one unit.
+/// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
+fn legacy_sse_routes() -> ApiRouter<AppState> {
+    ApiRouter::new()
+        .api_route(
             "/sse/logs",
             get_with(sse::logs, |o| {
                 o.summary("Log Server Sent Events")
-                    .description("Subscribes and returns the Server Sent Events for a Log stream")
+                    .description(
+                        "Deprecated: use GET /sse?events=logs. Subscribes and returns the \
+                         Server Sent Events for a Log stream",
+                    )
                     .tag("sse")
                     .security_requirement("CookieAuth")
                     .security_requirement("BearerAuth")
@@ -1469,7 +1601,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::status, |o| {
                 o.summary("Recent Status Server Sent Events")
                     .description(
-                        "Subscribes and returns the Server Sent Events for a Status stream",
+                        "Deprecated: use GET /sse?events=status,health. Subscribes and returns \
+                         the Server Sent Events for a Status stream",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")
@@ -1482,7 +1615,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::modes, |o| {
                 o.summary("Activated Mode Events")
                     .description(
-                        "Subscribes and returns the Server Sent Events for a ModeActivated stream",
+                        "Deprecated: use GET /sse?events=modes. Subscribes and returns the \
+                         Server Sent Events for a ModeActivated stream",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")
@@ -1490,12 +1624,21 @@ fn sse_routes() -> ApiRouter<AppState> {
             })
             .layer(axum::middleware::from_fn(auth::auth_middleware)),
         )
+        .merge(legacy_sse_event_routes())
+}
+
+/// The remaining deprecated per-stream endpoints, split from `legacy_sse_routes` purely
+/// to stay inside the line budget. Removed with it.
+/// DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
+fn legacy_sse_event_routes() -> ApiRouter<AppState> {
+    ApiRouter::new()
         .api_route(
             "/sse/alerts",
             get_with(sse::alerts, |o| {
                 o.summary("Alert Events")
                     .description(
-                        "Subscribes and returns Events for when an Alert State has changed",
+                        "Deprecated: use GET /sse?events=alerts. Subscribes and returns Events \
+                         for when an Alert State has changed",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")
@@ -1508,8 +1651,8 @@ fn sse_routes() -> ApiRouter<AppState> {
             get_with(sse::notifications, |o| {
                 o.summary("Desktop Notification Events")
                     .description(
-                        "Subscribes and returns Events for desktop notifications \
-                         that should be displayed to the user",
+                        "Deprecated: use GET /sse?events=notifications. Subscribes and returns \
+                         Events for desktop notifications that should be displayed to the user",
                     )
                     .tag("sse")
                     .security_requirement("CookieAuth")

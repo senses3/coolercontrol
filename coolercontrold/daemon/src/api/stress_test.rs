@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::ops::Not;
 use std::path::Path;
@@ -45,6 +30,9 @@ pub struct StartGpuStressRequest {
     pub duration_secs: Option<u16>,
     /// Which backend to use. Omit for the daemon's default (built-in).
     pub backend: Option<StressBackend>,
+    /// Which GPU to stress, as an `id` from GET /stress-test/gpus.
+    /// Omit to stress every GPU.
+    pub gpu_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -84,6 +72,18 @@ pub struct StressTestStatusResponse {
     pub drive_active: bool,
     pub drive_duration_secs: Option<u16>,
     pub drive_backend: StressBackend,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GpuInfo {
+    /// Opaque selection key to pass back as `gpu_id`. The PCI slot where one
+    /// is known, e.g. "0000:03:00.0".
+    pub id: String,
+    /// Driver-reported name, e.g. "AMD Radeon RX 6750 XT (RADV NAVI22)".
+    pub name: String,
+    /// Discrete GPUs are listed first and are what a stress test normally
+    /// means to target.
+    pub discrete: bool,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -131,10 +131,29 @@ pub async fn start_gpu(
     Json(request): Json<StartGpuStressRequest>,
 ) -> Result<Json<()>, CCError> {
     stress_test_handle
-        .start_gpu(request.duration_secs, request.backend)
+        .start_gpu(request.duration_secs, request.backend, request.gpu_id)
         .await
         .map(Json)
         .map_err(|e| CCError::UserError { msg: e.to_string() })
+}
+
+/// GET /stress-test/gpus
+pub async fn list_gpus(
+    State(AppState {
+        stress_test_handle, ..
+    }): State<AppState>,
+) -> Json<Vec<GpuInfo>> {
+    let gpus = stress_test_handle
+        .list_gpus()
+        .await
+        .into_iter()
+        .map(|target| GpuInfo {
+            id: target.id,
+            name: target.name,
+            discrete: target.discrete,
+        })
+        .collect();
+    Json(gpus)
 }
 
 /// POST /stress-test/gpu/stop

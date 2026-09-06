@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { UID } from '@/models/Device'
 
@@ -198,8 +183,8 @@ export interface CalibrationStatusFailed {
      * Machine-readable code matching one of the
      * `coolercontrold::calibration::DiagnosisFailure` variants:
      * `preflight_temp_too_high`, `fan_unresponsive`, `temp_aborted`,
-     * `user_cancelled`, `write_failed`, `restore_failed`,
-     * `persist_failed`.
+     * `user_cancelled`, `blocked_by_alert`, `write_failed`,
+     * `restore_failed`, `persist_failed`.
      */
     reason: string
     /** Human-readable explanation for display. */

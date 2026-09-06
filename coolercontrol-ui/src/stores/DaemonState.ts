@@ -1,27 +1,18 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { defineStore } from 'pinia'
 import { ref, Ref } from 'vue'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
+import defaultHealthCheck, { type HealthCheck } from '@/models/HealthCheck.ts'
+import {
+    connectionLostThresholdMs,
+    formatDisconnectedFor,
+    isConnectionLost,
+} from '@/shell/connectionWatchdog.ts'
 
 export enum DaemonStatus {
     OK = 'Ok',
@@ -40,14 +31,21 @@ export const useDaemonState = defineStore('daemonState', () => {
     const status: Ref<DaemonStatus> = ref(DaemonStatus.ERROR)
     const connected: Ref<boolean> = ref(false)
     const preDisconnectedStatus: Ref<DaemonStatus> = ref(DaemonStatus.ERROR)
+    // Kept here so views render it without their own blocking fetch. Falls back to
+    // defaultHealthCheck's empty values until the first refresh lands.
+    const healthCheck: Ref<HealthCheck> = ref(defaultHealthCheck())
+    // Connection liveness is measured from the last status tick rather than from
+    // the SSE error edge: a stream that stays open but stops delivering leaves
+    // `connected` true while the readings go stale.
+    const lastStatusAt: Ref<number> = ref(Date.now())
+    const connectionLost: Ref<boolean> = ref(false)
+    const disconnectedFor: Ref<string> = ref('')
+    let watchdog: ReturnType<typeof setInterval> | undefined
 
     async function init(): Promise<void> {
-        const deviceStore = useDeviceStore()
-        const healthCheck = await deviceStore.health()
-        systemName.value = healthCheck.system.name
-        warnings.value = healthCheck.details.warnings
-        errors.value = healthCheck.details.errors
+        await refreshHealth()
         connected.value = true
+        startWatchdog()
         if (errors.value > 0) {
             await setStatus(DaemonStatus.ERROR)
         } else if (warnings.value > 0) {
@@ -55,6 +53,41 @@ export const useDaemonState = defineStore('daemonState', () => {
         } else {
             await setStatus(DaemonStatus.OK)
         }
+    }
+
+    // daemonClient.health() falls back to defaults instead of throwing, so callers
+    // may fire this without awaiting it.
+    async function refreshHealth(): Promise<void> {
+        const deviceStore = useDeviceStore()
+        healthCheck.value = await deviceStore.health()
+        systemName.value = healthCheck.value.system.name
+        warnings.value = healthCheck.value.details.warnings
+        errors.value = healthCheck.value.details.errors
+    }
+
+    function noteStatusReceived(): void {
+        lastStatusAt.value = Date.now()
+        // Cleared here rather than left to the next tick so the overlay never
+        // outlives the frame that ended the outage.
+        connectionLost.value = false
+    }
+
+    // Started from init() so importing the store never spawns a timer, and so the
+    // boot path stays with the connection-error modal that already owns it.
+    function startWatchdog(): void {
+        if (watchdog != null) return
+        // Boot can outrun the grace period on a slow system, and the clock should
+        // measure the stream, not how long startup took.
+        noteStatusReceived()
+        const settingsStore = useSettingsStore()
+        watchdog = setInterval(() => {
+            // Read per tick, not captured: the poll rate is a live setting and the
+            // threshold has to follow it without a restart.
+            const threshold = connectionLostThresholdMs(settingsStore.ccSettings.poll_rate)
+            const elapsed = Date.now() - lastStatusAt.value
+            connectionLost.value = isConnectionLost(elapsed, threshold)
+            if (connectionLost.value) disconnectedFor.value = formatDisconnectedFor(elapsed)
+        }, 1_000)
     }
 
     async function setStatus(newStatus: DaemonStatus) {
@@ -96,15 +129,11 @@ export const useDaemonState = defineStore('daemonState', () => {
             // await deviceStore.loadLogs()
             // re-check if the session is valid, in case the daemon has restarted
             // await deviceStore.login()
+            return
         }
-        // else disconnected
+        // else disconnected. No toast: a drop that resolves within the watchdog's
+        // grace period is invisible on purpose, and a lasting one gets the overlay.
         preDisconnectedStatus.value = status.value
-        toast.add({
-            severity: 'error',
-            summary: t('views.daemon.daemonDisconnected'),
-            detail: t('views.daemon.daemonDisconnectedDetail'),
-            life: 4000,
-        })
         status.value = DaemonStatus.ERROR
     }
 
@@ -123,13 +152,18 @@ export const useDaemonState = defineStore('daemonState', () => {
     console.debug(`Daemon State Store created`)
     return {
         init,
+        refreshHealth,
         setStatus,
         setConnected,
+        noteStatusReceived,
         acknowledgeLogIssues,
+        healthCheck,
         systemName,
         warnings,
         errors,
         status,
         connected,
+        connectionLost,
+        disconnectedFor,
     }
 })

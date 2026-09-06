@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useI18n } from 'vue-i18n'
 import type { Calibration, CalibrationWarning } from '@/models/Calibration'
@@ -66,5 +51,20 @@ export function useCalibrationStatusText() {
             : t('components.channelExtensionSettings.calibration.statusCompleted')
     }
 
-    return { warningText, completedStatusText }
+    // Literal keys on purpose: building them from the stage would hide these
+    // strings from the unused-key sweep and get them pruned.
+    function stageLabel(stage: 'preflight' | 'up_sweep' | 'down_sweep' | 'finalizing'): string {
+        switch (stage) {
+            case 'preflight':
+                return t('components.channelExtensionSettings.calibration.stagePreflight')
+            case 'up_sweep':
+                return t('components.channelExtensionSettings.calibration.stageUpSweep')
+            case 'down_sweep':
+                return t('components.channelExtensionSettings.calibration.stageDownSweep')
+            case 'finalizing':
+                return t('components.channelExtensionSettings.calibration.stageFinalizing')
+        }
+    }
+
+    return { warningText, completedStatusText, stageLabel }
 }

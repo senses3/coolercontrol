@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
 use std::env;
@@ -22,6 +7,7 @@ use std::ops::Not;
 use std::rc::Rc;
 use std::time::Duration;
 
+use crate::hardware_support::HardwareSupportController;
 use crate::rt;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -33,7 +19,7 @@ use strum::{Display, EnumString};
 use tokio::sync::{Semaphore, SemaphorePermit};
 
 use crate::config::Config;
-use crate::device::{DeviceType, UID};
+use crate::device::{DeviceType, Duty, UID};
 use crate::repositories::failsafe::MISSING_STATUS_THRESHOLD;
 use crate::repositories::gpu::amd::{GpuAMD, TEMP_FOR_FAN_CURVE};
 use crate::repositories::gpu::nvidia::{GpuNVidia, NvmlInitResult, StatusNvidiaDeviceSMI};
@@ -87,6 +73,8 @@ pub enum GpuType {
 pub struct GpuRepo {
     config: Rc<Config>,
     devices: HashMap<UID, DeviceLock>,
+    /// Registry the channel verdicts are published to.
+    hardware_support: Option<Rc<HardwareSupportController>>,
     gpu_type_count: HashMap<GpuType, u8>,
     gpus_nvidia: GpuNVidia,
     nvml_active: bool,
@@ -123,6 +111,7 @@ impl GpuRepo {
             gpus_amd: GpuAMD::new(Rc::clone(&config)),
             config,
             devices: HashMap::new(),
+            hardware_support: None,
             gpu_type_count: HashMap::new(),
             nvml_active: false,
             force_nvidia_cli: nvidia_cli,
@@ -130,6 +119,35 @@ impl GpuRepo {
             device_permits: HashMap::new(),
             device_read_permit_timeout,
             device_write_permit_timeout,
+        }
+    }
+
+    /// Attaches the hardware-support registry. `None` in tests, which simply
+    /// skips publishing.
+    #[must_use]
+    pub fn with_hardware_support(
+        mut self,
+        hardware_support: Rc<HardwareSupportController>,
+    ) -> Self {
+        self.hardware_support = Some(hardware_support);
+        self
+    }
+
+    /// Publishes whether each channel can be driven. This repository has no
+    /// sysfs-level evidence, so the verdict carries none: an unexplained
+    /// "not controllable" is honest, invented measurements are not.
+    fn publish_channel_drivability(&self) {
+        let Some(hardware_support) = self.hardware_support.as_ref() else {
+            return;
+        };
+        for (device_uid, device_lock) in &self.devices {
+            let device = device_lock.borrow();
+            hardware_support.record_device_channels(device_uid, &device.info);
+            // Enabled by construction: a disabled device never reaches this map.
+            hardware_support.record_device_summary(
+                device_uid,
+                crate::hardware_report::DeviceSummary::from_device(&device, true),
+            );
         }
     }
 
@@ -371,6 +389,7 @@ impl Repository for GpuRepo {
             start_initialization.elapsed()
         );
         self.load_device_delays();
+        self.publish_channel_drivability();
         debug!("GPU Repository initialized");
         Ok(())
     }
@@ -563,6 +582,13 @@ impl Repository for GpuRepo {
     async fn reinitialize_devices(&self) {
         error!("Reinitializing Devices is not supported for this Repository");
     }
+
+    /// RDNA3/4 cards clamp non-zero duty into the PMFW speed range, and
+    /// with Zero RPM present `SpeedOptions::min_duty` reports 0, so the
+    /// floor is invisible without this.
+    fn duty_floor(&self, device_uid: &UID, _channel_name: &str) -> Duty {
+        self.gpus_amd.pmfw_duty_floor(device_uid).unwrap_or(0)
+    }
 }
 
 #[cfg(test)]
@@ -608,5 +634,60 @@ mod permit_timeout_tests {
             device_write_permit_timeout_for(5.0),
             Duration::from_secs(40)
         );
+    }
+}
+
+#[cfg(test)]
+mod verdict_publish_tests {
+    use super::*;
+    use crate::cc_fs;
+    use crate::device::{ChannelInfo, ChannelKind, Device, DeviceInfo, SpeedOptions};
+    use crate::hardware_support::ChannelVerdict;
+    use serial_test::serial;
+    use std::cell::RefCell;
+
+    /// Goal: prove this repository's publish path reaches the registry the
+    /// health snapshot is served from. Its channels carry no sysfs evidence, so
+    /// `fixed_enabled` is the only fact behind the verdict and a broken hand-off
+    /// would silently show nothing rather than fail. Method: attach a
+    /// controller, publish one undrivable channel, read the partition back.
+    #[test]
+    #[serial]
+    fn publishes_drivability_for_gpu_channels() {
+        cc_fs::test_runtime(async {
+            let hardware_support = Rc::new(HardwareSupportController::init(None, true).await);
+            let mut repo = GpuRepo::new(Rc::new(Config::init_default_config().unwrap()), false)
+                .with_hardware_support(Rc::clone(&hardware_support));
+            let mut info = DeviceInfo::default();
+            info.channels.insert(
+                "fan1".to_string(),
+                ChannelInfo {
+                    label: None,
+                    kind: ChannelKind::Speed(SpeedOptions {
+                        fixed_enabled: false,
+                        ..Default::default()
+                    }),
+                },
+            );
+            let device = Device::new(
+                "Test GPU".to_string(),
+                DeviceType::GPU,
+                1,
+                None,
+                info,
+                None,
+                1.0,
+            );
+            let uid = device.uid.clone();
+            repo.devices.insert(uid, Rc::new(RefCell::new(device)));
+
+            repo.publish_channel_drivability();
+
+            let (permanent, current) = hardware_support.partitioned_verdicts();
+            assert!(current.is_empty(), "unexpected current-state verdicts");
+            assert_eq!(permanent.len(), 1, "expected one published verdict");
+            assert_eq!(permanent[0].channel_name, "fan1");
+            assert_eq!(permanent[0].verdict, ChannelVerdict::NotSupportedByDriver);
+        });
     }
 }

@@ -1,7 +1,5 @@
 
 .idea/*
-!.idea/copyright
-!.idea/scopes
 .vscode
 
 .cargo/

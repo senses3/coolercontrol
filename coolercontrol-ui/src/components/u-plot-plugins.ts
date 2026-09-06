@@ -1,23 +1,10 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2024 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import uPlot from 'uplot'
+import { mdiMinus } from '@mdi/js'
 import type { Color } from '@/models/Device.ts'
+import { escapeHtml, safeColor } from '@/components/htmlEscaping.ts'
 
 export const SCALE_KEY_PERCENT: string = '%'
 export const SCALE_KEY_RPM: string = 'rpm'
@@ -258,7 +245,7 @@ export const tooltipPlugin = (
                 // @ts-ignore
                 const lineColor = allDevicesLineProperties.get(series.label!)?.color
                 seriesTexts.push(
-                    `<tr><td><i class="pi pi-minus" style="color:${lineColor};"/></td><td>${lineName}&nbsp;</td><td>${lineValue} ${suffix}</td></tr>`,
+                    `<tr><td><svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:middle;fill:${safeColor(lineColor)};"><path d="${mdiMinus}"/></svg></td><td>${escapeHtml(lineName)}&nbsp;</td><td>${lineValue} ${suffix}</td></tr>`,
                 )
             }
         }
@@ -427,6 +414,9 @@ export const mouseWheelZoomPlugin = () => {
                     }
                     const rect = u.over.getBoundingClientRect()
                     u.over.addEventListener('wheel', (e) => {
+                        // Plain wheel scrolls the page; Ctrl+wheel (and trackpad
+                        // pinch, which sets ctrlKey) zooms the chart.
+                        if (!e.ctrlKey) return
                         e.preventDefault()
                         const xMin = u.data[0][0]!
                         const xMax = u.data[0][u.data[0].length - 1]!

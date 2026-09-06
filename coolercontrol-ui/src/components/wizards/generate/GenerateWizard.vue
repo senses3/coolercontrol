@@ -1,41 +1,26 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import {
-    mdiArrowLeft,
-    mdiAutoFix,
-    mdiContentSaveOutline,
-    mdiInformationSlabCircleOutline,
-} from '@mdi/js'
-import Button from 'primevue/button'
-import Select from 'primevue/select'
-import SelectButton from 'primevue/selectbutton'
-import { inject, nextTick, ref, watch, type Ref } from 'vue'
-import { Emitter, EventType } from 'mitt'
-import type { DynamicDialogInstance } from 'primevue/dynamicdialogoptions'
+import { mdiAlertOutline, mdiArrowLeft, mdiAutoFix, mdiContentSaveOutline, mdiMinus } from '@mdi/js'
+import PanelHeader from '@/shell/PanelHeader.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import UiScrollArea from '@/shell/ui/UiScrollArea.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiGroupedSelect from '@/shell/ui/UiGroupedSelect.vue'
+import UiToggleGroup from '@/shell/ui/UiToggleGroup.vue'
+import { type UiOptionGroup } from '@/shell/ui/UiGroupedListbox.vue'
+import { computed, inject, nextTick, ref, watch, type Ref } from 'vue'
+import type { DynamicDialogInstance } from '@/shell/dialog'
 import { useI18n } from 'vue-i18n'
-import { useToast } from 'primevue/usetoast'
+import { useToolWizards } from '@/composables/useToolWizards.ts'
+import { useToast } from '@/shell/toast'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { DeviceType } from '@/models/Device.ts'
 import { getProfileTypeDisplayName, ProfileTempSource } from '@/models/Profile.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import {
@@ -54,9 +39,14 @@ const { t } = useI18n()
 const toast = useToast()
 const deviceStore = useDeviceStore()
 const settingsStore = useSettingsStore()
-const emitter: Emitter<Record<EventType, any>> = inject('emitter')!
+const { openCalibrationWizard } = useToolWizards()
 
 const step: Ref<number> = ref(1)
+
+// A single-channel preselect scopes the whole wizard to just that fan; when
+// absent it enumerates every controllable fan (whole-system).
+const preselect = dialogRef.value.data?.preselect as
+    { deviceUID: string; channelName: string } | undefined
 
 // Step 1: assign each controllable fan a role (or leave unset to skip).
 interface FanRow {
@@ -75,6 +65,12 @@ const fillFans = (): void => {
         if (deviceSettings == null) continue
         for (const [channelName, channelInfo] of device.info.channels.entries()) {
             if (!(channelInfo.speed_options?.fixed_enabled ?? false)) continue
+            if (
+                preselect != null &&
+                (device.uid !== preselect.deviceUID || channelName !== preselect.channelName)
+            ) {
+                continue
+            }
             const sc = deviceSettings.sensorsAndChannels.get(channelName)
             fanRows.value.push({
                 deviceUID: device.uid,
@@ -87,6 +83,30 @@ const fillFans = (): void => {
     }
 }
 fillFans()
+
+// Channel names repeat across devices (Fan1, Fan2...), so the roles are assigned
+// under their device. Rows are already collected device by device.
+interface FanGroup {
+    deviceUID: string
+    deviceName: string
+    rows: Array<FanRow>
+}
+const deviceLabel = (deviceUID: string): string =>
+    settingsStore.allUIDeviceSettings.get(deviceUID)?.name ?? deviceUID
+const fanGroups = computed<Array<FanGroup>>(() => {
+    const groups: Array<FanGroup> = []
+    for (const row of fanRows.value) {
+        const current = groups[groups.length - 1]
+        if (current != null && current.deviceUID === row.deviceUID) current.rows.push(row)
+        else
+            groups.push({
+                deviceUID: row.deviceUID,
+                deviceName: deviceLabel(row.deviceUID),
+                rows: [row],
+            })
+    }
+    return groups
+})
 
 const kindOptions = [
     FanKind.CpuCooler,
@@ -108,18 +128,17 @@ const calibrateFansFirst = async (): Promise<void> => {
         .map((row) => ({ deviceUID: row.deviceUID, channelName: row.channelName }))
     closeDialog()
     await nextTick()
-    emitter.emit('calibrate-fans', { preselect: preselect.length > 0 ? preselect : undefined })
+    openCalibrationWizard(preselect.length > 0 ? preselect : undefined)
 }
 
-// The shared Select preset positions the clear (X) icon at right-12, which leaves it stranded
-// mid-field here because this preset puts the dropdown chevron on the left. Move the X flush to
-// the right edge and reserve just enough label padding so the text does not run under it.
-const selectPt = {
-    label: { class: '!pr-9' },
-    clearIcon: { class: '!right-3' },
+// The kit select models a plain string; a cleared value (skip) maps back to null.
+const setFanKind = (row: FanRow, value: string | undefined): void => {
+    row.kind = (value as FanKind) ?? null
 }
 
-// Step 2: confirm the key temps. Pre-filled by a best-guess heuristic the user must verify.
+// Step 2: the key temps, all chosen by the user. Nothing is guessed: which temps are involved is
+// a real decision (an iGPU box has no GPU temp worth following, and a simple setup may want the
+// CPU temp alone), and picking a GPU temp is what opts a radiator into its GPU Mix.
 interface TempOption {
     deviceUID: string
     tempName: string
@@ -152,15 +171,42 @@ const fillTemps = (): void => {
                 color: sc?.color ?? '#888888',
             }
             group.temps.push(option)
-            if (cpuTemp.value == null && device.type === DeviceType.CPU) cpuTemp.value = option
-            if (gpuTemp.value == null && device.type === DeviceType.GPU) gpuTemp.value = option
-            if (liquidTemp.value == null && temp.name.toLowerCase().includes('liquid'))
-                liquidTemp.value = option
         }
         if (group.temps.length > 0) tempGroups.value.push(group)
     }
 }
 fillTemps()
+
+// Grouped temp selects: bridge the object model to a device/temp key string.
+const tempKey = (deviceUID: string, tempName: string): string => `${deviceUID}/${tempName}`
+const tempOptionGroups = computed<UiOptionGroup[]>(() =>
+    tempGroups.value.map((group) => ({
+        label: group.deviceName,
+        options: group.temps.map((temp) => ({
+            label: temp.label,
+            value: tempKey(temp.deviceUID, temp.tempName),
+            color: temp.color,
+        })),
+    })),
+)
+const findTemp = (key: string | undefined): TempOption | null =>
+    key == null
+        ? null
+        : (tempGroups.value
+              .flatMap((group) => group.temps)
+              .find((temp) => tempKey(temp.deviceUID, temp.tempName) === key) ?? null)
+const makeTempKeyModel = (tempRef: Ref<TempOption | null>) =>
+    computed<string | undefined>({
+        get: () =>
+            tempRef.value != null
+                ? tempKey(tempRef.value.deviceUID, tempRef.value.tempName)
+                : undefined,
+        set: (key) => (tempRef.value = findTemp(key)),
+    })
+const cpuTempKey = makeTempKeyModel(cpuTemp)
+const gpuTempKey = makeTempKeyModel(gpuTemp)
+const liquidTempKey = makeTempKeyModel(liquidTemp)
+const ambientTempKey = makeTempKeyModel(ambientTemp)
 
 // Step 3: choose the global preset, with optional per-role overrides.
 const presetOptions = [Preset.Silent, Preset.Balanced, Preset.Performance]
@@ -210,6 +256,16 @@ watch(globalPreset, (newPreset, oldPreset) => {
         if (row.preset === oldPreset) row.preset = newPreset
     }
 })
+
+// Preset toggle (single-select segmented control, mirrors the old SelectButton).
+const presetToggleOptions = presetOptions.map((preset) => ({ label: preset, value: preset }))
+const globalPresetModel = computed<string>({
+    get: () => globalPreset.value,
+    set: (value) => (globalPreset.value = value as Preset),
+})
+const setOverridePreset = (index: number, value: string): void => {
+    overrideRows.value[index].preset = value as Preset
+}
 
 const goToPresets = (): void => {
     buildOverrideRows()
@@ -264,7 +320,28 @@ const buildPreview = async (): Promise<void> => {
 }
 
 const profileNameByUid = (uid: string): string =>
-    proposal.value?.profiles.find((profile) => profile.uid === uid)?.name ?? uid
+    proposal.value?.profiles.find((profile) => profile.uid === uid)?.name ??
+    settingsStore.profiles.find((profile) => profile.uid === uid)?.name ??
+    uid
+
+// The daemon reuses an existing profile instead of proposing a copy, so an assignment can point at
+// something already saved. Those are worth naming: on a re-run the created list is empty and this
+// is all the preview has to show.
+const reusedProfileNames = computed<string[]>(() => {
+    const proposed = new Set((proposal.value?.profiles ?? []).map((profile) => profile.uid))
+    const names = new Set<string>()
+    for (const assignment of proposal.value?.assignments ?? []) {
+        if (proposed.has(assignment.profile_uid)) continue
+        names.add(profileNameByUid(assignment.profile_uid))
+    }
+    return [...names]
+})
+const anyEntityCreated = computed<boolean>(
+    () =>
+        (proposal.value?.profiles.length ?? 0) > 0 ||
+        (proposal.value?.functions.length ?? 0) > 0 ||
+        (proposal.value?.custom_sensors.length ?? 0) > 0,
+)
 
 const fanLabel = (deviceUID: string, channelName: string): string =>
     fanRows.value.find((row) => row.deviceUID === deviceUID && row.channelName === channelName)
@@ -303,6 +380,27 @@ const applyError = (): void => {
 const createAndApply = async (): Promise<void> => {
     if (proposal.value == null) return
     applying.value = true
+    // saveFunction/saveProfile look their subject up in the store, so each has to be
+    // pushed before it can be persisted. These hold only what is in the store but NOT yet
+    // in the daemon, so a failure takes back exactly the phantom entries: anything already
+    // persisted stays, or the Cooling page would omit entities the daemon really created
+    // and a later drag-reorder would send the truncated list.
+    const unpersistedFunctionUIDs: string[] = []
+    const unpersistedProfileUIDs: string[] = []
+    const abortApply = (): void => {
+        for (const uid of unpersistedProfileUIDs) {
+            const index = settingsStore.profiles.findIndex((profile) => profile.uid === uid)
+            if (index >= 0) settingsStore.profiles.splice(index, 1)
+        }
+        for (const uid of unpersistedFunctionUIDs) {
+            const index = settingsStore.functions.findIndex((fn) => fn.uid === uid)
+            if (index >= 0) settingsStore.functions.splice(index, 1)
+        }
+        applyError()
+        // Closed, not left open to retry: the proposal's names and custom-sensor ids
+        // were already rewritten in place, so a second run would build on them.
+        closeDialog()
+    }
     try {
         // Custom sensor ids are the key, so rename on collision and rewire references.
         const existingSensorIds = new Set(
@@ -327,7 +425,7 @@ const createAndApply = async (): Promise<void> => {
         for (const sensor of proposal.value.custom_sensors) {
             // Use the daemon client directly to avoid a success toast per sensor.
             if ((await deviceStore.daemonClient.saveCustomSensor(sensor)) != null) {
-                applyError()
+                abortApply()
                 return
             }
         }
@@ -337,20 +435,24 @@ const createAndApply = async (): Promise<void> => {
             fn.name = uniqueName(fn.name, existingFunctionNames)
             existingFunctionNames.add(fn.name)
             settingsStore.functions.push(fn)
+            unpersistedFunctionUIDs.push(fn.uid)
             if (!(await settingsStore.saveFunction(fn.uid))) {
-                applyError()
+                abortApply()
                 return
             }
+            unpersistedFunctionUIDs.pop() // now in the daemon, so it stays in the store
         }
         const existingProfileNames = new Set(settingsStore.profiles.map((profile) => profile.name))
         for (const profile of proposal.value.profiles) {
             profile.name = uniqueName(profile.name, existingProfileNames)
             existingProfileNames.add(profile.name)
             settingsStore.profiles.push(profile)
+            unpersistedProfileUIDs.push(profile.uid)
             if (!(await settingsStore.saveProfile(profile.uid))) {
-                applyError()
+                abortApply()
                 return
             }
+            unpersistedProfileUIDs.pop() // now in the daemon, so it stays in the store
         }
         for (const assignment of proposal.value.assignments) {
             await settingsStore.saveDaemonDeviceSettingProfile(
@@ -378,295 +480,310 @@ const createAndApply = async (): Promise<void> => {
 </script>
 
 <template>
-    <div class="flex flex-col justify-between min-w-96 w-[40vw] min-h-max h-[50vh]">
-        <!-- Step 1: assign fans -->
-        <div v-if="step === 1" class="flex flex-col gap-y-3 overflow-y-auto">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.assignIntro') }}
-            </small>
-            <button
-                type="button"
-                class="ml-1 self-start text-sm text-text-color-secondary hover:underline"
-                @click="calibrateFansFirst"
-            >
-                {{ t('components.wizards.generate.calibrateFirst') }}
-            </button>
-            <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
-                {{ t('components.wizards.generate.noFans') }}
-            </div>
-            <div
-                v-for="(row, index) in fanRows"
-                :key="row.deviceUID + row.channelName"
-                class="flex items-center justify-between gap-x-3"
-            >
-                <div class="flex items-center min-w-0">
-                    <span class="pi pi-minus mr-2 ml-1" :style="{ color: row.color }" />
-                    <span class="truncate">{{ row.label }}</span>
-                </div>
-                <Select
-                    v-model="fanRows[index].kind"
-                    :options="kindOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="w-56 h-10"
-                    show-clear
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :placeholder="t('components.wizards.generate.skip')"
-                />
-            </div>
-        </div>
-
-        <!-- Step 2: key temps -->
-        <div v-else-if="step === 2" class="flex flex-col gap-y-3">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.tempsIntro') }}
-            </small>
-            <div
-                v-for="picker in [
-                    { label: t('components.wizards.generate.cpuTemp'), model: 'cpu' },
-                    { label: t('components.wizards.generate.gpuTemp'), model: 'gpu' },
-                    { label: t('components.wizards.generate.liquidTemp'), model: 'liquid' },
-                    { label: t('components.wizards.generate.ambientTemp'), model: 'ambient' },
-                ]"
-                :key="picker.model"
-                class="flex items-center justify-between gap-x-3"
-            >
-                <span class="ml-1">{{ picker.label }}</span>
-                <Select
-                    v-if="picker.model === 'cpu'"
-                    v-model="cpuTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                />
-                <Select
-                    v-else-if="picker.model === 'gpu'"
-                    v-model="gpuTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                />
-                <Select
-                    v-else-if="picker.model === 'liquid'"
-                    v-model="liquidTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                />
-                <Select
-                    v-else
-                    v-model="ambientTemp"
-                    :pt="selectPt"
-                    :pt-options="{ mergeProps: true }"
-                    :options="tempGroups"
-                    option-label="label"
-                    option-group-label="deviceName"
-                    option-group-children="temps"
-                    class="w-64 h-10"
-                    show-clear
-                    filter
-                    :filter-placeholder="t('common.search')"
-                    :placeholder="t('components.wizards.generate.tempNone')"
-                />
-            </div>
-        </div>
-
-        <!-- Step 3: preset -->
-        <div v-else-if="step === 3" class="flex flex-col gap-y-4">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.presetIntro') }}
-            </small>
-            <SelectButton
-                v-model="globalPreset"
-                :options="presetOptions"
-                :allow-empty="false"
-                class="self-start"
-            />
-            <button
-                class="ml-1 text-sm text-text-color-secondary hover:text-text-color self-start"
-                @click="overridesOpen = !overridesOpen"
-            >
-                {{ t('components.wizards.generate.perKindOverrides') }}
-            </button>
-            <div v-if="overridesOpen" class="flex flex-col gap-y-2">
-                <div
-                    v-for="(row, index) in overrideRows"
-                    :key="row.key"
-                    class="flex items-center justify-between gap-x-3"
-                >
-                    <span class="ml-1">{{ row.label }}</span>
-                    <SelectButton
-                        v-model="overrideRows[index].preset"
-                        :options="presetOptions"
-                        :allow-empty="false"
-                    />
-                </div>
-            </div>
-            <small class="ml-1 font-light text-xs text-text-color-secondary">
-                {{ t('components.wizards.generate.cfmCaveat') }}
-            </small>
-        </div>
-
-        <!-- Step 4: preview -->
-        <div v-else class="flex flex-col gap-y-3 overflow-y-auto">
-            <small class="ml-1 font-light text-sm">
-                {{ t('components.wizards.generate.previewIntro') }}
-            </small>
-
-            <!-- Fan assignments -->
-            <div class="flex flex-col gap-y-1">
-                <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
-                    {{ t('components.wizards.generate.previewAssignments') }}
-                </div>
-                <div
-                    v-for="assignment in proposal?.assignments ?? []"
-                    :key="assignment.device_uid + assignment.channel_name"
-                    class="flex items-start justify-between gap-x-3 ml-1"
-                >
-                    <span class="truncate">{{
-                        fanLabel(assignment.device_uid, assignment.channel_name)
-                    }}</span>
-                    <div class="text-right">
-                        <span class="font-bold">{{
-                            profileNameByUid(assignment.profile_uid)
-                        }}</span>
-                        <span
-                            v-if="
-                                currentProfileName(assignment.device_uid, assignment.channel_name)
-                            "
-                            class="block text-xs text-yellow-500"
+    <div class="flex flex-col min-w-96 w-[40vw] h-[70vh]">
+        <div class="min-h-0 flex-1">
+            <UiScrollArea surface="two">
+                <!-- Step 1: assign fans -->
+                <div v-if="step === 1" class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.assignIntro') }}
+                    </small>
+                    <button
+                        type="button"
+                        class="ml-1 self-start text-sm text-text-color-secondary hover:underline"
+                        @click="calibrateFansFirst"
+                    >
+                        {{ t('components.wizards.generate.calibrateFirst') }}
+                    </button>
+                    <div v-if="fanRows.length === 0" class="ml-1 text-text-color-secondary">
+                        {{ t('components.wizards.generate.noFans') }}
+                    </div>
+                    <template v-for="group in fanGroups" :key="group.deviceUID">
+                        <PanelHeader :label="group.deviceName" />
+                        <div
+                            v-for="row in group.rows"
+                            :key="row.deviceUID + row.channelName"
+                            class="flex items-center justify-between gap-x-3"
                         >
-                            {{
-                                t('components.wizards.generate.replaces', {
-                                    name: currentProfileName(
-                                        assignment.device_uid,
-                                        assignment.channel_name,
-                                    ),
-                                })
-                            }}
-                        </span>
+                            <div class="flex items-center min-w-0">
+                                <svg-icon
+                                    type="mdi"
+                                    :path="mdiMinus"
+                                    :size="16"
+                                    class="mr-2 ml-1"
+                                    :style="{ color: row.color }"
+                                />
+                                <span class="truncate">{{ row.label }}</span>
+                            </div>
+                            <UiSelect
+                                :model-value="row.kind ?? undefined"
+                                :options="kindOptions"
+                                clearable
+                                :placeholder="t('components.wizards.generate.skip')"
+                                class="w-56"
+                                @update:model-value="setFanKind(row, $event)"
+                            />
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Step 2: key temps -->
+                <div v-else-if="step === 2" class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.tempsIntro') }}
+                    </small>
+                    <div
+                        v-for="picker in [
+                            { label: t('components.wizards.generate.cpuTemp'), model: 'cpu' },
+                            { label: t('components.wizards.generate.gpuTemp'), model: 'gpu' },
+                            { label: t('components.wizards.generate.liquidTemp'), model: 'liquid' },
+                            {
+                                label: t('components.wizards.generate.ambientTemp'),
+                                model: 'ambient',
+                            },
+                        ]"
+                        :key="picker.model"
+                        class="flex items-center justify-between gap-x-3"
+                    >
+                        <span class="ml-1">{{ picker.label }}</span>
+                        <UiGroupedSelect
+                            v-if="picker.model === 'cpu'"
+                            v-model="cpuTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                        <UiGroupedSelect
+                            v-else-if="picker.model === 'gpu'"
+                            v-model="gpuTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                        <UiGroupedSelect
+                            v-else-if="picker.model === 'liquid'"
+                            v-model="liquidTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
+                        <UiGroupedSelect
+                            v-else
+                            v-model="ambientTempKey"
+                            :groups="tempOptionGroups"
+                            clearable
+                            filter
+                            :filter-placeholder="t('common.search')"
+                            :placeholder="t('components.wizards.generate.tempNone')"
+                            class="w-64"
+                        />
                     </div>
                 </div>
-            </div>
 
-            <!-- Will be created -->
-            <div class="flex flex-col gap-y-1">
-                <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
-                    {{ t('components.wizards.generate.willCreateHeader') }}
-                </div>
-                <div class="flex items-start gap-x-2 ml-1 mb-1">
-                    <svg-icon
-                        type="mdi"
-                        class="shrink-0 mt-0.5"
-                        :path="mdiInformationSlabCircleOutline"
-                        :size="deviceStore.getREMSize(1.2)"
+                <!-- Step 3: preset -->
+                <div v-else-if="step === 3" class="flex flex-col gap-y-4">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.presetIntro') }}
+                    </small>
+                    <UiToggleGroup
+                        v-model="globalPresetModel"
+                        :options="presetToggleOptions"
+                        class="self-start"
                     />
-                    <span class="text-sm">
-                        {{ t('components.wizards.generate.startingPointNote') }}
-                    </span>
+                    <button
+                        class="ml-1 text-sm text-text-color-secondary hover:text-text-color self-start"
+                        @click="overridesOpen = !overridesOpen"
+                    >
+                        {{ t('components.wizards.generate.perKindOverrides') }}
+                    </button>
+                    <div v-if="overridesOpen" class="flex flex-col gap-y-2">
+                        <div
+                            v-for="(row, index) in overrideRows"
+                            :key="row.key"
+                            class="flex items-center justify-between gap-x-3"
+                        >
+                            <span class="ml-1">{{ row.label }}</span>
+                            <UiToggleGroup
+                                :model-value="overrideRows[index].preset"
+                                :options="presetToggleOptions"
+                                @update:model-value="setOverridePreset(index, $event)"
+                            />
+                        </div>
+                    </div>
+                    <small class="ml-1 font-light text-xs text-text-color-secondary">
+                        {{ t('components.wizards.generate.cfmCaveat') }}
+                    </small>
                 </div>
-                <div
-                    v-for="profile in proposal?.profiles ?? []"
-                    :key="profile.uid"
-                    class="flex items-center justify-between gap-x-3 ml-1 text-sm"
-                >
-                    <span class="truncate">{{ profile.name }}</span>
-                    <span class="shrink-0 text-text-color-secondary">{{
-                        `${getProfileTypeDisplayName(profile.p_type)} ${t('layout.add.profile')}`
-                    }}</span>
+
+                <!-- Step 4: preview -->
+                <div v-else class="flex flex-col gap-y-3">
+                    <small class="ml-1 font-light text-sm">
+                        {{ t('components.wizards.generate.previewIntro') }}
+                    </small>
+
+                    <!-- Fan assignments -->
+                    <div class="flex flex-col gap-y-1">
+                        <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
+                            {{ t('components.wizards.generate.previewAssignments') }}
+                        </div>
+                        <div
+                            v-for="assignment in proposal?.assignments ?? []"
+                            :key="assignment.device_uid + assignment.channel_name"
+                            class="flex items-start justify-between gap-x-3 ml-1"
+                        >
+                            <div class="flex min-w-0 items-baseline gap-x-2">
+                                <span class="truncate">{{
+                                    fanLabel(assignment.device_uid, assignment.channel_name)
+                                }}</span>
+                                <span class="truncate text-sm text-text-color-secondary">{{
+                                    deviceLabel(assignment.device_uid)
+                                }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="font-bold">{{
+                                    profileNameByUid(assignment.profile_uid)
+                                }}</span>
+                                <span
+                                    v-if="
+                                        currentProfileName(
+                                            assignment.device_uid,
+                                            assignment.channel_name,
+                                        )
+                                    "
+                                    class="block text-xs text-warning"
+                                >
+                                    {{
+                                        t('components.wizards.generate.replaces', {
+                                            name: currentProfileName(
+                                                assignment.device_uid,
+                                                assignment.channel_name,
+                                            ),
+                                        })
+                                    }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reused: already exists, so nothing is created for it -->
+                    <div v-if="reusedProfileNames.length > 0" class="flex flex-col gap-y-1">
+                        <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
+                            {{ t('components.wizards.generate.reusedHeader') }}
+                        </div>
+                        <div
+                            v-for="name in reusedProfileNames"
+                            :key="name"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ name }}</span>
+                            <span class="shrink-0 text-text-color-secondary">
+                                {{ t('components.wizards.generate.reused') }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Will be created -->
+                    <div v-if="anyEntityCreated" class="flex flex-col gap-y-1">
+                        <div class="ml-1 pb-1 border-b border-border-one text-sm font-semibold">
+                            {{ t('components.wizards.generate.willCreateHeader') }}
+                        </div>
+                        <!-- A warning, not an aside: a generated setup nearly always needs
+                             tweaking, and the user should know that before creating it. -->
+                        <div class="flex items-start gap-x-2 ml-1 mb-1">
+                            <svg-icon
+                                type="mdi"
+                                class="shrink-0 mt-0.5 text-warning"
+                                :path="mdiAlertOutline"
+                                :size="deviceStore.getREMSize(1.2)"
+                            />
+                            <span class="text-sm">
+                                {{ t('components.wizards.generate.startingPointNote') }}
+                            </span>
+                        </div>
+                        <div
+                            v-for="profile in proposal?.profiles ?? []"
+                            :key="profile.uid"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ profile.name }}</span>
+                            <span class="shrink-0 text-text-color-secondary">{{
+                                `${getProfileTypeDisplayName(profile.p_type)} ${t('layout.add.profile')}`
+                            }}</span>
+                        </div>
+                        <div
+                            v-for="fn in proposal?.functions ?? []"
+                            :key="fn.uid"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ fn.name }}</span>
+                            <span class="shrink-0 text-text-color-secondary">{{
+                                t('layout.add.function')
+                            }}</span>
+                        </div>
+                        <div
+                            v-for="sensor in proposal?.custom_sensors ?? []"
+                            :key="sensor.id"
+                            class="flex items-center justify-between gap-x-3 ml-1 text-sm"
+                        >
+                            <span class="truncate">{{ sensor.id }}</span>
+                            <span class="shrink-0 text-text-color-secondary">{{
+                                t('layout.add.customSensor')
+                            }}</span>
+                        </div>
+                        <small
+                            v-if="anyCaseFanAssigned()"
+                            class="ml-1 mt-1 font-light text-xs text-text-color-secondary"
+                        >
+                            {{ t('components.wizards.generate.cfmCaveat') }}
+                        </small>
+                    </div>
                 </div>
-                <div
-                    v-for="fn in proposal?.functions ?? []"
-                    :key="fn.uid"
-                    class="flex items-center justify-between gap-x-3 ml-1 text-sm"
-                >
-                    <span class="truncate">{{ fn.name }}</span>
-                    <span class="shrink-0 text-text-color-secondary">{{
-                        t('layout.add.function')
-                    }}</span>
-                </div>
-                <div
-                    v-for="sensor in proposal?.custom_sensors ?? []"
-                    :key="sensor.id"
-                    class="flex items-center justify-between gap-x-3 ml-1 text-sm"
-                >
-                    <span class="truncate">{{ sensor.id }}</span>
-                    <span class="shrink-0 text-text-color-secondary">{{
-                        t('layout.add.customSensor')
-                    }}</span>
-                </div>
-                <small
-                    v-if="anyCaseFanAssigned()"
-                    class="ml-1 mt-1 font-light text-xs text-text-color-secondary"
-                >
-                    {{ t('components.wizards.generate.cfmCaveat') }}
-                </small>
-            </div>
+            </UiScrollArea>
         </div>
 
         <!-- Footer -->
-        <div class="flex flex-row justify-between mt-4">
-            <Button
-                v-if="step === 1"
-                class="w-24 bg-bg-one"
-                :label="t('common.cancel')"
-                @click="closeDialog"
-            />
-            <Button
-                v-else
-                class="w-24 bg-bg-one"
-                :label="t('common.back')"
-                @click="step = step - 1"
-            >
+        <div class="flex flex-row justify-between mt-4 shrink-0">
+            <UiButton v-if="step === 1" variant="ghost" class="w-24 bg-bg-one" @click="closeDialog">
+                {{ t('common.cancel') }}
+            </UiButton>
+            <UiButton v-else variant="ghost" class="w-24 bg-bg-one" @click="step = step - 1">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-if="step === 1"
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 :disabled="assignedCount() === 0"
                 @click="step = 2"
-            />
-            <Button
+            >
+                {{ t('common.next') }}
+            </UiButton>
+            <UiButton
                 v-else-if="step === 2"
+                variant="ghost"
                 class="w-24 bg-bg-one"
-                :label="t('common.next')"
                 @click="goToPresets"
-            />
-            <Button
+            >
+                {{ t('common.next') }}
+            </UiButton>
+            <UiButton
                 v-else-if="step === 3"
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('components.wizards.generate.preview')"
+                variant="solid"
+                class="w-32"
                 :disabled="assignedCount() === 0 || building"
                 @click="buildPreview"
             >
@@ -676,11 +793,11 @@ const createAndApply = async (): Promise<void> => {
                     :path="mdiAutoFix"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
+            </UiButton>
+            <UiButton
                 v-else
-                class="bg-accent/80 hover:!bg-accent w-40"
-                :label="t('components.wizards.generate.createApply')"
+                variant="solid"
+                class="w-40"
                 :disabled="applying"
                 @click="createAndApply"
             >
@@ -690,7 +807,7 @@ const createAndApply = async (): Promise<void> => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

@@ -1,8 +1,8 @@
 [package]
 name = "cc-detect"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "Super-I/O hardware detection"
 categories = ["hardware-support"]
 keywords = ["sensors", "hardware", "drivers"]
@@ -18,3 +18,8 @@ doctest = false
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 log = "0.4"
+
+# Nested `if` is deliberate per RUST_STYLE.md: compound conditions are split so each
+# case stays individually visible. Matches the daemon crate.
+[lints.clippy]
+collapsible_if = "allow"

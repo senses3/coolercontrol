@@ -1,29 +1,16 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { onMounted, onUnmounted, ref } from 'vue'
+import { mdiAlertOutline } from '@mdi/js'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
-import { useToast } from 'primevue/usetoast'
-import { useConfirm } from 'primevue/useconfirm'
+import { useToast } from '@/shell/toast'
+import { useConfirm } from '@/shell/confirm'
 import { useI18n } from 'vue-i18n'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
 import { validatePluginFetchPath, buildSafeOptions } from '@/composables/pluginFetchValidation.ts'
+import { THEME_CSS_VAR_NAMES } from '@/shell/themes.ts'
 
 export type PluginIframeMode = 'modal' | 'full_page'
 
@@ -93,7 +80,7 @@ export function usePluginIframe(pluginId: string, mode: PluginIframeMode) {
         confirm.require({
             message: t('layout.topbar.restartConfirmMessage'),
             header: t('layout.topbar.restartConfirmHeader'),
-            icon: 'pi pi-exclamation-triangle',
+            icon: mdiAlertOutline,
             defaultFocus: 'accept',
             accept: async () => {
                 const successful = await deviceStore.daemonClient.shutdownDaemon()
@@ -136,16 +123,16 @@ export function usePluginIframe(pluginId: string, mode: PluginIframeMode) {
             case 'customStyle': {
                 // Always read the resolved CSS variable values from the parent document so
                 // the iframe gets the correct colours for any theme (not just Custom).
+                // Sent from the theme's own variable list rather than a copy of it here, so
+                // a token added to a theme reaches plugin UIs instead of silently resolving
+                // to nothing in an iframe that asked for it.
                 const rootStyle = getComputedStyle(document.documentElement)
-                const getVar = (name: string): string => rootStyle.getPropertyValue(name).trim()
-                const customStyle = {
-                    '--colors-accent': getVar('--colors-accent'),
-                    '--colors-bg-one': getVar('--colors-bg-one'),
-                    '--colors-bg-two': getVar('--colors-bg-two'),
-                    '--colors-border-one': getVar('--colors-border-one'),
-                    '--colors-text-color': getVar('--colors-text-color'),
-                    '--colors-text-color-secondary': getVar('--colors-text-color-secondary'),
-                }
+                const customStyle = Object.fromEntries(
+                    THEME_CSS_VAR_NAMES.map((name) => [
+                        name,
+                        rootStyle.getPropertyValue(name).trim(),
+                    ]),
+                )
                 postToIframe('customStyle', customStyle)
                 break
             }

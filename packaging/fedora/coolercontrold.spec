@@ -5,12 +5,12 @@
 %global cargo_install_lib 0
 
 Name:           %{project}d
-Version:        4.3.1
+Version:        5.0.0
 Release:        %{?autorelease}%{!?autorelease:0%{?dist}}
 Summary:        Powerful cooling control and monitoring
 Obsoletes:      coolercontrol-liqctld <= 2.2.2
 ExclusiveArch:  x86_64 aarch64
-License:        GPL-3.0-or-later
+License:        GPL-3.0-or-later AND OFL-1.1
 URL:            https://gitlab.com/%{project}/%{project}
 
 BuildRequires:  systemd-rpm-macros
@@ -77,6 +77,9 @@ popd
 %systemd_postun_with_restart %{name}.service
 
 %changelog
+* Sun Sep 06 2026 Guy Boldon <gb@guyboldon.com> - 5.0.0-1
+- 5.0.0 Release
+
 * Sat May 23 2026 Guy Boldon <gb@guyboldon.com> - 4.3.1-1
 - 4.3.1 Release
 

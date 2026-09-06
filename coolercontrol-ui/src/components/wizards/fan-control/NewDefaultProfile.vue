@@ -1,32 +1,19 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
 import { mdiArrowLeft, mdiContentSaveOutline } from '@mdi/js'
-import Button from 'primevue/button'
+import UiButton from '@/shell/ui/UiButton.vue'
 import { UID } from '@/models/Device.ts'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import { DeviceSettingWriteProfileDTO } from '@/models/DaemonSettings.ts'
 import { Profile, ProfileType } from '@/models/Profile.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { Emitter, EventType } from 'mitt'
 import { inject } from 'vue'
 import { v4 as uuidV4 } from 'uuid'
@@ -98,17 +85,17 @@ const saveSetting = async () => {
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32"
                 v-tooltip.top="t('views.speed.applySetting')"
                 @click="saveSetting"
             >
@@ -118,7 +105,7 @@ const saveSetting = async () => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

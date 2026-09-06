@@ -25,11 +25,7 @@
 Powerful cooling control and monitoring for Linux 🐧
 </p>
 
-<!-- trunk-ignore-begin(markdownlint/MD045): links with emojis -->
-
-![](screenshots/coolercontrol.webm)
-
-<!-- trunk-ignore-end(markdownlint/MD045): links with emojis -->
+![CoolerControl on desktop and mobile](screenshots/coolercontrol-collage.webp)
 
 <!-- <img src="screenshots/coolercontrol-overview.png" alt="Screenshot" width="700"/> -->
 
@@ -42,7 +38,7 @@ Powerful cooling control and monitoring for Linux 🐧
 
 [Install](https://docs.coolercontrol.org/getting-started.html) &middot;
 [Hardware Support](https://docs.coolercontrol.org/hardware-support.html) &middot;
-[Documentation](https://coolercontrol.org) &middot; [Discord](https://discord.gg/MbcgUFAfhV)
+[Documentation](https://docs.coolercontrol.org) &middot; [Discord](https://discord.gg/MbcgUFAfhV)
 
 <!-- trunk-ignore-end(markdownlint/MD051): links with emojis -->
 
@@ -54,6 +50,9 @@ Powerful cooling control and monitoring for Linux 🐧
 CoolerControl is an open-source application for monitoring and controlling supported cooling devices
 on Linux. It features a system daemon with a built-in Web UI, an optional desktop app, and a
 comprehensive REST API.
+
+**New in 5.0**: see
+[What's New in CoolerControl 5.0](https://gitlab.com/coolercontrol/coolercontrol/-/blob/main/.gitlab/release-notes/5.0.0.md).
 
 ## Features
 
@@ -68,8 +67,26 @@ comprehensive REST API.
 - Headless and remote access support
 - Reapplies settings after sleep
 
-For the full feature set and configuration guides, see the
-[documentation](https://coolercontrol.org).
+## Documentation
+
+The full documentation lives at [docs.coolercontrol.org](https://docs.coolercontrol.org).
+
+- 🚀 [Getting Started](https://docs.coolercontrol.org/getting-started.html) install and first-time
+  setup
+- 🧰 [Hardware Support](https://docs.coolercontrol.org/hardware-support.html) motherboards, USB AIOs
+  and fan hubs, NVIDIA and AMD GPUs, laptops, HDDs
+- 🧙 [Cooling Configuration](https://docs.coolercontrol.org/config-basic/controls.html) controls,
+  profiles, functions, dashboards, and alerts
+- 🎯
+  [Advanced Configuration](https://docs.coolercontrol.org/config-advanced/profile-control-flow.html)
+  control flow, custom sensors, mix and overlay profiles, modes, tags, stress tests, and calibration
+- 👨🏻‍🔧 [Daemon Configuration](https://docs.coolercontrol.org/daemon/config-files.html) headless
+  servers, remote access, TLS, reverse proxies, and startup
+- 🦾 [Plugins & Automation](https://docs.coolercontrol.org/automation/plugins.html) plugins,
+  scripting, and power profile sync
+- 👨‍💻 [Development](https://docs.coolercontrol.org/development/rest.html) REST API, gRPC API,
+  Prometheus metrics, and plugin development
+- ❓ [FAQ](https://docs.coolercontrol.org/wiki/faq.html)
 
 ## Installation
 
@@ -84,14 +101,14 @@ motherboard fans, USB AIOs, GPU fan control, laptops, and HDDs.
 
 ## Problems and Questions
 
-- Open an [issue on GitLab](https://gitlab.com/coolercontrol/coolercontrol/-/issues) using one of
-  the provided templates. Daemon logs are invaluable for bug reports.
+- Open an [issue on GitLab](https://gitlab.com/coolercontrol/coolercontrol/-/work_items) using one
+  of the provided templates. Daemon logs are invaluable for bug reports.
 - Join the [Discord](https://discord.gg/MbcgUFAfhV) for general questions and community support.
 
 ## Contributing
 
 Contributions are welcome. Please open an
-[issue](https://gitlab.com/coolercontrol/coolercontrol/-/issues/) or discuss on
+[issue](https://gitlab.com/coolercontrol/coolercontrol/-/work_items) or discuss on
 [Discord](https://discord.gg/MbcgUFAfhV) before submitting changes. See the
 [contributing guidelines](https://gitlab.com/coolercontrol/coolercontrol/-/blob/main/CONTRIBUTING.md)
 for details.

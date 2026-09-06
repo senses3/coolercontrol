@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::actor::{run_api_actor, ApiActor};
 use crate::device_health::{DeviceHealthController, DeviceHealthDto, HealthEvent};
@@ -61,6 +46,8 @@ impl ApiActor<DeviceHealthMessage> for DeviceHealthActor {
         &mut self.receiver
     }
 
+    // The trait declares this async; a body that happens not to await cannot drop it.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn handle_message(&mut self, msg: DeviceHealthMessage) {
         match msg {
             DeviceHealthMessage::GetAll { respond_to } => {
@@ -74,6 +61,7 @@ impl ApiActor<DeviceHealthMessage> for DeviceHealthActor {
 pub struct DeviceHealthHandle {
     sender: mpsc::Sender<DeviceHealthMessage>,
     broadcaster: broadcast::Sender<HealthEvent>,
+    cancel_token: CancellationToken,
 }
 
 impl DeviceHealthHandle {
@@ -87,6 +75,7 @@ impl DeviceHealthHandle {
         let handle = Self {
             sender,
             broadcaster,
+            cancel_token: cancel_token.clone(),
         };
         controller.set_handle(handle.clone());
         let actor = DeviceHealthActor::new(receiver, controller);
@@ -94,20 +83,30 @@ impl DeviceHealthHandle {
         handle
     }
 
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancel_token.clone()
+    }
+
     pub async fn get_all(&self) -> DeviceHealthDto {
         let (tx, rx) = oneshot::channel();
         let msg = DeviceHealthMessage::GetAll { respond_to: tx };
         if self.sender.send(msg).await.is_err() {
             return DeviceHealthDto {
-                failsafe: Vec::with_capacity(0),
-                missing: Vec::with_capacity(0),
-                stale_source: Vec::with_capacity(0),
+                failsafe: Vec::new(),
+                missing: Vec::new(),
+                stale_source: Vec::new(),
+                firmware_overrides: Vec::new(),
+                channel_capabilities: Vec::new(),
+                system_findings: Vec::new(),
             };
         }
         rx.await.unwrap_or(DeviceHealthDto {
-            failsafe: Vec::with_capacity(0),
-            missing: Vec::with_capacity(0),
-            stale_source: Vec::with_capacity(0),
+            failsafe: Vec::new(),
+            missing: Vec::new(),
+            stale_source: Vec::new(),
+            firmware_overrides: Vec::new(),
+            channel_capabilities: Vec::new(),
+            system_findings: Vec::new(),
         })
     }
 

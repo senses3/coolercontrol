@@ -1,28 +1,23 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon'
-import { mdiArrowLeft, mdiInformationSlabCircleOutline } from '@mdi/js'
+import {
+    mdiArrowExpand,
+    mdiArrowLeft,
+    mdiMinus,
+    mdiPlus,
+    mdiPlusCircleOutline,
+    mdiTrashCanOutline,
+} from '@mdi/js'
 import { Profile, ProfileType } from '@/models/Profile.ts'
 import { useI18n } from 'vue-i18n'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
+import type { TablePosition } from '@/models/UISettings.ts'
 import * as echarts from 'echarts/core'
 import {
     DataZoomComponent,
@@ -40,9 +35,9 @@ import VChart from 'vue-echarts'
 import type { GraphicComponentLooseOption } from 'echarts/types/dist/shared.d.ts'
 import { useThemeColorsStore } from '@/stores/ThemeColorsStore.ts'
 import { computed, onMounted, onUnmounted, ref, Ref, watch, type WatchStopHandle } from 'vue'
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
 import _ from 'lodash'
+import UiButton from '@/shell/ui/UiButton.vue'
+import HelpIcon from '@/components/info/HelpIcon.vue'
 
 echarts.use([
     GridComponent,
@@ -275,6 +270,8 @@ const option = {
             yAxisIndex: 0,
             filterMode: 'none',
             preventDefaultMouseMove: false,
+            zoomOnMouseWheel: 'ctrl',
+            moveOnMouseWheel: false,
             minValueSpan: 20,
             throttle: 25,
         },
@@ -584,6 +581,7 @@ const createDraggableGraphics = (): void => {
     // Add shadow circles (which is not visible) to enable drag.
     createGraphicDataFromPointData()
     controlGraph.value?.setOption({ graphic: graphicData })
+    graphicsCreated = true
 }
 
 const addPointToLine = (params: any) => {
@@ -712,12 +710,15 @@ const deletePointFromLine = (params: any) => {
 const MIN_DUTY_SEPARATION = 1
 
 // Points table position (local state, not persisted)
-type TablePosition = 'top-left' | 'bottom-right'
-const tablePosition: Ref<TablePosition> = ref('top-left')
+// The wizard's profile has no UID yet, so its table position cannot be keyed to one: it opens at
+// the default and a move lasts for this wizard run.
+const tablePosition: Ref<TablePosition> = ref('bottom-right')
 
 const tablePositionClasses = computed(() => ({
-    'top-14 left-[7.5rem]': tablePosition.value === 'top-left',
-    'bottom-20 right-[4.5rem]': tablePosition.value === 'bottom-right',
+    'left-[8.75rem] top-[3.25rem]': tablePosition.value === 'top-left',
+    // Clears the x-axis name and the last duty label, which sit below and right of the plot area:
+    // the graph editors' 7rem right offset, and enough bottom to stay off the axis line.
+    'bottom-[7rem] right-[7rem]': tablePosition.value === 'bottom-right',
 }))
 
 const cycleTablePosition = () => {
@@ -799,13 +800,13 @@ const handleOffsetTableScroll = (event: WheelEvent, idx: number): void => {
 
 // Direct input handlers for table cells
 const handleDutyTableInput = (idx: number, value: number | null): void => {
-    if (value == null || idx === 0 || idx === data.length - 1) return
+    if (value == null || Number.isNaN(value) || idx === 0 || idx === data.length - 1) return
     const clampedDuty = Math.max(getPointDutyMin(idx), Math.min(value, getPointDutyMax(idx)))
     updatePointFromTable(idx, clampedDuty, data[idx].value[1])
 }
 
 const handleOffsetTableInput = (idx: number, value: number | null): void => {
-    if (value == null) return
+    if (value == null || Number.isNaN(value)) return
     const clampedOffset = Math.max(offsetMin, Math.min(value, offsetMax))
     updatePointFromTable(idx, data[idx].value[0], clampedOffset)
 }
@@ -1050,6 +1051,9 @@ const updateResponsiveGraphHeight = (): void => {
     }
 }
 const updatePosition = (): void => {
+    if (!graphicsCreated) {
+        return
+    }
     controlGraph.value?.setOption({
         graphic: data.map((item, dataIndex) => ({
             id: dataIndex,
@@ -1065,6 +1069,19 @@ const addScrollEventListeners = (): void => {
     // @ts-ignore
     document?.querySelector('.offset-input')?.addEventListener('wheel', offsetScrolled)
 }
+
+// Held at module scope so onUnmounted can reach them. The observer is created inside a
+// delayed timeout, so unmounting before it fires would otherwise strand an observer that
+// nothing can ever disconnect.
+let resizeObserver: ResizeObserver | null = null
+let debouncedUpdatePosition: _.DebouncedFunc<() => void> | null = null
+// The drag circles only exist once createDraggableGraphics has run. A
+// position-only update before that asks ECharts to create a graphic with no
+// type, which throws and leaves the layer broken. The shell swaps its whole
+// tree at 768px, so a narrow drag remounts this view and lands in that window
+// on every resize event until the circles are back.
+let graphicsCreated = false
+let graphicsTimeout: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
     // Make sure on selected Point change, that there is only one.
@@ -1090,24 +1107,10 @@ onMounted(async () => {
     window.addEventListener('resize', updatePosition)
     addScrollEventListeners()
 
-    setTimeout(() => {
+    graphicsTimeout = setTimeout(() => {
         // debounce because we need to wait for the graph to be rendered
-        const resizeObserver = new ResizeObserver(
-            _.debounce(
-                () => {
-                    controlGraph.value?.setOption({
-                        graphic: data.map(function (item, _dataIndex) {
-                            return {
-                                type: 'circle',
-                                position: controlGraph.value?.convertToPixel('grid', item.value),
-                            }
-                        }),
-                    })
-                },
-                200,
-                { leading: false },
-            ),
-        )
+        debouncedUpdatePosition = _.debounce(updatePosition, 200, { leading: false })
+        resizeObserver = new ResizeObserver(debouncedUpdatePosition)
         resizeObserver.observe(controlGraph.value?.$el)
         createDraggableGraphics() // we need to create AFTER the element is visible and rendered
     }, 500) // due to graph resizing, we really need a substantial delay on creation
@@ -1115,6 +1118,15 @@ onMounted(async () => {
 onUnmounted(() => {
     window.removeEventListener('resize', updateResponsiveGraphHeight)
     window.removeEventListener('resize', updatePosition)
+    if (graphicsTimeout !== null) {
+        clearTimeout(graphicsTimeout)
+        graphicsTimeout = null
+    }
+    resizeObserver?.disconnect()
+    resizeObserver = null
+    debouncedUpdatePosition?.cancel()
+    debouncedUpdatePosition = null
+    graphicsCreated = false
 })
 
 const nextStep = () => {
@@ -1148,14 +1160,15 @@ const nextStep = () => {
                     <span class="font-semibold text-text-color cursor-default">{{
                         t('views.profiles.points')
                     }}</span>
-                    <Button
-                        @click="cycleTablePosition"
-                        icon="pi pi-arrow-up-right-and-arrow-down-left-from-center rotate-90"
-                        text
-                        rounded
-                        class="!w-7 !h-7 !p-0"
+                    <UiButton
+                        variant="ghost"
+                        size="icon"
+                        class="!h-7 !w-7 !p-0"
                         v-tooltip.top="t('views.profiles.moveTable')"
-                    />
+                        @click="cycleTablePosition"
+                    >
+                        <svg-icon type="mdi" :path="mdiArrowExpand" :size="16" class="rotate-90" />
+                    </UiButton>
                 </div>
                 <table class="w-full">
                     <thead class="sticky top-7 bg-bg-two/95 cursor-default">
@@ -1192,11 +1205,10 @@ const nextStep = () => {
                                         handleDutyTableScroll($event, idx)
                                     "
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -1207,30 +1219,29 @@ const nextStep = () => {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="point.value[0]"
-                                        @update:modelValue="handleDutyTableInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="0"
-                                        :maxFractionDigits="0"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="point.value[0]"
                                         :min="getPointDutyMin(idx)"
                                         :max="getPointDutyMax(idx)"
-                                        :suffix="t('common.percentUnit')"
+                                        step="1"
                                         :disabled="idx === 0 || idx === data.length - 1"
-                                        :inputStyle="{
-                                            width: '3rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        @change="
+                                            handleDutyTableInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="
                                             idx === 0 ||
                                             idx === data.length - 1 ||
@@ -1241,7 +1252,9 @@ const nextStep = () => {
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
                                 </div>
                             </td>
 
@@ -1251,73 +1264,81 @@ const nextStep = () => {
                                     class="flex items-center justify-center gap-0.5"
                                     @wheel.prevent="handleOffsetTableScroll($event, idx)"
                                 >
-                                    <Button
-                                        icon="pi pi-minus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="data[idx].value[1] <= offsetMin"
                                         @pointerdown.stop="
                                             startRepeat(() => decrementPointOffset(idx))
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
-                                    <InputNumber
-                                        :modelValue="Math.round(point.value[1]) || 0"
-                                        @update:modelValue="handleOffsetTableInput(idx, $event)"
-                                        @focus="selectPointFromTable(idx)"
-                                        mode="decimal"
-                                        :minFractionDigits="0"
-                                        :maxFractionDigits="0"
+                                    >
+                                        <svg-icon type="mdi" :path="mdiMinus" :size="10" />
+                                    </UiButton>
+                                    <input
+                                        type="number"
+                                        class="table-input h-6 w-[3.5rem] rounded bg-transparent px-0.5 text-center text-text-color outline-none focus:bg-bg-one disabled:opacity-60"
+                                        :value="Math.round(point.value[1]) || 0"
                                         :min="offsetMin"
                                         :max="offsetMax"
-                                        :suffix="t('common.percentUnit')"
-                                        :inputStyle="{
-                                            width: '3.5rem',
-                                            textAlign: 'center',
-                                            padding: '0.125rem',
-                                        }"
-                                        class="table-input"
+                                        step="1"
+                                        @change="
+                                            handleOffsetTableInput(
+                                                idx,
+                                                ($event.target as HTMLInputElement).valueAsNumber,
+                                            )
+                                        "
+                                        @focus="selectPointFromTable(idx)"
                                     />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        text
-                                        size="small"
-                                        class="!w-5 !h-5 !p-0 [&>span]:text-[0.6rem]"
+                                    <UiButton
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-5 !w-5 !p-0"
                                         :disabled="data[idx].value[1] >= offsetMax"
                                         @pointerdown.stop="
                                             startRepeat(() => incrementPointOffset(idx))
                                         "
                                         @pointerup.stop="stopRepeat"
                                         @pointerleave="stopRepeat"
-                                    />
+                                    >
+                                        <svg-icon type="mdi" :path="mdiPlus" :size="10" />
+                                    </UiButton>
                                 </div>
                             </td>
 
                             <!-- Action buttons (add/remove) -->
                             <td class="px-1 py-0.5">
                                 <div class="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                                    <Button
+                                    <UiButton
                                         v-if="canAddPointAfter(idx)"
-                                        icon="pi pi-plus-circle"
-                                        text
-                                        severity="success"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !p-0 !text-success"
                                         v-tooltip.top="t('views.profiles.addPointAfter')"
                                         @click.stop="addPointFromTable(idx)"
-                                    />
-                                    <Button
+                                    >
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiPlusCircleOutline"
+                                            :size="16"
+                                        />
+                                    </UiButton>
+                                    <UiButton
                                         v-if="canRemovePoint(idx)"
-                                        icon="pi pi-trash"
-                                        text
-                                        severity="danger"
-                                        size="small"
-                                        class="!w-6 !h-6 !p-0"
+                                        variant="ghost"
+                                        size="icon"
+                                        class="!h-6 !w-6 !p-0 !text-error"
                                         v-tooltip.top="t('views.profiles.removePoint')"
                                         @click.stop="removePointFromTable(idx)"
-                                    />
+                                    >
+                                        <svg-icon
+                                            type="mdi"
+                                            :path="mdiTrashCanOutline"
+                                            :size="16"
+                                        />
+                                    </UiButton>
                                 </div>
                             </td>
                         </tr>
@@ -1326,28 +1347,24 @@ const nextStep = () => {
             </div>
         </div>
         <div class="flex flex-row justify-center mt-4">
-            <div
-                class="p-2 mx-4 leading-none items-center"
-                v-tooltip.top="t('views.profiles.graphProfileMouseActions')"
-            >
-                <svg-icon
-                    type="mdi"
-                    class="h-7"
-                    :path="mdiInformationSlabCircleOutline"
-                    :size="deviceStore.getREMSize(1.25)"
-                />
-            </div>
+            <HelpIcon
+                class="p-2 mx-4"
+                :label="t('common.mouseActions')"
+                :text="t('views.profiles.graphProfileMouseActions')"
+            />
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button class="w-24 bg-bg-one" :label="t('common.next')" @click="nextStep" />
+            </UiButton>
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="nextStep">
+                {{ t('common.next') }}
+            </UiButton>
         </div>
     </div>
 </template>
@@ -1359,21 +1376,14 @@ const nextStep = () => {
     height: max(calc(80vh - 6rem), 20rem);
 }
 
-// Compact styling for points table InputNumber components
-:deep(.table-input) {
-    input {
-        background: transparent;
-        border: none;
-        height: 1.5rem;
-
-        &:focus {
-            box-shadow: none;
-            background: var(--cc-bg-one);
-        }
-
-        &:disabled {
-            opacity: 0.6;
-        }
-    }
+// Points table inputs: no native number spinners.
+.table-input::-webkit-outer-spin-button,
+.table-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.table-input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 </style>

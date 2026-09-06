@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Persistence + in-memory cache for per-channel calibrations.
 //! `RefCell<IndexMap>` populated from JSON; CRUD methods save after
@@ -24,7 +9,7 @@
 use super::curve::Calibration;
 use super::ChannelKey;
 use crate::cc_fs;
-use crate::device::{ChannelName, DeviceUID, Duty, RPM};
+use crate::device::{ChannelName, DeviceUID, Duty, Temp, RPM};
 use crate::paths;
 use anyhow::{anyhow, Result};
 use indexmap::IndexMap;
@@ -110,6 +95,26 @@ impl CalibrationStore {
         calibration.device_to_true_duty(device_duty)
     }
 
+    /// Maps a Graph profile's true-duty points into the device-duty a
+    /// firmware curve expects. `None` when the channel is uncalibrated or
+    /// stepped, so the caller writes the user's points unchanged.
+    pub fn map_curve_points(
+        &self,
+        key: &ChannelKey,
+        points: &[(Temp, Duty)],
+    ) -> Option<Vec<(Temp, Duty)>> {
+        let map = self.calibrations.borrow();
+        let calibration = map.get(key)?;
+        let mut mapped = Vec::with_capacity(points.len());
+        for &(temp, true_duty) in points {
+            // Stepped channels have no forward map.
+            let device_duty = calibration.true_to_device(true_duty)?.sustain;
+            mapped.push((temp, device_duty));
+        }
+        debug_assert_eq!(mapped.len(), points.len());
+        Some(mapped)
+    }
+
     /// Whether the forward map of `true_duty` would land on `device_duty`
     /// for this channel's calibration. False when the channel is
     /// uncalibrated or stepped.
@@ -163,7 +168,7 @@ impl CalibrationStore {
         } else {
             info!("Writing a new Calibration configuration file");
             let default = serde_json::to_string(&CalibrationConfigFile {
-                calibrations: Vec::with_capacity(0),
+                calibrations: Vec::new(),
             })?;
             cc_fs::write_string(&path, default).await.map_err(|err| {
                 anyhow!("Writing new configuration file: {} - {err}", path.display())
@@ -364,6 +369,61 @@ mod tests {
     }
 
     #[test]
+    fn map_curve_points_lifts_true_duty_into_device_duty() {
+        // Goal: a firmware curve is written in device-duty, so the
+        // mapping must lift each true-duty point. Expected values follow
+        // from the fixture's linear curve (rpm = duty * 20, floor 100 rpm
+        // at duty 5): true 10 -> 14, true 50 -> 52. Endpoints stay exact
+        // so an off-point stays off (AMD zero-RPM detection reads it) and
+        // full duty stays full. Temps are untouched.
+        let store = CalibrationStore::empty();
+        let key: ChannelKey = ("dev-a".to_string(), "fan1".to_string());
+        store.insert_unsaved(key.clone(), sample_calibration());
+        let points = vec![(30.0, 0), (50.0, 10), (70.0, 50), (90.0, 100)];
+
+        let mapped = store.map_curve_points(&key, &points).expect("maps");
+
+        assert_eq!(mapped, vec![(30.0, 0), (50.0, 14), (70.0, 52), (90.0, 100)]);
+    }
+
+    #[test]
+    fn map_curve_points_stays_monotonic() {
+        // Goal: the firmware interpolates linearly between the points it
+        // is given, so a non-monotonic mapping would make the curve dip
+        // as temperature rises.
+        let store = CalibrationStore::empty();
+        let key: ChannelKey = ("dev-a".to_string(), "fan1".to_string());
+        store.insert_unsaved(key.clone(), sample_calibration());
+        let points: Vec<(Temp, Duty)> = (0..=100)
+            .map(|duty| (f64::from(duty), u8::try_from(duty).expect("fits")))
+            .collect();
+
+        let mapped = store.map_curve_points(&key, &points).expect("maps");
+
+        for pair in mapped.windows(2) {
+            assert!(
+                pair[1].1 >= pair[0].1,
+                "mapping must not decrease: {pair:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn map_curve_points_none_for_uncalibrated_and_stepped() {
+        // Goal: both cases must return None so the caller writes the
+        // user's own points. Stepped channels have no forward map at all.
+        let store = CalibrationStore::empty();
+        let key: ChannelKey = ("dev-a".to_string(), "fan1".to_string());
+        let points = vec![(30.0, 20), (70.0, 100)];
+        assert!(store.map_curve_points(&key, &points).is_none());
+
+        let mut stepped = sample_calibration();
+        stepped.curve_kind = CurveKind::Stepped;
+        store.insert_unsaved(key.clone(), stepped);
+        assert!(store.map_curve_points(&key, &points).is_none());
+    }
+
+    #[test]
     fn insert_unsaved_then_get_returns_clone() {
         // Goal: the unsaved insertion path puts the value in the cache so
         // subsequent get/has/len observe it. The diagnoser relies on this
@@ -535,7 +595,7 @@ mod tests {
         // must contain an empty calibrations array, not null or absent.
         // A malformed default would block the daemon at startup.
         let file = CalibrationConfigFile {
-            calibrations: Vec::with_capacity(0),
+            calibrations: Vec::new(),
         };
         let json = serde_json::to_string(&file).expect("serializes");
         assert!(json.contains("\"calibrations\":[]"));

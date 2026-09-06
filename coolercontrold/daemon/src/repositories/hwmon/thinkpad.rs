@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::cc_fs;
 use crate::config::Config;
@@ -29,6 +14,12 @@ use std::rc::Rc;
 
 const PWM_ENABLE_THINKPAD_FULL_SPEED: u8 = 0;
 
+/// The `thinkpad_acpi` module rejects every pwm write while its `fan_control`
+/// option is off, which is the usual reason an apply fails on a `ThinkPad`.
+/// Appended to those errors so the log says what to do about it.
+pub const FAN_CONTROL_HINT: &str =
+    " If fan control is disabled for this ThinkPad, enable it on the device's page.";
+
 macro_rules! format_pwm_enable { ($($arg:tt)*) => {{ format!("pwm{}_enable", $($arg)*) }}; }
 
 pub async fn apply_speed_fixed(
@@ -37,21 +28,30 @@ pub async fn apply_speed_fixed(
     channel_info: &HwmonChannelInfo,
     speed_fixed: u8,
 ) -> Result<()> {
-    if speed_fixed == 100 && config.get_settings()?.thinkpad_full_speed {
+    let result = if speed_fixed == 100 && config.get_settings()?.thinkpad_full_speed {
         set_to_full_speed(&hwmon_driver.path, channel_info).await
     } else {
-        set_pwm_enable_if_not_already(PWM_ENABLE_MANUAL_VALUE, &hwmon_driver.path, channel_info)
-            .await?;
-        set_pwm_duty(&hwmon_driver.path, channel_info, speed_fixed)
-            .await
-            .map_err(|err| {
-                anyhow!(
-                    "Error on {}:{} for duty {speed_fixed} - {err}",
-                    hwmon_driver.name,
-                    channel_info.name
-                )
-            })
-    }
+        set_manual_duty(hwmon_driver, channel_info, speed_fixed).await
+    };
+    result.map_err(|err| anyhow!("{err}{FAN_CONTROL_HINT}"))
+}
+
+async fn set_manual_duty(
+    hwmon_driver: &Rc<HwmonDriverInfo>,
+    channel_info: &HwmonChannelInfo,
+    speed_fixed: u8,
+) -> Result<()> {
+    set_pwm_enable_if_not_already(PWM_ENABLE_MANUAL_VALUE, &hwmon_driver.path, channel_info)
+        .await?;
+    set_pwm_duty(&hwmon_driver.path, channel_info, speed_fixed)
+        .await
+        .map_err(|err| {
+            anyhow!(
+                "Error on {}:{} for duty {speed_fixed} - {err}",
+                hwmon_driver.name,
+                channel_info.name
+            )
+        })
 }
 
 /// This sets `pwm_enable` to 0. The effect of this is dependent on the device, but is primarily used
@@ -62,7 +62,7 @@ pub async fn set_to_full_speed(base_path: &Path, channel_info: &HwmonChannelInfo
     // (the driver doesn't automatically set the duty to 100% in full-speed mode)
     set_pwm_duty(base_path, channel_info, 100).await?;
     let path_pwm_enable = base_path.join(format_pwm_enable!(channel_info.number));
-    let current_pwm_enable = cc_fs::read_sysfs(&path_pwm_enable)
+    let current_pwm_enable = cc_fs::read_sysfs_value(&path_pwm_enable)
         .await
         .and_then(check_parsing_8)?;
     if current_pwm_enable != PWM_ENABLE_THINKPAD_FULL_SPEED {
@@ -162,7 +162,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -171,6 +171,41 @@ mod tests {
             assert!(result.is_ok());
             assert_eq!(current_pwm_enable, PWM_ENABLE_MANUAL_VALUE.to_string());
             assert_eq!(current_duty, 50.);
+        });
+    }
+
+    // A failed write says what to do about it: fan control may be off.
+    #[test]
+    #[serial]
+    fn thinkpad_apply_speed_error_carries_hint() {
+        cc_fs::test_runtime(async {
+            let ctx = setup().await;
+            // given: no pwm files, so every write fails like a locked ThinkPad
+            let channel_info = HwmonChannelInfo {
+                hwmon_type: HwmonChannelType::Fan,
+                number: 1,
+                pwm_enable_default: Some(2),
+                name: String::new(),
+                label: None,
+                caps: HwmonChannelCapabilities::FAN_WRITABLE,
+                auto_curve: AutoCurveInfo::None,
+                pwm_path: Some(ctx.test_base_path.join("pwm1")),
+                rpm_path: None,
+                temp_path: None,
+            };
+            let config = Rc::new(Config::init_default_config().unwrap());
+            let hwmon_info = Rc::new(HwmonDriverInfo {
+                path: ctx.test_base_path.clone(),
+                ..Default::default()
+            });
+
+            // when:
+            let result = apply_speed_fixed(&config, &hwmon_info, &channel_info, 50).await;
+
+            // then:
+            teardown(&ctx).await;
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains(FAN_CONTROL_HINT), "error: {err}");
         });
     }
 
@@ -221,7 +256,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -283,7 +318,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)
@@ -331,7 +366,7 @@ mod tests {
             let current_pwm_enable = cc_fs::read_sysfs(&test_base_path.join("pwm1_enable"))
                 .await
                 .unwrap();
-            let current_duty = cc_fs::read_sysfs(&test_base_path.join("pwm1"))
+            let current_duty = cc_fs::read_sysfs_value(&test_base_path.join("pwm1"))
                 .await
                 .and_then(check_parsing_8)
                 .map(pwm_value_to_duty)

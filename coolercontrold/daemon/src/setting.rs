@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -137,7 +122,7 @@ pub struct LcdSettings {
     /// Unused; kept for downgrade compatibility.
     // Written as an empty no-op because 4.3.x hard-requires this field when parsing
     // config.toml and modes.json, so removing it breaks a daemon downgrade.
-    // DOWNGRADE-COMPAT(added 4.4.0, remove 4.6.0): see DEPRECATIONS.md.
+    // DOWNGRADE-COMPAT(added 5.0.0, remove 5.2.0): see DEPRECATIONS.md.
     #[serde(default)]
     pub colors: Vec<(R, G, B)>,
 
@@ -271,6 +256,10 @@ impl Default for LcdCarouselSettings {
     }
 }
 
+/// Upper bound for `CoolerControlSettings::startup_delay`. Some systems need a
+/// long wait before their hardware answers, so this is generous.
+pub const STARTUP_DELAY_SECONDS_MAX: u16 = 120;
+
 /// General Settings for `CoolerControl`
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -300,6 +289,8 @@ pub struct CoolerControlSettings {
     pub sensors_auto_detect: bool,
     /// Whether to listen for kernel device add/remove events at startup
     pub device_listener_enabled: bool,
+    /// Whether to apply the `label` and `ignore` statements from the lm-sensors configuration
+    pub sensors_conf_enabled: bool,
 }
 
 /// Device Specific settings that generally apply to how the application deals with the device.
@@ -586,35 +577,27 @@ impl Function {
         match self.kind {
             FunctionKind::Identity => FunctionType::Identity,
             FunctionKind::Standard { .. } => FunctionType::Standard,
-            FunctionKind::ExponentialMovingAvg { .. } => FunctionType::ExponentialMovingAvg,
         }
     }
 
     pub fn deviance(&self) -> Option<Temp> {
         match &self.kind {
             FunctionKind::Standard { deviance, .. } => *deviance,
-            _ => None,
+            FunctionKind::Identity => None,
         }
     }
 
     pub fn only_downward(&self) -> Option<bool> {
         match &self.kind {
             FunctionKind::Standard { only_downward, .. } => *only_downward,
-            _ => None,
+            FunctionKind::Identity => None,
         }
     }
 
     pub fn response_delay(&self) -> Option<u8> {
         match &self.kind {
             FunctionKind::Standard { response_delay, .. } => *response_delay,
-            _ => None,
-        }
-    }
-
-    pub fn sample_window(&self) -> Option<u8> {
-        match &self.kind {
-            FunctionKind::ExponentialMovingAvg { sample_window } => *sample_window,
-            _ => None,
+            FunctionKind::Identity => None,
         }
     }
 }
@@ -623,8 +606,6 @@ impl Function {
 pub enum FunctionType {
     Identity,
     Standard,
-    /// DEPRECATED in favor of the EMA custom-sensor type. See `FunctionKind::ExponentialMovingAvg`.
-    ExponentialMovingAvg,
 }
 
 /// The function type discriminator (`f_type`) and the fields valid for that type. Most `Function`
@@ -644,13 +625,6 @@ pub enum FunctionKind {
 
         /// The response delay in seconds
         response_delay: Option<u8>,
-    },
-    /// DEPRECATED in favor of the EMA custom-sensor type (`CustomSensorKind::ExponentialMovingAvg`),
-    /// which is a visible, reusable temp source rather than smoothing hidden inside the profile.
-    /// Retained for backward compatibility; the daemon warns when one is loaded or saved.
-    ExponentialMovingAvg {
-        /// The sample window for the moving average.
-        sample_window: Option<u8>,
     },
 }
 
@@ -1180,22 +1154,20 @@ mod tests {
         assert_eq!(parsed.kind, f.kind);
     }
 
-    // An EMA Function carries sample_window under `f_type: "ExponentialMovingAvg"` and omits the
-    // Standard-only fields. The type is deprecated but must still round-trip.
+    // The removed EMA type is rejected at the deserialization boundary; config-file conversion
+    // happens in the TOML parser, not here, so REST clients get a clear error instead.
     #[test]
-    fn function_ema_round_trip() {
-        let f = function(FunctionKind::ExponentialMovingAvg {
-            sample_window: Some(8),
+    fn function_removed_ema_type_rejected() {
+        let payload = json!({
+            "uid": "fn-1",
+            "name": "Test",
+            "f_type": "ExponentialMovingAvg",
+            "duty_minimum": 2,
+            "duty_maximum": 100,
+            "sample_window": 8,
         });
-        let v = serde_json::to_value(&f).unwrap();
-        assert_eq!(v["f_type"], json!("ExponentialMovingAvg"));
-        assert_eq!(v["sample_window"], json!(8));
-        assert!(v.get("deviance").is_none());
-        assert!(v.get("only_downward").is_none());
-        assert!(v.get("response_delay").is_none());
-
-        let parsed: Function = serde_json::from_value(v).unwrap();
-        assert_eq!(parsed.kind, f.kind);
+        let result: Result<Function, _> = serde_json::from_value(payload);
+        assert!(result.is_err());
     }
 
     // An Identity Function serializes to just `f_type: "Identity"` beside the shared fields, with
@@ -1267,13 +1239,6 @@ mod tests {
             })
             .f_type(),
             FunctionType::Standard
-        );
-        assert_eq!(
-            function(FunctionKind::ExponentialMovingAvg {
-                sample_window: None
-            })
-            .f_type(),
-            FunctionType::ExponentialMovingAvg
         );
     }
 

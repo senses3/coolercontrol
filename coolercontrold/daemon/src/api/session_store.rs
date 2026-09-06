@@ -1,25 +1,8 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- *
- * FileSessionStore based on tower-sessions-file-store by Silas
- * Copyright (c) 2024 Silas
- * Licensed under the MIT License
- * https://github.com/nyabinary/tower-sessions-file-store
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// FileSessionStore is based on the design of tower-sessions-file-store by Silas:
+// https://github.com/nyabinary/tower-sessions-file-store
 
 use std::fs::Permissions;
 use std::os::unix::fs::PermissionsExt;

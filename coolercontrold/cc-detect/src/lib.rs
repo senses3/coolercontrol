@@ -1,26 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2026  Guy Boldon, megadjc and contributors
- *
- * This library is derived from lm-sensors (sensors-detect).
- * lm-sensors is Copyright (C) the lm-sensors contributors.
- * Source: https://github.com/lm-sensors/lm-sensors
- * TsunamiMommy fork: https://github.com/TsunamiMommy/lm-sensors
- * Original license: GNU General Public License, version 2 or later (GPL-2.0-or-later).
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, megadjc and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 //! Detects Super-I/O chips via I/O port probing and loads the appropriate
 //! kernel modules.
@@ -64,6 +43,15 @@ use environment::Environment;
 use module_loader::LoadResult;
 #[cfg(target_arch = "x86_64")]
 use superio::DetectedChip;
+
+/// Whether this build can actually probe for Super-I/O chips.
+///
+/// Callers must consult this before interpreting `EnvironmentInfo`: the
+/// non-x86_64 stub reports `has_dev_port: false` and `is_secure_boot: false`,
+/// and those are defaults, not observations. Treating them as observations
+/// would report a blocked environment on every machine that simply has no
+/// Super-I/O bus to probe.
+pub const DETECTION_SUPPORTED: bool = cfg!(target_arch = "x86_64");
 
 /// Complete detection results.
 #[derive(Debug, Clone, Serialize)]

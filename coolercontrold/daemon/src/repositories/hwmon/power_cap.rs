@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::cc_fs;
 use crate::device::Watts;
@@ -24,7 +9,6 @@ use anyhow::{Context, Result};
 use log::{debug, info, trace};
 use nu_glob::{glob, Uninterruptible};
 use regex::Regex;
-use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 
 const GLOB_RAPL_ENERGY_PATH: &str = "/sys/class/powercap/intel-rapl:?/energy_uj";
@@ -86,10 +70,13 @@ pub async fn find_power_cap_paths() -> Result<Vec<HwmonChannelInfo>> {
 /// Extract the power cap energy count in Joules. Returns `None` on
 /// read or parse failure so callers can distinguish a failed read from
 /// a legitimate 0-joule counter.
-pub async fn extract_power_joule_counter(channel_number: u8) -> Option<f64> {
-    cc_fs::read_sysfs(format!(
+pub async fn extract_power_joule_counter(
+    fds: &cc_fs::SysfsFdCache,
+    channel_number: u8,
+) -> Option<f64> {
+    fds.read_value(Path::new(&format!(
         "/sys/class/powercap/intel-rapl:{channel_number}/energy_uj"
-    ))
+    )))
     .await
     .and_then(check_parsing_f64)
     .map(microjoules_to_joules)
@@ -126,7 +113,7 @@ async fn get_rapl_name(base_path: &Path) -> String {
 
 /// Check if the energy channel is usable.
 async fn energy_is_not_usable(base_path: &Path) -> bool {
-    cc_fs::read_sysfs(base_path.join("energy_uj"))
+    cc_fs::read_sysfs_value(base_path.join("energy_uj"))
         .await
         .and_then(check_parsing_f64)
         .map(microjoules_to_joules)
@@ -144,11 +131,8 @@ fn microjoules_to_joules(microjoules: f64) -> f64 {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn check_parsing_f64(content: String) -> Result<f64> {
-    match content.trim().parse::<f64>() {
-        Ok(value) => Ok(value),
-        Err(err) => Err(Error::new(ErrorKind::InvalidData, err.to_string()).into()),
-    }
+fn check_parsing_f64(value: cc_fs::SysfsValue) -> Result<f64> {
+    value.parse()
 }
 
 #[cfg(test)]
@@ -165,7 +149,7 @@ mod tests {
     #[test]
     fn check_parsing_f64_accepts_valid_number() {
         // A valid numeric string must parse back into the expected f64.
-        let parsed = check_parsing_f64("1234567.0\n".to_string()).unwrap();
+        let parsed = check_parsing_f64(cc_fs::SysfsValue::from_bytes(b"1234567.0\n")).unwrap();
         assert!((parsed - 1_234_567.0).abs() < f64::EPSILON);
     }
 
@@ -173,7 +157,7 @@ mod tests {
     fn check_parsing_f64_rejects_garbage() {
         // Non-numeric content must return an InvalidData error rather
         // than a zero sentinel.
-        let parsed = check_parsing_f64("not_a_number".to_string());
+        let parsed = check_parsing_f64(cc_fs::SysfsValue::from_bytes(b"not_a_number"));
         assert!(parsed.is_err());
     }
 

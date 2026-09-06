@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::actor::CalibrationHandle;
 use crate::api::{handle_error, AppState, CCError};
@@ -24,20 +9,17 @@ use crate::engine::processors::image;
 use crate::setting::{LcdModeName, LcdSettings, LightingSettings, Setting};
 use crate::Device;
 use aide::axum::IntoApiResponse;
-use aide::NoApi;
-use axum::extract::{Path, Query, State};
+use axum::extract::multipart::Field;
+use axum::extract::{Multipart, Path, Query, State};
 use axum::http::header;
 use axum::Json;
-use axum_typed_multipart::{FieldData, TryFromMultipart, TypedMultipart};
 use mime::Mime;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
-use std::io::Read;
 use std::ops::Not;
 use std::str::FromStr;
-use tempfile::NamedTempFile;
 
 /// Returns a list of all detected devices and their associated information.
 /// Does not return Status, that's for another more-fine-grained endpoint
@@ -206,13 +188,11 @@ pub async fn update_device_setting_lcd_image(
     Path(path): Path<DeviceChannelPath>,
     Query(lcd_image_update_query): Query<LcdImageUpdateQuery>,
     State(AppState { device_handle, .. }): State<AppState>,
-    NoApi(mut form): NoApi<TypedMultipart<LcdImageSettingsForm>>,
+    multipart: Multipart,
 ) -> Result<(), CCError> {
-    let file_data = validate_form_images(&mut form)?;
+    let form = LcdImageForm::parse(multipart).await?;
     let log_success = lcd_image_update_query.log.unwrap_or(true);
-    let mode: LcdModeName = form.mode.parse().map_err(|_| CCError::UserError {
-        msg: format!("Invalid LCD mode name: {}", form.mode),
-    })?;
+    let mode = form.lcd_mode()?;
     device_handle
         .device_image_update(
             path.device_uid,
@@ -220,7 +200,7 @@ pub async fn update_device_setting_lcd_image(
             mode,
             form.brightness,
             form.orientation,
-            file_data,
+            form.images,
             log_success,
         )
         .await
@@ -231,11 +211,11 @@ pub async fn update_device_setting_lcd_image(
 pub async fn process_device_lcd_images(
     Path(path): Path<DeviceChannelPath>,
     State(AppState { device_handle, .. }): State<AppState>,
-    NoApi(mut form): NoApi<TypedMultipart<LcdImageSettingsForm>>,
+    multipart: Multipart,
 ) -> Result<impl IntoApiResponse, CCError> {
-    let file_data = validate_form_images(&mut form)?;
+    let form = LcdImageForm::parse(multipart).await?;
     device_handle
-        .device_image_process(path.device_uid, path.channel_name, file_data)
+        .device_image_process(path.device_uid, path.channel_name, form.images)
         .await
         .map(|(content_type, file_data)| {
             (
@@ -246,51 +226,14 @@ pub async fn process_device_lcd_images(
         .map_err(handle_error)
 }
 
-fn validate_form_images(
-    form: &mut TypedMultipart<LcdImageSettingsForm>,
-) -> Result<Vec<(Mime, Vec<u8>)>, CCError> {
-    if form.images.is_empty() {
-        return Err(CCError::UserError {
-            msg: "At least one image is required".to_string(),
-        });
-    } else if form.images.len() > 1 {
-        return Err(CCError::UserError {
-            msg: "Only one image is supported at this time".to_string(),
-        });
-    }
-    let mut file_data = Vec::new();
-    for file in form.images.as_mut_slice() {
-        let mut file_bytes = Vec::new();
-        file.contents.read_to_end(&mut file_bytes)?;
-        let content_type = file
-            .metadata
-            .content_type
-            .as_ref()
-            .and_then(|ct| Mime::from_str(ct.as_str()).ok())
-            .unwrap_or(mime::IMAGE_PNG);
-        if image::supported_image_types().contains(&content_type).not() {
-            return Err(CCError::UserError {
-                msg: format!(
-                    "Only image types {:?} are supported. Found:{content_type}",
-                    image::supported_image_types()
-                ),
-            });
-        }
-        file_data.push((content_type, file_bytes));
-    }
-    Ok(file_data)
-}
-
 /// Upload and save an LCD image to display when the daemon shuts down.
 pub async fn set_device_lcd_shutdown_image(
     Path(path): Path<DeviceChannelPath>,
     State(AppState { device_handle, .. }): State<AppState>,
-    NoApi(mut form): NoApi<TypedMultipart<LcdImageSettingsForm>>,
+    multipart: Multipart,
 ) -> Result<(), CCError> {
-    let file_data = validate_form_images(&mut form)?;
-    let mode: LcdModeName = form.mode.parse().map_err(|_| CCError::UserError {
-        msg: format!("Invalid LCD mode name: {}", form.mode),
-    })?;
+    let form = LcdImageForm::parse(multipart).await?;
+    let mode = form.lcd_mode()?;
     device_handle
         .device_set_lcd_shutdown_image(
             path.device_uid,
@@ -298,7 +241,7 @@ pub async fn set_device_lcd_shutdown_image(
             mode,
             form.brightness,
             form.orientation,
-            file_data,
+            form.images,
         )
         .await
         .map_err(handle_error)
@@ -438,14 +381,122 @@ pub struct SettingPWMMode {
     pwm_mode: u8,
 }
 
-#[derive(Debug, TryFromMultipart)]
-pub struct LcdImageSettingsForm {
+/// The form field carrying the uploaded files. The trailing brackets are what
+/// the UI's form serializer emits for a repeated field.
+const LCD_IMAGE_FIELD: &str = "images[]";
+
+/// Only a single image is ever applied to a channel, so a second upload is
+/// rejected before its body is buffered.
+const LCD_IMAGE_COUNT_MAX: usize = 1;
+
+/// Which part of `LcdImageForm` a multipart field feeds. Resolved before the
+/// field is consumed, because reading a body invalidates the borrowed name.
+enum LcdFormField {
+    Mode,
+    Brightness,
+    Orientation,
+    Image,
+    Unknown,
+}
+
+/// The multipart form shared by every LCD image endpoint. Fields are read as
+/// they stream in, so an unsupported upload is rejected before it is buffered.
+#[derive(Debug)]
+struct LcdImageForm {
     mode: String,
     brightness: Option<u8>,
     orientation: Option<u16>,
-    // limited to the request body size limit
-    #[form_data(field_name = "images[]", limit = "unlimited")]
-    images: Vec<FieldData<NamedTempFile>>,
+    images: Vec<(Mime, Vec<u8>)>,
+}
+
+impl LcdImageForm {
+    async fn parse(mut multipart: Multipart) -> Result<Self, CCError> {
+        let mut mode: Option<String> = None;
+        let mut brightness = None;
+        let mut orientation = None;
+        let mut images = Vec::with_capacity(LCD_IMAGE_COUNT_MAX);
+        while let Some(field) = multipart.next_field().await? {
+            match classify_field(field.name()) {
+                LcdFormField::Mode => mode = Some(field.text().await?),
+                LcdFormField::Brightness => brightness = parse_number(field, "brightness").await?,
+                LcdFormField::Orientation => {
+                    orientation = parse_number(field, "orientation").await?;
+                }
+                LcdFormField::Image => {
+                    if images.len() >= LCD_IMAGE_COUNT_MAX {
+                        return Err(CCError::UserError {
+                            msg: "Only one image is supported at this time".to_string(),
+                        });
+                    }
+                    images.push(read_image(field).await?);
+                }
+                // Unknown fields are ignored, matching the previous parser.
+                LcdFormField::Unknown => {}
+            }
+        }
+        if images.is_empty() {
+            return Err(CCError::UserError {
+                msg: "At least one image is required".to_string(),
+            });
+        }
+        assert!(images.len() <= LCD_IMAGE_COUNT_MAX);
+        let mode = mode.ok_or_else(|| CCError::UserError {
+            msg: "A mode is required".to_string(),
+        })?;
+        Ok(Self {
+            mode,
+            brightness,
+            orientation,
+            images,
+        })
+    }
+
+    fn lcd_mode(&self) -> Result<LcdModeName, CCError> {
+        self.mode.parse().map_err(|_| CCError::UserError {
+            msg: format!("Invalid LCD mode name: {}", self.mode),
+        })
+    }
+}
+
+fn classify_field(name: Option<&str>) -> LcdFormField {
+    match name {
+        Some("mode") => LcdFormField::Mode,
+        Some("brightness") => LcdFormField::Brightness,
+        Some("orientation") => LcdFormField::Orientation,
+        Some(LCD_IMAGE_FIELD) => LcdFormField::Image,
+        _ => LcdFormField::Unknown,
+    }
+}
+
+/// An absent field and a field submitted empty both mean "unset", as the UI
+/// omits these entirely when they do not apply.
+async fn parse_number<T: FromStr>(field: Field<'_>, name: &str) -> Result<Option<T>, CCError> {
+    let text = field.text().await?;
+    if text.is_empty() {
+        return Ok(None);
+    }
+    text.parse().map(Some).map_err(|_| CCError::UserError {
+        msg: format!("Invalid {name} value: {text}"),
+    })
+}
+
+/// The content type comes from the part headers and is checked before the body
+/// is buffered, so an unsupported upload costs nothing to reject.
+async fn read_image(field: Field<'_>) -> Result<(Mime, Vec<u8>), CCError> {
+    let content_type = field
+        .content_type()
+        .and_then(|ct| Mime::from_str(ct).ok())
+        .unwrap_or(mime::IMAGE_PNG);
+    if image::supported_image_types().contains(&content_type).not() {
+        return Err(CCError::UserError {
+            msg: format!(
+                "Only image types {:?} are supported. Found:{content_type}",
+                image::supported_image_types()
+            ),
+        });
+    }
+    let bytes = field.bytes().await?;
+    Ok((content_type, bytes.to_vec()))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -481,5 +532,215 @@ where
     match opt.as_deref() {
         None | Some("") => Ok(None),
         Some(s) => FromStr::from_str(s).map_err(de::Error::custom).map(Some),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::extract::FromRequest;
+    use axum::http::Request;
+
+    const BOUNDARY: &str = "cc-test-boundary";
+    const PNG_BYTES: &str = "fake-png-bytes";
+
+    fn text_part(name: &str, value: &str) -> String {
+        format!(
+            "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+        )
+    }
+
+    fn image_part(content_type: Option<&str>, bytes: &str) -> String {
+        let content_type =
+            content_type.map_or_else(String::new, |ct| format!("Content-Type: {ct}\r\n"));
+        format!(
+            "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{LCD_IMAGE_FIELD}\"; \
+             filename=\"lcd.png\"\r\n{content_type}\r\n{bytes}\r\n"
+        )
+    }
+
+    fn png_part() -> String {
+        image_part(Some("image/png"), PNG_BYTES)
+    }
+
+    /// Feeds the parts through the real axum extractor, so a test covers the
+    /// same path a request takes rather than a hand-built stand-in.
+    async fn parse_parts(parts: &[String]) -> Result<LcdImageForm, CCError> {
+        let body = format!("{}--{BOUNDARY}--\r\n", parts.concat());
+        let request = Request::builder()
+            .method("POST")
+            .header(
+                header::CONTENT_TYPE,
+                format!("multipart/form-data; boundary={BOUNDARY}"),
+            )
+            .body(Body::from(body))
+            .unwrap();
+        let multipart = Multipart::from_request(request, &()).await.unwrap();
+        LcdImageForm::parse(multipart).await
+    }
+
+    /// Every field the UI sends on the settings-apply path round-trips.
+    #[tokio::test]
+    async fn parses_a_complete_form() {
+        let form = parse_parts(&[
+            text_part("mode", "image"),
+            text_part("brightness", "50"),
+            text_part("orientation", "90"),
+            png_part(),
+        ])
+        .await
+        .unwrap();
+
+        assert_eq!(form.mode, "image");
+        assert_eq!(form.brightness, Some(50));
+        assert_eq!(form.orientation, Some(90));
+        assert_eq!(form.images.len(), 1);
+        assert_eq!(form.images[0].0, mime::IMAGE_PNG);
+        assert_eq!(form.images[0].1, PNG_BYTES.as_bytes());
+    }
+
+    /// The preview path sends only a mode and the file, so the optional
+    /// settings must stay unset rather than reject the request.
+    #[tokio::test]
+    async fn omitted_optionals_stay_unset() {
+        let form = parse_parts(&[text_part("mode", "image"), png_part()])
+            .await
+            .unwrap();
+
+        assert_eq!(form.brightness, None);
+        assert_eq!(form.orientation, None);
+    }
+
+    /// A browser submits an untouched control as an empty string, which means
+    /// unset and not a parse failure.
+    #[tokio::test]
+    async fn empty_optionals_are_unset() {
+        let form = parse_parts(&[
+            text_part("mode", "image"),
+            text_part("brightness", ""),
+            text_part("orientation", ""),
+            png_part(),
+        ])
+        .await
+        .unwrap();
+
+        assert_eq!(form.brightness, None);
+        assert_eq!(form.orientation, None);
+    }
+
+    #[tokio::test]
+    async fn rejects_an_unparsable_number() {
+        let error = parse_parts(&[
+            text_part("mode", "image"),
+            text_part("brightness", "bright"),
+            png_part(),
+        ])
+        .await
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Invalid brightness value"));
+    }
+
+    /// A value past the field's range is a client error, not a silent clamp.
+    #[tokio::test]
+    async fn rejects_an_out_of_range_number() {
+        let error = parse_parts(&[
+            text_part("mode", "image"),
+            text_part("brightness", "300"),
+            png_part(),
+        ])
+        .await
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Invalid brightness value"));
+    }
+
+    #[tokio::test]
+    async fn requires_an_image() {
+        let error = parse_parts(&[text_part("mode", "image")])
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("At least one image is required"));
+    }
+
+    #[tokio::test]
+    async fn requires_a_mode() {
+        let error = parse_parts(&[png_part()]).await.unwrap_err();
+
+        assert!(error.to_string().contains("A mode is required"));
+    }
+
+    #[tokio::test]
+    async fn rejects_a_second_image() {
+        let error = parse_parts(&[text_part("mode", "image"), png_part(), png_part()])
+            .await
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("Only one image is supported at this time"));
+    }
+
+    #[tokio::test]
+    async fn rejects_an_unsupported_image_type() {
+        let error = parse_parts(&[
+            text_part("mode", "image"),
+            image_part(Some("text/plain"), "not-an-image"),
+        ])
+        .await
+        .unwrap_err();
+
+        assert!(error.to_string().contains("Only image types"));
+    }
+
+    /// A part without its own content type is assumed to be a PNG, which is
+    /// what the UI produces for a processed image.
+    #[tokio::test]
+    async fn defaults_a_typeless_part_to_png() {
+        let form = parse_parts(&[text_part("mode", "image"), image_part(None, PNG_BYTES)])
+            .await
+            .unwrap();
+
+        assert_eq!(form.images[0].0, mime::IMAGE_PNG);
+    }
+
+    /// Unknown fields are skipped so an older or newer client can send extras
+    /// without breaking the request.
+    #[tokio::test]
+    async fn ignores_unknown_fields() {
+        let form = parse_parts(&[
+            text_part("mode", "image"),
+            text_part("something_else", "ignored"),
+            png_part(),
+        ])
+        .await
+        .unwrap();
+
+        assert_eq!(form.mode, "image");
+        assert_eq!(form.images.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn resolves_the_lcd_mode() {
+        let form = parse_parts(&[text_part("mode", "carousel"), png_part()])
+            .await
+            .unwrap();
+
+        assert_eq!(form.lcd_mode().unwrap(), LcdModeName::Carousel);
+    }
+
+    #[tokio::test]
+    async fn rejects_an_unknown_lcd_mode() {
+        let form = parse_parts(&[text_part("mode", "hologram"), png_part()])
+            .await
+            .unwrap();
+
+        assert!(form
+            .lcd_mode()
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid LCD mode name: hologram"));
     }
 }

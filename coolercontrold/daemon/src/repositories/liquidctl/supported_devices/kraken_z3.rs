@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
 
@@ -141,7 +126,16 @@ impl DeviceSupport for KrakenZ3Support {
                     info: Some(LcdInfo {
                         screen_width: lcd_resolution.0,
                         screen_height: lcd_resolution.1,
-                        max_image_size_bytes: 24_320 * 1024, // 24,320 KB/KiB
+                        // liquidctl asserts a processed gif is under `_LCD_TOTAL_MEMORY`
+                        // KB before it will send one, while its own bucket allocator
+                        // counts that same number in KiB. The assert is the stricter of
+                        // the two and the one a user hits: over it the upload dies inside
+                        // liquidctl as a bare assertion, which the daemon can only report
+                        // as a device fault. Capped here so the size is refused by size.
+                        max_image_size_bytes: 24_320_000,
+                        // Withdrawn after initialize, the first point the firmware version
+                        // is known. Only the Kraken 2023 on firmware 2.x refuses gifs.
+                        gif_supported: true,
                     }),
                 },
             },
@@ -198,5 +192,76 @@ impl DeviceSupport for KrakenZ3Support {
             ColorMode::new("wings", 1, 1, true, false),
         ];
         self.convert_to_channel_lighting_modes(color_modes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::device::ChannelKind;
+    use crate::repositories::liquidctl::liqctld_client::{DeviceProperties, DeviceResponse};
+
+    fn kraken_response(lcd_resolution: Option<(u32, u32)>) -> DeviceResponse {
+        DeviceResponse {
+            id: 1,
+            description: "NZXT Kraken 2024 Elite RGB".to_string(),
+            device_type: "KrakenZ3".to_string(),
+            serial_number: Some("1234567890".to_string()),
+            properties: DeviceProperties {
+                speed_channels: Vec::new(),
+                color_channels: Vec::new(),
+                supports_cooling: None,
+                supports_cooling_profiles: None,
+                supports_lighting: None,
+                led_count: None,
+                lcd_resolution,
+            },
+            liquidctl_version: Some("1.16.0".to_string()),
+            hid_address: Some("/dev/hidraw0".to_string()),
+            hwmon_address: None,
+        }
+    }
+
+    fn lcd_info_of(device_info: &DeviceInfo) -> &LcdInfo {
+        let ChannelKind::Lcd { info, .. } = &device_info.channels["lcd"].kind else {
+            panic!("the lcd channel should be an lcd channel");
+        };
+        info.as_ref().expect("lcd info should be present")
+    }
+
+    /// Goal: liquidctl asserts on a processed gif over `_LCD_TOTAL_MEMORY` KB, and an
+    /// assertion inside the driver reaches the user as an unexplained device fault. The cap
+    /// has to refuse first, so it must not sit above that number. Method: read it back.
+    #[test]
+    fn the_image_cap_stays_under_liquidctls_own_assert() {
+        let info = KrakenZ3Support::new().extract_info(&kraken_response(Some((640, 640))));
+
+        // `assert len(data) / 1000 < 24320` in liquidctl's `set_screen`.
+        assert_eq!(lcd_info_of(&info).max_image_size_bytes, 24_320_000);
+        assert!(
+            lcd_info_of(&info).max_image_size_bytes < 24_320 * 1024,
+            "the KiB reading is the looser one and leaves a window that fails obscurely"
+        );
+    }
+
+    /// Goal: the screen's own geometry drives image processing, and the 2024 Elite is the
+    /// one model that is not 320x320. Method: the resolution liquidctl reports for it.
+    #[test]
+    fn the_screen_geometry_comes_from_the_driver() {
+        let info = KrakenZ3Support::new().extract_info(&kraken_response(Some((640, 640))));
+        assert_eq!(lcd_info_of(&info).screen_width, 640);
+        assert_eq!(lcd_info_of(&info).screen_height, 640);
+
+        // An older liquidctl reports no resolution at all; the Z-series default stands in.
+        let fallback = KrakenZ3Support::new().extract_info(&kraken_response(None));
+        assert_eq!(lcd_info_of(&fallback).screen_width, 320);
+    }
+
+    /// Goal: gifs are assumed until liqctld says otherwise, since the firmware version is
+    /// not known this early. Method: the freshly extracted info.
+    #[test]
+    fn gifs_are_offered_until_the_firmware_is_known() {
+        let info = KrakenZ3Support::new().extract_info(&kraken_response(Some((240, 240))));
+        assert!(lcd_info_of(&info).gif_supported);
     }
 }

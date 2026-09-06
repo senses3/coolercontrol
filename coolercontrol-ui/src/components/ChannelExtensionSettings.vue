@@ -1,39 +1,27 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
 import SvgIcon from '@jamescoyle/vue-icon/lib/svg-icon.vue'
-import { ElSwitch } from 'element-plus'
-import 'element-plus/es/components/switch/style/css'
 import { useDeviceStore } from '@/stores/DeviceStore.ts'
-import { mdiAlertOutline, mdiCogs, mdiInformationSlabCircleOutline } from '@mdi/js'
-import { PopoverContent, PopoverRoot, PopoverTrigger } from 'radix-vue'
+import { mdiAlertOutline, mdiCogs } from '@mdi/js'
+import HelpIcon from '@/components/info/HelpIcon.vue'
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { useSettingsStore } from '@/stores/SettingsStore.ts'
 import ChannelCalibrationPanel from '@/components/ChannelCalibrationPanel.vue'
 import { computed, nextTick, ref, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UID } from '@/models/Device.ts'
 import { ChannelExtensionNames } from '@/models/SpeedOptions.ts'
-import { Profile, ProfileType } from '@/models/Profile.ts'
+import { Profile } from '@/models/Profile.ts'
+import { firmwareCurveApplicable } from '@/shell/cooling/firmwareCurve.ts'
 import { CCChannelSettings, ChannelExtensions } from '@/models/CCSettings.ts'
 import { ErrorResponse } from '@/models/ErrorResponse.ts'
-import { useToast } from 'primevue/usetoast'
+import UiSwitch from '@/shell/ui/UiSwitch.vue'
+import { useToast } from '@/shell/toast'
 
 const props = defineProps<{
     deviceUID: UID
@@ -89,13 +77,11 @@ for (const device of deviceStore.allDevices()) {
     }
 }
 const hwFanCurveIsApplicable = computed((): boolean => {
-    const p = props.chosenProfile
-    const isApplicable =
-        !!p &&
-        p.p_type === ProfileType.Graph &&
-        p.temp_source?.device_uid === props.deviceUID && // if it's an AMDGPU, that it uses the correct temp sensor:
-        (currentChannelExtension.value !== ChannelExtensionNames.AmdRdnaGpu ||
-            p.temp_source?.temp_name === 'temp1')
+    const isApplicable = firmwareCurveApplicable(
+        props.chosenProfile,
+        props.deviceUID,
+        currentChannelExtension.value,
+    )
     if (!isApplicable) {
         nextTick(() => {
             hwFanCurve.value = false
@@ -174,101 +160,92 @@ defineExpose({
             disabled: isPopupOpen,
         }"
     >
-        <popover-root @update:open="(open) => (isPopupOpen = open)">
+        <popover-root v-model:open="isPopupOpen">
             <popover-trigger
-                class="h-[2.375rem] rounded-lg border-2 border-border-one !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
+                class="h-[2.375rem] gap-1.5 rounded-lg border-2 border-border-one bg-control !py-1.5 !px-2.5 text-text-color outline-0 text-center justify-center items-center flex !m-0 hover:bg-surface-hover"
             >
                 <svg-icon
-                    class="outline-0 mt-[-2px]"
+                    class="outline-0"
                     type="mdi"
                     :path="mdiCogs"
                     :size="deviceStore.getREMSize(1.35)"
                 />
+                <span>{{ t('layout.topbar.settings') }}</span>
             </popover-trigger>
-            <popover-content side="bottom" class="z-10">
-                <div
-                    class="w-full bg-bg-two border border-border-one p-2 rounded-lg text-text-color pb-4 drop-shadow-[0_4px_8px_rgba(0,0,0,0.5)]"
-                >
-                    <div class="font-semibold pb-2.5 pt-1 text-center">
-                        {{ t('components.channelExtensionSettings.title') }}
-                    </div>
-                    <table v-if="currentChannelExtension != null">
-                        <tbody>
-                            <tr>
-                                <td class="w-24 text-end pl-4">
-                                    <div class="flex flex-row leading-none items-center">
-                                        <div
-                                            v-tooltip.top="
-                                                t(
-                                                    'components.channelExtensionSettings.firmwareControlledProfileDesc',
-                                                )
-                                            "
-                                        >
-                                            <svg-icon
-                                                type="mdi"
-                                                class="mr-2"
-                                                :path="mdiInformationSlabCircleOutline"
-                                                :size="deviceStore.getREMSize(1.25)"
-                                            />
-                                        </div>
-                                        {{
-                                            t(
-                                                'components.channelExtensionSettings.firmwareControlledProfile',
-                                            )
-                                        }}
-                                        <div
-                                            class="ml-2 w-2"
-                                            v-tooltip.top="
-                                                t(
-                                                    'components.channelExtensionSettings.firmwareControlDisabled',
-                                                )
-                                            "
-                                        >
-                                            <svg-icon
-                                                v-if="!hwFanCurveIsApplicable"
-                                                type="mdi"
-                                                :path="mdiAlertOutline"
-                                                :size="deviceStore.getREMSize(1.25)"
-                                                style="color: rgb(var(--colors-red))"
-                                            />
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="w-24 px-2 text-center">
-                                    <el-switch
-                                        v-model="hwFanCurve"
-                                        size="large"
-                                        :disabled="!hwFanCurveIsApplicable"
-                                        @change="emit('change')"
-                                    />
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <popover-portal>
+                <popover-content side="bottom" class="z-[1300]">
                     <div
-                        v-if="calibrationEligible"
-                        :class="[
-                            'px-2',
-                            currentChannelExtension != null
-                                ? 'mt-3 pt-3 border-t border-border-one'
-                                : 'pt-1',
-                        ]"
+                        class="w-full bg-bg-two border border-border-one p-2 rounded-lg text-text-color pb-4 shadow-overlay-lg"
                     >
-                        <channel-calibration-panel
-                            :device-u-i-d="deviceUID"
-                            :channel-name="channelName"
-                        />
+                        <div class="font-semibold pb-2.5 pt-1 text-center">
+                            {{ t('components.channelExtensionSettings.title') }}
+                        </div>
+                        <table v-if="currentChannelExtension != null">
+                            <tbody>
+                                <tr>
+                                    <td class="w-24 text-end pl-4">
+                                        <div class="flex flex-row leading-none items-center">
+                                            <HelpIcon
+                                                class="mr-2"
+                                                :text="
+                                                    t(
+                                                        'components.channelExtensionSettings.firmwareControlledProfileDesc',
+                                                    )
+                                                "
+                                            />
+                                            {{
+                                                t(
+                                                    'components.channelExtensionSettings.firmwareControlledProfile',
+                                                )
+                                            }}
+                                            <div
+                                                class="ml-2 w-2"
+                                                v-tooltip.top="
+                                                    t(
+                                                        'components.channelExtensionSettings.firmwareControlDisabled',
+                                                    )
+                                                "
+                                            >
+                                                <svg-icon
+                                                    v-if="!hwFanCurveIsApplicable"
+                                                    type="mdi"
+                                                    :path="mdiAlertOutline"
+                                                    :size="deviceStore.getREMSize(1.25)"
+                                                    style="color: rgb(var(--colors-red))"
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="w-24 px-2 text-center">
+                                        <UiSwitch
+                                            v-model="hwFanCurve"
+                                            :disabled="!hwFanCurveIsApplicable"
+                                            @update:model-value="emit('change')"
+                                        />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div
+                            v-if="calibrationEligible"
+                            :class="[
+                                'px-2',
+                                currentChannelExtension != null
+                                    ? 'mt-3 pt-3 border-t border-border-one'
+                                    : 'pt-1',
+                            ]"
+                        >
+                            <channel-calibration-panel
+                                :device-u-i-d="deviceUID"
+                                :channel-name="channelName"
+                                @request-close="isPopupOpen = false"
+                            />
+                        </div>
                     </div>
-                </div>
-            </popover-content>
+                </popover-content>
+            </popover-portal>
         </popover-root>
     </div>
 </template>
 
-<style scoped lang="scss">
-.el-switch {
-    --el-switch-on-color: rgb(var(--colors-accent));
-    --el-switch-off-color: rgb(var(--colors-bg-one));
-    --el-color-white: rgb(var(--colors-bg-two));
-}
-</style>
+<style scoped lang="scss"></style>

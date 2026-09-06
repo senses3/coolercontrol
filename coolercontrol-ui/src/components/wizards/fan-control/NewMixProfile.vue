@@ -1,20 +1,7 @@
 <!--
-  - CoolerControl - monitor and control your cooling and other devices
-  - Copyright (c) 2021-2025  Guy Boldon and contributors
-  -
-  - This program is free software: you can redistribute it and/or modify
-  - it under the terms of the GNU General Public License as published by
-  - the Free Software Foundation, either version 3 of the License, or
-  - (at your option) any later version.
-  -
-  - This program is distributed in the hope that it will be useful,
-  - but WITHOUT ANY WARRANTY; without even the implied warranty of
-  - MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  - GNU General Public License for more details.
-  -
-  - You should have received a copy of the GNU General Public License
-  - along with this program.  If not, see <https://www.gnu.org/licenses/>.
-  -->
+  SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
 
 <script setup lang="ts">
 // @ts-ignore
@@ -33,13 +20,14 @@ import {
     ProfileMixFunctionType,
     ProfileType,
 } from '@/models/Profile.ts'
-import { useToast } from 'primevue/usetoast'
+import { useToast } from '@/shell/toast'
 import { computed, inject, ref, Ref } from 'vue'
-import MultiSelect from 'primevue/multiselect'
-import Select from 'primevue/select'
+import UiMultiSelect from '@/shell/ui/UiMultiSelect.vue'
+import UiSelect from '@/shell/ui/UiSelect.vue'
+import UiButton from '@/shell/ui/UiButton.vue'
+import { useLibraryGroups } from '@/shell/useLibraryGroups.ts'
 import { $enum } from 'ts-enum-util'
 import { Emitter, EventType } from 'mitt'
-import Button from 'primevue/button'
 
 interface Props {
     deviceUID: UID
@@ -86,6 +74,24 @@ const memberProfileOptions: Ref<Array<Profile>> = computed(() =>
         return !hasMixSubMembers
     }),
 )
+const chosenMemberProfileUids = computed<string[]>({
+    get: () => chosenMemberProfiles.value.map((p) => p.uid),
+    set: (uids) => {
+        chosenMemberProfiles.value = uids
+            .map((uid) => memberProfileOptions.value.find((p) => p.uid === uid))
+            .filter((p): p is Profile => p != null)
+    },
+})
+const { profileGroups } = useLibraryGroups()
+const memberProfileGroups = profileGroups(() =>
+    memberProfileOptions.value.map((p) => ({ uid: p.uid, name: p.name })),
+)
+const chosenProfileMixFunctionModel = computed<string | undefined>({
+    get: () => chosenProfileMixFunction.value,
+    set: (v) => {
+        if (v != null) chosenProfileMixFunction.value = v as ProfileMixFunctionType
+    },
+})
 const saveSetting = async () => {
     if (chosenMemberProfiles.value.length < 2) {
         toast.add({
@@ -136,45 +142,38 @@ const saveSetting = async () => {
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.profilesToMix') }}
                 </small>
-                <MultiSelect
-                    v-model="chosenMemberProfiles"
-                    :options="memberProfileOptions"
-                    option-label="name"
+                <UiMultiSelect
+                    v-model="chosenMemberProfileUids"
+                    :groups="memberProfileGroups"
                     :placeholder="t('views.profiles.memberProfiles')"
-                    class="w-full h-11 bg-bg-one items-center"
-                    scroll-height="40rem"
-                    dropdown-icon="pi pi-chart-line"
                     :invalid="chosenMemberProfiles.length < 2"
+                    class="w-full"
                 />
             </div>
             <div class="mt-0 flex flex-col">
                 <small class="ml-2 mb-1 font-light text-sm">
                     {{ t('views.profiles.applyMixFunction') }}
                 </small>
-                <Select
-                    v-model="chosenProfileMixFunction"
+                <UiSelect
+                    v-model="chosenProfileMixFunctionModel"
                     :options="mixFunctionTypeOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="w-full mr-3 h-11 bg-bg-one !justify-end"
-                    checkmark
-                    dropdown-icon="pi pi-sliders-v"
-                    scroll-height="40rem"
+                    :placeholder="t('views.profiles.applyMixFunction')"
+                    class="w-full"
                 />
             </div>
         </div>
         <div class="flex flex-row justify-between mt-4">
-            <Button class="w-24 bg-bg-one" label="Back" @click="emit('nextStep', 3)">
+            <UiButton variant="ghost" class="w-24 bg-bg-one" @click="emit('nextStep', 3)">
                 <svg-icon
                     class="outline-0"
                     type="mdi"
                     :path="mdiArrowLeft"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
-            <Button
-                class="bg-accent/80 hover:!bg-accent w-32"
-                :label="t('common.apply')"
+            </UiButton>
+            <UiButton
+                variant="solid"
+                class="w-32"
                 v-tooltip.top="t('views.speed.applySetting')"
                 :disabled="chosenMemberProfiles.length < 2"
                 @click="saveSetting"
@@ -185,7 +184,7 @@ const saveSetting = async () => {
                     :path="mdiContentSaveOutline"
                     :size="deviceStore.getREMSize(1.5)"
                 />
-            </Button>
+            </UiButton>
         </div>
     </div>
 </template>

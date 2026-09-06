@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2025 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::repositories::service_plugin::service_management::openrc::OpenRcManager;
 use crate::repositories::service_plugin::service_management::systemd::SystemdManager;
@@ -34,6 +19,13 @@ pub trait ServiceManager {
     async fn start(&self, service_id: &ServiceId) -> Result<()>;
 
     async fn stop(&self, service_id: &ServiceId) -> Result<()>;
+
+    /// Replaces a running service with its current definition, and starts it if stopped.
+    ///
+    /// Separate from `stop` then `start` because each init system has its own correct way
+    /// to do this. Doing it by hand leaves a window where the old process is still winding
+    /// down while the new one starts, which is how two of them end up alive at once.
+    async fn restart(&self, service_id: &ServiceId) -> Result<()>;
 
     async fn status(&self, service_id: &ServiceId) -> Result<ServiceStatus>;
 }
@@ -74,6 +66,14 @@ impl ServiceManager for Manager {
         match self {
             Manager::Systemd(m) => m.stop(service_id).await,
             Manager::OpenRc(m) => m.stop(service_id).await,
+            Manager::Disabled => Ok(()),
+        }
+    }
+
+    async fn restart(&self, service_id: &ServiceId) -> Result<()> {
+        match self {
+            Manager::Systemd(m) => m.restart(service_id).await,
+            Manager::OpenRc(m) => m.restart(service_id).await,
             Manager::Disabled => Ok(()),
         }
     }
@@ -138,4 +138,22 @@ pub struct ServiceDefinition {
     pub wrk_dir: Option<PathBuf>,
     pub envs: Option<Vec<(String, String)>>,
     pub disable_restart_on_failure: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Goal: `Disabled` stands in wherever no init system manages the plugins, so every
+    /// lifecycle call on it has to succeed and do nothing. A `restart` that fell through
+    /// to `unreachable!` would abort plugin registration on those systems.
+    /// Method: call it and require success.
+    #[test]
+    fn disabled_manager_restart_succeeds_and_does_nothing() {
+        crate::sidecar::ensure_test_handle();
+        crate::rt::test_runtime(async {
+            let service_id = "test-plugin".to_string();
+            assert!(Manager::Disabled.restart(&service_id).await.is_ok());
+        });
+    }
 }

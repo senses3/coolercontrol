@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -65,11 +50,11 @@ function reflectMetadataPlugin(): Plugin {
 }
 
 // Experimental UI features gated to specific branch builds. Each feature lists
-// the git branches it is enabled on; any other branch (and builds where the
-// branch cannot be detected) leaves it off, so main and release builds stay
-// clean. Consumed at runtime via src/features.ts.
+// the git branches it is enabled on, or '*' to enable it on every branch. Any
+// other branch (and builds where the branch cannot be detected) leaves it off,
+// so main and release builds stay clean. Consumed at runtime via src/features.ts.
 const FEATURE_BRANCHES: Record<string, string[]> = {
-    coolingWizard: ['cooling-wizard', 'compio-base'],
+    coolingWizard: ['*'],
 }
 
 function currentGitBranch(): string {
@@ -89,7 +74,7 @@ function buildFeatureFlags(): Record<string, boolean> {
     return Object.fromEntries(
         Object.entries(FEATURE_BRANCHES).map(([feature, branches]) => [
             feature,
-            branches.includes(branch),
+            branches.includes('*') || branches.includes(branch),
         ]),
     )
 }
@@ -118,9 +103,29 @@ export default defineConfig({
     build: {
         minify: 'oxc',
         cssMinify: 'lightningcss',
-        assetsInlineLimit: 10_240_000,
+        // Everything is inlined so the app loads in as few requests as possible, but
+        // not the fonts: base64 costs ~33% and welds them to the CSS bundle, so every
+        // release would re-send all of them. Emitted as files they are content-hashed,
+        // fetched once, and reused until the bytes actually change.
+        assetsInlineLimit: (filePath: string) => !filePath.endsWith('.woff2'),
         cssCodeSplit: false,
         chunkSizeWarningLimit: 2_500,
+        rollupOptions: {
+            // reka-ui bundles its own @vueuse/core whose built output places
+            // /* #__PURE__ */ comments where Rolldown flags them as invalid.
+            // It is a third-party artifact we cannot fix, so silence only that
+            // warning for that dependency; our own annotations still warn.
+            onLog(level, log, handler) {
+                if (
+                    level === 'warn' &&
+                    log.code === 'INVALID_ANNOTATION' &&
+                    (log.id ?? log.message ?? '').includes('@vueuse/core')
+                ) {
+                    return
+                }
+                handler(level, log)
+            },
+        },
     },
     css: {
         postcss: './postcss.config.js',

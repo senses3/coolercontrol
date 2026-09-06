@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>CoolerControl apt repository</title>
+        <style>
+            :root {
+                color-scheme: light dark;
+                --bg: #fbfbfa;
+                --fg: #1c1c1a;
+                --muted: #5f5f58;
+                --line: #e2e2dd;
+                --code-bg: #f2f2ee;
+                --accent: #0a6b5f;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #16171a;
+                    --fg: #e8e8e4;
+                    --muted: #a0a09a;
+                    --line: #2b2d31;
+                    --code-bg: #1e2024;
+                    --accent: #4fd1bd;
+                }
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                padding: 3rem 1.25rem 4rem;
+                background: var(--bg);
+                color: var(--fg);
+                font:
+                    16px/1.6 system-ui,
+                    -apple-system,
+                    'Segoe UI',
+                    Roboto,
+                    sans-serif;
+            }
+            main {
+                max-width: 44rem;
+                margin: 0 auto;
+            }
+            h1 {
+                font-size: 1.5rem;
+                margin: 0 0 0.25rem;
+            }
+            .sub {
+                color: var(--muted);
+                margin: 0 0 2rem;
+            }
+            h2 {
+                font-size: 1rem;
+                margin: 2rem 0 0.5rem;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--muted);
+            }
+            pre {
+                background: var(--code-bg);
+                border: 1px solid var(--line);
+                border-radius: 6px;
+                padding: 0.85rem 1rem;
+                overflow-x: auto;
+                margin: 0 0 1rem;
+            }
+            code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.9em;
+            }
+            table {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            td {
+                padding: 0.4rem 0.75rem 0.4rem 0;
+                border-bottom: 1px solid var(--line);
+                vertical-align: top;
+            }
+            td:first-child {
+                white-space: nowrap;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                font-size: 0.9em;
+            }
+            a {
+                color: var(--accent);
+            }
+            footer {
+                margin-top: 2.5rem;
+                padding-top: 1rem;
+                border-top: 1px solid var(--line);
+                color: var(--muted);
+                font-size: 0.9rem;
+            }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>CoolerControl apt repository</h1>
+            <p class="sub">
+                This host serves Debian and Ubuntu packages for
+                <a href="https://docs.coolercontrol.org">CoolerControl</a>. It is a package
+                repository, not a website, so there is nothing to browse here.
+            </p>
+
+            <h2>Set it up</h2>
+            <pre><code>curl -fsSL https://apt.coolercontrol.org/setup.sh | sudo sh
+sudo apt install coolercontrol</code></pre>
+            <p>
+                The script picks the right package tree for your distribution, installs the signing
+                key and writes the apt source. Full instructions, including other distributions, are
+                in the
+                <a href="https://docs.coolercontrol.org/installation/debian.html"
+                    >installation guide</a
+                >.
+            </p>
+
+            <h2>Packages</h2>
+            <table>
+                <tr>
+                    <td>coolercontrol</td>
+                    <td>Desktop application</td>
+                </tr>
+                <tr>
+                    <td>coolercontrold</td>
+                    <td>Daemon, installed automatically with the above</td>
+                </tr>
+                <tr>
+                    <td>liquidctl-git</td>
+                    <td>Newer liquidctl, for distributions carrying an outdated one</td>
+                </tr>
+                <tr>
+                    <td>it87-dkms</td>
+                    <td>Out of tree it87 driver, many Gigabyte boards</td>
+                </tr>
+                <tr>
+                    <td>nct6687d-dkms</td>
+                    <td>Out of tree nct6687 driver, many MSI and ASUS boards</td>
+                </tr>
+                <tr>
+                    <td>arctic-fan-controller-dkms</td>
+                    <td>ARCTIC fan controller driver, for kernels older than 7.2</td>
+                </tr>
+            </table>
+
+            <h2>Layout</h2>
+            <p>
+                Two trees, <code>/debian</code> for Debian based systems and
+                <code>/ubuntu</code> for Ubuntu based ones, each serving <code>amd64</code> and
+                <code>arm64</code> from the <code>stable</code> suite. Every published version is
+                kept, so an older one can still be installed with
+                <code>apt install coolercontrold=&lt;version&gt;</code>.
+            </p>
+
+            <footer>
+                <a href="https://docs.coolercontrol.org">Documentation</a> &middot;
+                <a href="https://gitlab.com/coolercontrol/coolercontrol">Source</a> &middot;
+                <a href="https://gitlab.com/coolercontrol/coolercontrol/-/work_items">Issues</a>
+            </footer>
+        </main>
+    </body>
+</html>

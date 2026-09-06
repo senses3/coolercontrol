@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use sha2::Digest;
 use std::ops::Not;
@@ -77,7 +62,9 @@ pub async fn process_carousel_images(
             .inspect_err(|err| warn!("Error getting image digest: {err}"))?;
         // The content type is just used to know if it's processing an animated gif or a
         // static file, all processed static file output is encoded to png regardless of input.
-        let content_type = if path.extension() == Some("gif".as_ref()) {
+        // A screen that cannot animate still shows the gif's first frame, which is what
+        // the static path encodes. Skipping the file would empty a carousel of gifs instead.
+        let content_type = if path.extension() == Some("gif".as_ref()) && lcd_info.gif_supported {
             mime::IMAGE_GIF
         } else {
             mime::IMAGE_PNG

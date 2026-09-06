@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Transform, Type } from 'class-transformer'
 import type { UID } from '@/models/Device'
@@ -201,24 +186,6 @@ export class ProfilesDTO {
 export enum FunctionType {
     Identity = 'Identity',
     Standard = 'Standard',
-    ExponentialMovingAvg = 'ExponentialMovingAvg',
-}
-
-/**
- * Get localized display name for FunctionType
- */
-export function getFunctionTypeDisplayName(type: FunctionType): string {
-    const t = i18n.global.t
-    switch (type) {
-        case FunctionType.Identity:
-            return t('models.profile.functionType.identity')
-        case FunctionType.Standard:
-            return t('models.profile.functionType.standard')
-        case FunctionType.ExponentialMovingAvg:
-            return t('models.profile.functionType.exponentialMovingAvg')
-        default:
-            return type
-    }
 }
 
 export class Function {
@@ -276,11 +243,6 @@ export class Function {
     only_downward?: boolean
 
     /**
-     * The sample window size this function should use for EMA
-     */
-    sample_window?: number
-
-    /**
      * Whether to temporarily bypass thresholds when fan speed remains unchanged for 30+ seconds to meet curve target.
      */
     threshold_hopping: boolean = true
@@ -298,7 +260,6 @@ export class Function {
         response_delay: number | undefined = undefined,
         deviance: number | undefined = undefined,
         only_downward: boolean | undefined = undefined,
-        sample_window: number | undefined = undefined,
     ) {
         this.name = name
         this.f_type = f_type
@@ -307,7 +268,6 @@ export class Function {
         this.response_delay = response_delay
         this.deviance = deviance
         this.only_downward = only_downward
-        this.sample_window = sample_window
     }
 
     static createDefault(): Function {

@@ -4,6 +4,21 @@ The desktop application is written in C++ and uses the [Qt6](https://www.qt.io/p
 framework to create a native desktop application which renders the UI assets using QtWebEngine,
 which is based on the [chromium](https://www.chromium.org/) browser engine.
 
+## Saved daemon connections
+
+The app remembers a list of daemons and switches between them from the **Daemons** submenu in the
+system tray, which appears once more than one is saved. Connections are added and edited in **Daemon
+Connection...**, where each can be given an optional name (blank shows `host:port`).
+
+One daemon is connected at a time. Switching drops the old connection, brings the window up, and
+loads the new daemon's UI. Certificate pins, tray pinned sensors and access tokens are all stored
+per `host:port`, so each daemon keeps its own.
+
+**Known limitation:** cookies are not scoped by port, so two daemons on the _same host_ with
+different ports overwrite each other's session cookie and the UI has to log in again on every
+switch. The tray keeps working either way, since it uses a per-daemon access token. Daemons on
+different hosts are unaffected.
+
 ## Package Requirements RPM
 
 ### Runtime RPM

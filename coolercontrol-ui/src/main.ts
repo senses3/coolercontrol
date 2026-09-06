@@ -1,25 +1,9 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2023 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import './style.css'
-import 'primeicons/primeicons.css'
 import 'uplot/dist/uPlot.min.css'
 import 'vue-color/style.css'
 import 'abortcontroller-polyfill/dist/abortsignal-polyfill-only'
@@ -28,14 +12,9 @@ import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
 
-import PrimeVue from 'primevue/config'
-import ToastService from 'primevue/toastservice'
-import DialogService from 'primevue/dialogservice'
-import ConfirmationService from 'primevue/confirmationservice'
-import CC from './presets/cc'
 import VueFullscreen from 'vue-fullscreen'
 
-import Tooltip from 'primevue/tooltip'
+import { tooltipDirective } from '@/shell/tooltipDirective.ts'
 import mitt from 'mitt'
 
 const appVersion = import.meta.env.PACKAGE_VERSION
@@ -50,19 +29,16 @@ console.info(`
 `)
 const app = createApp(App)
 app.provide('emitter', mitt())
+// Capture whether the app opened at the root URL, before the router's initial
+// navigation rewrites the hash. App.vue applies the configured start page only
+// for a root launch, not for a direct/deep link like /#/home.
+app.provide('startedAtRoot', ['', '#', '#/'].includes(window.location.hash))
 
 app.use(createPinia())
 app.use(router)
 app.use(i18n)
-app.use(PrimeVue, {
-    unstyled: true,
-    pt: CC,
-})
-app.use(ToastService)
-app.use(DialogService)
-app.use(ConfirmationService)
 app.use(VueFullscreen)
 
-app.directive('tooltip', Tooltip)
+app.directive('tooltip', tooltipDirective)
 
 app.mount('#app')

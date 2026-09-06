@@ -1,20 +1,5 @@
-/*
- * CoolerControl - monitor and control your cooling and other devices
- * Copyright (c) 2021-2025  Guy Boldon, Eren Simsek and contributors
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2026 Guy Boldon, Eren Simsek and contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::api::actor::{run_api_actor, ApiActor};
 use crate::api::calibration::CalibrationView;
@@ -152,6 +137,10 @@ impl CalibrationStatus {
                 ),
             ),
             DiagnosisFailure::Cancelled => ("user_cancelled", "diagnosis cancelled".to_string()),
+            DiagnosisFailure::BlockedByAlert { alert_name } => (
+                "blocked_by_alert",
+                format!("alert '{alert_name}' is active on this channel"),
+            ),
             DiagnosisFailure::WriteFailed(err) => ("write_failed", err.clone()),
             DiagnosisFailure::RestoreFailed(err) => ("restore_failed", err.clone()),
             DiagnosisFailure::PersistFailed(err) => ("persist_failed", err.clone()),
@@ -270,6 +259,11 @@ impl CalibrationActor {
         if self.engine.is_calibration_in_progress(&key) {
             return Err(anyhow::anyhow!(
                 "calibration already in progress for {device_uid}:{channel_name}"
+            ));
+        }
+        if let Some(alert_name) = self.engine.active_alert_blocking(&key) {
+            return Err(anyhow::anyhow!(
+                "cannot calibrate {device_uid}:{channel_name}: alert '{alert_name}' is active"
             ));
         }
         let engine = Rc::clone(&self.engine);
