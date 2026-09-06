@@ -22,7 +22,7 @@ import io
 import math
 import pathlib
 
-__VERSION__ = "10"
+__VERSION__ = "11"
 
 try:
     import cairosvg
@@ -68,6 +68,9 @@ ICO_SIZES = (256, 64, 48, 32, 24, 16)
 # radius. The remainder is a black ring between the mark and the bezel.
 LCD_SHUTDOWN = 320
 LCD_SAFE = 0.90
+# The round app icon: the same inset on a transparent square, for anywhere the
+# icon is cropped to a circle. It shares LCD_SAFE so the two read alike.
+ROUND_ICON = 256
 # gdk-pixbuf identifies a file by sniffing its first 256 bytes, so <svg> has to
 # open inside that window. Past it the load fails outright ("Could not load a
 # pixbuf from icon theme") for GTK, GNOME Shell, and every tray that goes
@@ -373,6 +376,16 @@ def corner_reach(img):
     return reach / (size / 2)
 
 
+def circle_safe(svg_text, size, ground=(0, 0, 0, 0)):
+    """The mark on a `size` canvas, scaled until its farthest pixel sits at
+    LCD_SAFE of the inscribed circle's radius, so a circular crop cannot clip it."""
+    box = round(size * LCD_SAFE / corner_reach(render(svg_text, size)))
+    canvas = Image.new("RGBA", (size, size), ground)
+    offset = (size - box) // 2
+    canvas.alpha_composite(render(svg_text, box), (offset, offset))
+    return canvas
+
+
 def render(svg_text, size):
     png = cairosvg.svg2png(
         bytestring=svg_text.encode(), output_width=size, output_height=size
@@ -436,11 +449,11 @@ def main():
     canvas.alpha_composite(art, ((512 - box) // 2, (512 - box) // 2))
     canvas.convert("RGB").save(PUBLIC / "icons/app-maskable-512.png")
 
-    box = round(LCD_SHUTDOWN * LCD_SAFE / corner_reach(render(logo, LCD_SHUTDOWN)))
-    screen = Image.new("RGBA", (LCD_SHUTDOWN, LCD_SHUTDOWN), "#000000")
-    offset = (LCD_SHUTDOWN - box) // 2
-    screen.alpha_composite(render(logo, box), (offset, offset))
+    screen = circle_safe(logo, LCD_SHUTDOWN, "#000000")
     screen.convert("RGB").save(CC_IMAGE / "lcd-shutdown.png")
+    circle_safe(base, ROUND_ICON).save(
+        META / "org.coolercontrol.CoolerControl-round.png"
+    )
 
     ico = PUBLIC / "favicon.ico"
     render(logo, 256).save(ico, sizes=[(s, s) for s in ICO_SIZES])
@@ -448,7 +461,7 @@ def main():
 
     for path in files:
         print("wrote", path.relative_to(ROOT))
-    print("wrote the PNG, maskable, LCD shutdown and favicon rasters")
+    print("wrote the PNG, round, maskable, LCD shutdown and favicon rasters")
 
 
 if __name__ == "__main__":
