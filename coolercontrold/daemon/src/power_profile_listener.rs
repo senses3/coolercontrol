@@ -242,29 +242,19 @@ impl Listener {
     /// Connects, watches, and reconnects until the daemon shuts down. A power profile daemon that
     /// is absent, restarting, or installed later is normal, so no outcome is terminal.
     async fn run(mut self) {
-        let mut failure_logged = false;
+        let mut outage = OutageLog::default();
         loop {
             match connect().await {
                 ConnectOutcome::Connected(connection, proxy) => {
-                    failure_logged = false;
+                    outage.connected();
                     let shutting_down = self.watch(&proxy).await;
                     let _ = connection.close().await;
                     if shutting_down {
                         return;
                     }
-                    warn!(
-                        "Lost the connection to the power profile daemon. Retrying in \
-                         {RECONNECT_DELAY_S}s."
-                    );
+                    outage.lost();
                 }
-                ConnectOutcome::NotConnected(reason) => {
-                    // Only the first attempt of a run logs: the retry is every
-                    // RECONNECT_DELAY_S for the life of the daemon.
-                    if failure_logged.not() {
-                        reason.log();
-                        failure_logged = true;
-                    }
-                }
+                ConnectOutcome::NotConnected(reason) => outage.not_connected(&reason),
             }
             tokio::select! {
                 () = self.run_token.cancelled() => return,
@@ -376,32 +366,69 @@ enum ConnectOutcome {
     NotConnected(NoConnection),
 }
 
-/// Why a connect attempt produced no proxy. Logged by the caller so a retry every
-/// `RECONNECT_DELAY_S` does not repeat the same line for the life of the daemon.
+/// Why a connect attempt produced no proxy.
 enum NoConnection {
-    /// No power profile daemon owns either bus name. `power-profiles-daemon`, `tuned-ppd`, and
-    /// TLP-less systems are all normal, so absence is logged at info and is not an error.
+    /// No power profile daemon owns either bus name.
     Absent,
     Failed(zbus::Error),
     TimedOut,
 }
 
 impl NoConnection {
+    /// Info, not a warning: a system with no power profile daemon installed is a normal system,
+    /// and the line exists so a user looking for the feature can see why it is missing.
     fn log(&self) {
         match self {
             Self::Absent => info!(
                 "No power profile daemon found on DBUS. Mode switching on power profile changes \
                  is unavailable until one appears."
             ),
-            Self::Failed(err) => warn!(
+            Self::Failed(err) => info!(
                 "Could not connect to DBUS, the power profile listener is retrying every \
                  {RECONNECT_DELAY_S}s: {err}"
             ),
-            Self::TimedOut => warn!(
+            Self::TimedOut => info!(
                 "DBUS power profile listener setup timed out after {DBUS_SETUP_TIMEOUT_S}s, \
                  retrying every {RECONNECT_DELAY_S}s."
             ),
         }
+    }
+}
+
+/// Reports an outage once, then stays quiet until the connection is back.
+///
+/// The retry runs every `RECONNECT_DELAY_S` for the life of the daemon, so a line per attempt
+/// would be a line per 30s forever.
+#[derive(Default)]
+struct OutageLog {
+    /// True once the current outage has been reported.
+    reported: bool,
+}
+
+impl OutageLog {
+    fn connected(&mut self) {
+        self.reported = false;
+    }
+
+    /// A daemon that answered and then went away is a change the user did not ask for, so unlike
+    /// a first connect that never worked, this warns.
+    fn lost(&mut self) {
+        if self.reported {
+            return;
+        }
+        warn!(
+            "Lost the connection to the power profile daemon. Retrying every \
+             {RECONNECT_DELAY_S}s."
+        );
+        self.reported = true;
+    }
+
+    fn not_connected(&mut self, reason: &NoConnection) {
+        if self.reported {
+            return;
+        }
+        reason.log();
+        self.reported = true;
     }
 }
 
@@ -643,10 +670,10 @@ mod tests {
         println!("active: {active}, available: {available:?}");
     }
 
-    /// Captures log records so a test can assert what a dependency logged.
+    /// Captures log records so a test can assert what was logged, and at which level.
     struct CapturingLogger;
 
-    static CAPTURED_LOGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static CAPTURED_LOGS: Mutex<Vec<(log::Level, String)>> = Mutex::new(Vec::new());
 
     impl log::Log for CapturingLogger {
         fn enabled(&self, _metadata: &log::Metadata) -> bool {
@@ -657,10 +684,28 @@ mod tests {
             CAPTURED_LOGS
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
-                .push(record.args().to_string());
+                .push((record.level(), record.args().to_string()));
         }
 
         fn flush(&self) {}
+    }
+
+    /// Installs the capturing logger and empties it, so `captured` returns only what follows.
+    fn capture_logs() {
+        // Failure means a logger is already installed, which still captures nothing of ours.
+        let _ = log::set_boxed_logger(Box::new(CapturingLogger));
+        log::set_max_level(log::LevelFilter::Info);
+        CAPTURED_LOGS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+    }
+
+    fn captured() -> Vec<(log::Level, String)> {
+        CAPTURED_LOGS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     /// Goal: probing a bus name nobody owns must stay silent, where a lazily cached proxy made
@@ -673,14 +718,7 @@ mod tests {
         const ABSENT_BUS_NAME: &str = "org.coolercontrol.NoSuchPowerProfileDaemon";
         const ABSENT_OBJECT_PATH: &str = "/org/coolercontrol/NoSuchPowerProfileDaemon";
 
-        // Failure means a logger is already installed, which still captures nothing of ours.
-        let _ = log::set_boxed_logger(Box::new(CapturingLogger));
-        log::set_max_level(log::LevelFilter::Warn);
-        CAPTURED_LOGS
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clear();
-
+        capture_logs();
         crate::sidecar::ensure_test_handle();
         let probed = crate::rt::test_runtime(async {
             crate::sidecar::handle()
@@ -694,10 +732,7 @@ mod tests {
                 .expect("sidecar must run the probe")
         });
 
-        let logs = CAPTURED_LOGS
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone();
+        let logs = captured();
         let Some(served) = probed else {
             println!("No system bus reachable, nothing was probed.");
             return;
@@ -705,8 +740,54 @@ mod tests {
         assert!(served.not(), "A name nobody owns can never be served");
         assert!(
             logs.iter()
-                .all(|line| line.contains("properties cache").not()),
+                .all(|(_, line)| line.contains("properties cache").not()),
             "Probing an absent bus name must not warn about the property cache: {logs:?}"
+        );
+    }
+
+    /// Goal: a daemon that was never there is expected and must only inform, while a daemon that
+    /// answered and then went away must warn. Either way the retry runs every 30s for the life of
+    /// the daemon, so an outage must cost exactly one line.
+    /// Methodology: drive the outage reporting through both sequences with the log captured.
+    #[test]
+    #[serial]
+    fn an_outage_is_reported_once_at_the_level_its_history_earns() {
+        capture_logs();
+        let mut outage = OutageLog::default();
+
+        outage.not_connected(&NoConnection::Absent);
+        outage.not_connected(&NoConnection::Absent);
+        outage.not_connected(&NoConnection::TimedOut);
+        let never_connected = captured();
+        assert_eq!(
+            never_connected.len(),
+            1,
+            "A retry must not repeat the line: {never_connected:?}"
+        );
+        assert_eq!(
+            never_connected[0].0,
+            log::Level::Info,
+            "A power profile daemon that was never there is not a fault"
+        );
+
+        capture_logs();
+        outage.connected();
+        outage.lost();
+        outage.not_connected(&NoConnection::Absent);
+        let after_a_loss = captured();
+        assert_eq!(
+            after_a_loss.len(),
+            1,
+            "A failed reconnect must not repeat the outage line: {after_a_loss:?}"
+        );
+        assert_eq!(
+            after_a_loss[0].0,
+            log::Level::Warn,
+            "A daemon that answered and then went away is worth a warning"
+        );
+        assert!(
+            after_a_loss[0].1.contains("Lost the connection"),
+            "The warning must say what happened: {after_a_loss:?}"
         );
     }
 
