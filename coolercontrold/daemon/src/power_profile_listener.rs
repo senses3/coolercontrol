@@ -16,6 +16,7 @@ use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::time::Duration;
 use tokio::time::{sleep, timeout};
 use tokio_util::sync::CancellationToken;
+use zbus::proxy::{Builder as ProxyBuilder, CacheProperties};
 use zbus::{Connection, Proxy};
 
 /// `power-profiles-daemon` and the `tuned-ppd` shim both publish this interface. The freedesktop
@@ -412,15 +413,13 @@ async fn connect() -> ConnectOutcome {
             (PPD_BUS_NAME, PPD_OBJECT_PATH),
             (PPD_LEGACY_BUS_NAME, PPD_LEGACY_OBJECT_PATH),
         ] {
-            // The interface name matches the bus name for both variants.
-            let proxy = Proxy::new(&connection, bus_name, object_path, bus_name).await?;
-            if proxy
-                .get_property::<String>(ACTIVE_PROFILE_PROPERTY)
-                .await
-                .is_ok()
-            {
-                return Ok::<_, zbus::Error>(Some((connection, proxy)));
+            if is_served(&connection, bus_name, object_path).await?.not() {
+                continue;
             }
+            // Only a name that just answered gets a cached proxy, which
+            // `receive_property_changed` needs to produce values.
+            let proxy = Proxy::new(&connection, bus_name, object_path, bus_name).await?;
+            return Ok::<_, zbus::Error>(Some((connection, proxy)));
         }
         Ok(None)
     };
@@ -430,6 +429,27 @@ async fn connect() -> ConnectOutcome {
         Ok(Err(err)) => ConnectOutcome::NotConnected(NoConnection::Failed(err)),
         Err(_) => ConnectOutcome::NotConnected(NoConnection::TimedOut),
     }
+}
+
+/// Whether `bus_name` answers for the power profile interface. Caching is off so an unowned name
+/// fails on a plain `Get`: the default lazy cache makes zbus warn about `GetAll` on every retry.
+async fn is_served(
+    connection: &Connection,
+    bus_name: &'static str,
+    object_path: &'static str,
+) -> Result<bool, zbus::Error> {
+    // The interface name matches the bus name for both variants.
+    let probe: Proxy<'static> = ProxyBuilder::new(connection)
+        .destination(bus_name)?
+        .path(object_path)?
+        .interface(bus_name)?
+        .cache_properties(CacheProperties::No)
+        .build()
+        .await?;
+    Ok(probe
+        .get_property::<String>(ACTIVE_PROFILE_PROPERTY)
+        .await
+        .is_ok())
 }
 
 /// Reads the profile names the daemon offers. An unreadable list is not fatal: the mapping still
@@ -455,6 +475,7 @@ async fn available_profiles(proxy: &Proxy<'static>) -> Vec<String> {
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::sync::Mutex;
 
     /// Goal: an unmapped profile must resolve to nothing, so an unconfigured system never
     /// activates a Mode by accident.
@@ -620,6 +641,73 @@ mod tests {
             "Decoded profile names must not be empty: {available:?}"
         );
         println!("active: {active}, available: {available:?}");
+    }
+
+    /// Captures log records so a test can assert what a dependency logged.
+    struct CapturingLogger;
+
+    static CAPTURED_LOGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    impl log::Log for CapturingLogger {
+        fn enabled(&self, _metadata: &log::Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &log::Record) {
+            CAPTURED_LOGS
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(record.args().to_string());
+        }
+
+        fn flush(&self) {}
+    }
+
+    /// Goal: probing a bus name nobody owns must stay silent, where a lazily cached proxy made
+    /// zbus warn on every retry.
+    /// Methodology: probe a name that cannot exist while capturing the log. Needs a system bus,
+    /// not a power profile daemon; without a bus there is nothing to probe.
+    #[test]
+    #[serial]
+    fn probing_an_absent_bus_name_stays_silent() {
+        const ABSENT_BUS_NAME: &str = "org.coolercontrol.NoSuchPowerProfileDaemon";
+        const ABSENT_OBJECT_PATH: &str = "/org/coolercontrol/NoSuchPowerProfileDaemon";
+
+        // Failure means a logger is already installed, which still captures nothing of ours.
+        let _ = log::set_boxed_logger(Box::new(CapturingLogger));
+        log::set_max_level(log::LevelFilter::Warn);
+        CAPTURED_LOGS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+
+        crate::sidecar::ensure_test_handle();
+        let probed = crate::rt::test_runtime(async {
+            crate::sidecar::handle()
+                .run(|| async {
+                    let connection = Connection::system().await.ok()?;
+                    let served = is_served(&connection, ABSENT_BUS_NAME, ABSENT_OBJECT_PATH).await;
+                    let _ = connection.close().await;
+                    Some(served.is_ok_and(|served| served))
+                })
+                .await
+                .expect("sidecar must run the probe")
+        });
+
+        let logs = CAPTURED_LOGS
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        let Some(served) = probed else {
+            println!("No system bus reachable, nothing was probed.");
+            return;
+        };
+        assert!(served.not(), "A name nobody owns can never be served");
+        assert!(
+            logs.iter()
+                .all(|line| line.contains("properties cache").not()),
+            "Probing an absent bus name must not warn about the property cache: {logs:?}"
+        );
     }
 
     /// Goal: `CC_DBUS` gates this listener the same way it gates the sleep listener, so one
