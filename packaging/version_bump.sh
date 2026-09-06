@@ -11,8 +11,8 @@
 # Updates the source-of-truth versions (cargo, constants.h, package.json), then
 # propagates the new version + current UTC date to every version-stamped
 # packaging file: metainfo.xml, debian/changelog, fedora *.spec (regular and
-# rc1), OBS .dsc and include-binaries. Substitutions match by regex rather than
-# the previous version, so the script self-heals if files were out of sync.
+# rc1). Substitutions match by regex rather than the previous version, so the
+# script self-heals if files were out of sync.
 # The OpenAPI spec stamps the daemon version too, so it is regenerated last.
 
 set -euo pipefail
@@ -91,15 +91,6 @@ done
 for spec in packaging/fedora/coolercontrol-rc1.spec packaging/fedora/coolercontrold-rc1.spec; do
     sed -i -E "s/^(Version:[[:space:]]+)[0-9]+\.[0-9]+\.[0-9]+~rc1\$/\1${NEW_RC_VER}/" "${spec}"
 done
-
-# OBS .dsc: Version: line + version-stamped tarball references
-dsc=packaging/obs/coolercontrol.dsc
-sed -i -E "s/^Version: [0-9]+\.[0-9]+\.[0-9]+\$/Version: ${NEW_VER}/" "${dsc}"
-sed -i -E "s|coolercontrold-vendor-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrold-vendor-${NEW_VER}.tar.gz|g" "${dsc}"
-sed -i -E "s|coolercontrol-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrol-${NEW_VER}.tar.gz|g" "${dsc}"
-
-# OBS include-binaries: vendor tarball name
-sed -i -E "s|coolercontrold-vendor-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|coolercontrold-vendor-${NEW_VER}.tar.gz|g" packaging/obs/debian/source/include-binaries
 
 # OpenAPI spec: carries the daemon version in info.version, and a daemon test fails when the
 # checked-in file is stale. Regenerated last so a build failure here does not interrupt the
